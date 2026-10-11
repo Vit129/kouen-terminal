@@ -17,11 +17,6 @@ final class SessionPty: @unchecked Sendable {
     var onFailure: (@Sendable (String) -> Void)?
     var onStreamInterrupted: (@Sendable () -> Void)?
     private var exitHandler: ((Int32?) -> Void)?
-    private var monitorToken: UUID?
-    var monitorSubscription: UUID? {
-        get { lock.lock(); defer { lock.unlock() }; return monitorToken }
-        set { lock.lock(); monitorToken = newValue; lock.unlock() }
-    }
     var onExit: ((Int32?) -> Void)? {
         get { lock.lock(); defer { lock.unlock() }; return exitHandler }
         set { lock.lock(); exitHandler = newValue; lock.unlock(); local?.onExit = newValue }
@@ -70,8 +65,8 @@ final class SessionPty: @unchecked Sendable {
         lock.lock(); cachedState = value; lock.unlock(); return value
     }
     func observationReplay(fromSequence: UInt64) throws -> AttachHistory {
-        if let local { return local.attachHistory(history: true, fromSequence: fromSequence, screenOnResync: false, includeCheckpoint: false) }
-        guard case let .history(value) = try query(.history(id, true, fromSequence, 1 << 20, false, false)) else { throw SessionHostError.refused("Retained observation replay is unavailable.") }
+        if let local { return local.observationReplay(fromSequence: fromSequence) }
+        guard case let .history(value) = try query(.observationReplay(id, fromSequence)) else { throw SessionHostError.refused("Retained observation replay is unavailable.") }
         return value
     }
     private func result(_ operation: HostedPtyOperation) -> SessionHostResult? {
@@ -85,6 +80,24 @@ final class SessionPty: @unchecked Sendable {
         lock.lock(); let changed = lastFailure != message; lastFailure = message; lock.unlock()
         if changed { onFailure?("Session host: " + message) }
     }
+    func updateState(_ value: HostedPtyState) {
+        lock.lock(); cachedState = value; lock.unlock()
+        if value.alive { AgentDetector.registerRootPID(value.pid, forSurfaceKey: id) }
+    }
+    func updateOutput(_ observation: HostedOutputObservation) {
+        lock.lock()
+        cachedState?.ringEnd = observation.endSequence
+        cachedState?.ringStart = observation.retainedStart
+        cachedState?.historyBytes = observation.retainedBytes
+        lock.unlock()
+    }
+    func markExited() {
+        lock.lock(); cachedState?.alive = false; cachedState?.running = false; lock.unlock()
+    }
+    func observeLocally(_ handler: @escaping @Sendable (HostedOutputObservation) -> Void) {
+        local?.onObservation = handler
+    }
+    var isHosted: Bool { remote != nil }
     private var state: HostedPtyState? {
         lock.lock(); defer { lock.unlock() }; return cachedState
     }
@@ -129,7 +142,7 @@ final class SessionPty: @unchecked Sendable {
     func flushScrollback() { if let local { local.flushScrollback() } else { _ = result(.flush(id)) } }
     func deletePersistedScrollback() { if let local { local.deletePersistedScrollback() } else { _ = result(.deleteHistory(id)) } }
     func setScrollbackBytes(_ bytes: Int) { if let local { local.setScrollbackBytes(bytes) } else { _ = result(.budget(id, bytes)) } }
-    func parkIfIdle(now: Date = Date(), threshold: TimeInterval = IdleGrid.defaultThreshold) { if let local { local.parkIfIdle(now: now, threshold: threshold) } else { _ = result(.park(id, now, threshold)) } }
+    func parkIfIdle(now: Date = Date(), threshold: TimeInterval = IdleGrid.defaultThreshold) { local?.parkIfIdle(now: now, threshold: threshold) }
     func warmScreen() { if let local { local.warmScreen() } else { _ = result(.warm(id)) } }
     func injectSyntheticOutput(_ data: Data) { if let local { local.injectSyntheticOutput(data) } else { _ = result(.inject(id, data)) } }
     func captureFormatted(format: String, trim: Bool, unwrap: Bool, screen: Bool = false) -> String { local?.captureFormatted(format: format, trim: trim, unwrap: unwrap, screen: screen) ?? text(.capture(id, format, trim, unwrap, screen)) }
@@ -153,14 +166,14 @@ final class SessionPty: @unchecked Sendable {
     func searchSnapshot() -> TerminalTextSnapshot? { local?.searchSnapshot() ?? emulator()?.textSnapshot() }
     var searchRevision: String { local?.searchRevision ?? state.map { "\($0.pid):\($0.ringEnd):\($0.rows ?? 0):\($0.cols ?? 0)" } ?? "unavailable" }
     func withMobileHistory<T>(_ body: (TerminalEmulator) -> T?) -> T? { if let local { return local.withMobileHistory(body) }; guard let term = emulator() else { return nil }; return body(term) }
-    func subscribeSafely(watching: Bool = true, onResize: (@Sendable (ReplaySize) -> Void)? = nil, _ handler: @escaping @Sendable (Data, UInt64) -> Void) throws -> UUID {
-        if let local { return local.subscribe(watching: watching, onResize: onResize, handler) }
+    func subscribeSafely(watching: Bool = true, acknowledgesOutput: Bool = false, onResize: (@Sendable (ReplaySize) -> Void)? = nil, _ handler: @escaping @Sendable (Data, UInt64) -> Void) throws -> UUID {
+        if let local { return local.subscribe(watching: watching, acknowledgesOutput: acknowledgesOutput, onResize: onResize, handler) }
         guard onResize == nil else { throw SessionHostError.refused("Recording geometry requires the public session-host stream.") }
         guard let remote else { throw SessionHostError.refused("The session host is unavailable.") }
         let token = UUID()
         lock.lock(); activeTokens.insert(token); lock.unlock()
         do {
-            let channel = try remote.subscribe(id: id, watching: watching, onOutput: handler, onExit: { [weak self] status in
+            let channel = try remote.subscribe(id: id, watching: watching, acknowledgesOutput: acknowledgesOutput, onOutput: handler, onExit: { [weak self] status in
                 guard let self else { return }
                 self.lock.lock(); self.activeTokens.remove(token)
                 self.cachedState?.alive = false; self.cachedState?.running = false
@@ -183,9 +196,14 @@ final class SessionPty: @unchecked Sendable {
             throw error
         }
     }
-    func subscribe(watching: Bool = true, onResize: (@Sendable (ReplaySize) -> Void)? = nil, _ handler: @escaping @Sendable (Data, UInt64) -> Void) -> UUID {
-        do { return try subscribeSafely(watching: watching, onResize: onResize, handler) }
+    func subscribe(watching: Bool = true, acknowledgesOutput: Bool = false, onResize: (@Sendable (ReplaySize) -> Void)? = nil, _ handler: @escaping @Sendable (Data, UInt64) -> Void) -> UUID {
+        do { return try subscribeSafely(watching: watching, acknowledgesOutput: acknowledgesOutput, onResize: onResize, handler) }
         catch { reportFailure(error.localizedDescription); onStreamInterrupted?(); return UUID() }
+    }
+    func acknowledgeSubscription(token: UUID, sequence: UInt64) {
+        if let local { local.acknowledgeSubscription(token: token, sequence: sequence); return }
+        lock.lock(); let channel = subscriptions[token]; lock.unlock()
+        if let channel { remote?.acknowledgeOutput(id: id, sequence: sequence, channel: channel) }
     }
     func cancelSubscription(token: UUID? = nil) {
         if let local { local.cancelSubscription(token: token); return }

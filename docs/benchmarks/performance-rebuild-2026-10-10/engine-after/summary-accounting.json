@@ -1,0 +1,395 @@
+{
+  "consumer_plain_ascii": {
+    "medianMbps": 162.03248004880444,
+    "baselineMbps": 44.052654306856944,
+    "speedup": 3.678154758170464,
+    "samples": [
+      {
+        "benchmark": "consumer_plain_ascii",
+        "nanos": 6326542,
+        "bytes": 1048600,
+        "mbps": 165.746,
+        "feedNanos": 6211958,
+        "frameBuildNanos": 108625
+      },
+      {
+        "benchmark": "consumer_plain_ascii",
+        "nanos": 6582625,
+        "bytes": 1048600,
+        "mbps": 159.298,
+        "feedNanos": 6421708,
+        "frameBuildNanos": 125000
+      },
+      {
+        "benchmark": "consumer_plain_ascii",
+        "nanos": 6368709,
+        "bytes": 1048600,
+        "mbps": 164.649,
+        "feedNanos": 6262959,
+        "frameBuildNanos": 98958
+      },
+      {
+        "benchmark": "consumer_plain_ascii",
+        "nanos": 6471542,
+        "bytes": 1048600,
+        "mbps": 162.032,
+        "feedNanos": 6372209,
+        "frameBuildNanos": 92542
+      },
+      {
+        "benchmark": "consumer_plain_ascii",
+        "nanos": 6519292,
+        "bytes": 1048600,
+        "mbps": 160.846,
+        "feedNanos": 6405833,
+        "frameBuildNanos": 106542
+      }
+    ]
+  },
+  "consumer_ansi_sgr": {
+    "medianMbps": 161.2464536962288,
+    "baselineMbps": 55.418592101423975,
+    "speedup": 2.9096093491715678,
+    "samples": [
+      {
+        "benchmark": "consumer_ansi_sgr",
+        "nanos": 6456416,
+        "bytes": 1048626,
+        "mbps": 162.416,
+        "feedNanos": 6431959,
+        "frameBuildNanos": 24250
+      },
+      {
+        "benchmark": "consumer_ansi_sgr",
+        "nanos": 7400875,
+        "bytes": 1048626,
+        "mbps": 141.689,
+        "feedNanos": 7373208,
+        "frameBuildNanos": 27334
+      },
+      {
+        "benchmark": "consumer_ansi_sgr",
+        "nanos": 6419625,
+        "bytes": 1048626,
+        "mbps": 163.347,
+        "feedNanos": 6391125,
+        "frameBuildNanos": 27959
+      },
+      {
+        "benchmark": "consumer_ansi_sgr",
+        "nanos": 6503250,
+        "bytes": 1048626,
+        "mbps": 161.246,
+        "feedNanos": 6481250,
+        "frameBuildNanos": 21625
+      },
+      {
+        "benchmark": "consumer_ansi_sgr",
+        "nanos": 6608750,
+        "bytes": 1048626,
+        "mbps": 158.672,
+        "feedNanos": 6581792,
+        "frameBuildNanos": 26625
+      }
+    ]
+  },
+  "consumer_unicode_mixed": {
+    "medianMbps": 61.708273684357955,
+    "baselineMbps": 50.58593183739141,
+    "speedup": 1.2198702572628164,
+    "samples": [
+      {
+        "benchmark": "consumer_unicode_mixed",
+        "nanos": 16702750,
+        "bytes": 1048619,
+        "mbps": 62.781,
+        "feedNanos": 16680959,
+        "frameBuildNanos": 21417
+      },
+      {
+        "benchmark": "consumer_unicode_mixed",
+        "nanos": 20345750,
+        "bytes": 1048619,
+        "mbps": 51.54,
+        "feedNanos": 20318167,
+        "frameBuildNanos": 27125
+      },
+      {
+        "benchmark": "consumer_unicode_mixed",
+        "nanos": 16993167,
+        "bytes": 1048619,
+        "mbps": 61.708,
+        "feedNanos": 16970708,
+        "frameBuildNanos": 22084
+      },
+      {
+        "benchmark": "consumer_unicode_mixed",
+        "nanos": 17096458,
+        "bytes": 1048619,
+        "mbps": 61.335,
+        "feedNanos": 17073500,
+        "frameBuildNanos": 22542
+      },
+      {
+        "benchmark": "consumer_unicode_mixed",
+        "nanos": 16797250,
+        "bytes": 1048619,
+        "mbps": 62.428,
+        "feedNanos": 16773917,
+        "frameBuildNanos": 22834
+      }
+    ]
+  },
+  "consumer_attributes": {
+    "medianMbps": 169.57065853767787,
+    "baselineMbps": 49.68723309740279,
+    "speedup": 3.412761145408629,
+    "samples": [
+      {
+        "benchmark": "consumer_attributes",
+        "nanos": 6138958,
+        "bytes": 1048618,
+        "mbps": 170.814,
+        "feedNanos": 6123208,
+        "frameBuildNanos": 15542
+      },
+      {
+        "benchmark": "consumer_attributes",
+        "nanos": 7408917,
+        "bytes": 1048618,
+        "mbps": 141.535,
+        "feedNanos": 7382333,
+        "frameBuildNanos": 26333
+      },
+      {
+        "benchmark": "consumer_attributes",
+        "nanos": 5948500,
+        "bytes": 1048618,
+        "mbps": 176.283,
+        "feedNanos": 5931458,
+        "frameBuildNanos": 16833
+      },
+      {
+        "benchmark": "consumer_attributes",
+        "nanos": 6183959,
+        "bytes": 1048618,
+        "mbps": 169.571,
+        "feedNanos": 6168125,
+        "frameBuildNanos": 15250
+      },
+      {
+        "benchmark": "consumer_attributes",
+        "nanos": 6198500,
+        "bytes": 1048618,
+        "mbps": 169.173,
+        "feedNanos": 6179292,
+        "frameBuildNanos": 18958
+      }
+    ]
+  },
+  "consumer_truecolor_gradient": {
+    "medianMbps": 205.1026961076537,
+    "baselineMbps": 84.39830257818663,
+    "speedup": 2.4301756059329094,
+    "samples": [
+      {
+        "benchmark": "consumer_truecolor_gradient",
+        "nanos": 4340292,
+        "bytes": 899700,
+        "mbps": 207.29,
+        "feedNanos": 4325542,
+        "frameBuildNanos": 14750
+      },
+      {
+        "benchmark": "consumer_truecolor_gradient",
+        "nanos": 4860958,
+        "bytes": 899700,
+        "mbps": 185.087,
+        "feedNanos": 4838666,
+        "frameBuildNanos": 22083
+      },
+      {
+        "benchmark": "consumer_truecolor_gradient",
+        "nanos": 4325208,
+        "bytes": 899700,
+        "mbps": 208.013,
+        "feedNanos": 4304500,
+        "frameBuildNanos": 20500
+      },
+      {
+        "benchmark": "consumer_truecolor_gradient",
+        "nanos": 4386583,
+        "bytes": 899700,
+        "mbps": 205.103,
+        "feedNanos": 4372334,
+        "frameBuildNanos": 14125
+      },
+      {
+        "benchmark": "consumer_truecolor_gradient",
+        "nanos": 4629791,
+        "bytes": 899700,
+        "mbps": 194.328,
+        "feedNanos": 4611959,
+        "frameBuildNanos": 17750
+      }
+    ]
+  },
+  "consumer_redraw": {
+    "medianMbps": 690.3463334126449,
+    "baselineMbps": 298.67533071263404,
+    "speedup": 2.31136040517806,
+    "samples": [
+      {
+        "benchmark": "consumer_redraw",
+        "nanos": 3447500,
+        "bytes": 2463300,
+        "mbps": 714.518,
+        "feedNanos": 3435708,
+        "frameBuildNanos": 11750
+      },
+      {
+        "benchmark": "consumer_redraw",
+        "nanos": 4194875,
+        "bytes": 2463300,
+        "mbps": 587.217,
+        "feedNanos": 4146458,
+        "frameBuildNanos": 48125
+      },
+      {
+        "benchmark": "consumer_redraw",
+        "nanos": 3568209,
+        "bytes": 2463300,
+        "mbps": 690.346,
+        "feedNanos": 3554417,
+        "frameBuildNanos": 13709
+      },
+      {
+        "benchmark": "consumer_redraw",
+        "nanos": 3571500,
+        "bytes": 2463300,
+        "mbps": 689.71,
+        "feedNanos": 3559375,
+        "frameBuildNanos": 12084
+      },
+      {
+        "benchmark": "consumer_redraw",
+        "nanos": 3472958,
+        "bytes": 2463300,
+        "mbps": 709.28,
+        "feedNanos": 3460083,
+        "frameBuildNanos": 12791
+      }
+    ]
+  },
+  "consumer_scrollback": {
+    "medianMbps": 184.17820046674785,
+    "baselineMbps": 47.42599664157251,
+    "speedup": 3.883486136489572,
+    "samples": [
+      {
+        "benchmark": "consumer_scrollback",
+        "nanos": 6949791,
+        "bytes": 1280000,
+        "mbps": 184.178,
+        "feedNanos": 6928500,
+        "frameBuildNanos": 21000
+      },
+      {
+        "benchmark": "consumer_scrollback",
+        "nanos": 7181875,
+        "bytes": 1280000,
+        "mbps": 178.226,
+        "feedNanos": 7156792,
+        "frameBuildNanos": 24833
+      },
+      {
+        "benchmark": "consumer_scrollback",
+        "nanos": 6827417,
+        "bytes": 1280000,
+        "mbps": 187.479,
+        "feedNanos": 6808958,
+        "frameBuildNanos": 18250
+      },
+      {
+        "benchmark": "consumer_scrollback",
+        "nanos": 7062084,
+        "bytes": 1280000,
+        "mbps": 181.25,
+        "feedNanos": 7042709,
+        "frameBuildNanos": 19000
+      },
+      {
+        "benchmark": "consumer_scrollback",
+        "nanos": 6841125,
+        "bytes": 1280000,
+        "mbps": 187.104,
+        "feedNanos": 6820833,
+        "frameBuildNanos": 19917
+      }
+    ]
+  },
+  "vt_parse_ansi_colored_ascii_256kib": {
+    "medianMbps": 139.10745555850357,
+    "baselineMbps": 28.795210830552925,
+    "speedup": 4.83092332183603,
+    "samples": [
+      {
+        "benchmark": "vt_parse_ansi_colored_ascii_256kib",
+        "nanos": 1865666,
+        "bytes": 262148
+      },
+      {
+        "benchmark": "vt_parse_ansi_colored_ascii_256kib",
+        "nanos": 2607708,
+        "bytes": 262148
+      },
+      {
+        "benchmark": "vt_parse_ansi_colored_ascii_256kib",
+        "nanos": 1823667,
+        "bytes": 262148
+      },
+      {
+        "benchmark": "vt_parse_ansi_colored_ascii_256kib",
+        "nanos": 1939916,
+        "bytes": 262148
+      },
+      {
+        "benchmark": "vt_parse_ansi_colored_ascii_256kib",
+        "nanos": 1884500,
+        "bytes": 262148
+      }
+    ]
+  },
+  "vt_parse_plain_ascii_256kib": {
+    "medianMbps": 174.04106492953062,
+    "baselineMbps": 61.19435415567312,
+    "speedup": 2.8440706227045927,
+    "samples": [
+      {
+        "benchmark": "vt_parse_plain_ascii_256kib",
+        "nanos": 1543709,
+        "bytes": 262200
+      },
+      {
+        "benchmark": "vt_parse_plain_ascii_256kib",
+        "nanos": 1506541,
+        "bytes": 262200
+      },
+      {
+        "benchmark": "vt_parse_plain_ascii_256kib",
+        "nanos": 1391708,
+        "bytes": 262200
+      },
+      {
+        "benchmark": "vt_parse_plain_ascii_256kib",
+        "nanos": 1754875,
+        "bytes": 262200
+      },
+      {
+        "benchmark": "vt_parse_plain_ascii_256kib",
+        "nanos": 1323625,
+        "bytes": 262200
+      }
+    ]
+  }
+}

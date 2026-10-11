@@ -13,7 +13,7 @@ struct HostedPtyLaunch: Codable, Sendable {
     var initialStandardInput: Data? = nil
     var workloadID: UUID? = nil
 }
-struct HostedPtyState: Codable, Sendable {
+struct HostedPtyState: Codable, Sendable, Equatable {
     var streamIdentity: String
     var processGeneration: UInt64
     var freshShellIdentity: String?
@@ -31,14 +31,22 @@ struct HostedPtyState: Codable, Sendable {
     var alive: Bool, running: Bool
     var preparedStandardInput: Bool? = nil
     var parkedStored: Int?, parkedRaw: Int?
-    init(_ pty: RealPty) {
+    init(_ pty: RealPty, parents: [Int32: Int32]? = nil) {
         streamIdentity = pty.streamIdentity
         processGeneration = pty.processGeneration
         freshShellIdentity = pty.freshShellIdentity
-        pid = pty.currentChildPID; cwd = pty.currentWorkingDirectory()
-        let foreground = pty.probeForegroundProcess()
-        foregroundPID = foreground?.pid; foregroundExecutable = foreground?.executable
-        let command = pty.probeForegroundArguments(); arguments = command?.arguments; isShell = command?.isShell
+        let child = pty.currentChildPID
+        pid = child
+        if parents == nil, let cached = pty.cachedMetadata, cached.processGeneration == processGeneration {
+            cwd = cached.cwd; foregroundPID = cached.foregroundPID; foregroundExecutable = cached.foregroundExecutable
+            arguments = cached.arguments; isShell = cached.isShell
+        } else {
+            cwd = pty.probeWorkingDirectory(parents: parents ?? [:])?.cwd
+            let foreground = pty.probeForegroundProcess()
+            foregroundPID = foreground?.pid; foregroundExecutable = foreground?.executable
+            arguments = foreground.map { RealPty.processArguments(for: $0.pid) }
+            isShell = foreground.map { $0.pid == child }
+        }
         let size = pty.currentSize(); rows = size?.rows; cols = size?.cols
         historyBytes = pty.historyBytes; ringEnd = pty.ringEnd; ringStart = pty.ringStart
         historyUnavailable = pty.historyUnavailable; historyProtection = pty.historyProtection
@@ -46,8 +54,27 @@ struct HostedPtyState: Codable, Sendable {
         let parked = pty.parkedFootprint; parkedStored = parked?.stored; parkedRaw = parked?.raw
     }
 }
+struct HostedOutputObservation: Codable, Sendable {
+    var streamIdentity: String
+    var sequence: UInt64
+    var byteCount: Int
+    var events: [AnchoredPtyScanEvent]
+    var scanner: PtyStreamScanner?
+    var retainedStart: UInt64
+    var retainedBytes: Int
+    var endSequence: UInt64 { sequence + UInt64(byteCount) }
+}
+
+enum HostedPtyEvent: Codable, Sendable {
+    case output(String, HostedOutputObservation)
+    case metadata([String: HostedPtyState], [String: AgentSnapshot?])
+    case exited(String, String, Int32?)
+}
+
 enum HostedPtyOperation: Codable, Sendable {
     case applicationCheckpoint(Data)
+    case observe
+    case acknowledgeEvents(String, String, UInt64)
     case inventory
     case capabilities
     case workloadOutcome(UUID), cancelWorkload(UUID)
@@ -60,23 +87,25 @@ enum HostedPtyOperation: Codable, Sendable {
     case pipe(String, String?)
     case close(String), respawn(String, Bool, String?), clear(String)
     case persist(String, Bool), flush(String), deleteHistory(String), budget(String, Int)
-    case park(String, Date, TimeInterval), warm(String)
+    case warm(String)
     case capture(String, String, Bool, Bool, Bool)
     case captureScrollback(String, Bool), captureGrid(String, Int?, Int?, Bool), captureRange(String, Int?, Int?, Bool)
     case processTree(String), replay(String, UInt64?)
     case history(String, Bool, UInt64?, Int, Bool, Bool), checkpoint(String)
-    case subscribe(String, Bool)
+    case observationReplay(String, UInt64)
+    case subscribe(String, Bool, Bool)
+    case acknowledgeOutput(String, UInt64)
     var querySurface: String? {
         switch self {
         case let .state(id), let .processTree(id), let .checkpoint(id): id
         case let .capture(id, _, _, _, _), let .captureScrollback(id, _), let .captureGrid(id, _, _, _),
-             let .captureRange(id, _, _, _), let .replay(id, _), let .history(id, _, _, _, _, _), let .commandOutput(id, _, _): id
+             let .captureRange(id, _, _, _), let .replay(id, _), let .observationReplay(id, _), let .history(id, _, _, _, _, _), let .commandOutput(id, _, _): id
         default: nil
         }
     }
     var mutation: Bool {
         switch self {
-        case .inventory, .adopt, .state, .capture, .captureScrollback, .captureGrid, .captureRange, .processTree, .replay, .history, .checkpoint, .subscribe, .commandOutput, .workloadOutcome, .capabilities: false
+        case .acknowledgeOutput, .acknowledgeEvents, .observe, .inventory, .adopt, .state, .capture, .captureScrollback, .captureGrid, .captureRange, .processTree, .replay, .observationReplay, .history, .checkpoint, .subscribe, .commandOutput, .workloadOutcome, .capabilities: false
         default: true
         }
     }
@@ -93,6 +122,8 @@ enum SessionHostResult: Codable, Sendable {
     case inventory([String]), capabilities([String])
     case ok, error(String), state(HostedPtyState), text(String), replay(String, UInt64)
     case history(AttachHistory), checkpoint(Data), output(Data, UInt64), exited(Int32?)
+    case checkpointAccepted(UUID, String?)
+    case event(HostedPtyEvent)
     case commandOutput(CommandOutput)
     case workloadOutcome(WorkloadOutcome?)
 }
@@ -101,6 +132,8 @@ enum SessionHostResult: Codable, Sendable {
 /// A retry with the same operation identity is safe while the generation lease is retained.
 final class SessionHostClient: @unchecked Sendable {
     private static let sequences = SequenceAllocator()
+    private let checkpointLock = NSLock()
+    private var checkpointReplies: [UUID: ResponseBox] = [:]
     let path: String, generation: UUID
     init(path: String, generation: UUID) { self.path = path; self.generation = generation }
     static var configured: SessionHostClient? {
@@ -125,7 +158,10 @@ final class SessionHostClient: @unchecked Sendable {
         if case let .error(message) = result { throw SessionHostError.refused(message) }
         return result
     }
-    func subscribe(id: String, watching: Bool, onOutput: @escaping @Sendable (Data, UInt64) -> Void,
+    func acknowledgeOutput(id: String, sequence: UInt64, channel: SessionHostChannel) {
+        if let frame = try? IPCCodec.encode(SessionHostRequest(generation: generation, operationSequence: Self.sequences.next(generation), operation: .acknowledgeOutput(id, sequence))) { channel.send(frame) }
+    }
+    func subscribe(id: String, watching: Bool, acknowledgesOutput: Bool = false, onOutput: @escaping @Sendable (Data, UInt64) -> Void,
                    onExit: @escaping @Sendable (Int32?) -> Void,
                    onEnd: @escaping @Sendable () -> Void) throws -> SessionHostChannel {
         let channel = SessionHostChannel(fd: try EndpointConnector.connect(.unix(path: path)))
@@ -144,7 +180,7 @@ final class SessionHostClient: @unchecked Sendable {
             default: break
             }
         }, onEnd: { acknowledgement.set(nil); onEnd() })
-        channel.send(try IPCCodec.encode(SessionHostRequest(generation: generation, operationSequence: Self.sequences.next(generation), operation: .subscribe(id, watching))))
+        channel.send(try IPCCodec.encode(SessionHostRequest(generation: generation, operationSequence: Self.sequences.next(generation), operation: .subscribe(id, watching, acknowledgesOutput))))
         guard acknowledgement.ready.wait(timeout: .now() + 1) == .success, let result = acknowledgement.read() else {
             channel.closeChannel(); throw SessionHostError.refused("The session host did not acknowledge the activity subscription.")
         }
@@ -155,6 +191,51 @@ final class SessionHostClient: @unchecked Sendable {
         }
         return channel
     }
+    func observe(onEvent: @escaping @Sendable (HostedPtyEvent) -> Void,
+                 onEnd: @escaping @Sendable () -> Void) throws -> SessionHostChannel {
+        let channel = SessionHostChannel(fd: try EndpointConnector.connect(.unix(path: path)))
+        let acknowledgement = ResponseBox()
+        channel.start(onFrame: { frame in
+            guard let result = try? JSONDecoder().decode(SessionHostResult.self, from: frame.dropFirst(4)) else { return }
+            switch result {
+            case let .event(event): onEvent(event)
+            case let .checkpointAccepted(id, error):
+                self.checkpointLock.lock(); let box = self.checkpointReplies[id]; self.checkpointLock.unlock()
+                box?.set(error.map(SessionHostResult.error) ?? .ok)
+            case .ok, .error: acknowledgement.set(result)
+            default: break
+            }
+        }, onEnd: {
+            acknowledgement.set(nil)
+            self.checkpointLock.lock(); let boxes = Array(self.checkpointReplies.values); self.checkpointLock.unlock()
+            for box in boxes { box.set(nil) }
+            onEnd()
+        })
+        channel.send(try IPCCodec.encode(SessionHostRequest(generation: generation, operationSequence: Self.sequences.next(generation), operation: .observe)))
+        guard acknowledgement.ready.wait(timeout: .now() + 2) == .success,
+              case .ok? = acknowledgement.read() else {
+            channel.closeChannel(); throw SessionHostError.refused("The session host did not acknowledge terminal events.")
+        }
+        return channel
+    }
+    func acknowledgeEvents(surfaceID: String, streamIdentity: String, sequence: UInt64, channel: SessionHostChannel) {
+        if let frame = try? IPCCodec.encode(SessionHostRequest(generation: generation,
+            operationSequence: Self.sequences.next(generation), operation: .acknowledgeEvents(surfaceID, streamIdentity, sequence))) { channel.send(frame) }
+    }
+    func sendCheckpoint(_ data: Data, channel: SessionHostChannel) throws {
+        let request = SessionHostRequest(generation: generation,
+            operationSequence: Self.sequences.next(generation), operation: .applicationCheckpoint(data))
+        let frame = try IPCCodec.encode(request)
+        let box = ResponseBox()
+        checkpointLock.lock(); checkpointReplies[request.operationID] = box; checkpointLock.unlock()
+        defer { checkpointLock.lock(); checkpointReplies.removeValue(forKey: request.operationID); checkpointLock.unlock() }
+        channel.send(frame)
+        guard box.ready.wait(timeout: .now() + 2) == .success, let result = box.read() else {
+            throw SessionHostError.refused("The session host did not acknowledge the observation checkpoint.")
+        }
+        if case let .error(message) = result { throw SessionHostError.refused(message) }
+    }
+
     private final class SequenceAllocator: @unchecked Sendable {
         private let lock = NSLock()
         private var values: [UUID: UInt64] = [:]

@@ -1,4 +1,5 @@
 import Darwin
+import Foundation
 import HarnessTerminalSupport
 import HarnessTheme
 
@@ -90,7 +91,8 @@ extension RenderColor {
     }
 }
 
-final class RenderColorConverter {
+final class RenderColorConverter: @unchecked Sendable {
+    private let lock = NSLock()
     private static let maxVividCacheEntries = 512
 
     private let renderingMode: TerminalColorRenderingMode
@@ -119,6 +121,7 @@ final class RenderColorConverter {
     }
 
     private func vividColor(for rgb: RGBColor) -> SIMD4<Float> {
+        lock.lock(); defer { lock.unlock() }
         if let cached = vividCache[rgb] { return cached }
         let converted: SIMD4<Float>
         switch gamut {

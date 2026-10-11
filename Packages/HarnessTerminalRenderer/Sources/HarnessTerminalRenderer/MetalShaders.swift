@@ -23,8 +23,11 @@ enum MetalShaders {
         float2 uvOrigin;
         float2 uvSize;
         uint pageIndex;
+        float2 cellOrigin;
         float4 color;
     };
+
+    struct CursorGlyphOverlay { float4 bounds; float4 textColor; };
 
     // Procedural line decoration. `params` = (centerY, thickness, amplitude, period) in px;
     // `kind` selects the style.
@@ -41,6 +44,8 @@ enum MetalShaders {
         float4 color;
         float2 uv;
         uint pageIndex [[flat]];
+        float2 gridPx;
+        float2 cellOrigin [[flat]];
     };
 
     struct DecoOut {
@@ -77,6 +82,8 @@ enum MetalShaders {
         out.color = inst.color;
         out.uv = float2(0.0, 0.0);
         out.pageIndex = 0u;
+        out.gridPx = px;
+        out.cellOrigin = float2(0.0);
         return out;
     }
 
@@ -98,6 +105,8 @@ enum MetalShaders {
         out.color = inst.color;
         out.uv = inst.uvOrigin + corner * inst.uvSize;
         out.pageIndex = inst.pageIndex;
+        out.gridPx = px + float2(0.0, scrollPx);
+        out.cellOrigin = inst.cellOrigin;
         return out;
     }
 
@@ -105,18 +114,27 @@ enum MetalShaders {
                                    texture2d_array<float> atlas [[texture(0)]],
                                    texture2d_array<float> colorAtlas [[texture(1)]],
                                    sampler samp [[sampler(0)]],
-                                   constant float &gamma [[buffer(0)]]) {
+                                   constant float &gamma [[buffer(0)]],
+                                   constant CursorGlyphOverlay &cursor [[buffer(1)]]) {
+        bool cursorEnabled = cursor.bounds.z > 0.0 && cursor.bounds.w > 0.0;
+        bool sourceCell = all(in.cellOrigin == cursor.bounds.xy);
+        bool withinCursor = all(in.gridPx >= cursor.bounds.xy)
+            && all(in.gridPx < cursor.bounds.xy + cursor.bounds.zw);
+        // Whole source-cell glyphs retain their overhang/wide-cell inversion. A ligature
+        // crossing the cursor is recolored within the cell without reshaping the row.
+        float4 tint = cursorEnabled && (sourceCell || withinCursor)
+            ? float4(cursor.textColor.rgb, cursor.textColor.a * in.color.a) : in.color;
         if ((in.pageIndex & 0x80000000u) != 0u) {
             float4 pixel = colorAtlas.sample(samp, in.uv, in.pageIndex & 0x7fffffffu);
             // CoreGraphics supplies premultiplied color; this pipeline blends straight alpha.
             float3 color = pixel.a > 0.0 ? pixel.rgb / pixel.a : float3(0.0);
-            return float4(color, pixel.a * in.color.a);
+            return float4(color, pixel.a * tint.a);
         }
         float coverage = atlas.sample(samp, in.uv, in.pageIndex).r;
         // Gamma-correct ("linear-corrected") coverage thickens light-on-dark antialiasing.
         // gamma == 1 is native (no change).
         coverage = pow(coverage, gamma);
-        return float4(in.color.rgb, in.color.a * coverage);
+        return float4(tint.rgb, tint.a * coverage);
     }
 
     // Inline image (Sixel / Kitty / iTerm2): one textured quad per image, RGBA sampled directly.
@@ -134,6 +152,8 @@ enum MetalShaders {
         // slice a Kitty placeholder cell shows (the whole image otherwise).
         out.uv = inst.source.xy + corner * inst.source.zw;
         out.pageIndex = 0u;
+        out.gridPx = px;
+        out.cellOrigin = float2(0.0);
         return out;
     }
 

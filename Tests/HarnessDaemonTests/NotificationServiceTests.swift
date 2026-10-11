@@ -3,6 +3,38 @@ import HarnessCore
 @testable import HarnessDaemonCore
 
 final class NotificationServiceTests: XCTestCase {
+    func testUnavailableStorageBacksOffAndDeliveryRecovers() throws {
+        let home = FileManager.default.temporaryDirectory.appendingPathComponent("hnotifications-retry-" + UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: home) }
+        #if os(macOS)
+        let protection = try HistoryProtection(keyMaterial: Data(repeating: 96, count: 32))
+        #else
+        let protection = HistoryProtection.system()
+        #endif
+        let store = ActivityStore(url: home.appendingPathComponent("activity.sqlite"), protection: protection)
+        var settings = HarnessSettings()
+        var policy = NotificationPolicySettings(); policy.burstSeconds = 0
+        settings.notificationPolicy = policy
+        let service = NotificationService(store: store, settings: settings, settingsURL: home.appendingPathComponent("settings.json"))
+        try service.activate(); defer { service.suspend() }
+        XCTAssertNil(service.status().unavailable, "A missing optional settings file is not a reload failure")
+        let delivered = expectation(description: "delivery recovers after bounded storage backoff")
+        let submittedAt = Date()
+        service.onDesktop = { _ in
+            XCTAssertGreaterThan(Date().timeIntervalSince(submittedAt), 4.5)
+            delivered.fulfill()
+        }
+        var notice = NotificationNotice(surfaceID: nil, event: .agentWaiting, title: "storage recovery")
+        notice.at = submittedAt.addingTimeInterval(0.2)
+        service.submit(notice); _ = service.status()
+        try store.suspend()
+        let deadline = Date().addingTimeInterval(2)
+        while service.status().unavailable == nil, Date() < deadline { Thread.sleep(forTimeInterval: 0.01) }
+        XCTAssertNotNil(service.status().unavailable)
+        try store.activate()
+        wait(for: [delivered], timeout: 7)
+    }
+
     private struct PendingProjection: Decodable { var coalesced: Int }
     func testDurableReceiptCoalescingPaneSnoozeAndLeaseRecovery() throws {
         let home = FileManager.default.temporaryDirectory.appendingPathComponent("hnotifications-" + UUID().uuidString)

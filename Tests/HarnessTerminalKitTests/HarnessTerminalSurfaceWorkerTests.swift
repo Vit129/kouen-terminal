@@ -7,7 +7,6 @@ import XCTest
 final class HarnessTerminalSurfaceWorkerTests: XCTestCase {
     private func configure(
         _ view: HarnessTerminalSurfaceView,
-        offMain: Bool,
         textRendering: TerminalTextRenderingMode = .native
     ) {
         view.configureAppearance(
@@ -32,8 +31,7 @@ final class HarnessTerminalSurfaceWorkerTests: XCTestCase {
             linearBlending: false,
             textRendering: textRendering,
             ligatures: true,
-            promptGutter: false,
-            offMainParserFramePipeline: offMain
+            promptGutter: false
         )
     }
 
@@ -46,23 +44,23 @@ final class HarnessTerminalSurfaceWorkerTests: XCTestCase {
     }
 
     func testCrispTextRenderingEnablesSurfaceFontThickening() {
-        let view = HarnessTerminalSurfaceView(offMainParserFramePipeline: false)
+        let view = HarnessTerminalSurfaceView()
 
-        configure(view, offMain: false, textRendering: .native)
+        configure(view, textRendering: .native)
         XCTAssertFalse(view.testingFontThickenConfiguration.enabled)
         XCTAssertEqual(view.testingFontThickenConfiguration.strength, 255)
 
-        configure(view, offMain: false, textRendering: .crisp)
+        configure(view, textRendering: .crisp)
         XCTAssertTrue(view.testingFontThickenConfiguration.enabled)
         XCTAssertEqual(view.testingFontThickenConfiguration.strength, 255)
 
-        configure(view, offMain: false, textRendering: .soft)
+        configure(view, textRendering: .soft)
         XCTAssertFalse(view.testingFontThickenConfiguration.enabled)
         XCTAssertEqual(view.testingFontThickenConfiguration.strength, 255)
     }
 
     func testOffMainDSRResponseIsDeliveredAfterVisibleOutput() async {
-        let view = HarnessTerminalSurfaceView(offMainParserFramePipeline: true)
+        let view = HarnessTerminalSurfaceView()
         let response = expectation(description: "DSR response")
         view.onInput = { data in
             XCTAssertEqual(String(decoding: data, as: UTF8.self), "\u{1b}[1;2R")
@@ -77,7 +75,7 @@ final class HarnessTerminalSurfaceWorkerTests: XCTestCase {
     }
 
     func testOffMainSynchronizedOutputHoldsAndReleasesRender() async {
-        let view = HarnessTerminalSurfaceView(offMainParserFramePipeline: true)
+        let view = HarnessTerminalSurfaceView()
 
         view.receive("\u{1b}[?2026hpartial")
         view.testingWaitForEmulatorIdle()
@@ -102,7 +100,7 @@ final class HarnessTerminalSurfaceWorkerTests: XCTestCase {
     }
 
     func testOffMainResizeSerializesWithHeavyOutput() {
-        let view = HarnessTerminalSurfaceView(offMainParserFramePipeline: true)
+        let view = HarnessTerminalSurfaceView()
         let line = "resize worker stress 0123456789\r\n"
         let data = Data(String(repeating: line, count: 2_000).utf8)
 
@@ -116,7 +114,7 @@ final class HarnessTerminalSurfaceWorkerTests: XCTestCase {
     }
 
     func testInputModesMirrorTracksModeChangesAcrossMainHop() async {
-        let view = HarnessTerminalSurfaceView(offMainParserFramePipeline: true)
+        let view = HarnessTerminalSurfaceView()
         XCTAssertFalse(view.testingInputModes().cursorKeysApplication)
         XCTAssertEqual(view.testingInputModes().kittyKeyboardFlags, 0)
 
@@ -137,7 +135,7 @@ final class HarnessTerminalSurfaceWorkerTests: XCTestCase {
     }
 
     func testOffMainBurstCoalescesMainHopsAndConvergesMirrors() async {
-        let view = HarnessTerminalSurfaceView(offMainParserFramePipeline: true)
+        let view = HarnessTerminalSurfaceView()
         view.testingMainHopCount = 0
         // 200 chunks fed back-to-back while main never yields: every post-parse state merges
         // into the staged hop, so the executed hop count must collapse far below the chunk
@@ -158,7 +156,7 @@ final class HarnessTerminalSurfaceWorkerTests: XCTestCase {
     }
 
     func testOffMainScrolledUpAnchorAdvancesByTotalAddedHistory() async {
-        let view = HarnessTerminalSurfaceView(offMainParserFramePipeline: true)
+        let view = HarnessTerminalSurfaceView()
         // Seed history and let the mirror converge so the scroll clamp sees it.
         view.receive(String(repeating: "seed\r\n", count: 100))
         view.testingWaitForEmulatorIdle()
@@ -178,7 +176,7 @@ final class HarnessTerminalSurfaceWorkerTests: XCTestCase {
     }
 
     func testOffMainSynchronizedFlipWithinBurstAppliesFinalState() async {
-        let view = HarnessTerminalSurfaceView(offMainParserFramePipeline: true)
+        let view = HarnessTerminalSurfaceView()
         // 2026 opens and closes within one coalesced window: only the FINAL state matters —
         // the display must not be left held.
         view.receive("\u{1b}[?2026h")
@@ -190,13 +188,13 @@ final class HarnessTerminalSurfaceWorkerTests: XCTestCase {
         XCTAssertTrue(view.testingRenderPending, "released batch presents")
     }
 
-    func testOffMainPipelineCanBeDisabledWithoutRacingQueuedWork() {
-        let view = HarnessTerminalSurfaceView(offMainParserFramePipeline: true)
+    func testAppearanceChangesPreserveTerminalContent() {
+        let view = HarnessTerminalSurfaceView()
         view.frame = CGRect(x: 0, y: 0, width: 800, height: 400)
         view.receive("A")
         view.testingWaitForEmulatorIdle()
 
-        configure(view, offMain: false)
+        configure(view)
         view.receive("B")
 
         let grid = view.testingReadGridSnapshot()

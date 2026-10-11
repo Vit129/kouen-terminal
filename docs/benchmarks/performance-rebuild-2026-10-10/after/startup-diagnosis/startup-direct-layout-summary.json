@@ -1,0 +1,13 @@
+{
+  "dsr_ready_median_ms": 302.01125,
+  "prompt_observed_median_ms": 325.189083,
+  "samples_ms": [
+    1341.372209,
+    302.01125,
+    301.083041,
+    2325.313958,
+    289.682292
+  ],
+  "source_sha256": "3d90b2c93e9bb9f97c96c72986e8649f2f5b9c9f0720da32c7efb480e4bd767e",
+  "limitations": "before ordinary main-thread drawable wait repair; CPU submission, not photons"
+}

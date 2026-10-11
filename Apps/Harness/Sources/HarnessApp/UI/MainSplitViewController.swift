@@ -58,17 +58,19 @@ final class MainSplitViewController: NSViewController {
         // together. Calling `makeClear` here would set `wantsLayer` and
         // layer-back the whole window, which clips the blur to a rectangle and leaves a dark
         // compositing seam at the rounded edge. See MainWindowController.applyTransparency.
-        view = EffectiveAppearanceReportingView()
+        view = EffectiveAppearanceReportingView(frame: NSRect(origin: .zero, size: HarnessDesign.defaultWindowSize))
     }
 
     override func viewDidLoad() {
         super.viewDidLoad()
+        split.frame = view.bounds
         split.isVertical = true
         split.dividerStyle = .thin
         // No autosaveName: visibility lives in `settings.sidebarVisible` and is
         // re-applied on load; an autosaved divider width would restore a stale
         // collapsed state and fight the settings-driven restore.
         split.delegate = splitDelegate
+        content.setTabRowHidden(SessionCoordinator.shared.settings.sidebarVisible)
 
         // Container is a transparent wrapper so the sidebar.view's own chrome
         // backdrop is the only one in play. Stacking two ChromeBackdrops (one
@@ -76,15 +78,22 @@ final class MainSplitViewController: NSViewController {
         // the glass+tint and shifted the sidebar's perceived tint relative to
         // the terminal side — making the top of the window read as a darker
         // strip even though both regions request the same theme color.
-        let sidebarContainer = NSView()
+        let sidebarContainer = NSView(frame: NSRect(x: 0, y: 0, width: HarnessDesign.sidebarWidth,
+                                                    height: view.bounds.height))
         HarnessDesign.makeClear(sidebarContainer)
+        sidebarContainer.layer?.masksToBounds = true
         sidebarContainer.translatesAutoresizingMaskIntoConstraints = false
         sidebar.view.translatesAutoresizingMaskIntoConstraints = false
         sidebarContainer.addSubview(sidebar.view)
+        // Keep the sidebar's controls at a usable width while its wrapper collapses.
+        // Squeezing their required constraints to zero makes AppKit break the layout.
+        let sidebarWidth = sidebar.view.widthAnchor.constraint(equalTo: sidebarContainer.widthAnchor)
+        sidebarWidth.priority = .defaultHigh
         NSLayoutConstraint.activate([
             sidebar.view.topAnchor.constraint(equalTo: sidebarContainer.topAnchor),
             sidebar.view.leadingAnchor.constraint(equalTo: sidebarContainer.leadingAnchor),
-            sidebar.view.trailingAnchor.constraint(equalTo: sidebarContainer.trailingAnchor),
+            sidebarWidth,
+            sidebar.view.widthAnchor.constraint(greaterThanOrEqualToConstant: SplitChromeDelegate.minimumWidth),
             sidebar.view.bottomAnchor.constraint(equalTo: sidebarContainer.bottomAnchor),
         ])
 
@@ -131,9 +140,7 @@ final class MainSplitViewController: NSViewController {
 
         updateEdgeDivider()
 
-        DispatchQueue.main.async { [weak self] in
-            self?.setSidebarVisible(SessionCoordinator.shared.settings.sidebarVisible)
-        }
+        applySidebarVisibility(SessionCoordinator.shared.settings.sidebarVisible, animated: false)
 
         NotificationCenter.default.addObserver(
             self,
@@ -259,8 +266,22 @@ final class MainSplitViewController: NSViewController {
     /// min-coordinate drops to 0 (it's 200 at rest, so a *user drag* can't shrink the
     /// sidebar to an unusable sliver — but a programmatic collapse must reach 0).
     func setSidebarVisible(_ visible: Bool, animated: Bool) {
-        SessionCoordinator.shared.settings.sidebarVisible = visible
-        SessionCoordinator.shared.saveSettings()
+        if SessionCoordinator.shared.settings.sidebarVisible != visible {
+            SessionCoordinator.shared.settings.sidebarVisible = visible
+            SessionCoordinator.shared.saveSettings()
+        }
+        applySidebarVisibility(visible, animated: animated)
+    }
+
+    /// Resolve the divider against the final window size before AppKit can display it.
+    /// Loading the controller alone can happen before the split has usable bounds.
+    func prepareForPresentation() {
+        view.layoutSubtreeIfNeeded()
+        applySidebarVisibility(SessionCoordinator.shared.settings.sidebarVisible, animated: false)
+        view.layoutSubtreeIfNeeded()
+    }
+
+    private func applySidebarVisibility(_ visible: Bool, animated: Bool) {
         // Sidebar mode lists tabs in the sidebar; title-bar mode shows the tab row.
         content.setTabRowHidden(visible)
         sidebarAnimToken &+= 1
@@ -270,7 +291,7 @@ final class MainSplitViewController: NSViewController {
         guard animated, let panel = split.subviews.first else {
             let panel = split.subviews.first
             panel?.isHidden = false              // unhide so setPosition can size it to 0
-            split.setPosition(target, ofDividerAt: 0)
+            if split.bounds.width > 1 { split.setPosition(target, ofDividerAt: 0) }
             panel?.isHidden = !visible
             splitDelegate.allowFullCollapse = false
             edgeDivider.isHidden = !visible
@@ -359,6 +380,7 @@ private final class SidebarSplitView: NSSplitView {
 
 @MainActor
 private final class SplitChromeDelegate: NSObject, NSSplitViewDelegate {
+    static let minimumWidth: CGFloat = 200
     /// While a programmatic collapse/expand is running, let the divider reach 0 so the
     /// sidebar can fully disappear. At rest it's false, so a *user drag* still floors
     /// at 200pt and can't shrink the sidebar to an unusable sliver.
@@ -366,7 +388,7 @@ private final class SplitChromeDelegate: NSObject, NSSplitViewDelegate {
 
     func splitView(_ splitView: NSSplitView, constrainMinCoordinate proposedMinimum: CGFloat, ofSubviewAt index: Int) -> CGFloat {
         guard index == 0 else { return proposedMinimum }
-        return allowFullCollapse ? 0 : 200
+        return allowFullCollapse ? 0 : Self.minimumWidth
     }
 
     func splitView(_ splitView: NSSplitView, constrainMaxCoordinate proposedMaximum: CGFloat, ofSubviewAt index: Int) -> CGFloat {

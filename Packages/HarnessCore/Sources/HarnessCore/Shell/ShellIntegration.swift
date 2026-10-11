@@ -100,14 +100,22 @@ public enum ShellIntegration {
 
     private static let zshScript = """
     # Harness shell integration for zsh — OSC 133 semantic prompts.
-    # Emits OSC 133;A to mark each prompt and OSC 133;D;<exit> to report the previous command's
-    # status, so Harness draws the prompt gutter, colors success/failure, and jumps between
-    # prompts. Active only inside a Harness pane (the daemon exports $HARNESS).
+    # A/B bracket the rendered prompt; C starts output; D reports command status.
+    # Active only inside a Harness pane (the daemon exports $HARNESS).
     if [[ -n "$HARNESS" && "$TERM" != "dumb" ]]; then
       autoload -Uz add-zsh-hook 2>/dev/null
       __harness_precmd() {
-        printf '\\033]133;D;%s\\007' "$?"
-        printf '\\033]133;A\\007'
+        local __harness_status=$?
+        printf '\\033]133;D;%s\\007' "$__harness_status"
+        case "$PS1" in
+          *'133;A'*) ;;
+          *) PS1=$'%{\\033]133;A\\007%}'"$PS1" ;;
+        esac
+        case "$PS1" in
+          *'133;B'*) ;;
+          *) PS1="$PS1"$'%{\\033]133;B\\007%}' ;;
+        esac
+        return "$__harness_status"
       }
       __harness_preexec() { printf '\\033]133;C\\007'; }
       if (( ${+functions[add-zsh-hook]} )); then
@@ -122,12 +130,25 @@ public enum ShellIntegration {
 
     private static let bashScript = """
     # Harness shell integration for bash — OSC 133 semantic prompts.
-    # Emits OSC 133;A to mark each prompt and OSC 133;D;<exit> to report the previous command's
-    # status, so Harness draws the prompt gutter, colors success/failure, and jumps between
-    # prompts. Active only inside a Harness pane (the daemon exports $HARNESS).
+    # A/B bracket the rendered prompt; C starts output; D reports command status.
+    # Active only inside a Harness pane (the daemon exports $HARNESS).
     if [ -n "$HARNESS" ] && [ "$TERM" != "dumb" ]; then
       __harness_precmd() {
-        printf '\\001\\033]133;D;%s\\007\\002' "$?"
+        local __harness_status=$?
+        printf '\\033]133;D;%s\\007' "$__harness_status"
+        return "$__harness_status"
+      }
+      __harness_wrap_prompt() {
+        local __harness_status=$?
+        case "$PS1" in
+          *'133;A'*) : ;;
+          *) PS1='\\[\\033]133;A\\007\\]'"$PS1" ;;
+        esac
+        case "$PS1" in
+          *'133;B'*) : ;;
+          *) PS1="$PS1"'\\[\\033]133;B\\007\\]' ;;
+        esac
+        return "$__harness_status"
       }
       __harness_pc_decl=$(declare -p PROMPT_COMMAND 2>/dev/null)
       if [[ "$__harness_pc_decl" == "declare -a "* ]]; then
@@ -136,13 +157,13 @@ public enum ShellIntegration {
           [[ "$__harness_pc_item" == __harness_precmd ]] && __harness_pc_found=1
         done
         if [[ "$__harness_pc_found" == 0 ]]; then
-          PROMPT_COMMAND=(__harness_precmd "${PROMPT_COMMAND[@]}")
+          PROMPT_COMMAND=(__harness_precmd "${PROMPT_COMMAND[@]}" __harness_wrap_prompt)
         fi
         unset __harness_pc_found __harness_pc_item
       else
         case ";${PROMPT_COMMAND};" in
           *";__harness_precmd;"*) : ;;
-          *) PROMPT_COMMAND="__harness_precmd${PROMPT_COMMAND:+;$PROMPT_COMMAND}" ;;
+          *) PROMPT_COMMAND="__harness_precmd${PROMPT_COMMAND:+;$PROMPT_COMMAND};__harness_wrap_prompt" ;;
         esac
       fi
       unset __harness_pc_decl
@@ -153,24 +174,31 @@ public enum ShellIntegration {
           *) PS0=$'\\033]133;C\\007'"$PS0" ;;
         esac
       fi
-      case "$PS1" in
-        *'133;A'*) : ;;
-        *) PS1='\\[\\033]133;A\\007\\]'"$PS1" ;;
-      esac
+      __harness_wrap_prompt
     fi
     """
 
     private static let fishScript = """
     # Harness shell integration for fish — OSC 133 semantic prompts.
-    # Emits OSC 133;A to mark each prompt and OSC 133;D;<exit> to report the previous command's
-    # status, so Harness draws the prompt gutter, colors success/failure, and jumps between
-    # prompts. Active only inside a Harness pane (the daemon exports $HARNESS).
+    # A/B bracket the rendered prompt; C starts output; D reports command status.
+    # Active only inside a Harness pane (the daemon exports $HARNESS).
     # Interactive shells only: `exit` in a sourced file skips the rest
     # of the file, so scripts and `fish -c` never register the hooks (the vendor_conf.d
     # vehicle would otherwise run this for every fish).
     status is-interactive; or exit
     if set -q HARNESS; and test "$TERM" != dumb
         function __harness_osc133_prompt --on-event fish_prompt
+            # Refresh the wrapper if a theme replaces fish_prompt after startup.
+            if not functions fish_prompt | string match -q '*__harness_original_fish_prompt*'
+                functions -e __harness_original_fish_prompt
+                functions -c fish_prompt __harness_original_fish_prompt
+                function fish_prompt
+                    __harness_original_fish_prompt
+                    set -l __harness_prompt_status $status
+                    printf '\\033]133;B\\007'
+                    return $__harness_prompt_status
+                end
+            end
             printf '\\033]133;A\\007'
         end
         function __harness_osc133_preexec --on-event fish_preexec

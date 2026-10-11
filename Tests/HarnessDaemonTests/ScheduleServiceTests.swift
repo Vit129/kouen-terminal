@@ -4,6 +4,47 @@ import HarnessCore
 @testable import HarnessDaemonCore
 
 final class ScheduleServiceTests: XCTestCase {
+    func testEventBacklogContinuesWithoutAnotherExternalWake() throws {
+        _ = testSIGPIPEIgnored
+        let root = URL(fileURLWithPath: "/tmp/hsched-page-" + UUID().uuidString.prefix(8))
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        #if os(macOS)
+        let protection = try HistoryProtection(keyMaterial: Data(repeating: 37, count: 32))
+        #else
+        let protection = HistoryProtection.system()
+        #endif
+        let ledger = ActivityStore(url: root.appendingPathComponent("activity.sqlite"), protection: protection)
+        let owner = try OwnedWorkloadFixture(root: root)
+        defer { owner.stop() }
+        let hostID = UUID(), launched = expectation(description: "event after the first page was observed")
+        let scheduler = ScheduleService(store: ledger, host: owner.client,
+            limits: { now in UsageSummary(hostID: hostID, from: now, to: now, profiles: [], historyUnavailable: nil) },
+            launch: { _, _ in
+                launched.fulfill()
+                throw OwnedWorkloadLaunchError.notAccepted("Fixture records scheduling without launching a process")
+            })
+        defer { scheduler.suspend() }
+        let definition = ScheduleDefinition(name: "Paged event", enabled: true, timezone: "UTC",
+            trigger: .agentEvent(kind: .turnCompleted, surfaceID: nil, provider: .codex, profile: nil),
+            workspaceID: UUID(), launch: AgentLaunchSpecification(executable: "/bin/sh", arguments: [], directory: root.path, profile: "fixture"))
+        _ = try scheduler.handle(.save(definition: definition, expectedRevision: nil))
+        scheduler.tick(now: Date().addingTimeInterval(-1))
+        var run = AgentRun(hostID: hostID, surfaceID: UUID().uuidString, processGeneration: "fixture", pid: nil, provider: .codex)
+        try ledger.save(run)
+        for index in 0..<205 {
+            _ = try ledger.record(RunEvent(runID: run.id, kind: .turnStarted, source: .hook, turnID: "turn-\(index)"), reducing: &run)
+        }
+        _ = try ledger.record(RunEvent(runID: run.id, kind: .turnCompleted, source: .hook, turnID: "last"), reducing: &run)
+        scheduler.activate()
+        wait(for: [launched], timeout: 5)
+        scheduler.suspend()
+        let events = try ledger.scheduledEvents(after: 0)
+        XCTAssertEqual(events.count, 200, "the fixture must cross the real event page limit")
+        let record = try XCTUnwrap(ledger.object(ScheduleRecord.self, kind: "schedule", id: definition.id.uuidString))
+        XCTAssertEqual(record.eventCursor, try ledger.latestEventSequence())
+    }
+
     func testDurableOccurrenceDeduplicationOverlapMissedRecoveryAndActualOutcome() throws {
         _ = testSIGPIPEIgnored
         let root = URL(fileURLWithPath: "/tmp/hsched-" + UUID().uuidString.prefix(8)); try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true); defer { try? FileManager.default.removeItem(at: root) }

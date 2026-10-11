@@ -86,6 +86,27 @@ final class HistoryRingBufferTests: XCTestCase {
         XCTAssertEqual(Array(ring), [42])
     }
 
+    func testCompactionRoundsCapacityAndPreservesWrappedOrder() {
+        var ring = HistoryRingBuffer(0..<32)
+        ring.removeFirst(29)
+        ring.compactIfUnderused()
+        for value in 32..<50 { ring.append(value) }
+        XCTAssertEqual(Array(ring), Array(29..<50))
+    }
+
+    func testDroppedElementsAreReleasedWithoutFallbackRetention() {
+        final class Item {}
+        weak var retained: Item?
+        var ring = HistoryRingBuffer<Item>()
+        do {
+            let item = Item()
+            retained = item
+            ring.append(item)
+        }
+        ring.removeFirst()
+        XCTAssertNil(retained)
+    }
+
     func testInitFromSequence() {
         let ring = HistoryRingBuffer([7, 8, 9])
         XCTAssertEqual(ring.count, 3)

@@ -180,6 +180,20 @@ final class AuthoritativeParser {
         if term.cols != cols || term.rows != rows { term.resize(cols: cols, rows: rows) }
     }
 
+    /// Restore the complete parked continuation before parsing its hot tail.
+    /// Invalid checkpoints fall back to reconstructing the retained raw stream.
+    @discardableResult
+    func restore(_ frame: ScreenFrame) -> Bool {
+        guard let bytes = frame.checkpoint,
+              let checkpoint = try? PropertyListDecoder().decode(TerminalCheckpoint.self, from: bytes) else { return false }
+        let restored = TerminalEmulator(cols: 80, rows: 24)
+        restored.readsGraphicsFiles = false; restored.isReplaying = true
+        guard (try? restored.restore(checkpoint)) != nil else { return false }
+        restored.maxScrollbackLines = historyLines
+        term = restored; fedThrough = frame.sequence
+        return true
+    }
+
     func frame(includeCheckpoint: Bool = false) -> ScreenFrame? {
         guard let term else { return nil }
         var checkpoint: Data?

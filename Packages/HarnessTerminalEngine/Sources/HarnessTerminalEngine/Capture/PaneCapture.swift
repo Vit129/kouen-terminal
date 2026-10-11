@@ -51,7 +51,9 @@ public enum PaneCapture {
             rows = rows.map(trimCells)
             while rows.last?.isEmpty == true { rows.removeLast() }
         }
-        return rows.map { vtRow($0, clusters: clusters) }.joined(separator: "\n")
+        var graphemeClusters = false
+        let text = rows.map { vtRow($0, clusters: clusters, graphemeClusters: &graphemeClusters) }.joined(separator: "\n")
+        return "\u{1b}[?2027l" + text + (graphemeClusters ? "" : "\u{1b}[?2027h")
     }
 
     private static func trimCells(_ cells: [TerminalGridCell]) -> [TerminalGridCell] {
@@ -97,7 +99,8 @@ public enum PaneCapture {
     public static func screen(_ term: TerminalEmulator) -> Data {
         let grid = term.readGrid()
         var out = term.isAlternateScreenActive ? "\u{1b}[?1049h" : ""
-        out += "\u{1b}[0m\u{1b}[H\u{1b}[2J"
+        out += "\u{1b}[0m\u{1b}[H\u{1b}[2J\u{1b}[?2027l"
+        var graphemeClusters = false
         var continues = false
         for row in 0 ..< grid.rows {
             let start = row * grid.cols
@@ -114,13 +117,21 @@ public enum PaneCapture {
             }
             if continues {
                 // An emptied continuation still needs a character to wrap onto it, erased after.
-                out += cells.isEmpty ? " \u{1b}[1K" : vtRow(cells, clusters: grid.clusters)
+                if cells.isEmpty {
+                    if graphemeClusters { out += "\u{1b}[?2027l"; graphemeClusters = false }
+                    out += " \u{1b}[1K"
+                } else {
+                    out += vtRow(cells, clusters: grid.clusters, graphemeClusters: &graphemeClusters)
+                }
             } else if !cells.isEmpty {
-                out += "\u{1b}[\(row + 1);1H" + vtRow(cells, clusters: grid.clusters)
+                out += "\u{1b}[\(row + 1);1H" + vtRow(cells, clusters: grid.clusters, graphemeClusters: &graphemeClusters)
             }
             continues = wraps
         }
         let modes = term.modes
+        if modes.graphemeClusters != graphemeClusters {
+            out += modes.graphemeClusters ? "\u{1b}[?2027h" : "\u{1b}[?2027l"
+        }
         let flags: [(Bool, String)] = [
             (modes.cursorKeysApplication, "\u{1b}[?1h"), (modes.keypadApplication, "\u{1b}="),
             (modes.bracketedPaste, "\u{1b}[?2004h"), (modes.focusReporting, "\u{1b}[?1004h"),
@@ -149,7 +160,7 @@ public enum PaneCapture {
         return plain == .blank
     }
 
-    private static func vtRow(_ cells: [TerminalGridCell], clusters: [UInt32: String]) -> String {
+    private static func vtRow(_ cells: [TerminalGridCell], clusters: [UInt32: String], graphemeClusters: inout Bool) -> String {
         var out = ""
         var previous = ""
         for cell in cells where cell.width != .spacerTail {
@@ -159,7 +170,21 @@ public enum PaneCapture {
                 out += style.isEmpty ? "\u{1b}[0m" : "\u{1b}[0;\(style)m"
                 previous = style
             }
-            out += cell.codepoint == 0 ? " " : cell.resolvedCluster(in: clusters)
+            let text = cell.codepoint == 0 ? " " : cell.resolvedCluster(in: clusters)
+            let scalars = text.unicodeScalars
+            guard let first = scalars.first else { continue }
+            // Start each stored cell independently: legacy Jamo/RI cells must not merge.
+            // Only the remainder of this cell uses grapheme placement.
+            if graphemeClusters {
+                out += "\u{1b}[?2027l"
+                graphemeClusters = false
+            }
+            out.unicodeScalars.append(first)
+            if scalars.count > 1 {
+                out += "\u{1b}[?2027h"
+                graphemeClusters = true
+                out.unicodeScalars.append(contentsOf: scalars.dropFirst())
+            }
         }
         if !previous.isEmpty { out += "\u{1b}[0m" }
         return out

@@ -69,7 +69,7 @@ final class TerminalTabBarView: NSView {
     private let sessionsButton = SoftIconButton(frame: .zero)
     private let machineButton = MachineIndicatorButton(frame: .zero)
     private let pillSpacing = HarnessDesign.Spacing.md
-    private let minPillWidth: CGFloat = 160
+    private let minPillWidth = TabPillView.minimumWidth
     private let preferredPillWidth: CGFloat = 240
     private let maxPillWidth: CGFloat = 280
 
@@ -327,7 +327,6 @@ final class TerminalTabBarView: NSView {
     /// sidebar collapses/expands). 0 = sidebar visible; the shared traffic-light clearance when collapsed.
     func setLeadingInset(_ inset: CGFloat) {
         leadingInset = inset
-        layoutSubtreeIfNeeded()
     }
 
     // MARK: - Layout
@@ -575,6 +574,7 @@ private func tabAgentKind(for tab: Tab) -> AgentKind? {
 
 @MainActor
 private final class TabPillView: NSView {
+    static let minimumWidth: CGFloat = 160
     let tabID: TabID
     var onSelect: ((TabID) -> Void)?
     var onClose: ((TabID) -> Void)?
@@ -637,7 +637,9 @@ private final class TabPillView: NSView {
     init(tab: Tab, isActive: Bool, position: Int?) {
         tabID = tab.id
         hasShortcut = position != nil
-        super.init(frame: .zero)
+        // Auto Layout visits newly inserted (and overflow-hidden) pills before the
+        // strip assigns their final frame. Give their inset constraints usable bounds.
+        super.init(frame: NSRect(x: 0, y: 0, width: Self.minimumWidth, height: HarnessDesign.tabPillHeight))
         self.isActive = isActive
         self.status = tab.status
         self.isPersistent = tab.persistent

@@ -21,8 +21,17 @@ public final class StartupMetrics: @unchecked Sendable {
         case firstWindow
         case firstSurfaceAttached
         case firstDrawablePresented
+        case daemonReadinessEnqueued
+        case daemonReadinessStarted
+        case daemonReadinessCompleted
         case daemonConnected
+        case firstSnapshotRequestStarted
+        case firstSnapshotResponseReceived
         case firstSnapshot
+        /// The parser consumed OSC 133 B marking the end of the first shell prompt.
+        case firstShellPromptConsumed
+        /// A frame containing that prompt was submitted successfully, before GPU visibility.
+        case firstShellPromptFrameSubmitted
     }
 
     public static let shared = StartupMetrics()

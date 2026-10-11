@@ -180,6 +180,8 @@ public final class TerminalMetalRenderer {
         device: MTLDevice,
         fontFamily: String,
         fontSize: CGFloat,
+        fallbackFamilies: [String] = [],
+        features: [String: Int] = [:],
         scale: CGFloat,
         atlasSize: Int = 1024,
         atlasMaxPages: Int = 4,
@@ -190,7 +192,7 @@ public final class TerminalMetalRenderer {
     ) {
         self.init(
             device: device,
-            resolvedFont: TerminalFontResolver.resolve(fontFamily: fontFamily, size: fontSize),
+            resolvedFont: TerminalFontResolver.resolve(fontFamily: fontFamily, size: fontSize, fallbackFamilies: fallbackFamilies, features: features),
             scale: scale,
             atlasSize: atlasSize,
             atlasMaxPages: atlasMaxPages,
@@ -429,7 +431,7 @@ public final class TerminalMetalRenderer {
         let encodeStart = DispatchTime.now().uptimeNanoseconds
         defer { imageCache.endFrame(animating: animatingImages) }
         var frameStats = TerminalRenderStats(
-            cells: frame.cells.count,
+            cells: frame.cellCount,
             atlasPages: atlas.stats.pages,
             frameBuildNanos: frameBuildNanos
         )
@@ -467,7 +469,7 @@ public final class TerminalMetalRenderer {
         // shape so an invalid (transient) frame truly draws nothing — the build just cleared the
         // flats, and a stray cursor quad over the cleared canvas would outlive the guard's intent.
         let frameShapeIsValid = frame.columns > 0 && frame.rows > 0
-            && frame.cells.count == frame.columns * frame.rows
+            && frame.cellCount == frame.columns * frame.rows
         let bgGridCount = flatBg.count
 
         // OSC 133 prompt gutter: a thin vertical stripe in the left margin marking shell-prompt
@@ -652,6 +654,19 @@ public final class TerminalMetalRenderer {
             renderEncoder.setFragmentTexture(atlas.colorTexture ?? atlas.texture, index: 1)
             renderEncoder.setFragmentSamplerState(sampler, index: 0)
             renderEncoder.setFragmentBytes(&glyphGamma, length: MemoryLayout<Float>.stride, index: 0)
+            let cursor = frame.cursor
+            let invertCursor = cursor.visible && cursor.style == .block && !cursor.hollow
+                && cursor.row >= 0 && cursor.row < frame.rows
+                && cursor.column >= 0 && cursor.column < frame.columns
+            var cursorOverlay = CursorGlyphOverlay(
+                bounds: SIMD4(ox + Float(cursor.column * cellPixelWidth),
+                              oy + Float(cursor.row * cellPixelHeight),
+                              invertCursor ? Float(cellPixelWidth) : 0,
+                              invertCursor ? Float(cellPixelHeight) : 0),
+                textColor: vector(cursor.textColor)
+            )
+            renderEncoder.setFragmentBytes(&cursorOverlay,
+                                           length: MemoryLayout<CursorGlyphOverlay>.stride, index: 1)
             renderEncoder.drawPrimitives(type: .triangleStrip, vertexStart: 0, vertexCount: 4, instanceCount: instanceBuffers.glyphCount)
         }
 
@@ -724,7 +739,7 @@ public final class TerminalMetalRenderer {
         let key = instanceUploadCacheKey(frame: frame, origin: origin, ligatures: ligatures)
         let frameShapeIsValid = frame.columns > 0
             && frame.rows > 0
-            && frame.cells.count == frame.columns * frame.rows
+            && frame.cellCount == frame.columns * frame.rows
         // Images do NOT gate the stable cache: image quads draw per frame from `frame.images`
         // (textures keyed by their never-reused ids in ImageTextureCache), entirely outside the
         // cell instance buffers — a moved/changed image renders at its new placement while the
@@ -886,7 +901,7 @@ public final class TerminalMetalRenderer {
 
         guard frame.columns > 0,
               frame.rows > 0,
-              frame.cells.count == frame.columns * frame.rows
+              frame.cellCount == frame.columns * frame.rows
         else {
             resetRowInstanceCache()
             clearFlats() // an invalid frame draws nothing — stale flats must not upload
@@ -907,14 +922,6 @@ public final class TerminalMetalRenderer {
 
         // Per-build memo: only a salvage pass in THIS build may populate it.
         salvageRowKeys = nil
-        let cursorKey = CursorCacheKey(
-            row: frame.cursor.row,
-            column: frame.cursor.column,
-            visible: frame.cursor.visible,
-            style: frame.cursor.style,
-            textColor: frame.cursor.textColor,
-            hollow: frame.cursor.hollow
-        )
         let cacheMatches = rowInstanceCache.columns == frame.columns
             && rowInstanceCache.rows == frame.rows
             && rowInstanceCache.originX == origin.x
@@ -940,7 +947,7 @@ public final class TerminalMetalRenderer {
             // suffix — the unchanged top band re-binds instead of re-encoding. nil = not
             // compatible or under the hit-rate floor → the plain full reset, exactly as before.
             let salvaged = salvageRowInstances(
-                frame, origin: origin, ligatures: ligatures, cursorKey: cursorKey
+                frame, origin: origin, ligatures: ligatures
             )
             rowInstanceCache = RowInstanceCache(
                 columns: frame.columns,
@@ -952,7 +959,6 @@ public final class TerminalMetalRenderer {
                 cellPixelWidth: cellPixelWidth,
                 cellPixelHeight: cellPixelHeight,
                 rowInstances: salvaged ?? Array(repeating: nil, count: frame.rows),
-                previousCursor: nil,
                 textBlinkHidden: textBlinkHidden
             )
             if let salvaged {
@@ -965,18 +971,9 @@ public final class TerminalMetalRenderer {
             }
         }
 
-        if rowInstanceCache.previousCursor != cursorKey {
-            if let previous = rowInstanceCache.previousCursor, previous.invertsGlyph {
-                insert(row: previous.row, into: &dirtyRows, rowCount: frame.rows)
-            }
-            if cursorKey.invertsGlyph {
-                insert(row: cursorKey.row, into: &dirtyRows, rowCount: frame.rows)
-            }
-        }
-
         // SGR blink phase flip: cached rows containing blink cells were encoded under the
         // other phase — re-encode exactly those rows. Everything else is untouched, so a
-        // blink tick costs O(blink rows), the same shape as a cursor-row re-encode.
+        // blink tick costs O(blink rows); cursor blink only updates its shader uniform.
         if rowInstanceCache.textBlinkHidden != textBlinkHidden {
             for row in 0 ..< frame.rows where rowInstanceCache.rowInstances.indices.contains(row)
                 && rowInstanceCache.rowInstances[row]?.hasBlink == true {
@@ -1004,13 +1001,11 @@ public final class TerminalMetalRenderer {
             for row in dirtyRows.sorted() {
                 var fresh = encodeRowInstances(
                     row, frame: frame, origin: origin, cellSize: cellSize, ligatures: ligatures,
-                    cursorKey: cursorKey, thickness: thickness, underlineY: underlineY,
+                    thickness: thickness, underlineY: underlineY,
                     strikeY: strikeY, overlineY: overlineY
                 )
-                fresh.contentKey = (cursorKey.invertsGlyph && cursorKey.row == row)
-                    ? 0
-                    : (salvageRowKeys?[row]
-                        ?? Self.rowContentKey(frame, row: row, blinkHidden: textBlinkHidden))
+                fresh.contentKey = salvageRowKeys?[row]
+                    ?? Self.rowContentKey(frame, row: row, blinkHidden: textBlinkHidden)
                 let old = rowSeg[row]
                 let oldStats = rowInstanceCache.rowInstances[row]
                 flatBgSpans += fresh.bgSpans - (oldStats?.bgSpans ?? 0)
@@ -1067,9 +1062,9 @@ public final class TerminalMetalRenderer {
             var bgLo = Int.max, bgHi = 0, bgShift = Int.max
             var glLo = Int.max, glHi = 0, glShift = Int.max
             var deLo = Int.max, deHi = 0, deShift = Int.max
-            flatBg.reserveCapacity(frame.cells.count + 1)
-            flatGlyph.reserveCapacity(frame.cells.count)
-            flatDeco.reserveCapacity(frame.cells.count / 8)
+            flatBg.reserveCapacity(frame.cellCount + 1)
+            flatGlyph.reserveCapacity(frame.cellCount)
+            flatDeco.reserveCapacity(frame.cellCount / 8)
             rowSeg.reserveCapacity(frame.rows)
             for row in 0 ..< frame.rows {
                 let previous = rowInstanceCache.rowInstances[row]
@@ -1077,18 +1072,12 @@ public final class TerminalMetalRenderer {
                 if dirtyRows.contains(row) || previous == nil {
                     var fresh = encodeRowInstances(
                         row, frame: frame, origin: origin, cellSize: cellSize, ligatures: ligatures,
-                        cursorKey: cursorKey, thickness: thickness, underlineY: underlineY,
+                        thickness: thickness, underlineY: underlineY,
                         strikeY: strikeY, overlineY: overlineY
                     )
-                    // Stamp the content key so a later column-count change can salvage this row.
-                    // Skipped for a glyph-inverting cursor row: its instances bake the cursor-text
-                    // color, so they are NOT a pure function of the row content alone. A salvage
-                    // pass in this build already hashed the row — reuse its key instead of
-                    // re-walking the columns.
-                    fresh.contentKey = (cursorKey.invertsGlyph && cursorKey.row == row)
-                        ? 0
-                        : (salvageRowKeys?[row]
-                            ?? Self.rowContentKey(frame, row: row, blinkHidden: textBlinkHidden))
+                    // Salvage already hashed these rows; reuse that key when available.
+                    fresh.contentKey = salvageRowKeys?[row]
+                        ?? Self.rowContentKey(frame, row: row, blinkHidden: textBlinkHidden)
                     rowInstances = fresh
                     rowInstanceCache.rowInstances[row] = rowInstances
                     encoded.encodedRows += 1
@@ -1123,7 +1112,6 @@ public final class TerminalMetalRenderer {
         }
         encoded.bgSpans = flatBgSpans
         encoded.bgCells = flatBgCells
-        rowInstanceCache.previousCursor = cursorKey
         encoded.cachePopulated = true // every row now lives in the cache (encoded or reused)
 
         if atlas.stats.resets != atlasResetsBefore {
@@ -1157,9 +1145,9 @@ public final class TerminalMetalRenderer {
     ) -> EncodedFrameInstances {
         var encoded = EncodedFrameInstances()
         clearFlats()
-        flatBg.reserveCapacity(frame.cells.count + 1)
-        flatGlyph.reserveCapacity(frame.cells.count)
-        flatDeco.reserveCapacity(frame.cells.count / 8)
+        flatBg.reserveCapacity(frame.cellCount + 1)
+        flatGlyph.reserveCapacity(frame.cellCount)
+        flatDeco.reserveCapacity(frame.cellCount / 8)
         for row in 0 ..< frame.rows {
             let rowInstances = encodeRowInstances(
                 row,
@@ -1167,14 +1155,6 @@ public final class TerminalMetalRenderer {
                 origin: origin,
                 cellSize: cellSize,
                 ligatures: ligatures,
-                cursorKey: CursorCacheKey(
-                    row: frame.cursor.row,
-                    column: frame.cursor.column,
-                    visible: frame.cursor.visible,
-                    style: frame.cursor.style,
-                    textColor: frame.cursor.textColor,
-                    hollow: frame.cursor.hollow
-                ),
                 thickness: thickness,
                 underlineY: underlineY,
                 strikeY: strikeY,
@@ -1245,62 +1225,64 @@ public final class TerminalMetalRenderer {
     /// cell — a missed field is a silent wrong-pixel cache. Pinned per-field by
     /// `MetalRendererTests.testContentKeyCoversEveryRenderedField`.
     static func rowContentKey(_ frame: TerminalFrame, row: Int, blinkHidden: Bool = false) -> UInt64 {
-        let start = row * frame.columns
-        var end = start + frame.columns
-        while end > start {
-            let c = frame.cells[end - 1]
-            let significant = c.drawBackground || c.hasGlyph || c.combining0 != 0
-                || c.underline != .none || c.strikethrough || c.overline
-                || Self.isBlockElement(c.codepoint)
-            if significant { break }
-            end -= 1
+        return frame.withRowResolver(row) { rowCells in
+            let start = row * frame.columns
+            var end = start + frame.columns
+            while end > start {
+                let c = rowCells.cell(end - start - 1)
+                let significant = c.drawBackground || c.hasGlyph || c.combining0 != 0
+                    || c.underline != .none || c.strikethrough || c.overline
+                    || Self.isBlockElement(c.codepoint)
+                if significant { break }
+                end -= 1
+            }
+            var h: UInt64 = 0xCBF2_9CE4_8422_2325 // FNV-64 offset basis
+            var rowHasBlink = false
+            for i in start ..< end {
+                let c = rowCells.cell(i - start)
+                if c.blink { rowHasBlink = true }
+                mixContentKey(&h, UInt64(c.codepoint) | (UInt64(c.combining0) << 32))
+                mixContentKey(&h, UInt64(c.combining1))
+                if c.combining1 & 0x8000_0000 != 0 {
+                    for byte in frame.cluster(for: c).utf8 { mixContentKey(&h, UInt64(byte)) }
+                }
+                mixContentKey(&h, UInt64(c.foreground.red.bitPattern) | (UInt64(c.foreground.green.bitPattern) << 32))
+                mixContentKey(&h, UInt64(c.foreground.blue.bitPattern) | (UInt64(c.foreground.alpha.bitPattern) << 32))
+                mixContentKey(&h, UInt64(c.background.red.bitPattern) | (UInt64(c.background.green.bitPattern) << 32))
+                mixContentKey(&h, UInt64(c.background.blue.bitPattern) | (UInt64(c.background.alpha.bitPattern) << 32))
+                mixContentKey(&h, UInt64(c.underlineColor.red.bitPattern) | (UInt64(c.underlineColor.green.bitPattern) << 32))
+                mixContentKey(&h, UInt64(c.underlineColor.blue.bitPattern) | (UInt64(c.underlineColor.alpha.bitPattern) << 32))
+                let underlineBits: UInt64
+                switch c.underline {
+                case .none: underlineBits = 0
+                case .single: underlineBits = 1
+                case .double: underlineBits = 2
+                case .curly: underlineBits = 3
+                case .dotted: underlineBits = 4
+                case .dashed: underlineBits = 5
+                }
+                let widthBits: UInt64
+                switch c.width {
+                case .normal: widthBits = 0
+                case .wide: widthBits = 1
+                case .spacerTail: widthBits = 2
+                }
+                mixContentKey(&h, underlineBits
+                    | (widthBits << 3)
+                    | (c.bold ? 1 << 6 : 0)
+                    | (c.italic ? 1 << 7 : 0)
+                    | (c.strikethrough ? 1 << 8 : 0)
+                    | (c.overline ? 1 << 9 : 0)
+                    | (c.drawBackground ? 1 << 10 : 0)
+                    | (c.blink ? 1 << 11 : 0))
+            }
+            mixContentKey(&h, UInt64(end - start)) // significant length, so prefixes can't alias
+            // Fold the blink PHASE into rows that contain blink cells (and only those): the same
+            // content encoded under the other phase produces different instances, so it must not
+            // salvage/re-bind across a phase flip. Blink-free rows stay phase-independent.
+            if rowHasBlink, blinkHidden { mixContentKey(&h, 0xB11_4B17) }
+            return h
         }
-        var h: UInt64 = 0xCBF2_9CE4_8422_2325 // FNV-64 offset basis
-        var rowHasBlink = false
-        for i in start ..< end {
-            let c = frame.cells[i]
-            if c.blink { rowHasBlink = true }
-            mixContentKey(&h, UInt64(c.codepoint) | (UInt64(c.combining0) << 32))
-            mixContentKey(&h, UInt64(c.combining1))
-            if c.combining1 & 0x8000_0000 != 0 {
-                for byte in frame.cluster(for: c).utf8 { mixContentKey(&h, UInt64(byte)) }
-            }
-            mixContentKey(&h, UInt64(c.foreground.red.bitPattern) | (UInt64(c.foreground.green.bitPattern) << 32))
-            mixContentKey(&h, UInt64(c.foreground.blue.bitPattern) | (UInt64(c.foreground.alpha.bitPattern) << 32))
-            mixContentKey(&h, UInt64(c.background.red.bitPattern) | (UInt64(c.background.green.bitPattern) << 32))
-            mixContentKey(&h, UInt64(c.background.blue.bitPattern) | (UInt64(c.background.alpha.bitPattern) << 32))
-            mixContentKey(&h, UInt64(c.underlineColor.red.bitPattern) | (UInt64(c.underlineColor.green.bitPattern) << 32))
-            mixContentKey(&h, UInt64(c.underlineColor.blue.bitPattern) | (UInt64(c.underlineColor.alpha.bitPattern) << 32))
-            let underlineBits: UInt64
-            switch c.underline {
-            case .none: underlineBits = 0
-            case .single: underlineBits = 1
-            case .double: underlineBits = 2
-            case .curly: underlineBits = 3
-            case .dotted: underlineBits = 4
-            case .dashed: underlineBits = 5
-            }
-            let widthBits: UInt64
-            switch c.width {
-            case .normal: widthBits = 0
-            case .wide: widthBits = 1
-            case .spacerTail: widthBits = 2
-            }
-            mixContentKey(&h, underlineBits
-                | (widthBits << 3)
-                | (c.bold ? 1 << 6 : 0)
-                | (c.italic ? 1 << 7 : 0)
-                | (c.strikethrough ? 1 << 8 : 0)
-                | (c.overline ? 1 << 9 : 0)
-                | (c.drawBackground ? 1 << 10 : 0)
-                | (c.blink ? 1 << 11 : 0))
-        }
-        mixContentKey(&h, UInt64(end - start)) // significant length, so prefixes can't alias
-        // Fold the blink PHASE into rows that contain blink cells (and only those): the same
-        // content encoded under the other phase produces different instances, so it must not
-        // salvage/re-bind across a phase flip. Blink-free rows stay phase-independent.
-        if rowHasBlink, blinkHidden { mixContentKey(&h, 0xB11_4B17) }
-        return h
     }
 
     /// Content-keyed salvage across a geometry change the row cache would otherwise discard
@@ -1316,7 +1298,7 @@ public final class TerminalMetalRenderer {
     private var salvageRowKeys: [UInt64?]?
 
     private func salvageRowInstances(
-        _ frame: TerminalFrame, origin: (x: Int, y: Int), ligatures: Bool, cursorKey: CursorCacheKey
+        _ frame: TerminalFrame, origin: (x: Int, y: Int), ligatures: Bool
     ) -> [EncodedRowInstances?]? {
         let cache = rowInstanceCache
         guard cache.rows == frame.rows,
@@ -1331,11 +1313,6 @@ public final class TerminalMetalRenderer {
         var frameKeys: [UInt64?] = Array(repeating: nil, count: frame.rows)
         var hits = 0
         for row in 0 ..< frame.rows {
-            // Cursor-affected rows never salvage: cached instances baked the OLD cursor's glyph
-            // inversion; the new cursor row must re-encode under the new key. (Mirrors the
-            // cursor-row dirtying on the incremental path.)
-            if let previous = cache.previousCursor, previous.invertsGlyph, previous.row == row { continue }
-            if cursorKey.invertsGlyph, cursorKey.row == row { continue }
             guard let cached = cache.rowInstances[row], cached.contentKey != 0 else { continue }
             let frameKey = Self.rowContentKey(frame, row: row, blinkHidden: textBlinkHidden)
             frameKeys[row] = frameKey
@@ -1356,109 +1333,106 @@ public final class TerminalMetalRenderer {
         origin: (x: Int, y: Int),
         cellSize: SIMD2<Float>,
         ligatures: Bool,
-        cursorKey: CursorCacheKey,
         thickness: Float,
         underlineY: Float,
         strikeY: Float,
         overlineY: Float
     ) -> EncodedRowInstances {
-        let ox = Float(origin.x)
-        let oy = Float(origin.y)
-        let cellW = cellSize.x
-        let cellH = cellSize.y
-        var encoded = EncodedRowInstances()
-        encoded.backgrounds.reserveCapacity(frame.columns)
-        encoded.glyphs.reserveCapacity(frame.columns)
-        var pendingBgSpan: PendingBgSpan?
+        return frame.withRowResolver(row) { rowCells in
+            let ox = Float(origin.x)
+            let oy = Float(origin.y)
+            let cellW = cellSize.x
+            let cellH = cellSize.y
+            var encoded = EncodedRowInstances()
+            encoded.backgrounds.reserveCapacity(frame.columns)
+            encoded.glyphs.reserveCapacity(frame.columns)
+            var pendingBgSpan: PendingBgSpan?
 
-        func flushPendingBgSpan() {
-            guard let span = pendingBgSpan else { return }
-            encoded.backgrounds.append(span.instance)
-            encoded.bgSpans += 1
-            pendingBgSpan = nil
-        }
-
-        func appendCellBackground(_ cell: RenderCell, originX: Float, originY: Float) {
-            encoded.bgCells += 1
-            if var span = pendingBgSpan,
-               span.row == cell.row,
-               span.endColumn + 1 == cell.column,
-               span.color == cell.background {
-                span.endColumn = cell.column
-                span.instance.size.x += cellW
-                pendingBgSpan = span
-                return
+            func flushPendingBgSpan() {
+                guard let span = pendingBgSpan else { return }
+                encoded.backgrounds.append(span.instance)
+                encoded.bgSpans += 1
+                pendingBgSpan = nil
             }
 
-            flushPendingBgSpan()
-            pendingBgSpan = PendingBgSpan(
-                row: cell.row,
-                endColumn: cell.column,
-                color: cell.background,
-                instance: BgInstance(
-                    origin: SIMD2(originX, originY),
-                    size: SIMD2(cellW, cellH),
-                    color: vector(cell.background)
-                )
-            )
-        }
+            func appendCellBackground(_ cell: RenderCell, originX: Float, originY: Float) {
+                encoded.bgCells += 1
+                if var span = pendingBgSpan,
+                   span.row == cell.row,
+                   span.endColumn + 1 == cell.column,
+                   span.color == cell.background {
+                    span.endColumn = cell.column
+                    span.instance.size.x += cellW
+                    pendingBgSpan = span
+                    return
+                }
 
-        let start = row * frame.columns
-        let end = start + frame.columns
-        for cell in frame.cells[start ..< end] {
-            if cell.blink { encoded.hasBlink = true }
-            let originX = ox + Float(cell.column * cellPixelWidth)
-            let originY = oy + Float(cell.row * cellPixelHeight)
-            let blockRects = Self.blockElementRects(cell.codepoint)
-            // Block elements remain procedural and painter-ordered after the cell background.
-            if let rects = blockRects {
                 flushPendingBgSpan()
-                if cell.drawBackground {
-                    encoded.bgCells += 1
-                    encoded.backgrounds.append(BgInstance(
+                pendingBgSpan = PendingBgSpan(
+                    row: cell.row,
+                    endColumn: cell.column,
+                    color: cell.background,
+                    instance: BgInstance(
                         origin: SIMD2(originX, originY),
                         size: SIMD2(cellW, cellH),
                         color: vector(cell.background)
-                    ))
-                    encoded.bgSpans += 1
-                }
-
-                let fill = vector(cell.foreground)
-                for r in rects {
-                    let x0 = originX + (r.0 * cellW).rounded()
-                    let y0 = originY + (r.1 * cellH).rounded()
-                    let x1 = originX + ((r.0 + r.2) * cellW).rounded()
-                    let y1 = originY + ((r.1 + r.3) * cellH).rounded()
-                    encoded.backgrounds.append(BgInstance(
-                        origin: SIMD2(x0, y0), size: SIMD2(x1 - x0, y1 - y0), color: fill
-                    ))
-                }
-            } else if cell.drawBackground {
-                appendCellBackground(cell, originX: originX, originY: originY)
+                    )
+                )
             }
 
-            // A blinking cell's decorations follow its glyph through the phase (the
-            // background quad above stays).
-            if !(cell.blink && textBlinkHidden) {
-                appendDecorations(cell, originX: originX, originY: originY,
-                                  cellSize: cellSize,
-                                  thickness: thickness, underlineY: underlineY,
-                                  strikeY: strikeY, overlineY: overlineY,
-                                  into: &encoded.decorations)
+            for column in 0..<frame.columns {
+                let cell = rowCells.cell(column)
+                if cell.blink { encoded.hasBlink = true }
+                let originX = ox + Float(cell.column * cellPixelWidth)
+                let originY = oy + Float(cell.row * cellPixelHeight)
+                let blockRects = Self.blockElementRects(cell.codepoint)
+                // Block elements remain procedural and painter-ordered after the cell background.
+                if let rects = blockRects {
+                    flushPendingBgSpan()
+                    if cell.drawBackground {
+                        encoded.bgCells += 1
+                        encoded.backgrounds.append(BgInstance(
+                            origin: SIMD2(originX, originY),
+                            size: SIMD2(cellW, cellH),
+                            color: vector(cell.background)
+                        ))
+                        encoded.bgSpans += 1
+                    }
+
+                    let fill = vector(cell.foreground)
+                    for r in rects {
+                        let x0 = originX + (r.0 * cellW).rounded()
+                        let y0 = originY + (r.1 * cellH).rounded()
+                        let x1 = originX + ((r.0 + r.2) * cellW).rounded()
+                        let y1 = originY + ((r.1 + r.3) * cellH).rounded()
+                        encoded.backgrounds.append(BgInstance(
+                            origin: SIMD2(x0, y0), size: SIMD2(x1 - x0, y1 - y0), color: fill
+                        ))
+                    }
+                } else if cell.drawBackground {
+                    appendCellBackground(cell, originX: originX, originY: originY)
+                }
+
+                // A blinking cell's decorations follow its glyph through the phase (the
+                // background quad above stays).
+                if !(cell.blink && textBlinkHidden) {
+                    appendDecorations(cell, originX: originX, originY: originY,
+                                      cellSize: cellSize,
+                                      thickness: thickness, underlineY: underlineY,
+                                      strikeY: strikeY, overlineY: overlineY,
+                                      into: &encoded.decorations)
+                }
             }
-        }
-        flushPendingBgSpan()
+            flushPendingBgSpan()
 
-        let cursorCell = cursorKey.invertsGlyph ? (row: cursorKey.row, column: cursorKey.column) : nil
-        if ligatures {
-            emitLigatedGlyphs(row: row, frame: frame, ox: ox, oy: oy, cursorCell: cursorCell,
-                              cursorTextColor: cursorKey.textColor, into: &encoded.glyphs)
-        } else {
-            emitPerCellGlyphs(row: row, frame: frame, ox: ox, oy: oy, cursorCell: cursorCell,
-                              cursorTextColor: cursorKey.textColor, into: &encoded.glyphs)
-        }
+            if ligatures {
+                emitLigatedGlyphs(row: row, frame: frame, ox: ox, oy: oy, into: &encoded.glyphs)
+            } else {
+                emitPerCellGlyphs(row: row, frame: frame, ox: ox, oy: oy, into: &encoded.glyphs)
+            }
 
-        return encoded
+            return encoded
+        }
     }
 
     private func resetRowInstanceCache() {
@@ -1485,10 +1459,6 @@ public final class TerminalMetalRenderer {
     /// Y (instance origins are device-pixel positions frozen at encode time; decoration `params`
     /// stay cell-relative, so only `origin.y` moves). Rows shifted out of the viewport drop;
     /// exposed slots become nil so the caller encodes them fresh.
-    /// The cached cursor key SHIFTS with the content — its row indexes the band it was encoded
-    /// into, so after rotation the standard `previousCursor != cursorKey` pass still dirties the
-    /// right slot (e.g. live→scrolled hides a block cursor: the old cursor row carries an
-    /// inverted glyph and must re-encode at its shifted position, not its old index).
     /// The stable-upload cache holds pre-shift Y too; the exposed-row encodes force a real upload
     /// this frame (`encodedRows > 0` fails `stableFrame`), but it must also be dropped so a later
     /// stable frame can't revive the stale buffers through a still-matching key.
@@ -1497,7 +1467,6 @@ public final class TerminalMetalRenderer {
         let rows = rowInstanceCache.rowInstances.count
         guard abs(shift) < rows else {
             rowInstanceCache.rowInstances = Array(repeating: nil, count: rows)
-            rowInstanceCache.previousCursor = nil
             return
         }
         var rotated: [EncodedRowInstances?] = Array(repeating: nil, count: rows)
@@ -1507,16 +1476,15 @@ public final class TerminalMetalRenderer {
             guard destRow >= 0, destRow < rows,
                   var instances = rowInstanceCache.rowInstances[sourceRow] else { continue }
             for i in instances.backgrounds.indices { instances.backgrounds[i].origin.y += dy }
-            for i in instances.glyphs.indices { instances.glyphs[i].origin.y += dy }
+            for i in instances.glyphs.indices {
+                instances.glyphs[i].origin.y += dy
+                instances.glyphs[i].cellOrigin.y += dy
+            }
             for i in instances.decorations.indices { instances.decorations[i].origin.y += dy }
             rotated[destRow] = instances
         }
         rowInstanceCache.rowInstances = rotated
-        if var previous = rowInstanceCache.previousCursor {
-            previous.row += shift
-            rowInstanceCache.previousCursor =
-                (previous.row >= 0 && previous.row < rows) ? previous : nil
-        }
+
     }
 
     private func clampedRows(_ rows: IndexSet, rowCount: Int) -> IndexSet {
@@ -1618,54 +1586,38 @@ public final class TerminalMetalRenderer {
         }
     }
 
-    /// Test seam: emit a single row's glyphs (ligated path) for `frame` with the given inverting
-    /// cursor cell and cursor text color, returning each instance's color. Lets a unit test assert
-    /// per-glyph color (e.g. that a combining-mark cluster under the cursor gets the cursor color)
-    /// without standing up a full render pass. Not part of the public API.
-    func emittedGlyphColorsForTesting(
-        row: Int, frame: TerminalFrame, cursorCell: (row: Int, column: Int)?, cursorTextColor: RenderColor
-    ) -> [SIMD4<Float>] {
-        var glyphs: [GlyphInstance] = []
-        emitLigatedGlyphs(row: row, frame: frame, ox: 0, oy: 0, cursorCell: cursorCell,
-                          cursorTextColor: cursorTextColor, into: &glyphs)
-        return glyphs.map { $0.color }
-    }
-
-    /// Fast path: one atlas glyph per cell (no shaping). Each glyph sits on its own cell;
-    /// the cursor cell flips to the cursor-text color.
+    /// One atlas glyph per cell; cursor tint is applied by the fragment shader.
     private func emitPerCellGlyphs(
         row: Int, frame: TerminalFrame, ox: Float, oy: Float,
-        cursorCell: (row: Int, column: Int)?, cursorTextColor: RenderColor,
         into glyphs: inout [GlyphInstance]
     ) {
-        let start = row * frame.columns
-        let end = start + frame.columns
-        for cell in frame.cells[start ..< end] {
-            // Render when there's a base glyph OR a combining mark — a mark stacked on a space
-            // (hasGlyph == false for 0x20) must still draw, matching what copy/search/capture see.
-            guard cell.hasGlyph || cell.combining0 != 0, !Self.isBlockElement(cell.codepoint) else { continue }
-            // SGR blink off-phase: the glyph disappears; the background quad stays.
-            if cell.blink, textBlinkHidden { continue }
-            // A cell carrying combining marks composes as one CoreText cluster bitmap; otherwise the
-            // plain per-codepoint atlas entry (unchanged for ASCII/CJK).
-            let entry = cell.combining0 != 0
-                ? atlas.entry(forCluster: frame.cluster(for: cell), bold: cell.bold, italic: cell.italic)
-                : atlas.entry(for: GlyphKey(codepoint: cell.codepoint, bold: cell.bold, italic: cell.italic))
-            guard let entry else { continue }
-            let isCursor = cursorCell.map { $0.row == cell.row && $0.column == cell.column } ?? false
-            let color = isCursor ? vector(cursorTextColor) : vector(cell.foreground)
-            glyphs.append(glyphInstance(
-                entry,
-                originX: ox + Float(cell.column * cellPixelWidth),
-                originY: oy + Float(cell.row * cellPixelHeight),
-                color: color, colorGlyphOpacity: cell.colorGlyphOpacity
-            ))
+        frame.withRowResolver(row) { rowCells in
+            for column in 0..<frame.columns {
+                let cell = rowCells.cell(column)
+                // Render when there's a base glyph OR a combining mark — a mark stacked on a space
+                // (hasGlyph == false for 0x20) must still draw, matching what copy/search/capture see.
+                guard cell.hasGlyph || cell.combining0 != 0, !Self.isBlockElement(cell.codepoint) else { continue }
+                // SGR blink off-phase: the glyph disappears; the background quad stays.
+                if cell.blink, textBlinkHidden { continue }
+                // A cell carrying combining marks composes as one CoreText cluster bitmap; otherwise the
+                // plain per-codepoint atlas entry (unchanged for ASCII/CJK).
+                let entry = cell.combining0 != 0
+                    ? atlas.entry(forCluster: frame.cluster(for: cell), bold: cell.bold, italic: cell.italic)
+                    : atlas.entry(for: GlyphKey(codepoint: cell.codepoint, bold: cell.bold, italic: cell.italic))
+                guard let entry else { continue }
+                glyphs.append(glyphInstance(
+                    entry,
+                    originX: ox + Float(cell.column * cellPixelWidth),
+                    originY: oy + Float(cell.row * cellPixelHeight),
+                    color: vector(cell.foreground), colorGlyphOpacity: cell.colorGlyphOpacity
+                ))
+            }
         }
     }
 
     /// Ligature path: shape each maximal same-style/same-color run with CoreText, then place
     /// every shaped glyph on its *source* cell so the monospace grid stays aligned (a
-    /// ligature spanning N cells lands on its first cell). The cursor cell is shaped alone.
+    /// ligature spanning N cells lands on its first cell). Cursor tint leaves shaping unchanged.
     /// Scratch for `emitLigatedGlyphs`'s run accumulation, reused across runs/rows/frames
     /// (`removeAll(keepingCapacity:)` per run) — encoding is single-threaded per renderer, and
     /// a fresh String + Int array per run was a per-dirty-row-per-frame allocation pair.
@@ -1674,94 +1626,91 @@ public final class TerminalMetalRenderer {
 
     private func emitLigatedGlyphs(
         row: Int, frame: TerminalFrame, ox: Float, oy: Float,
-        cursorCell: (row: Int, column: Int)?, cursorTextColor: RenderColor,
         into glyphs: inout [GlyphInstance]
     ) {
-        let cols = frame.columns
-        var col = 0
-        while col < cols {
-            guard let cell = frame.cell(row: row, column: col), cell.hasGlyph || cell.combining0 != 0,
-                  !Self.isBlockElement(cell.codepoint) else {
-                col += 1
-                continue
+        frame.withRowResolver(row) { rowCells in
+            let cols = frame.columns
+            var col = 0
+            while col < cols {
+                let cell = rowCells.cell(col)
+                guard cell.hasGlyph || cell.combining0 != 0,
+                      !Self.isBlockElement(cell.codepoint) else {
+                    col += 1
+                    continue
+                }
+                // SGR blink off-phase: the glyph disappears; the background quad stays.
+                if cell.blink, textBlinkHidden {
+                    col += 1
+                    continue
+                }
+                // Box-drawing chars use a procedural cell-sized sprite — never shape them into
+                // a ligature run (that would render the font glyph and reintroduce seams).
+                if BoxDrawing.supported(cell.codepoint) {
+                    emitSingleGlyph(cell, frame: frame, row: row, col: col, ox: ox, oy: oy,
+                                    color: vector(cell.foreground), into: &glyphs)
+                    col += 1
+                    continue
+                }
+                // Nerd Font / Powerline icons (PUA) must not be shaped: when the primary font lacks
+                // them CoreText substitutes a LastResort "missing glyph" box (the tofu bug, #37).
+                // Emit per-cell so they route through the rasterizer's bundled symbol-font fallback.
+                if GlyphRasterizer.isNerdFontCodepoint(cell.codepoint) {
+                    emitSingleGlyph(cell, frame: frame, row: row, col: col, ox: ox, oy: oy,
+                                    color: vector(cell.foreground), into: &glyphs)
+                    col += 1
+                    continue
+                }
+                // A cell carrying combining marks (Thai vowel/tone, etc.) is composed by CoreText as a
+                // single cluster bitmap with contextual mark positioning — never shaped into a ligature
+                // run (the run path discards CoreText's per-glyph positions, which marks depend on).
+                if cell.combining0 != 0 {
+                    emitClusterGlyph(cell, frame: frame, row: row, col: col, ox: ox, oy: oy,
+                                     color: vector(cell.foreground), into: &glyphs)
+                    col += 1
+                    continue
+                }
+                // Accumulate a run of contiguous, same-style, same-color glyph cells.
+                ligatureRunText.removeAll(keepingCapacity: true)
+                ligatureUTF16ToColumn.removeAll(keepingCapacity: true)
+                let bold = cell.bold, italic = cell.italic, fg = cell.foreground
+                var c = col
+                while c < cols {
+                    let rc = rowCells.cell(c)
+                    if rc.width == .spacerTail { c += 1; continue } // wide-char tail
+                    if !rc.hasGlyph { break }
+                    if Self.isBlockElement(rc.codepoint) { break } // drawn procedurally
+                    if BoxDrawing.supported(rc.codepoint) { break } // procedural box sprite
+                    if GlyphRasterizer.isNerdFontCodepoint(rc.codepoint) { break } // icon → per-cell symbol fallback
+                    if rc.combining0 != 0 { break } // composed separately as a CoreText cluster bitmap
+                    if rc.bold != bold || rc.italic != italic || rc.foreground != fg
+                        || rc.blink != cell.blink || rc.colorGlyphOpacity != cell.colorGlyphOpacity { break }
+                    let scalar = Unicode.Scalar(rc.codepoint) ?? " "
+                    let before = ligatureRunText.utf16.count
+                    ligatureRunText.unicodeScalars.append(scalar)
+                    for _ in before ..< ligatureRunText.utf16.count { ligatureUTF16ToColumn.append(c) }
+                    c += 1
+                }
+                if ligatureUTF16ToColumn.isEmpty { col += 1; continue }
+                let color = vector(fg)
+                for shaped in atlas.shape(ligatureRunText, bold: bold, italic: italic) {
+                    guard let entry = atlas.entry(forShaped: shaped.glyph, font: shaped.font) else { continue }
+                    let idx = min(max(0, shaped.utf16Index), ligatureUTF16ToColumn.count - 1)
+                    let cellColumn = ligatureUTF16ToColumn[idx]
+                    var instance = glyphInstance(
+                        entry,
+                        originX: ox + Float(cellColumn * cellPixelWidth),
+                        originY: oy + Float(row * cellPixelHeight),
+                        color: color, colorGlyphOpacity: cell.colorGlyphOpacity
+                    )
+                    // Shaped narrow glyphs can span a ligature: invert only the cursor's
+                    // pixel slice. Wide glyphs retain whole-cell inversion like clusters.
+                    if rowCells.cell(cellColumn).width != .wide {
+                        instance.cellOrigin.x = -.greatestFiniteMagnitude
+                    }
+                    glyphs.append(instance)
+                }
+                col = c
             }
-            // SGR blink off-phase: the glyph disappears; the background quad stays.
-            if cell.blink, textBlinkHidden {
-                col += 1
-                continue
-            }
-            if let cur = cursorCell, cur.row == row, cur.column == col {
-                emitSingleGlyph(cell, frame: frame, row: row, col: col, ox: ox, oy: oy,
-                                color: vector(cursorTextColor), into: &glyphs)
-                col += 1
-                continue
-            }
-            // Box-drawing chars use a procedural cell-sized sprite — never shape them into
-            // a ligature run (that would render the font glyph and reintroduce seams).
-            if BoxDrawing.supported(cell.codepoint) {
-                emitSingleGlyph(cell, frame: frame, row: row, col: col, ox: ox, oy: oy,
-                                color: vector(cell.foreground), into: &glyphs)
-                col += 1
-                continue
-            }
-            // Nerd Font / Powerline icons (PUA) must not be shaped: when the primary font lacks
-            // them CoreText substitutes a LastResort "missing glyph" box (the tofu bug, #37).
-            // Emit per-cell so they route through the rasterizer's bundled symbol-font fallback.
-            if GlyphRasterizer.isNerdFontCodepoint(cell.codepoint) {
-                emitSingleGlyph(cell, frame: frame, row: row, col: col, ox: ox, oy: oy,
-                                color: vector(cell.foreground), into: &glyphs)
-                col += 1
-                continue
-            }
-            // A cell carrying combining marks (Thai vowel/tone, etc.) is composed by CoreText as a
-            // single cluster bitmap with contextual mark positioning — never shaped into a ligature
-            // run (the run path discards CoreText's per-glyph positions, which marks depend on).
-            // Use the cursor text color when an inverting cursor sits on the cluster, for parity with
-            // the single-glyph path (the leading cursor check above already covers the common case;
-            // this keeps the branch self-consistent regardless of ordering). (#66 review nit)
-            if cell.combining0 != 0 {
-                let isCursor = cursorCell.map { $0.row == row && $0.column == col } ?? false
-                let color = isCursor ? vector(cursorTextColor) : vector(cell.foreground)
-                emitClusterGlyph(cell, frame: frame, row: row, col: col, ox: ox, oy: oy,
-                                 color: color, into: &glyphs)
-                col += 1
-                continue
-            }
-            // Accumulate a run of contiguous, same-style, same-color glyph cells.
-            ligatureRunText.removeAll(keepingCapacity: true)
-            ligatureUTF16ToColumn.removeAll(keepingCapacity: true)
-            let bold = cell.bold, italic = cell.italic, fg = cell.foreground
-            var c = col
-            while c < cols, let rc = frame.cell(row: row, column: c) {
-                if rc.width == .spacerTail { c += 1; continue } // wide-char tail
-                if !rc.hasGlyph { break }
-                if Self.isBlockElement(rc.codepoint) { break } // drawn procedurally
-                if BoxDrawing.supported(rc.codepoint) { break } // procedural box sprite
-                if GlyphRasterizer.isNerdFontCodepoint(rc.codepoint) { break } // icon → per-cell symbol fallback
-                if rc.combining0 != 0 { break } // composed separately as a CoreText cluster bitmap
-                if let cur = cursorCell, cur.row == row, cur.column == c { break }
-                if rc.bold != bold || rc.italic != italic || rc.foreground != fg
-                    || rc.blink != cell.blink || rc.colorGlyphOpacity != cell.colorGlyphOpacity { break }
-                let scalar = Unicode.Scalar(rc.codepoint) ?? " "
-                let before = ligatureRunText.utf16.count
-                ligatureRunText.unicodeScalars.append(scalar)
-                for _ in before ..< ligatureRunText.utf16.count { ligatureUTF16ToColumn.append(c) }
-                c += 1
-            }
-            if ligatureUTF16ToColumn.isEmpty { col += 1; continue }
-            let color = vector(fg)
-            for shaped in atlas.shape(ligatureRunText, bold: bold, italic: italic) {
-                guard let entry = atlas.entry(forShaped: shaped.glyph, font: shaped.font) else { continue }
-                let idx = min(max(0, shaped.utf16Index), ligatureUTF16ToColumn.count - 1)
-                let cellColumn = ligatureUTF16ToColumn[idx]
-                glyphs.append(glyphInstance(
-                    entry,
-                    originX: ox + Float(cellColumn * cellPixelWidth),
-                    originY: oy + Float(row * cellPixelHeight),
-                    color: color, colorGlyphOpacity: cell.colorGlyphOpacity
-                ))
-            }
-            col = c
         }
     }
 
@@ -1812,6 +1761,7 @@ public final class TerminalMetalRenderer {
             uvOrigin: entry.uvOrigin,
             uvSize: entry.uvSize,
             pageIndex: entry.encodedPageIndex,
+            cellOrigin: SIMD2(originX, originY),
             color: color
         )
     }

@@ -1,0 +1,9 @@
+[
+  {
+    "case": "agent_session",
+    "file": "agent_session.vt",
+    "bytes": 4750,
+    "sha256": "02c3c18b64b4f2ab3e95b198026fd250b1f07ee49c51b781f78a9c6fa4d26b26",
+    "recording": "Fixtures/benchmarks/codex-recorded-2026-10-10.cast"
+  }
+]

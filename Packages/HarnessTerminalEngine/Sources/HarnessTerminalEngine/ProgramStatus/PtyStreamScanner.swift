@@ -1,7 +1,7 @@
 import Foundation
 
 /// Bytes the daemon has to notice without running a terminal emulator on the PTY read.
-public enum PtyScanEvent: Equatable, Sendable {
+public enum PtyScanEvent: Equatable, Sendable, Codable {
     case bell
     case osc(code: Int, body: String, sequenceLength: Int)
     case cursorKeys(application: Bool)
@@ -13,7 +13,7 @@ public enum PtyScanEvent: Equatable, Sendable {
     /// RIS (`ESC c`). Resets program status and the keyboard-mode mirror.
     case ris
 }
-public struct AnchoredPtyScanEvent: Equatable, Sendable {
+public struct AnchoredPtyScanEvent: Equatable, Sendable, Codable {
     public var event: PtyScanEvent
     /// The first byte after the event, in the stable terminal stream epoch.
     public var endSequence: UInt64

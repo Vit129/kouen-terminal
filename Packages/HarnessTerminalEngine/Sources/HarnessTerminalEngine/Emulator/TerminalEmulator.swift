@@ -26,11 +26,12 @@ import Dispatch // DispatchTime: a monotonic clock for command-duration timing (
 /// are only valid within the synchronous `feed` call, so concurrent or reentrant feeds would be a
 /// use-after-free; `VTParser` carries a debug-only tripwire that traps on violations.
 public final class TerminalEmulator: VTParserHandler {
-    private var parser: VTParser!
+    private var parser: VTParser<TerminalEmulator>!
     private var primary: TerminalScreen
     private var alternate: TerminalScreen
     private var current: TerminalScreen
     private var onAlternateScreen = false
+    private var commandHistory = TerminalCommandHistory()
 
     /// Terminal modes that the host queries to encode input correctly (Phase 6).
     public private(set) var modes = TerminalModes()
@@ -128,6 +129,11 @@ public final class TerminalEmulator: VTParserHandler {
     public var onProgramStatus: ((ProgramStatusBook) -> Void)?
     /// Program-status records for this terminal. RIS clears them. DECSTR does not.
     public private(set) var programStatus = ProgramStatusBook()
+    /// An OSC 133 prompt-end marker has been consumed since creation or the last RIS.
+    /// Replay also sets this, so a rebuilt terminal can expose its resumed prompt state.
+    public private(set) var hasSeenShellPromptEnd = false
+    /// Shell integration currently reports an input-ready prompt (OSC 133 B).
+    public private(set) var isShellPromptReady = false
     /// Mouse pointer shape requested via OSC 22 (e.g. `text`, `pointer`, `default`); nil clears.
     public var onPointerShapeChange: ((String?) -> Void)?
     /// iTerm2 `OSC 1337 ; SetUserVar=name=<base64>` landed (already decoded + validated).
@@ -205,6 +211,8 @@ public final class TerminalEmulator: VTParserHandler {
     /// emulator had no callbacks.
     public func takeOver(from previous: TerminalEmulator) {
         copySettings(from: previous)
+        primary.takeTextAnchors(from: previous.primary, lineOffset: primary.historyCount - previous.primary.historyCount)
+        alternate.takeTextAnchors(from: previous.alternate, lineOffset: 0)
         onTitleChange = previous.onTitleChange
         onWorkingDirectoryChange = previous.onWorkingDirectoryChange
         onRemoteHostChange = previous.onRemoteHostChange
@@ -347,8 +355,9 @@ public final class TerminalEmulator: VTParserHandler {
             }
         })
         images += KittyPlaceholders.placements(in: grid, virtuals: virtuals)
-        return TerminalGridSnapshot(cols: grid.cols, rows: grid.rows, cells: grid.cells, cursor: grid.cursor,
-                                    images: images, marks: grid.marks, clusters: grid.clusters)
+        var result = grid
+        result.images = images
+        return result
     }
 
     /// Plays the Kitty animations `grid` draws: each running one whose current frame has shown
@@ -371,8 +380,8 @@ public final class TerminalEmulator: VTParserHandler {
             placement.id = advanced[placement.id] ?? placement.id
             return placement
         }
-        let animated = TerminalGridSnapshot(cols: grid.cols, rows: grid.rows, cells: grid.cells, cursor: grid.cursor,
-                                            images: images, marks: grid.marks, clusters: grid.clusters)
+        var animated = grid
+        animated.images = images
         return (animated, nextFrameAt)
     }
 
@@ -381,6 +390,13 @@ public final class TerminalEmulator: VTParserHandler {
     /// Reports `full` for screen-wide changes (clear/resize/reset/alternate-screen switch) and
     /// `cursorOnly` when the only change was the cursor moving. Always reflects the *live*
     /// viewport; callers showing scrollback should rebuild fully instead.
+    /// Update an independently owned renderer grid without sharing the mutable engine storage.
+    /// Keep the mirror on the same serial queue as feed and consume the damage exactly once.
+    public func updateRenderMirror(_ mirror: inout TerminalGridSnapshot?, damage: TerminalDamage) {
+        current.updateRenderMirror(&mirror, damage: damage)
+        mirror = withKittyImages(mirror!)
+    }
+
     public func consumeDamage() -> TerminalDamage {
         current.consumeDamage()
     }
@@ -400,6 +416,28 @@ public final class TerminalEmulator: VTParserHandler {
     /// first — drives jump-to-previous/next-prompt. Empty without shell integration.
     public var promptRows: [Int] { current.promptRows() }
 
+    public func textAnchorContext() -> TerminalTextAnchorContext { current.textAnchorContext() }
+
+    public func makeTextAnchor(line: Int, column: Int) -> TerminalTextAnchor {
+        current.makeTextAnchor(line: line, column: column)
+    }
+
+    public var commandRegions: [TerminalCommandRegion] {
+        onAlternateScreen ? [] : commandHistory.commands
+    }
+
+    public var lastCompletedCommand: TerminalCommandRegion? {
+        onAlternateScreen ? nil : commandHistory.lastCompleted
+    }
+
+    public func command(atBufferLine line: Int, column: Int = 0) -> TerminalCommandRegion? {
+        commandRegions.last { command in
+            guard let prompt = command.prompt.position, (prompt.line, prompt.column) <= (line, column) else { return false }
+            guard let end = command.end?.position else { return true }
+            return (line, column) < (end.line, end.column)
+        }
+    }
+
     /// The OSC 133 semantic mark on a copy-mode-space line, or nil.
     public func mark(atBufferLine index: Int) -> SemanticMark? { current.mark(atBufferLine: index) }
 
@@ -415,6 +453,8 @@ public final class TerminalEmulator: VTParserHandler {
     }
 
     /// Whether screen row `row` soft-wraps into the next.
+    public func isBufferLineWrapped(_ line: Int) -> Bool { current.isLineWrapped(line) }
+
     func screenRowWraps(_ row: Int) -> Bool { current.isLineWrapped(current.historyCount + row) }
 
     /// Virtual-line span `[first, last]` of the logical (soft-wrapped) line containing virtual
@@ -1146,30 +1186,37 @@ public final class TerminalEmulator: VTParserHandler {
         onProgress?(report)
     }
 
-    /// OSC 133 shell integration. `A` marks a prompt line, `D[;exit]`
-    /// reports the finished command's status; `B` (command start) and `C` (output start) are the
-    /// input/output delimiters — parsed but not stamped, since the prompt mark + exit status are
-    /// what drive jump-to-prompt and the success/failure gutter. Purely informational: nothing is
-    /// written back to the PTY, and a program that doesn't emit 133 is unaffected.
+    /// OSC 133 boundaries remain attached to terminal text, including wrapped prompts/input.
     private func handleSemanticPrompt(_ payload: String) {
         let parts = payload.split(separator: ";", omittingEmptySubsequences: false).map(String.init)
-        guard let kind = parts.first?.first else { return }
+        guard !onAlternateScreen, let kind = parts.first?.first else { return }
         switch kind {
         case "A":
+            isShellPromptReady = false
             current.markPromptStart()
+            commandHistory.startPrompt(at: current.makeCursorTextAnchor())
             commandStartedAt = nil // new prompt: no command running yet
             let before = programStatus
             programStatus.dropEphemeral()
             publishProgramStatus(from: before)
         case "B", "C":
-            // Command execution begins. C (output/exec start) deliberately overwrites B
+            if kind == "B" {
+                hasSeenShellPromptEnd = true
+                commandHistory.startInput(at: current.makeCursorTextAnchor())
+            } else {
+                commandHistory.startOutput(at: current.makeCursorTextAnchor())
+            }
+            isShellPromptReady = kind == "B"
+            // C (output/exec start) deliberately overwrites B's timing fallback
             // (prompt-end/input start): duration must measure execution (C→D), not the time
             // the user spent typing at the prompt. B alone still covers integrations that
             // never emit C.
             commandStartedAt = .now()
         case "D":
+            isShellPromptReady = false
             let exitCode = parts.count >= 2 ? Int(parts[1]) : nil
             current.markCommandFinished(exit: exitCode)
+            commandHistory.finish(at: current.makeCursorTextAnchor(), exitCode: exitCode)
             if let started = commandStartedAt {
                 // Monotonic elapsed seconds — never negative or clock-skewed.
                 let elapsedNanos = DispatchTime.now().uptimeNanoseconds &- started.uptimeNanoseconds
@@ -1402,6 +1449,10 @@ public final class TerminalEmulator: VTParserHandler {
             case 1004: modes.focusReporting = set          // focus in/out reporting
             case 1007: modes.alternateScroll = set         // wheel → arrows on alt screen
             case 2004: modes.bracketedPaste = set          // bracketed paste
+            case 2027:
+                modes.graphemeClusters = set
+                primary.graphemeClusters = set
+                alternate.graphemeClusters = set
             case 2026: modes.synchronizedOutput = set      // synchronized output (no tearing)
             case 1: modes.cursorKeysApplication = set      // DECCKM
             case 47, 1047: switchAlternate(set, clearOnEnter: true, saveCursor: false)
@@ -1432,6 +1483,7 @@ public final class TerminalEmulator: VTParserHandler {
         case 1004: state = modes.focusReporting ? 1 : 2
         case 1007: state = modes.alternateScroll ? 1 : 2
         case 2004: state = modes.bracketedPaste ? 1 : 2
+        case 2027: state = modes.graphemeClusters ? 1 : 2
         case 2026: state = modes.synchronizedOutput ? 1 : 2
         case 1: state = modes.cursorKeysApplication ? 1 : 2
         case 47, 1047, 1049: state = onAlternateScreen ? 1 : 2
@@ -1592,6 +1644,8 @@ public final class TerminalEmulator: VTParserHandler {
     }
 
     private func fullReset() {
+        hasSeenShellPromptEnd = false
+        isShellPromptReady = false
         primary.fullReset()
         alternate.fullReset()
         if onAlternateScreen {
@@ -1633,6 +1687,7 @@ public final class TerminalEmulator: VTParserHandler {
         // A full reset abandons any in-flight command timing — otherwise a 133;D after
         // ESC c reports a spurious command-finished with a pre-reset start time.
         commandStartedAt = nil
+        commandHistory.reset()
         let hadStatus = !programStatus.records.isEmpty || programStatus.acceptedRealReport
         programStatus.reset()
         if hadStatus { onProgramStatus?(programStatus) }
@@ -1665,6 +1720,8 @@ public struct TerminalModes: Sendable, Equatable, Codable {
     /// renderer should hold the last presented frame rather than paint partial updates — no
     /// tearing in TUIs (vim, fzf, btop, …). Cleared by the program (or a renderer-side timeout).
     public var synchronizedOutput = false
+    /// Unicode grapheme placement (DEC private mode 2027), enabled by default.
+    public var graphemeClusters = true
     /// Kitty keyboard progressive-enhancement flag stack (`CSI > flags u` push / `CSI < u` pop).
     /// Top of stack = active flags; empty = disabled (flags 0). Bits: 1 disambiguate-escape-codes,
     /// 2 report-event-types, 4 report-alternate-keys, 8 report-all-keys-as-escape-codes,
@@ -1689,9 +1746,12 @@ extension TerminalEmulator {
     private struct CheckpointState: Codable {
         var primary: TerminalScreen.CheckpointState
         var alternate: TerminalScreen.CheckpointState
-        var parser: VTParser.CheckpointState
+        var parser: VTParser<TerminalEmulator>.CheckpointState
         var onAlternateScreen: Bool
         var modes: TerminalModes
+        var commandHistory: TerminalCommandHistory.CheckpointState
+        var hasSeenShellPromptEnd: Bool
+        var isShellPromptReady: Bool
         var workingDirectory: String?
         var reportedRemoteHost: String?
         var hasReportedRemoteHost: Bool
@@ -1730,6 +1790,9 @@ extension TerminalEmulator {
             parser: try parser.checkpointState(),
             onAlternateScreen: onAlternateScreen,
             modes: modes,
+            commandHistory: commandHistory.checkpointState(historyCount: primary.historyCount, rows: primary.rows, columns: primary.cols),
+            hasSeenShellPromptEnd: hasSeenShellPromptEnd,
+            isShellPromptReady: isShellPromptReady,
             workingDirectory: workingDirectory,
             reportedRemoteHost: reportedRemoteHost,
             hasReportedRemoteHost: hasReportedRemoteHost,
@@ -1798,6 +1861,9 @@ extension TerminalEmulator {
         }
         let restoredPrimary = try TerminalScreen.restored(from: state.primary, remapImage: remap)
         let restoredAlternate = try TerminalScreen.restored(from: state.alternate, remapImage: remap)
+        let restoredCommands = try TerminalCommandHistory.restored(from: state.commandHistory,
+            rows: restoredPrimary.rows, columns: restoredPrimary.cols,
+            makeAnchor: restoredPrimary.makeBoundaryTextAnchor)
         restoredPrimary.maxHistoryLines = primary.maxHistoryLines
         restoredPrimary.maxHistoryBytes = primary.maxHistoryBytes
         let restoredParser = VTParser(handler: self)
@@ -1812,9 +1878,14 @@ extension TerminalEmulator {
         primary = restoredPrimary
         alternate = restoredAlternate
         parser = restoredParser
+        commandHistory = restoredCommands
+        hasSeenShellPromptEnd = state.hasSeenShellPromptEnd
+        isShellPromptReady = state.isShellPromptReady
         current = state.onAlternateScreen ? alternate : primary
         onAlternateScreen = state.onAlternateScreen
         modes = state.modes
+        primary.graphemeClusters = modes.graphemeClusters
+        alternate.graphemeClusters = modes.graphemeClusters
         workingDirectory = state.workingDirectory
         reportedRemoteHost = state.reportedRemoteHost
         hasReportedRemoteHost = state.hasReportedRemoteHost

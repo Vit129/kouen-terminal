@@ -34,12 +34,12 @@ public final class LiveTerminalRecorder: @unchecked Sendable {
             guard append(.metadata(version: 1, createdAt: .now, surfaceID: surfaceID)) else { return }
             let attached = try client.attachStream(
                 AttachRequest(surfaceID: surfaceID, label: "harness-recording", readOnly: true, history: false, geometryEvents: true),
-                onAttached: { [weak self] reply in
+                onAttached: { [weak self] reply, _ in
                     guard let self else { return }
                     guard let size = reply.replaySizes?.last, let screen = reply.screen else { self.fail("The initial terminal screen or dimensions are unavailable."); return }
                     guard self.append(.resize(timeMs: self.nowMs(), rows: size.rows, cols: size.cols)), self.append(.output(timeMs: self.nowMs(), data: screen)) else { return }
                     self.lock.lock(); if !self.stopping { self.state.phase = .recording }; let status = self.state; self.lock.unlock(); self.onUpdate(status)
-                }, onData: { [weak self] data, _ in
+                }, onData: { [weak self] data, _, _ in
                     guard let self else { return }
                     if self.append(.output(timeMs: self.nowMs(), data: data)) { self.onOutput?(data) }
                 }, onResize: { [weak self] size in

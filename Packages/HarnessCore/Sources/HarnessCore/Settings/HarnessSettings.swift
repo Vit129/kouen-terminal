@@ -94,6 +94,8 @@ private enum LegacyHarnessSettingsCodingKeys: String, CodingKey {
 public struct HarnessSettings: Codable, Sendable, Equatable {
     public var fontSize: Float
     public var fontFamily: String
+    public var fontFallbackFamilies: [String]
+    public var fontFeatures: [String: Int]
     public var defaultShell: String
     public var defaultCWD: String
     public var transparentTitlebar: Bool
@@ -223,13 +225,6 @@ public struct HarnessSettings: Codable, Sendable, Equatable {
     /// Programming-font ligatures (e.g. `=>`, `!=`, `->`) via CoreText run shaping. On by
     /// default; turn off for the fastest one-glyph-per-cell path.
     public var ligatures: Bool
-    /// Moves terminal byte ingestion (VT parse) and frame building to a per-surface serial worker
-    /// queue, keeping only AppKit/Metal presentation on the main thread — so heavy output never
-    /// contends with input handling, scrolling, or layout. **Default on.** Safe because the
-    /// emulator is confined to that serial queue (every main-thread reader snapshots via
-    /// `queue.sync`), stale builds are dropped by a render-generation tag, and the row-reuse cache
-    /// is queue-owned. An explicitly stored `false` is honored (opt-out).
-    public var offMainParserFramePipeline: Bool
     /// Real-time live resize: while dragging the window edge, reflow the grid and
     /// signal the running program (`SIGWINCH`) at every cell boundary, so interactive programs
     /// (vim/htop/tmux) redraw continuously instead of waiting for the drag to end. **Default on.**
@@ -373,14 +368,14 @@ public struct HarnessSettings: Codable, Sendable, Equatable {
     }
 
     private enum CodingKeys: String, CodingKey, CaseIterable {
-        case fontSize, fontFamily, defaultShell, defaultCWD, transparentTitlebar, sidebarVisible
+        case fontSize, fontFamily, fontFallbackFamilies, fontFeatures, defaultShell, defaultCWD, transparentTitlebar, sidebarVisible
         case showMachineIndicator, restoreWindowSize, backgroundOpacity, backgroundBlur, windowPaddingX, windowPaddingY
         case appearanceMode, systemLightThemeName, systemDarkThemeName, customBackgroundHex, customForegroundHex, customCursorHex
         case importedConfigSignature, prefixKey, scrollbackLines, cursorStyle, cursorBlink, copyOnSelect
         case selectionBackgroundHex, selectionForegroundHex, boldColorHex, cursorTextHex, paletteHex, agentColorOverrides
         case paletteShortcuts, dividerHex, statusLineHex, windowBorderHex, windowBorderOpacity, systemNotificationsEnabled
         case vividColors, colorRendering, linearBlending, textRendering
-        case notificationSoundEnabled, colorGamut, applyThemeToTerminalOutput, ligatures, offMainParserFramePipeline, liveResizeReflow
+        case notificationSoundEnabled, colorGamut, applyThemeToTerminalOutput, ligatures, liveResizeReflow
         case showPromptGutter, showStatusLine, experienceMode, harnessControlsEnabled, prefixKeyEnabled, statusLineEnabled
         case resizeOverlay, resizeOverlayPosition, bellMode, scrollMultiplier, mouseHideWhileTyping, optionAsMeta
         case quickTerminalEnabled, quickTerminalHotkey, windowPaddingBalance, minimumContrast, themeFit, paneSpacing
@@ -394,6 +389,8 @@ public struct HarnessSettings: Codable, Sendable, Equatable {
         // translucent + blurred canvas, Nerd Font, roomy padding, copy-on-select on.
         fontSize: Float = 16,
         fontFamily: String = "JetBrainsMono Nerd Font",
+        fontFallbackFamilies: [String] = [],
+        fontFeatures: [String: Int] = [:],
         defaultShell: String = ProcessInfo.processInfo.environment["SHELL"] ?? "/bin/zsh",
         defaultCWD: String = FileManager.default.homeDirectoryForCurrentUser.path,
         transparentTitlebar: Bool = true,
@@ -439,7 +436,6 @@ public struct HarnessSettings: Codable, Sendable, Equatable {
         linearBlending: Bool = false,
         applyThemeToTerminalOutput: Bool = false,
         ligatures: Bool = true,
-        offMainParserFramePipeline: Bool = true,
         liveResizeReflow: Bool = true,
         showPromptGutter: Bool = false,
         showStatusLine: Bool = false,
@@ -481,6 +477,8 @@ public struct HarnessSettings: Codable, Sendable, Equatable {
     ) {
         self.fontSize = HarnessSettings.clampedFontSize(fontSize)
         self.fontFamily = fontFamily
+        self.fontFallbackFamilies = fontFallbackFamilies
+        self.fontFeatures = fontFeatures
         self.defaultShell = defaultShell
         self.defaultCWD = defaultCWD
         self.transparentTitlebar = transparentTitlebar
@@ -525,7 +523,6 @@ public struct HarnessSettings: Codable, Sendable, Equatable {
         self.linearBlending = resolvedTextRendering == .crisp
         self.applyThemeToTerminalOutput = applyThemeToTerminalOutput
         self.ligatures = ligatures
-        self.offMainParserFramePipeline = offMainParserFramePipeline
         self.liveResizeReflow = liveResizeReflow
         self.showPromptGutter = showPromptGutter
         self.showStatusLine = showStatusLine
@@ -653,6 +650,8 @@ public struct HarnessSettings: Codable, Sendable, Equatable {
         windowBorderOpacity = defaults.windowBorderOpacity
         paletteHex = HarnessSettings.normalizedPalette(imported?.paletteHex ?? Array(repeating: nil, count: 16))
         fontFamily = imported?.fontFamily ?? defaults.fontFamily
+        fontFallbackFamilies = defaults.fontFallbackFamilies
+        fontFeatures = defaults.fontFeatures
         fontSize = defaults.fontSize // Harness-owned (import the face, not the size).
         windowPaddingX = imported?.windowPaddingX ?? defaults.windowPaddingX
         windowPaddingY = imported?.windowPaddingY ?? defaults.windowPaddingY
@@ -661,6 +660,23 @@ public struct HarnessSettings: Codable, Sendable, Equatable {
         copyOnSelect = imported?.copyOnSelect ?? defaults.copyOnSelect
         minimumContrast = HarnessSettings.clampedContrast(imported?.minimumContrast ?? defaults.minimumContrast)
         importedConfigSignature = imported?.signature
+    }
+
+    /// Comma-separated OpenType tags, for example `calt=0, ss01=1`.
+    /// Invalid input leaves the caller's existing settings intact.
+    public static func parseFontFeatures(_ text: String) -> [String: Int]? {
+        guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return [:] }
+        var features: [String: Int] = [:]
+        for entry in text.split(separator: ",", omittingEmptySubsequences: false) {
+            let pair = entry.split(separator: "=", omittingEmptySubsequences: false)
+            guard pair.count == 2 else { return nil }
+            let tag = pair[0].trimmingCharacters(in: .whitespacesAndNewlines)
+            guard tag.utf8.count == 4, tag.utf8.allSatisfy({ (32 ... 126).contains($0) }),
+                  let value = Int(pair[1].trimmingCharacters(in: .whitespacesAndNewlines)), value >= 0,
+                  features[tag] == nil else { return nil }
+            features[tag] = value
+        }
+        return features
     }
 
     /// Forward-compat field decode driven by the default instance: `decode(.key, \\.field)`
@@ -705,6 +721,8 @@ public struct HarnessSettings: Codable, Sendable, Equatable {
 
         fontSize = HarnessSettings.clampedFontSize(try fields.decode(.fontSize, \.fontSize))
         fontFamily = try fields.decode(.fontFamily, \.fontFamily)
+        fontFallbackFamilies = try fields.decode(.fontFallbackFamilies, \.fontFallbackFamilies)
+        fontFeatures = try fields.decode(.fontFeatures, \.fontFeatures)
         defaultShell = try fields.decode(.defaultShell, \.defaultShell)
         defaultCWD = try fields.decode(.defaultCWD, \.defaultCWD)
         transparentTitlebar = try fields.decode(.transparentTitlebar, \.transparentTitlebar)
@@ -801,9 +819,6 @@ public struct HarnessSettings: Codable, Sendable, Equatable {
         linearBlending = resolvedTextRendering == .crisp
         applyThemeToTerminalOutput = try fields.decode(.applyThemeToTerminalOutput, \.applyThemeToTerminalOutput)
         ligatures = try fields.decode(.ligatures, \.ligatures)
-        // Default on when the key is absent (existing installs get the fast path); an explicitly
-        // stored `false` is honored as an opt-out.
-        offMainParserFramePipeline = try container.decodeIfPresent(Bool.self, forKey: .offMainParserFramePipeline) ?? true
         // Default on when the key is absent (existing installs get real-time resize); an explicitly
         // stored `false` is honored as an opt-out to the legacy defer-to-release behavior.
         liveResizeReflow = try container.decodeIfPresent(Bool.self, forKey: .liveResizeReflow) ?? true

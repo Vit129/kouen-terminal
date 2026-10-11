@@ -137,6 +137,33 @@ final class MetalRendererTests: XCTestCase {
         XCTAssertEqual(size.height, renderer.cellPixelHeight * 24)
     }
 
+    func testDirectEngineRowsRenderLikeReferenceAndReuseCleanRows() throws {
+        let (device, renderer) = try makeRenderer()
+        let referenceRenderer = try makeRenderer(device: device)
+        let terminal = try XCTUnwrap(HarnessGridTerminal(cols: 28, rows: 4))
+        terminal.feed("\u{1b}[?25l\u{1b}[31;4mA\u{0301} 漢 ไทย 👩‍💻 ==\u{1b}[0m\r\nsecond line\r\nthird line")
+        let builder = FrameBuilder(theme: theme)
+        let size = renderer.surfacePixelSize(columns: 28, rows: 4)
+        let target = try XCTUnwrap(makeTarget(device, width: size.width, height: size.height))
+        let expected = try XCTUnwrap(makeTarget(device, width: size.width, height: size.height))
+        let clear = RenderColor(theme.background)
+        var snapshot = try XCTUnwrap(terminal.readGrid())
+        renderer.render(builder.buildDirect(snapshot, region: nil), to: target, clearColor: clear,
+            ligatures: true, damage: terminal.consumeDamage())
+        referenceRenderer.render(builder.build(snapshot), to: expected, clearColor: clear, ligatures: true)
+        XCTAssertEqual(readPixelBytes(target, width: size.width, height: size.height),
+            readPixelBytes(expected, width: size.width, height: size.height))
+        terminal.feed("\u{1b}[2;1Hchanged row")
+        snapshot = try XCTUnwrap(terminal.readGrid())
+        renderer.render(builder.buildDirect(snapshot, region: nil), to: target, clearColor: clear,
+            ligatures: true, damage: terminal.consumeDamage())
+        XCTAssertLessThan(renderer.stats.encodedRows, 4)
+        XCTAssertGreaterThan(renderer.stats.reusedRows, 0)
+        referenceRenderer.render(builder.build(snapshot), to: expected, clearColor: clear, ligatures: true)
+        XCTAssertEqual(readPixelBytes(target, width: size.width, height: size.height),
+            readPixelBytes(expected, width: size.width, height: size.height))
+    }
+
     /// Glitchless live resize: a transaction-synchronized present (commit → waitUntilScheduled →
     /// drawable.present) must succeed against a layer in `presentsWithTransaction` mode and record
     /// the bounded schedule wait in the stats; the async path must leave that stat at zero (it's
@@ -381,10 +408,8 @@ final class MetalRendererTests: XCTestCase {
         XCTAssertEqual(renderer.stats.reusedRows, 0)
     }
 
-    /// Live→scrolled with a visible block cursor: the cursor's row carries an inverted glyph in
-    /// the cache, and after the shift it must re-encode at its SHIFTED slot (the cached cursor key
-    /// rotates with the content) — otherwise the stale inversion rides along one row down.
-    func testScrollShiftReencodesShiftedCursorRow() throws {
+    /// Scrolling retains cached glyph colors; the cursor overlay must disappear immediately.
+    func testScrollShiftReusesCursorRowWithoutStaleInversion() throws {
         let (device, renderer) = try makeRenderer()
         let cols = 12, rows = 4
         let term = HarnessGridTerminal(cols: cols, rows: rows)!
@@ -415,7 +440,7 @@ final class MetalRendererTests: XCTestCase {
                 mismatches += 1
             }
         }
-        XCTAssertEqual(mismatches, 0, "shifted cursor row must re-encode without the stale inversion")
+        XCTAssertEqual(mismatches, 0, "shifted cached rows must not carry cursor inversion")
     }
 
     func testRenderStatsDistinguishNonEmptyAndDefaultCanvasFrames() throws {
@@ -452,14 +477,12 @@ final class MetalRendererTests: XCTestCase {
         XCTAssertNotEqual(nonEmptyStats.glyphInstances, blankStats.glyphInstances)
     }
 
-    /// Cursor blink is overlay-cheap BY DESIGN and must stay that way: the cursor quad lives in
-    /// the per-frame extras (not the row cache), and a block cursor's glyph inversion re-encodes
-    /// exactly its own row via the `previousCursor` key diff. A blink toggle (visible flips, no
-    /// cell damage) must therefore re-encode at most one row — never the grid — and the readback
-    /// must equal a fresh full render. Locks the invariant the cell-overlay work relies on.
-    func testCursorBlinkReencodesAtMostTheCursorRow() throws {
+    /// Cursor blink updates uniforms and extras, with zero glyph-row work and full-render parity.
+    func testCursorBlinkReusesAllRowsWithPixelParity() throws {
         let (device, renderer) = try makeRenderer()
-        let shown = frame("AAAA\r\nBB", cols: 4, rows: 3) // visible block cursor on row 1
+        var shown = frame("AAAA\r\nBB\u{1b}[2;1H", cols: 4, rows: 3)
+        shown.cursor.textColor = RenderColor(red: 1, green: 0, blue: 0, alpha: 1)
+        shown.cursor.color = RenderColor(red: 0, green: 0, blue: 0.5, alpha: 1)
         XCTAssertTrue(shown.cursor.visible)
         var hidden = shown
         hidden.cursor.visible = false // the blink off-beat: only the cursor changed
@@ -475,14 +498,20 @@ final class MetalRendererTests: XCTestCase {
 
         renderer.render(hidden, to: target, clearColor: clear,
                         damage: TerminalDamage(rows: [], full: false))
-        XCTAssertLessThanOrEqual(renderer.stats.encodedRows, 1,
-                                 "the blink off-beat re-encodes at most the cursor row")
-        XCTAssertGreaterThanOrEqual(renderer.stats.reusedRows, 2)
+        XCTAssertEqual(renderer.stats.encodedRows, 0, "the blink off-beat only updates its overlay")
+        XCTAssertEqual(renderer.stats.reusedRows, 3)
 
         renderer.render(shown, to: target, clearColor: clear,
                         damage: TerminalDamage(rows: [], full: false))
-        XCTAssertLessThanOrEqual(renderer.stats.encodedRows, 1,
-                                 "the blink on-beat re-encodes at most the cursor row")
+        XCTAssertEqual(renderer.stats.encodedRows, 0, "the blink on-beat only updates its overlay")
+        XCTAssertEqual(renderer.stats.reusedRows, 3)
+        let pixels = readPixels(target, width: size.width, height: size.height)
+        XCTAssertTrue((0..<size.height).contains { y in
+            (0..<size.width).contains { x in
+                let pixel = pixels(x, y)
+                return Int(pixel.0) > Int(pixel.1) + 80 && Int(pixel.0) > Int(pixel.2) + 80
+            }
+        }, "the glyph under the cursor must receive its distinct red text color")
 
         let reference = try makeRenderer(device: device)
         reference.render(shown, to: fullTarget, clearColor: clear)
@@ -671,9 +700,8 @@ final class MetalRendererTests: XCTestCase {
         )
     }
 
-    func testSalvageExcludesGlyphInvertingCursorRow() throws {
-        // A visible block cursor bakes the cursor-text color into its row's glyph instances, so
-        // that row is never salvaged — it re-encodes under the new cursor key.
+    func testSalvageIncludesCursorRow() throws {
+        // Cursor inversion is a uniform, so its row remains eligible for content salvage.
         var first = frame("AAAA\r\nBBBB\r\nCCCC\r\nDDDD", cols: 8, rows: 4)
         first.cursor.visible = true
         first.cursor.style = .block
@@ -682,8 +710,8 @@ final class MetalRendererTests: XCTestCase {
         second.cursor.style = .block
         try assertSalvage(
             first: first, second: second,
-            expectedEncodedRows: 1,
-            "the glyph-inverting cursor row re-encodes; the rest salvage"
+            expectedEncodedRows: 0,
+            "all unchanged rows salvage, including the cursor row"
         )
     }
 
@@ -1207,7 +1235,7 @@ final class MetalRendererTests: XCTestCase {
         }
     }
 
-    func testRendererDamageRebuildsBlockCursorGlyphRowWhenBlinking() throws {
+    func testRendererDamageReusesBlockCursorGlyphRowWhenBlinking() throws {
         let (device, renderer) = try makeRenderer()
         var visible = frame("A", cols: 1, rows: 1)
         visible.cursor.visible = true
@@ -1232,8 +1260,8 @@ final class MetalRendererTests: XCTestCase {
             damage: TerminalDamage(rows: [], full: false)
         )
 
-        XCTAssertEqual(renderer.stats.encodedRows, 1, "cursor blink invalidates the glyph row")
-        XCTAssertEqual(renderer.stats.reusedRows, 0)
+        XCTAssertEqual(renderer.stats.encodedRows, 0, "cursor blink retains the glyph row")
+        XCTAssertEqual(renderer.stats.reusedRows, 1)
     }
 
     func testRendererDamageDoesNotReuseStableBuffersForInvalidFrameShape() throws {
@@ -1801,30 +1829,41 @@ final class MetalRendererTests: XCTestCase {
                     label: "block cursor fill over skipped cell", tolerance: 24)
     }
 
-    /// #66 review nit: in the ligated path, a combining-mark cluster cell under an inverting block
-    /// cursor must emit with the cursor TEXT color (parity with the single-glyph path), and keep its
-    /// own foreground when the cursor is elsewhere. The cluster here is `น้ำ`'s base cell (น + tone +
-    /// SARA AM's NIKHAHIT), which takes the `combining0 != 0` branch.
+    /// The shader must tint a combining cluster under a block cursor and restore its
+    /// foreground when the cursor moves, including when every glyph row is reused.
     func testClusterCellUnderCursorUsesCursorTextColor() throws {
-        let (_, renderer) = try makeRenderer()
-        let f = frame("น้ำ", cols: 6, rows: 1)
-        XCTAssertNotEqual(f.cells[0].combining0, 0, "cell 0 is a marked cluster (takes the cluster branch)")
-        let cursorText = RenderColor(red: 1, green: 0, blue: 0, alpha: 1) // distinct from any fg
-        let fgVec = SIMD4<Float>(f.cells[0].foreground.red, f.cells[0].foreground.green,
-                                 f.cells[0].foreground.blue, f.cells[0].foreground.alpha)
-        let cursorVec = SIMD4<Float>(1, 0, 0, 1)
-
-        // Cursor ON the cluster cell → first emitted glyph (the cluster bitmap) gets the cursor color.
-        let onCluster = renderer.emittedGlyphColorsForTesting(
-            row: 0, frame: f, cursorCell: (row: 0, column: 0), cursorTextColor: cursorText)
-        XCTAssertEqual(onCluster.first, cursorVec,
-                       "marked cluster under the cursor must use the cursor text color")
-
-        // Cursor on a DIFFERENT cell → the cluster keeps its own foreground.
-        let offCluster = renderer.emittedGlyphColorsForTesting(
-            row: 0, frame: f, cursorCell: (row: 0, column: 1), cursorTextColor: cursorText)
-        XCTAssertEqual(offCluster.first, fgVec,
-                       "marked cluster keeps its foreground when the cursor is elsewhere")
+        let (device, renderer) = try makeRenderer()
+        var shown = frame("น้ำ", cols: 6, rows: 1)
+        XCTAssertNotEqual(shown.cells[0].combining0, 0, "cell 0 contains the marked cluster")
+        for index in shown.cells.indices {
+            shown.cells[index].foreground = RenderColor(red: 1, green: 1, blue: 1, alpha: 1)
+        }
+        shown.cursor.row = 0; shown.cursor.column = 0
+        shown.cursor.textColor = RenderColor(red: 1, green: 0, blue: 0, alpha: 1)
+        shown.cursor.color = RenderColor(red: 0, green: 0, blue: 0.5, alpha: 1)
+        var moved = shown
+        moved.cursor.column = 5
+        let size = renderer.surfacePixelSize(columns: 6, rows: 1)
+        let target = try XCTUnwrap(makeTarget(device, width: size.width, height: size.height))
+        let clear = RenderColor(red: 0, green: 0, blue: 0, alpha: 1)
+        func hasRedGlyph() -> Bool {
+            let pixels = readPixels(target, width: size.width, height: size.height)
+            return (0..<size.height).contains { y in
+                (0..<renderer.cellPixelWidth).contains { x in
+                    let pixel = pixels(x, y)
+                    return Int(pixel.0) > Int(pixel.1) + 80 && Int(pixel.0) > Int(pixel.2) + 80
+                }
+            }
+        }
+        for ligatures in [false, true] {
+            XCTAssertTrue(renderer.render(shown, to: target, clearColor: clear,
+                                          ligatures: ligatures, damage: TerminalDamage(full: true)))
+            XCTAssertTrue(hasRedGlyph(), "the cluster must receive cursor text color")
+            XCTAssertTrue(renderer.render(moved, to: target, clearColor: clear,
+                                          ligatures: ligatures, damage: TerminalDamage(rows: [], full: false)))
+            XCTAssertEqual(renderer.stats.encodedRows, 0)
+            XCTAssertFalse(hasRedGlyph(), "the reused cluster must restore its foreground")
+        }
     }
 
     func testRepeatedRendersReuseInstanceBuffersWithoutCorruption() throws {

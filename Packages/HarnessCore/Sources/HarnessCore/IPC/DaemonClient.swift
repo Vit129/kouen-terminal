@@ -12,8 +12,6 @@ public final class DaemonClient: @unchecked Sendable {
     /// Where this client connects. Defaults to the local daemon's control socket, so every existing
     /// `DaemonClient()` call is unchanged; a remote client passes the local end of an SSH tunnel.
     private let endpoint: Endpoint
-    private let capabilityLock = NSLock()
-    private var attachStreamSupported: Bool?
 
     public init(endpoint: Endpoint = .localControlSocket) {
         self.endpoint = endpoint
@@ -33,22 +31,20 @@ public final class DaemonClient: @unchecked Sendable {
         }
     }
 
-    /// Explicit response negotiation for layout-bearing calls. Probe each time because
-    /// the active daemon can change while a client remains alive.
+    /// Layout-bearing calls advertise the current client's supported content directly.
+    /// The coordinated protocol cutover makes a separate health probe unnecessary.
     public func requestForCurrentClient(_ request: IPCRequest, timeout: TimeInterval = 2) throws -> IPCResponse {
         switch request {
-        case .getSnapshot, .library:
-            guard case let .daemonStats(stats) = try self.request(.daemonStats, timeout: min(timeout, 2)) else { throw DaemonClientError.unexpectedResponse }
-            if stats.supports(DaemonStats.paneContent) {
-                switch request {
-                case .getSnapshot: return try self.request(.getSnapshotForClient(capabilities: [DaemonStats.paneContent, DaemonStats.agentIdentities]), timeout: timeout)
-                case let .library(operation): return try self.request(.libraryForClient(operation, capabilities: [DaemonStats.paneContent, DaemonStats.agentIdentities]), timeout: timeout)
-                default: break
-                }
-            }
-        default: break
+        case .getSnapshot:
+            StartupMetrics.shared.mark(.firstSnapshotRequestStarted)
+            let response = try self.request(.getSnapshotForClient(capabilities: [DaemonStats.paneContent, DaemonStats.agentIdentities]), timeout: timeout)
+            StartupMetrics.shared.mark(.firstSnapshotResponseReceived)
+            return response
+        case let .library(operation):
+            return try self.request(.libraryForClient(operation, capabilities: [DaemonStats.paneContent, DaemonStats.agentIdentities]), timeout: timeout)
+        default:
+            return try self.request(request, timeout: timeout)
         }
-        return try self.request(request, timeout: timeout)
     }
 
     @discardableResult
@@ -65,74 +61,6 @@ public final class DaemonClient: @unchecked Sendable {
         let subscription = DaemonSubscription(fd: fd)
         subscription.start(onData: onData, onEnd: onEnd)
         if RemoteAttach.isTunnel(endpoint) { subscription.presentAsTunnel() }
-        return subscription
-    }
-
-    /// Gap-free attach: subscribe FIRST (buffering live output), then replay scrollback, deliver the
-    /// replayed history via `onReplay`, flush the buffered live frames DEDUPED against the replay's
-    /// end sequence, and stream the rest via `onData`. This closes the replay→subscribe window where
-    /// bytes appended between the replay snapshot and handler registration were persisted but never
-    /// delivered (the daemon does no backfill).
-    ///
-    /// Ordering is preserved end to end: live frames buffer inside the subscription until
-    /// `flushBuffered` runs, so `onReplay` (history) is always delivered before any live byte, and
-    /// the flush + live frames share one ordered sink. The caller's `onReplay`/`onData` decide the
-    /// delivery thread (e.g. the GUI hops to main); this method only guarantees the *call* order.
-    ///
-    /// Compatibility: uses `replayScrollbackSequenced` to learn the dedup boundary. An old daemon
-    /// rejects that request (`.error`), so we fall back to plain `replayScrollback`. Without a
-    /// boundary the buffered frames can't be deduped against the replay — and that replay (taken
-    /// after the subscribe) already covers them — so on the old-daemon path we DISCARD the buffer
-    /// and restore the original replay-then-subscribe ordering: no double-delivery, at the cost of
-    /// the small historical gap an old daemon's missing boundary makes unavoidable. The probe, not
-    /// just the dedup, decides ordering. `fromSequence` is passed through (nil = full history).
-    @discardableResult
-    public func attachReplayingSurfaceOutput(
-        surfaceID: String,
-        label: String? = nil,
-        fromSequence: UInt64? = nil,
-        readOnly: Bool = false,
-        replayTimeout: TimeInterval = 5,
-        onReplay: @escaping @Sendable (String) -> Void,
-        onData: @escaping @Sendable (Data, UInt64) -> Void,
-        onEnd: (@Sendable () -> Void)? = nil
-    ) throws -> DaemonSubscription {
-        // 1. Subscribe first, buffering live frames (do NOT deliver yet).
-        let deadline = SocketDeadline(timeout: 2)
-        let fd = try EndpointConnector.connect(endpoint, deadline: deadline)
-        let subscribe: IPCRequest = readOnly
-            ? .subscribeSurfaceOutputReadOnly(surfaceID: surfaceID, label: label)
-            : .subscribeSurfaceOutput(surfaceID: surfaceID, label: label)
-        let payload = try IPCCodec.encode(IPCEnvelope(request: subscribe))
-        do { try deadline.write(payload, to: fd) } catch { close(fd); throw error }
-        let subscription = DaemonSubscription(fd: fd)
-        subscription.start(onData: onData, onEnd: onEnd, buffered: true)
-
-        // 2. Replay AFTER the subscription is live, so every byte the replay omits is already in the
-        //    buffer. Prefer the sequenced replay (gives the dedup boundary); on an old daemon that
-        //    rejects it, fall back to the plain replay — and remember we got NO usable boundary.
-        var replayText = ""
-        var endSequence: UInt64 = 0
-        var haveBoundary = false
-        if case let .replayResult(text, end)? = try? request(.replayScrollbackSequenced(surfaceID: surfaceID, fromSequence: fromSequence), timeout: replayTimeout) {
-            replayText = text
-            endSequence = end
-            haveBoundary = true
-        } else if case let .text(text)? = try? request(.replayScrollback(surfaceID: surfaceID, fromSequence: fromSequence), timeout: replayTimeout) {
-            replayText = text // legacy daemon: no usable boundary
-        }
-
-        // 3. Deliver the replayed history, THEN release the buffered live frames. With a real
-        //    boundary, flush deduped (gap-free). Without one (old daemon), discard the buffer and
-        //    fall back to replay-then-subscribe ordering — the replay already covers the buffered
-        //    tail, so flushing it would double-deliver. The caller's sink keeps both in one order.
-        if RemoteAttach.isTunnel(endpoint) { subscription.presentAsTunnel() }
-        onReplay(replayText)
-        if haveBoundary {
-            subscription.flushBuffered(droppingSequencesBelow: endSequence, onData: onData)
-        } else {
-            subscription.discardBufferedAndDeliverDirect()
-        }
         return subscription
     }
 
@@ -162,7 +90,7 @@ public final class DaemonClient: @unchecked Sendable {
 
     /// Attach to a surface's output with its history. On a daemon with `attach-stream` this
     /// is one request: the history streams as binary frames (no JSON size cap) and a known
-    /// `resume` point sends only what was missed. An older daemon gets subscribe + replay.
+    /// `resume` point sends only what was missed. All controlling clients use the current streaming protocol.
     /// `onStart` runs before any `onData`, on the subscription's read thread.
     @discardableResult
     public func attach(
@@ -170,34 +98,24 @@ public final class DaemonClient: @unchecked Sendable {
         label: String? = nil,
         readOnly: Bool = false,
         resume: AttachPoint? = nil,
+        launch: AttachLaunch? = nil,
+        acknowledgesOutput: Bool = false,
         onStart: @escaping @Sendable (AttachStart) -> Void,
         onData: @escaping @Sendable (Data, UInt64) -> Void,
         onOwnership: (@Sendable (SizeOwnership) -> Void)? = nil,
         onEnd: (@Sendable () -> Void)? = nil
     ) throws -> DaemonSubscription {
-        guard supportsAttachStream() else {
-            // The replay is history at sequence 0; live frames count from 1 so none is taken for it.
-            return try attachReplayingSurfaceOutput(
-                surfaceID: surfaceID, label: label, readOnly: readOnly,
-                onReplay: { text in
-                    onStart(AttachStart(resync: true, historyEnd: 1, point: nil))
-                    if !text.isEmpty { onData(Data(text.utf8), 0) }
-                },
-                onData: { data, sequence in onData(data, max(sequence, 1)) },
-                onEnd: onEnd
-            )
-        }
         let request = AttachRequest(
             surfaceID: surfaceID, label: label, readOnly: readOnly, history: true,
-            fromSequence: resume?.sequence, epoch: resume?.epoch, inputErrors: true
+            fromSequence: resume?.sequence, epoch: resume?.epoch, inputErrors: true, launch: launch, acknowledgesOutput: acknowledgesOutput
         )
-        return try attachStream(request, onAttached: { reply in
+        return try attachStream(request, onAttached: { reply, _ in
             onStart(AttachStart(
                 resync: reply.resync, historyEnd: reply.endSequence,
                 point: AttachPoint(epoch: reply.epoch, sequence: reply.endSequence), screen: reply.screen,
                 replaySizes: reply.replaySizes
             ))
-        }, onData: onData, onOwnership: onOwnership, onEnd: onEnd)
+        }, onData: { data, sequence, _ in onData(data, sequence) }, onOwnership: onOwnership, onEnd: onEnd)
     }
 
     /// The `attachStream` request itself: `.attached`, then output frames. `harness-cli attach`
@@ -205,8 +123,8 @@ public final class DaemonClient: @unchecked Sendable {
     @discardableResult
     public func attachStream(
         _ request: AttachRequest,
-        onAttached: @escaping @Sendable (AttachReply) -> Void,
-        onData: @escaping @Sendable (Data, UInt64) -> Void,
+        onAttached: @escaping @Sendable (AttachReply, @escaping @Sendable () -> Void) -> Void,
+        onData: @escaping @Sendable (Data, UInt64, @escaping @Sendable () -> Void) -> Void,
         onResize: (@Sendable (ReplaySize) -> Void)? = nil,
         onOwnership: (@Sendable (SizeOwnership) -> Void)? = nil,
         onEnd: (@Sendable () -> Void)? = nil,
@@ -220,9 +138,15 @@ public final class DaemonClient: @unchecked Sendable {
         subscription.start(onResponse: { [weak subscription] response in
             switch response {
             case let .attached(reply):
+                guard !request.acknowledgesOutput || reply.outputToken != nil else {
+                    onError?("The daemon lacks acknowledged terminal output. Restart the updated daemon and session host before attaching.")
+                    subscription?.cancel(); return
+                }
                 subscription?.setInputErrorSupport(reply.inputErrors == true)
-                onAttached(reply)
-            case let .data(data, sequence): onData(data, sequence)
+                subscription?.setOutputToken(reply.outputToken, surfaceID: request.surfaceID)
+                onAttached(reply) { [weak subscription] in subscription?.acknowledgeOutput(surfaceID: request.surfaceID, sequence: reply.endSequence) }
+            case let .data(data, sequence):
+                onData(data, sequence) { [weak subscription] in subscription?.acknowledgeOutput(surfaceID: request.surfaceID, sequence: sequence + UInt64(data.count)) }
             case let .terminalResize(size): onResize?(size)
             case let .sizeOwnership(ownership): onOwnership?(ownership)
             case let .error(message): onError?(message)
@@ -233,19 +157,6 @@ public final class DaemonClient: @unchecked Sendable {
         return subscription
     }
 
-    /// Whether the daemon has `attach-stream`. Remembered once the daemon answers; a probe
-    /// that fails (daemon starting, tunnel not up) is asked again next time.
-    public func supportsAttachStream() -> Bool {
-        capabilityLock.lock()
-        if let known = attachStreamSupported { capabilityLock.unlock(); return known }
-        capabilityLock.unlock()
-        guard case let .daemonStats(stats)? = try? request(.daemonStats, timeout: 2) else { return false }
-        let supported = stats.capabilities?.contains(DaemonStats.attachStream) == true
-        capabilityLock.lock()
-        attachStreamSupported = supported
-        capabilityLock.unlock()
-        return supported
-    }
 
     /// Long-lived snapshot subscription: invokes `onRevision` each time the daemon
     /// pushes a `snapshotChanged(revision:)` frame (i.e. the layout committed). Replaces
@@ -357,18 +268,8 @@ public final class DaemonClient: @unchecked Sendable {
 
 /// Live output stream over a dedicated socket.
 ///
-/// The read loop runs a *blocking* `read(fd)` on `queue`, so it parks that queue for the
-/// subscription's whole lifetime (an idle daemon keeps the socket open, so `read()` does
-/// not return on its own). Cancellation therefore must NOT funnel through `queue` — a
-/// `queue.sync` would wait behind the read loop forever, and the `close(fd)` that would
-/// wake the loop is exactly what's trapped behind it. That self-deadlock froze the main
-/// thread whenever a tab/pane closed and its `TerminalHostView` deinit called `cancel()`.
-///
-/// Instead `cancel()` flips a lock-guarded flag and `shutdown(2)`s the socket to wake the
-/// blocked `read()`. The read loop then observes EOF, exits, and owns the final `close(fd)`
-/// so the descriptor is closed exactly once and never while another thread might read it.
-///
-/// @unchecked Sendable: `fd` is immutable; `cancelled`/`finished` are guarded by `lock`.
+/// A nonblocking subscription. Its read source owns the descriptor until cancellation
+/// completes; input writes remain serialized independently of output delivery.
 public final class DaemonSubscription: @unchecked Sendable {
     private let fd: Int32
     private let queue = DispatchQueue(label: "com.robert.harness.daemon-subscription")
@@ -378,32 +279,18 @@ public final class DaemonSubscription: @unchecked Sendable {
     /// the cancel flags) so a blocking write can't wedge `cancel()`. Uncontended in practice —
     /// input is already serialized upstream on the host's IO queue.
     private let writeLock = NSLock()
+    private let acknowledgementQueue = DispatchQueue(label: "com.robert.harness.output-acknowledgement")
+    private var acknowledgementScheduled = false
+    private var acknowledgements: [String: (UUID, UInt64)] = [:]
+    private var outputTokens: [String: UUID] = [:]
     private var cancelled = false
     private var finished = false
-
-    /// Gap-free attach buffering. While `buffering` is true the output read loop stashes live
-    /// `(data, sequence)` frames here instead of delivering them, so a subscription can be
-    /// established BEFORE the scrollback replay is taken without the live frames racing ahead of
-    /// the replayed history. `flushBuffered(droppingSequencesBelow:)` drains them in order — minus
-    /// any whose sequence is already inside the replay — and switches to direct delivery. Guarded
-    /// by `bufferLock` (distinct from `lock`/`writeLock`, which guard teardown/writes).
-    private let bufferLock = NSLock()
-    private var buffering = false
-    private var pendingFrames: [(Data, UInt64)] = []
-    /// Running byte total of `pendingFrames`, so the cap check stays O(1) on the read hot path.
-    private var pendingBytes = 0
-    /// Cap on buffered live output while a replay is outstanding. A flooding surface against a slow
-    /// daemon could otherwise buffer the entire replay window (default 5 s) of output in memory.
-    /// On overflow we drop the OLDEST buffered frames (a byte ring) to stay under the cap, set
-    /// `bufferOverflowed`, and at flush time skip dedup — dropping-oldest broke buffer contiguity,
-    /// so the replay-boundary dedup can no longer prove which frames are duplicates; delivering all
-    /// remaining frames after the replay risks a momentary visible duplication but never drops live
-    /// output, and bounds memory. A few MiB is far above any real terminal's per-replay-window
-    /// output yet small enough that the worst-case flush is a single bounded `onData`.
-    private static let maxPendingBufferBytes = 4 * 1024 * 1024
-    /// Set once `pendingFrames` had to drop a frame to respect the cap (see above): tells
-    /// `flushBuffered` to skip dedup and deliver everything that survived.
-    private var bufferOverflowed = false
+    private var reader: DispatchSourceRead?
+    private var readerSuspended = false
+    private var readingPaused = false
+    private var readBuffer = IPCReadBuffer()
+    private var scratch = [UInt8](repeating: 0, count: 65536)
+    private var responseHandler: (@Sendable (IPCResponse) -> Void)?
 
     init(fd: Int32) {
         self.fd = fd
@@ -448,6 +335,37 @@ public final class DaemonSubscription: @unchecked Sendable {
             : try? IPCCodec.encode(IPCEnvelope(request: .sendData(surfaceID: surfaceID, data: data)))
         guard let payload else { return false }
         return writeFrame(payload)
+    }
+
+    fileprivate func setOutputToken(_ token: UUID?, surfaceID: String) {
+        lock.lock(); outputTokens[surfaceID] = token; acknowledgements.removeValue(forKey: surfaceID); lock.unlock()
+    }
+
+    /// Coalesce consumption fences off the parser worker; never block parsing on a socket write.
+    public func acknowledgeOutput(surfaceID: String, sequence: UInt64) {
+        lock.lock()
+        guard !cancelled, !finished, let token = outputTokens[surfaceID] else { lock.unlock(); return }
+        let prior = acknowledgements[surfaceID].map { $0.0 == token ? $0.1 : 0 } ?? 0
+        acknowledgements[surfaceID] = (token, max(prior, sequence))
+        let schedule = !acknowledgementScheduled
+        acknowledgementScheduled = true
+        lock.unlock()
+        guard schedule else { return }
+        acknowledgementQueue.async { [weak self] in
+            guard let self else { return }
+            while true {
+                self.lock.lock()
+                let fences = self.acknowledgements
+                self.acknowledgements.removeAll(keepingCapacity: true)
+                if fences.isEmpty { self.acknowledgementScheduled = false }
+                self.lock.unlock()
+                guard !fences.isEmpty else { return }
+                for (surfaceID, fence) in fences {
+                    guard let payload = try? IPCCodec.encode(IPCEnvelope(request: .acknowledgeOutput(surfaceID: surfaceID, token: fence.0, sequence: fence.1))),
+                          self.writeFrame(payload) else { return }
+                }
+            }
+        }
     }
 
     /// Mark this subscription as an SSH-tunneled client so a dropped forward emits
@@ -518,202 +436,106 @@ public final class DaemonSubscription: @unchecked Sendable {
 
     public func cancel() {
         lock.lock()
-        defer { lock.unlock() }
-        guard !cancelled, !finished else { return }
+        guard !cancelled, !finished else { lock.unlock(); return }
         cancelled = true
-        // Wake the blocked read() without touching `queue`. Holding `lock` while we call
-        // shutdown — paired with the read loop setting `finished` under the same lock
-        // before it closes — guarantees `fd` is still open here, so we never shutdown a
-        // descriptor the loop already closed and the OS may have recycled.
-        shutdown(fd, Int32(SHUT_RDWR)) // SHUT_RDWR is `Int` on Glibc, `Int32` on Darwin
+        shutdown(fd, Int32(SHUT_RDWR))
+        lock.unlock()
+        queue.async { [weak self] in self?.finishReading() }
     }
 
-    /// Output-stream convenience: forwards `.data` frames to `onData`.
-    ///
-    /// When `buffered` is true the loop starts in buffering mode (see `beginBuffering`): live frames
-    /// are stashed until `flushBuffered(droppingSequencesBelow:)` releases them. The caller uses this
-    /// to subscribe BEFORE the replay snapshot and then dedupe — closing the replay→subscribe gap.
-    func start(
-        onData: @escaping @Sendable (Data, UInt64) -> Void,
-        onEnd: (@Sendable () -> Void)?,
-        buffered: Bool = false
-    ) {
-        if buffered { beginBuffering() }
-        start(
-            onResponse: { [weak self] in
-                guard case let .data(data, sequence) = $0 else { return }
-                // While buffering, stash in order under `bufferLock`; the flush drains these and
-                // flips to direct delivery atomically, so no frame is lost or reordered at the seam.
-                if let self {
-                    self.bufferLock.lock()
-                    if self.buffering {
-                        self.pendingFrames.append((data, sequence))
-                        self.pendingBytes += data.count
-                        // Bound the buffer: under a flood + slow replay, drop the OLDEST frames so
-                        // memory stays capped. Dropping-oldest (not refusing the newest) keeps the
-                        // freshest output; the `bufferOverflowed` flag makes the flush skip dedup so
-                        // a dropped frame can never be mistaken for a kept one.
-                        while self.pendingBytes > Self.maxPendingBufferBytes,
-                              self.pendingFrames.count > 1 {
-                            let evicted = self.pendingFrames.removeFirst()
-                            self.pendingBytes -= evicted.0.count
-                            self.bufferOverflowed = true
-                        }
-                        self.bufferLock.unlock()
-                        return
-                    }
-                    self.bufferLock.unlock()
-                }
-                onData(data, sequence)
-            },
-            onEnd: onEnd
-        )
+    public func pauseReading() {
+        lock.lock(); readingPaused = true; lock.unlock()
+        queue.async { [weak self] in self?.updateReadSuspension() }
     }
 
-    /// Arm buffering before the read loop starts (called from `start(…, buffered: true)`).
-    private func beginBuffering() {
-        bufferLock.lock(); buffering = true; bufferLock.unlock()
-    }
-
-    /// Test-only: how many live frames are currently held in the buffer (before a flush). Lets a
-    /// deterministic test wait for the read loop to stash all frames without timing guesswork.
-    func bufferedFrameCountForTesting() -> Int {
-        bufferLock.lock(); defer { bufferLock.unlock() }; return pendingFrames.count
-    }
-
-    /// Release buffered live frames in arrival order, dropping any whose sequence is already inside
-    /// the replay (`sequence < endSequence`), then switch to direct delivery — all under `bufferLock`
-    /// so a frame arriving mid-flush either lands in `pendingFrames` (drained here, in order) or is
-    /// delivered directly after the flag flips, never both and never out of order. `onData` is the
-    /// SAME closure the read loop forwards to, so flushed and live frames share one ordered sink.
-    ///
-    /// The surviving frames are CONCATENATED into a single `onData` call (their bytes are already in
-    /// order, and the coalesced frame keeps its FIRST byte's sequence), so a large buffer
-    /// flushes as ONE main-thread hop instead of one per frame — the per-frame `main.async` storm
-    /// the old loop caused under a big buffer.
-    ///
-    /// If the buffer overflowed its byte cap (oldest frames were dropped to bound memory), dedup is
-    /// SKIPPED: dropping-oldest broke buffer contiguity so `endSequence` can no longer prove which
-    /// remaining frames are replay duplicates. Everything that survived is delivered after the
-    /// replay — a momentary visible duplication is possible under that pathological flood, but no
-    /// live output is lost and memory stayed bounded.
-    ///
-    /// Returns the number of frames dropped as duplicates (0 when overflowed / boundary 0).
-    @discardableResult
-    func flushBuffered(
-        droppingSequencesBelow endSequence: UInt64,
-        onData: @Sendable (Data, UInt64) -> Void
-    ) -> Int {
-        bufferLock.lock()
-        defer { bufferLock.unlock() }
-        let skipDedup = bufferOverflowed || endSequence == 0
-        var dropped = 0
-        var coalesced = Data()
-        var firstSequence: UInt64 = 0
-        for (data, sequence) in pendingFrames {
-            if !skipDedup, sequence < endSequence { dropped += 1; continue }
-            if coalesced.isEmpty { firstSequence = sequence }
-            coalesced.append(data)
+    public func resumeReading() {
+        lock.lock(); readingPaused = false; lock.unlock()
+        queue.async { [weak self] in
+            guard let self else { return }
+            self.updateReadSuspension()
+            self.readReady()
         }
-        if !coalesced.isEmpty { onData(coalesced, firstSequence) }
-        pendingFrames.removeAll(keepingCapacity: false)
-        pendingBytes = 0
-        bufferOverflowed = false
-        buffering = false
-        return dropped
     }
 
-    /// Old-daemon attach path: a daemon too old to answer `replayScrollbackSequenced` gives no
-    /// dedup boundary, so the buffered live frames can't be deduped against the plain replay text —
-    /// and that replay (taken AFTER the subscribe) already covers the buffered tail, so flushing
-    /// them re-shows the overlap. Restore the ORIGINAL replay-then-subscribe ordering instead:
-    /// DROP everything buffered (it's a subset of the replay text, modulo the same tiny historical
-    /// gap the pre-buffering code always had) and switch to direct delivery for subsequent live
-    /// frames. No double-delivery; the only cost is the historical gap an old daemon can't avoid.
-    /// Like `flushBuffered`, runs under `bufferLock` so the flag flip and the buffer drop are atomic
-    /// against a frame arriving mid-call.
-    func discardBufferedAndDeliverDirect() {
-        bufferLock.lock()
-        defer { bufferLock.unlock() }
-        pendingFrames.removeAll(keepingCapacity: false)
-        pendingBytes = 0
-        bufferOverflowed = false
-        buffering = false
+    private func updateReadSuspension() {
+        lock.lock(); let paused = readingPaused; lock.unlock()
+        guard let reader else { return }
+        if paused && !readerSuspended { reader.suspend(); readerSuspended = true }
+        if !paused && readerSuspended { reader.resume(); readerSuspended = false }
+    }
+    func start(onData: @escaping @Sendable (Data, UInt64) -> Void, onEnd: (@Sendable () -> Void)?) {
+        start(onResponse: { response in
+            if case let .data(data, sequence) = response { onData(data, sequence) }
+        }, onEnd: onEnd)
     }
 
-    /// Generic read loop: decodes every pushed reply and forwards its response. Used by
-    /// both output (`.data`) and snapshot (`.snapshotChanged`) subscriptions.
     func start(
         onResponse: @escaping @Sendable (IPCResponse) -> Void,
         onEnd: (@Sendable () -> Void)?
     ) {
-        queue.async { [weak self, fd] in
-            // `IPCReadBuffer`, not `Data`: this loop runs for the life of the subscription and a
-            // busy PTY delivers thousands of ~1 KiB frames/s — `Data.removeFirst` per frame is an
-            // O(remaining) shift (quadratic under flood); the offset buffer consumes in O(1).
-            var buffer = IPCReadBuffer()
-            var temp = [UInt8](repeating: 0, count: 65_536)
-            outer: while true {
-                var ready = pollfd(fd: fd, events: Int16(POLLIN), revents: 0)
-                let polled = poll(&ready, 1, -1)
-                if polled < 0, errno == EINTR { continue }
-                if polled < 0 || ready.revents & Int16(POLLNVAL) != 0 { break }
-                let count = read(fd, &temp, temp.count)
-                if count < 0, errno == EINTR || errno == EAGAIN || errno == EWOULDBLOCK { continue }
-                if count <= 0 { break }
-                buffer.append(temp, count: count)
-                while true {
-                    let decoded: IPCCodec.DecodedReplyFrame?
-                    do { decoded = try IPCCodec.decodeReplyOrData(from: &buffer) }
-                    catch { break outer } // oversized/garbage frame — unrecoverable on a stream
-                    guard let decoded else { break }
-                    switch decoded {
-                    case let .reply(response):
-                        if case let .inputRejected(message) = response, let self {
-                            self.lock.lock()
-                            let handler = self.inputErrorHandler
-                            self.lock.unlock()
-                            handler?(message)
-                        }
-                        if case let .error(message) = response, let self {
-                            self.lock.lock()
-                            let handler = self.inputErrorHandler
-                            self.lock.unlock()
-                            handler?(message)
-                        }
-                        onResponse(response)
-                        // A subscription connection only carries `.ok`/`.error` acks before `.data`
-                        // flows. An `.error` means the subscribe was rejected (e.g. surface gone) and
-                        // the daemon leaves the fd open — so the read loop would block forever and
-                        // `onEnd` would never fire. Treat it as fatal (like EOF) so callers (GUI
-                        // reconnect, CLI attach) finish and can retry instead of hanging.
-                        if case .error = response { break outer }
-                    // Binary output frame → present it as `.data` so `onData` consumers (app +
-                    // every CLI attach client) are unchanged and get the no-base64 fast path free.
-                    case let .output(data, sequence): onResponse(.data(data, sequence: sequence))
-                    }
+        queue.async { [self] in
+            responseHandler = onResponse
+            _ = fcntl(fd, F_SETFL, fcntl(fd, F_GETFL) | O_NONBLOCK)
+            let source = DispatchSource.makeReadSource(fileDescriptor: fd, queue: queue)
+            source.setEventHandler { [weak self] in self?.readReady() }
+            let descriptor = fd, descriptorWriteLock = writeLock
+            source.setCancelHandler {
+                descriptorWriteLock.lock(); close(descriptor); descriptorWriteLock.unlock()
+                onEnd?()
+            }
+            reader = source; source.resume()
+            lock.lock(); let dead = cancelled || finished; lock.unlock()
+            if dead { finishReading() } else { updateReadSuspension() }
+        }
+    }
+
+    private func readReady() {
+        guard reader != nil else { return }
+        for _ in 0..<16 {
+            while true {
+                lock.lock(); let dead = cancelled || finished, paused = readingPaused; lock.unlock()
+                if dead { finishReading(); return }
+                if paused { updateReadSuspension(); return }
+                let decoded: IPCCodec.DecodedReplyFrame?
+                do { decoded = try IPCCodec.decodeReplyOrData(from: &readBuffer) }
+                catch { finishReading(); return }
+                guard let decoded else { break }
+                switch decoded {
+                case let .reply(response):
+                    if case let .inputRejected(message) = response { reportInputFailure(message) }
+                    if case let .error(message) = response { reportInputFailure(message) }
+                    responseHandler?(response)
+                    if case .error = response { finishReading(); return }
+                case let .output(data, sequence): responseHandler?(.data(data, sequence: sequence))
                 }
             }
-            if let self {
-                // Close `fd` under `writeLock` so an in-flight `writeFrame` completes first and any
-                // later writer sees `finished` and bails — never a write into a closed/recycled fd.
-                // Liveness: a blocked write here is released by `cancel()`'s shutdown or the peer's
-                // close (EPIPE), so this never hangs teardown.
-                self.writeLock.lock()
-                self.lock.lock()
-                self.finished = true
-                self.lock.unlock()
-                close(fd)
-                self.writeLock.unlock()
-            } else {
-                close(fd)
-            }
-            onEnd?()
+            let count = scratch.withUnsafeMutableBytes { read(fd, $0.baseAddress, $0.count) }
+            if count < 0, errno == EINTR { continue }
+            if count < 0, errno == EAGAIN || errno == EWOULDBLOCK { return }
+            if count <= 0 { finishReading(); return }
+            readBuffer.append(scratch, count: count)
         }
+        // The last read may have filled complete frames even if the socket is now empty.
+        queue.async { [weak self] in self?.readReady() }
+    }
+
+    private func reportInputFailure(_ message: String) {
+        lock.lock(); let handler = inputErrorHandler; lock.unlock()
+        handler?(message)
+    }
+
+    private func finishReading() {
+        guard let source = reader else { return }
+        lock.lock(); finished = true; lock.unlock()
+        if readerSuspended { source.resume(); readerSuspended = false }
+        reader = nil; responseHandler = nil; readBuffer.removeAll()
+        source.setEventHandler {}; source.cancel()
     }
 
     deinit {
         cancel()
+        if readerSuspended { reader?.resume() }
+        reader?.cancel()
     }
 }
 

@@ -1,0 +1,26 @@
+{
+  "consumer": {
+    "ansi_sgr": {
+      "samples": 5,
+      "median_consumer_ms": 944.872167,
+      "median_consumer_mbps": 71.02432195994614
+    },
+    "plain_ascii": {
+      "samples": 5,
+      "median_consumer_ms": 941.644625,
+      "median_consumer_mbps": 71.26768445155199
+    },
+    "unicode_mixed": {
+      "samples": 5,
+      "median_consumer_ms": 1110.808166,
+      "median_consumer_mbps": 60.41448114453275
+    }
+  },
+  "agent-consumer": {
+    "agent_session": {
+      "samples": 5,
+      "median_consumer_ms": 3.578208,
+      "median_consumer_mbps": 1.3274801241291732
+    }
+  }
+}

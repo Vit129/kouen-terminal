@@ -84,12 +84,14 @@ public final class GlyphRasterizer {
     /// compositor / headless tests) where the font isn't activated — they keep the existing
     /// `CTFontCreateForString` path unchanged.
     private let symbolFont: CTFont?
+    private let preferredFallbackFonts: [CTFont]
     // iOS can choose Apple Color Emoji for text-default symbols such as U+23FA.
     // Keep a monochrome fallback without changing actual emoji or their variation selectors.
-    private lazy var textSymbolFonts: [CTFont] = ["Menlo", "AppleSymbols"].map {
+    private lazy var textSymbolFonts: [CTFont] = preferredFallbackFonts + ["Menlo", "AppleSymbols"].map {
         CTFontCreateWithName($0 as CFString, pointSize, nil)
     }
     private let grayColorSpace = CGColorSpaceCreateDeviceGray()
+    private let sourceColorSpace = CGColorSpace(name: CGColorSpace.sRGB)!
     private let rgbColorSpace: CGColorSpace
     private let shapedRunCacheLimit: Int
     // Stores non-Sendable CTFont-bearing shaped glyphs; this rasterizer is single-surface,
@@ -158,6 +160,9 @@ public final class GlyphRasterizer {
         italicPSName = CTFontCopyPostScriptName(italic) as String
         boldItalicPSName = CTFontCopyPostScriptName(boldItalic) as String
         symbolFont = Self.resolveSymbolFallback(size: resolvedFont.pointSize)
+        preferredFallbackFonts = resolvedFont.fallbackFamilies.compactMap {
+            TerminalFontResolver.exactFont(named: $0, size: resolvedFont.pointSize)?.font
+        }
     }
 
     private static func applyTraits(_ font: CTFont, size: CGFloat, add traits: CTFontSymbolicTraits) -> CTFont {
@@ -229,6 +234,9 @@ public final class GlyphRasterizer {
         // Box-drawing characters are rendered procedurally (cell-sized sprite) so they tile
         // seamlessly across cells regardless of the font.
         if BoxDrawing.supported(codepoint) { return rasterizeBox(codepoint) }
+        if !fontResolution.features.isEmpty && !Self.isNerdFontCodepoint(codepoint) {
+            return rasterize(cluster: String(scalar), bold: isBold, italic: isItalic)
+        }
         let primary = font(bold: isBold, italic: isItalic)
         var chosenFont = primary
         if codepoint > 0x7F, scalar.properties.isEmoji, !scalar.properties.isEmojiPresentation {
@@ -237,6 +245,17 @@ public final class GlyphRasterizer {
         let glyph: CGGlyph
         if let g = glyphID(for: codepoint, in: chosenFont) {
             glyph = g
+        } else if let preferred = preferredFallbackFonts.first(where: { glyphID(for: codepoint, in: $0) != nil }),
+                  let g = glyphID(for: codepoint, in: preferred) {
+            let traits = CTFontGetSymbolicTraits(primary).intersection([.traitBold, .traitItalic])
+            let styled = Self.applyTraits(preferred, size: pointSize, add: traits)
+            if let styledGlyph = glyphID(for: codepoint, in: styled) {
+                chosenFont = styled
+                glyph = styledGlyph
+            } else {
+                chosenFont = preferred
+                glyph = g
+            }
         } else if Self.isNerdFontCodepoint(codepoint), let sym = symbolFont,
                   let g = glyphID(for: codepoint, in: sym) {
             // Nerd Font / Powerline icon the primary font lacks → draw it from the bundled symbol
@@ -273,11 +292,11 @@ public final class GlyphRasterizer {
     /// byte-identical. Returns nil for no-ink clusters.
     public func rasterize(cluster: String, bold isBold: Bool = false, italic isItalic: Bool = false) -> RasterizedGlyph? {
         let scalars = Array(cluster.unicodeScalars)
-        if scalars.count <= 1 {
+        if scalars.count <= 1 && fontResolution.features.isEmpty {
             return scalars.first.flatMap { rasterize(codepoint: $0.value, bold: isBold, italic: isItalic) }
         }
         let base = font(bold: isBold, italic: isItalic)
-        if scalars.count == 2, scalars.last?.value == 0xFE0E,
+        if scalars.count == 1 || (scalars.count == 2 && scalars.last?.value == 0xFE0E),
            let textFont = textPresentationFont(for: cluster, base: base),
            let glyph = glyphID(for: scalars[0].value, in: textFont) {
             return render(glyph: glyph, font: textFont)
@@ -301,20 +320,28 @@ public final class GlyphRasterizer {
         let bounds = CTLineGetBoundsWithOptions(line, .useGlyphPathBounds)
         guard bounds.width > 0, bounds.height > 0 else { return nil }
 
+        let hasFallback = (CTLineGetGlyphRuns(line) as? [CTRun] ?? []).contains { run in
+            let attributes = CTRunGetAttributes(run) as NSDictionary
+            guard let value = attributes[kCTFontAttributeName as String],
+                  CFGetTypeID(value as CFTypeRef) == CTFontGetTypeID() else { return false }
+            return !isPrimaryFont(value as! CTFont)
+        }
+        let drawingScale = scale * (hasFallback ? fallbackInkScale(bounds) : 1)
+
         // Mirror `render(glyph:font:)`: snap the baseline + left edge to the device-pixel grid so a
         // composed cluster sits on the SAME baseline as every other glyph.
         let pad = 1
-        let leftPx = Int(floor(bounds.minX * scale))
-        let rightPx = Int(ceil(bounds.maxX * scale))
-        let topPx = Int(ceil(bounds.maxY * scale))
-        let botPx = Int(floor(bounds.minY * scale))
+        let leftPx = Int(floor(bounds.minX * drawingScale))
+        let rightPx = Int(ceil(bounds.maxX * drawingScale))
+        let topPx = Int(ceil(bounds.maxY * drawingScale))
+        let botPx = Int(floor(bounds.minY * drawingScale))
         let pxW = (rightPx - leftPx) + 2 * pad
         let pxH = (topPx - botPx) + 2 * pad
         guard pxW > 0, pxH > 0 else { return nil }
 
         guard let ctx = CGContext(
             data: nil, width: pxW, height: pxH, bitsPerComponent: 8,
-            bytesPerRow: 0, space: hasColor ? rgbColorSpace : grayColorSpace,
+            bytesPerRow: 0, space: hasColor ? sourceColorSpace : grayColorSpace,
             bitmapInfo: hasColor ? CGBitmapInfo.byteOrder32Big.rawValue | CGImageAlphaInfo.premultipliedLast.rawValue
                                  : CGImageAlphaInfo.none.rawValue
         ) else { return nil }
@@ -322,15 +349,16 @@ public final class GlyphRasterizer {
         ctx.setShouldAntialias(true)
         ctx.setShouldSmoothFonts(false)
         ctx.setFillColor(gray: 1, alpha: 1)
-        ctx.scaleBy(x: scale, y: scale)
+        ctx.scaleBy(x: drawingScale, y: drawingScale)
         // Pen origin at integer device pixels (CG is y-up from the bitmap bottom); CTLineDraw draws
         // from `textPosition`. Same alignment math as the single-glyph path.
-        ctx.textPosition = CGPoint(x: CGFloat(pad - leftPx) / scale, y: CGFloat(pad - botPx) / scale)
+        ctx.textPosition = CGPoint(x: CGFloat(pad - leftPx) / drawingScale, y: CGFloat(pad - botPx) / drawingScale)
         CTLineDraw(line, ctx)
 
         if hasColor {
+            guard let rgba = readColorPixels(ctx, width: pxW, height: pxH) else { return nil }
             return RasterizedGlyph(width: pxW, height: pxH, bearingX: leftPx - pad,
-                                   bearingY: topPx + pad, coverage: [], rgba: readPixels(ctx, width: pxW, height: pxH, bytesPerPixel: 4))
+                                   bearingY: topPx + pad, coverage: [], rgba: rgba)
         }
 
         // Thicken composed clusters the same way single glyphs are thickened, so crisp-mode
@@ -439,6 +467,18 @@ public final class GlyphRasterizer {
         return out
     }
 
+    private func isPrimaryFont(_ font: CTFont) -> Bool {
+        let name = CTFontCopyPostScriptName(font) as String
+        return name == regularPSName || name == boldPSName || name == italicPSName || name == boldItalicPSName
+    }
+
+    /// Fit actual fallback ink, not its typographic metrics: emoji/CJK fonts often reserve
+    /// much more descent than their glyphs use. The primary font and shared baseline stay fixed.
+    private func fallbackInkScale(_ bounds: CGRect) -> CGFloat {
+        min(1, bounds.maxY > 0 ? CTFontGetAscent(regular) / bounds.maxY : 1,
+            bounds.minY < 0 ? CTFontGetDescent(regular) / -bounds.minY : 1)
+    }
+
     private func textPresentationFont(for cluster: String, base: CTFont) -> CTFont? {
         let scalars = cluster.unicodeScalars
         guard let scalar = scalars.first else { return nil }
@@ -490,15 +530,17 @@ public final class GlyphRasterizer {
         CTFontGetBoundingRectsForGlyphs(font, .horizontal, &g, &bounds, 1)
         guard bounds.width > 0, bounds.height > 0 else { return nil }
 
+        let drawingScale = scale * (isPrimaryFont(font) ? 1 : fallbackInkScale(bounds))
+
         // Work in whole device pixels and snap the glyph's pen origin (baseline + left edge) to
         // the pixel grid, so the baseline lands on the SAME integer row for every glyph. Drawing
         // at a fractional position while rounding the bearing independently (the old path) left a
         // sub-pixel residual per glyph — a wavy / "squiggly" baseline across a line of text.
         let pad = 1
-        let leftPx = Int(floor(bounds.minX * scale))   // pen → ink left  (may be negative)
-        let rightPx = Int(ceil(bounds.maxX * scale))   // pen → ink right
-        let topPx = Int(ceil(bounds.maxY * scale))     // baseline → ink top (rows above baseline)
-        let botPx = Int(floor(bounds.minY * scale))    // baseline → ink bottom (≤ 0 with descenders)
+        let leftPx = Int(floor(bounds.minX * drawingScale))   // pen → ink left  (may be negative)
+        let rightPx = Int(ceil(bounds.maxX * drawingScale))   // pen → ink right
+        let topPx = Int(ceil(bounds.maxY * drawingScale))     // baseline → ink top (rows above baseline)
+        let botPx = Int(floor(bounds.minY * drawingScale))    // baseline → ink bottom (≤ 0 with descenders)
         let pxW = (rightPx - leftPx) + 2 * pad
         let pxH = (topPx - botPx) + 2 * pad
         guard pxW > 0, pxH > 0 else { return nil }
@@ -509,7 +551,7 @@ public final class GlyphRasterizer {
             height: pxH,
             bitsPerComponent: 8,
             bytesPerRow: 0, // let CoreGraphics choose alignment
-            space: hasColor ? rgbColorSpace : grayColorSpace,
+            space: hasColor ? sourceColorSpace : grayColorSpace,
             bitmapInfo: hasColor ? CGBitmapInfo.byteOrder32Big.rawValue | CGImageAlphaInfo.premultipliedLast.rawValue
                                  : CGImageAlphaInfo.none.rawValue
         ) else { return nil }
@@ -518,16 +560,17 @@ public final class GlyphRasterizer {
         ctx.setShouldAntialias(true)
         ctx.setShouldSmoothFonts(false)
         ctx.setFillColor(gray: 1, alpha: 1) // white ink on the zero-cleared (black) bitmap
-        ctx.scaleBy(x: scale, y: scale)
+        ctx.scaleBy(x: drawingScale, y: drawingScale)
 
         // Pen origin at integer device pixels (CG is y-up from the bitmap bottom), so the baseline
         // is pixel-aligned. `position` is in points (pre-scale), hence the /scale.
-        var position = CGPoint(x: CGFloat(pad - leftPx) / scale, y: CGFloat(pad - botPx) / scale)
+        var position = CGPoint(x: CGFloat(pad - leftPx) / drawingScale, y: CGFloat(pad - botPx) / drawingScale)
         CTFontDrawGlyphs(font, &g, &position, 1, ctx)
 
         if hasColor {
+            guard let rgba = readColorPixels(ctx, width: pxW, height: pxH) else { return nil }
             return RasterizedGlyph(width: pxW, height: pxH, bearingX: leftPx - pad,
-                                   bearingY: topPx + pad, coverage: [], rgba: readPixels(ctx, width: pxW, height: pxH, bytesPerPixel: 4))
+                                   bearingY: topPx + pad, coverage: [], rgba: rgba)
         }
 
         let rawCoverage = readCoverage(ctx, width: pxW, height: pxH)
@@ -559,6 +602,23 @@ public final class GlyphRasterizer {
     /// honoring the context's (possibly padded) bytesPerRow.
     private func readCoverage(_ ctx: CGContext, width: Int, height: Int) -> [UInt8] {
         readPixels(ctx, width: width, height: height, bytesPerPixel: 1)
+    }
+
+    /// Scale/interpolate the font's bitmap once in its source space, then convert the
+    /// finished pixels. Interpolating separately in P3 changes saturated emoji edge colors.
+    private func readColorPixels(_ context: CGContext, width: Int, height: Int) -> [UInt8]? {
+        if rgbColorSpace == sourceColorSpace {
+            return readPixels(context, width: width, height: height, bytesPerPixel: 4)
+        }
+        guard let image = context.makeImage(), let converted = CGContext(
+            data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: 0,
+            space: rgbColorSpace,
+            bitmapInfo: CGBitmapInfo.byteOrder32Big.rawValue | CGImageAlphaInfo.premultipliedLast.rawValue
+        ) else { return nil }
+        converted.interpolationQuality = .none
+        converted.setBlendMode(.copy)
+        converted.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
+        return readPixels(converted, width: width, height: height, bytesPerPixel: 4)
     }
 
     private func readPixels(_ ctx: CGContext, width: Int, height: Int, bytesPerPixel: Int) -> [UInt8] {

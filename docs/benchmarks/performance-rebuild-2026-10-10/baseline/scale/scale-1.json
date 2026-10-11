@@ -1,0 +1,47 @@
+{
+  "sessions": 1,
+  "agent_processes_requested": 0,
+  "settle_seconds": 30,
+  "sample_seconds": 60.039942540999995,
+  "styled_lines": 10000,
+  "processes": [
+    {
+      "pid": 31117,
+      "role": "host",
+      "command": "/Users/rcourson/Desktop/Harness Terminal/.benchmark-results/performance-rebuild/baseline/Harness.app/Contents/Helpers/HarnessSessionHost.app/Contents/MacOS/HarnessSessionHost",
+      "rss_bytes": 42663936,
+      "one_core_cpu_percent": 0.21652252566902164,
+      "phys_footprint_bytes": 11813656
+    },
+    {
+      "pid": 31118,
+      "role": "daemon",
+      "command": "/Users/rcourson/Desktop/Harness Terminal/.benchmark-results/performance-rebuild/baseline/Harness.app/Contents/Helpers/HarnessDaemon.app/Contents/MacOS/HarnessDaemon",
+      "rss_bytes": 29097984,
+      "one_core_cpu_percent": 0.21652252566902164,
+      "phys_footprint_bytes": 7684912
+    },
+    {
+      "pid": 31119,
+      "role": "shell-or-agent",
+      "command": "/opt/homebrew/bin/fish",
+      "rss_bytes": 9224192,
+      "one_core_cpu_percent": 0.0,
+      "phys_footprint_bytes": 5620168
+    },
+    {
+      "pid": 31335,
+      "role": "app",
+      "command": "/Users/rcourson/Desktop/Harness Terminal/.benchmark-results/performance-rebuild/baseline/Harness.app/Contents/MacOS/Harness",
+      "rss_bytes": 253804544,
+      "one_core_cpu_percent": 0.11658905228331752,
+      "phys_footprint_bytes": 89703672
+    }
+  ],
+  "panes": [
+    {
+      "session": "4346E5A3-A1C4-48FA-819C-8AF38762D8BE",
+      "surface": "988F1B5D-A6A5-4B86-9216-5CAD4676A69F"
+    }
+  ]
+}

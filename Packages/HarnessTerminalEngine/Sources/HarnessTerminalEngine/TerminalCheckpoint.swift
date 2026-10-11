@@ -3,7 +3,7 @@ import Foundation
 /// Versioned, bounded terminal continuation state, aligned by the host with an output sequence.
 /// Old scrollback is deliberately paged separately. The payload is opaque to the wire protocol.
 public struct TerminalCheckpoint: Codable, Sendable, Equatable {
-    public static let currentVersion = 1
+    public static let currentVersion = 2
     public static let maxPayloadBytes = 8 * 1024 * 1024
     public let version: Int
     public let payload: Data

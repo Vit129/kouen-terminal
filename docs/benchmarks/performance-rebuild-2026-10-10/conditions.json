@@ -1,0 +1,40 @@
+{
+  "hardware": "Apple M5 Max physical Mac",
+  "baseline_commit": "3fd9cf174215808af8721eb8a687b75f16514339",
+  "grid": [
+    100,
+    30
+  ],
+  "font": "JetBrainsMono Nerd Font Mono",
+  "font_size": 14,
+  "opacity": 0.85,
+  "blur": 12,
+  "padding": [
+    14,
+    14
+  ],
+  "scrollback_lines": 10000,
+  "settings_evidence": "baseline/resolved-settings-post-run.json; appearance captured after baseline; candidate uses copied settings; grid verified every sample",
+  "cpu_sample_seconds": 60,
+  "cpu_settle_seconds": 30,
+  "os": "macOS 27.0.1 (26A434)",
+  "xcode": "27.0",
+  "swift": "6.4",
+  "window_points": [
+    894,
+    682
+  ],
+  "drawable_pixels": [
+    1788,
+    1364
+  ],
+  "production_shared_key_access": false,
+  "persistence_limitation": "Isolated ad-hoc benchmark bundle reports keyUnavailable; excludes production encrypted persistence cost",
+  "cpu_scope": "app + daemon + session host; one-core percent; shells and agents separate",
+  "foreground_focus_limitation": "Original scale windows did not instrument key-window state or blink cadence; dedicated matched focused windows recorded separately",
+  "hw.memsize": 137438953472,
+  "hw.physicalcpu": 18,
+  "hw.logicalcpu": 18,
+  "display": "Built-in Retina, 1728x1117 points, 2x scale, maximum 120 Hz; actual variable cadence not measured",
+  "measurement_source_receipt": "after/source-receipt.json for final GUI/startup/scale/echo/UI; engine-after unchanged engine receipts; after/previous-stage explicitly intermediate"
+}

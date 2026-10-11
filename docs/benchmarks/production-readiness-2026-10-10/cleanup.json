@@ -1,0 +1,20 @@
+{
+  "baseline": {
+    "pids": [
+      99867,
+      99866
+    ],
+    "exit": 0,
+    "output": "Session service stopped; its terminals have been interrupted. Saved layouts can create fresh shells.\n"
+  },
+  "candidate": {
+    "pids": [
+      239,
+      238
+    ],
+    "exit": 0,
+    "output": "Session service stopped; its terminals have been interrupted. Saved layouts can create fresh shells.\n"
+  },
+  "normal_daemon_alive": true,
+  "remaining_owned_pids": []
+}

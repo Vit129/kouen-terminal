@@ -1,9 +1,9 @@
 # Shell integration (OSC 133 semantic prompts)
 
 Harness understands the **OSC 133** shell-integration protocol. When your shell emits these
-marks, Harness records where each prompt begins and whether the command launched from it
-succeeded — powering:
+marks, Harness records the prompt, input, output, and completion boundaries — powering:
 
+- Accurate command-output selection and copying.
 - **Jump-to-prompt** navigation (previous/next prompt) in the terminal and copy mode.
 - A **prompt gutter** with a success/failure indicator (green for exit 0, red otherwise).
 
@@ -41,16 +41,17 @@ yourself instead:
 | fish | `~/.config/fish/config.fish` | `source "<…>/shell-integration/harness.fish"` |
 
 The copies in `docs/shell-integration/` carry the same code as the scripts installed by Harness
-(with longer comments).
+exactly.
 
 ## What gets emitted
 
-Each snippet emits the two marks Harness consumes:
+The scripts emit all four command boundaries:
 
-- `OSC 133 ; A` — **prompt start**, on the line where your shell prompt is drawn.
-- `OSC 133 ; D ; <exit>` — **command finished**, carrying the previous command's exit status.
+- `OSC 133 ; A` — prompt start.
+- `OSC 133 ; B` — command-input start, after the rendered prompt.
+- `OSC 133 ; C` — command-output start (bash requires 4.4 or newer).
+- `OSC 133 ; D ; <exit>` — command finished, including its exit status.
 
-The optional `B` (command-input start) and `C` (output start) delimiters are intentionally not
-emitted: they aren't needed for prompt navigation or the status gutter, and leaving them out
-keeps the shell hooks minimal and robust. Programs that emit `B`/`C` themselves are parsed and
-ignored without harm.
+Zsh embeds A/B in its prompt so redraws retain the boundaries. Bash reapplies the markers
+after existing prompt hooks, including hooks that replace PS1. Fish wraps the current
+`fish_prompt` and refreshes that wrapper if a theme replaces it. Prompt text is preserved.

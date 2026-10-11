@@ -60,10 +60,8 @@ public enum AttachClient {
         let client = DaemonClient(endpoint: endpoint)
 
         let session = LiveSession(client: client, surfaceID: surfaceID, configuration: configuration)
-        // Gap-free attach: subscribe FIRST (buffering live output), then replay scrollback to the
-        // local TTY (still cooked — raw mode is off here), then flush the buffered live frames
-        // deduped against the replay boundary. This closes the window where output appended between
-        // the old replay snapshot and the separate subscribe was persisted but never streamed.
+        // One attach stream delivers its screen/history boundary before ordered live output.
+        // Keep the local TTY cooked until the stream has established that boundary.
         do {
             try session.connect()
         } catch {
@@ -111,38 +109,20 @@ private final class LiveSession: @unchecked Sendable {
         self.configuration = configuration
     }
 
-    /// Subscribe + replay, gap-free. Run BEFORE raw mode so the replayed history is written to the
-    /// cooked TTY (matching the prior behavior). The output subscription is on its own socket; as
-    /// data arrives it's copied straight to stdout — no interpretation; the daemon emits raw bytes.
+    /// The stream writes history and live bytes to the outer terminal in their original order.
     func connect() throws {
         try installWakePipe()
         installSignalHandlers()
-        if !configuration.history, client.supportsAttachStream() {
-            // Screen first: the daemon sends the pane's current screen as VT bytes (alternate
-            // screen, cursor, and input modes included), then live output.
-            let request = AttachRequest(surfaceID: surfaceID, label: configuration.label, readOnly: configuration.readOnly, history: false)
-            subscription = try client.attachStream(
-                request,
-                onAttached: { [weak self] reply in if let screen = reply.screen { self?.writeOut(screen) } },
-                onData: { [weak self] data, _ in self?.writeOut(data) },
-                onEnd: { [weak self] in self?.requestDetach() }
-            )
-            return
-        }
-        subscription = try client.attachReplayingSurfaceOutput(
-            surfaceID: surfaceID,
-            label: configuration.label,
-            readOnly: configuration.readOnly,
-            onReplay: { [weak self] text in
-                if !text.isEmpty, let data = text.data(using: .utf8) { self?.writeOut(data) }
-            },
-            onData: { [weak self] data, _ in self?.writeOut(data) },
-            onEnd: { [weak self] in
-                // Daemon closed the stream — surface exited or daemon died. Wake
-                // the stdin loop so attach exits without leaving the TTY in raw mode.
-                self?.requestDetach()
-            }
-        )
+        let request = AttachRequest(surfaceID: surfaceID, label: configuration.label, readOnly: configuration.readOnly,
+            history: configuration.history, acknowledgesOutput: true)
+        subscription = try client.attachStream(request, onAttached: { [weak self] reply, consumed in
+            guard let self, !self.configuration.history else { return }
+            if let screen = reply.screen, !self.writeOut(screen) { self.requestDetach(); return }
+            consumed()
+        }, onData: { [weak self] data, _, consumed in
+            guard let self else { return }
+            if self.writeOut(data) { consumed() } else { self.subscription?.cancel(); self.requestDetach() }
+        }, onEnd: { [weak self] in self?.requestDetach() }, onError: { [weak self] _ in self?.requestDetach() })
     }
 
     func run() throws {
@@ -252,16 +232,18 @@ private final class LiveSession: @unchecked Sendable {
         _ = write(wakeWrite, &byte, 1)
     }
 
-    private func writeOut(_ data: Data) {
+    @discardableResult
+    private func writeOut(_ data: Data) -> Bool {
         data.withUnsafeBytes { raw in
-            guard let base = raw.baseAddress else { return }
+            guard let base = raw.baseAddress else { return true }
             var written = 0
             while written < raw.count {
                 let n = write(STDOUT_FILENO, base.advanced(by: written), raw.count - written)
                 if n > 0 { written += n; continue }
                 if n < 0, errno == EINTR { continue }
-                return
+                return false
             }
+            return true
         }
     }
 

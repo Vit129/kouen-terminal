@@ -1,0 +1,124 @@
+{
+  "scope": "one-pane residency diagnosis, not a new headline throughput comparison",
+  "memory_source_sha256": "ac0fa28920d89c71d2359fa4570979d141f2b1bc4c50633a429860d715f9af46",
+  "final_source_sha256": "8b47956cd11a2a79ad9050c2c5fa6e1205a846b07e579401b6c97126e8804b82",
+  "final_changes_after_measurement": [
+    "PrefixKeymap event swallowing",
+    "PaletteShortcuts event swallowing"
+  ],
+  "grid": [
+    100,
+    30
+  ],
+  "settle_seconds": 30,
+  "stages": {
+    "fresh": {
+      "baseline": {
+        "processes": {
+          "app": {
+            "pid": 99859,
+            "physical_bytes": 290899240
+          },
+          "daemon": {
+            "pid": 99867,
+            "physical_bytes": 7422744
+          },
+          "host": {
+            "pid": 99866,
+            "physical_bytes": 6423272
+          }
+        },
+        "owned_mib": 290.62772369384766
+      },
+      "candidate": {
+        "processes": {
+          "app": {
+            "pid": 234,
+            "physical_bytes": 89163000
+          },
+          "daemon": {
+            "pid": 239,
+            "physical_bytes": 7389952
+          },
+          "host": {
+            "pid": 238,
+            "physical_bytes": 7766808
+          }
+        },
+        "owned_mib": 99.48707580566406
+      }
+    },
+    "throughput": {
+      "baseline": {
+        "processes": {
+          "app": {
+            "pid": 99859,
+            "physical_bytes": 107611504
+          },
+          "daemon": {
+            "pid": 99867,
+            "physical_bytes": 7717656
+          },
+          "host": {
+            "pid": 99866,
+            "physical_bytes": 9732864
+          }
+        },
+        "owned_mib": 119.26844024658203
+      },
+      "candidate": {
+        "processes": {
+          "app": {
+            "pid": 234,
+            "physical_bytes": 106071264
+          },
+          "daemon": {
+            "pid": 239,
+            "physical_bytes": 7717632
+          },
+          "host": {
+            "pid": 238,
+            "physical_bytes": 12124952
+          }
+        },
+        "owned_mib": 120.08080291748047
+      }
+    },
+    "styled": {
+      "baseline": {
+        "processes": {
+          "app": {
+            "pid": 99859,
+            "physical_bytes": 107611504
+          },
+          "daemon": {
+            "pid": 99867,
+            "physical_bytes": 7766808
+          },
+          "host": {
+            "pid": 99866,
+            "physical_bytes": 9290496
+          }
+        },
+        "owned_mib": 118.89344024658203
+      },
+      "candidate": {
+        "processes": {
+          "app": {
+            "pid": 234,
+            "physical_bytes": 106218720
+          },
+          "daemon": {
+            "pid": 239,
+            "physical_bytes": 7734040
+          },
+          "host": {
+            "pid": 238,
+            "physical_bytes": 12174104
+          }
+        },
+        "owned_mib": 120.28395080566406
+      }
+    }
+  }
+}

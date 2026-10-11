@@ -1,0 +1,31 @@
+name: Local macOS CI
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: local-macos-ci
+  cancel-in-progress: false
+
+jobs:
+  build-test:
+    # Only explicitly dispatched main builds use the owner's VM runner.
+    if: github.ref == 'refs/heads/main'
+    runs-on: [self-hosted, macOS, ARM64, harness-macos]
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Build and test macOS
+        run: Scripts/ci-macos.sh
+      - name: Upload coverage
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: local-macos-coverage
+          path: .build/*/debug/codecov/*.json
+          if-no-files-found: ignore

@@ -13,7 +13,9 @@ final class SessionCoordinator: NSObject {
     static let shared = SessionCoordinator()
 
     private let daemon = DaemonSessionService()
-    private(set) var snapshot = SessionSnapshot()
+    // Until hydration there are no real sessions to mount. A default Workspace would
+    // invent a pane, start an attach for it, then discard it when the daemon answers.
+    private(set) var snapshot = SessionSnapshot(workspaces: [])
     private var lastRevision = -1
     private let terminalHosts = TerminalPaneRegistry()
     private var previewHosts: [String: PreviewPaneView] = [:]
@@ -112,7 +114,7 @@ final class SessionCoordinator: NSObject {
     private var synchronizedTabIDs: Set<TabID> = []
     var structureRevision = 0
 
-    /// The active tab's live working directory (kept current by `SurfaceShellTracker`),
+    /// The active tab's live working directory (kept current by host metadata),
     /// used as the default for new tabs/sessions so they open where the user is
     /// working — matching Terminal.app / iTerm. `nil` when unknown.
     private var activeTabCWD: String? {
@@ -141,7 +143,7 @@ final class SessionCoordinator: NSObject {
         // Deliberately do NOT hydrate from the daemon here. This singleton is first
         // touched while building the window (before `showWindow`), and `syncFromDaemon`
         // is a blocking daemon IPC — doing it here freezes first paint on a cold/slow
-        // daemon. We start from the default `snapshot` + already-loaded local `settings`
+        // daemon. We start from an empty `snapshot` + already-loaded local `settings`
         // (chrome resolves correctly from `settings.custom*Hex`), and the async
         // `DaemonLauncher.ensureRunning` callback in AppDelegate performs the first
         // hydration the moment the daemon answers — after the window is on screen.
@@ -675,6 +677,7 @@ final class SessionCoordinator: NSObject {
     /// Bumped by every applied snapshot, so an off-main fetch that started earlier can tell a
     /// newer sync already landed and drop its (possibly older) answer.
     private var appliedSnapshots = 0
+    var isAwaitingInitialSnapshot: Bool { appliedSnapshots == 0 }
 
     private func applySnapshot(_ remote: SessionSnapshot, metadataOnly: Bool) {
         StartupMetrics.shared.mark(.firstSnapshot) // idempotent: records the first hydration only
@@ -1154,12 +1157,6 @@ final class SessionCoordinator: NSObject {
     func addSession(to workspaceID: WorkspaceID, cwd: String? = nil, name: String? = nil) {
         createSession(in: workspaceID, cwd: cwd, name: name)
         refreshSnapshot()
-        // Kick the cwd tracker immediately after session creation so the shell's working
-        // directory lights up as early as possible.  A second kick follows the daemon's next
-        // snapshotChanged notification (which arrives once the PTY/surface is live), so there
-        // is no fixed timing dependency — the notification-driven path handles the "shell not
-        // yet spawned" window without a magic timeout.
-        SurfaceShellTracker.shared.bumpScan()
     }
 
     /// Ask the daemon for a session without syncing, so a caller can open its window before
@@ -1176,11 +1173,6 @@ final class SessionCoordinator: NSObject {
     func addTab(to workspaceID: WorkspaceID, cwd: String? = nil) {
         requestDaemonAsync(.newTab(workspaceID: workspaceID, cwd: cwd ?? activeTabCWD ?? settings.defaultCWD, shell: settings.defaultShell))
         refreshSnapshot()
-        // Kick the cwd tracker immediately so the new tab's path lights up without waiting
-        // for the next 500ms tick.  When the daemon posts snapshotChanged for the new PTY
-        // surface, syncFromDaemon is called again and SurfaceShellTracker's next tick picks
-        // up the final cwd — removing the need for an additional 300ms delayed kick.
-        SurfaceShellTracker.shared.bumpScan()
     }
 
     func openDefaultTerminalLaunch(_ launch: DefaultTerminalLaunchRequest) {
@@ -1627,9 +1619,6 @@ final class SessionCoordinator: NSObject {
             lastActiveSurfaceID = old
         }
         activeSurfaceID = surfaceID
-        // Focus changed: snap the cwd tracker back to its responsive cadence (it relaxes
-        // while nothing moves) — interaction predicts cwd changes.
-        SurfaceShellTracker.shared.noteUserInteraction()
         // Refresh `window-style`/`pane-style` before the border toggle so each host has the
         // current base before it re-resolves active vs inactive on the focus change.
         // One read of options.json serves both.
@@ -2641,6 +2630,9 @@ final class SessionCoordinator: NSObject {
 }
 
 extension SessionCoordinator: TerminalHostDelegate {
+    func terminalHostDidSubmitFirstShellPrompt(surfaceID: SurfaceID) {
+        DaemonLauncher.shared.firstPromptReady()
+    }
     func terminalHostDidChangeTitle(_ title: String, surfaceID: SurfaceID) {
         logIfFailed(.updateTabTitle(surfaceID: surfaceID.uuidString, title: title), surface: surfaceID)
         refreshSnapshot()
@@ -2703,19 +2695,6 @@ extension SessionCoordinator: TerminalHostDelegate {
                 }
             }
         }
-    }
-
-    /// Called by `SurfaceShellTracker` when a polled cwd changes (the OSC 7
-    /// fallback for shells that don't emit it).
-    func surfaceShellTrackerDidUpdateCwd(_ surfaceID: SurfaceID, cwd: String) {
-        // Only push if the daemon's stored value is stale — avoids a feedback
-        // loop when the renderer already told us about the same path.
-        let current = snapshot.workspaces
-            .flatMap { workspace in workspace.sessions.flatMap { $0.tabs } }
-            .first { $0.rootPane.allSurfaceIDs().contains(surfaceID) }?.cwd
-        if current == cwd { return }
-        logIfFailed(.updateTabCwd(surfaceID: surfaceID.uuidString, path: cwd), surface: surfaceID)
-        refreshSnapshot()
     }
 
     func terminalHostDidChangeFocus(_ focused: Bool, surfaceID: SurfaceID) {

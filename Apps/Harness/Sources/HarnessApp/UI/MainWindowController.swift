@@ -108,6 +108,13 @@ final class MainWindowController: NSWindowController {
         applyTransparency()
     }
 
+    override func showWindow(_ sender: Any?) {
+        if window?.isVisible == false {
+            (contentViewController as? MainSplitViewController)?.prepareForPresentation()
+        }
+        super.showWindow(sender)
+    }
+
     func applyChrome() {
         if let window { Self.applyWindowAppearance(window) }
         applyTransparency()

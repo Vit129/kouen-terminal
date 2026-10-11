@@ -1,0 +1,49 @@
+{
+  "layout": {
+    "sessions": [
+      {
+        "active": true,
+        "id": "06B86668-D9CE-4B6B-9B8E-02B98D621A8B",
+        "label": "Session 1",
+        "tabs": [
+          {
+            "active": true,
+            "id": "E187B47F-7F58-4C97-B23C-0295C242C303",
+            "label": "~",
+            "panes": [
+              {
+                "active": true,
+                "caller": false,
+                "cwd": "/Users/rcourson",
+                "id": "4D06A318-C8B1-46D3-8EA6-0EA539600F0E",
+                "program": "fish",
+                "surface": "8B0229A9-EAB0-40C1-A98A-B14235BC58FE"
+              },
+              {
+                "active": false,
+                "caller": false,
+                "cwd": "/Users/rcourson",
+                "id": "4352C316-7886-40A2-B4B5-E53F68A0991C",
+                "program": "fish",
+                "surface": "637F198C-26FC-4F76-A83D-B0253D645908"
+              }
+            ],
+            "status": "idle"
+          }
+        ],
+        "workspace": "Default"
+      }
+    ]
+  },
+  "processes": {
+    "8B0229A9-EAB0-40C1-A98A-B14235BC58FE": {
+      "pid": 87767,
+      "executable": "fish"
+    },
+    "637F198C-26FC-4F76-A83D-B0253D645908": {
+      "pid": 94652,
+      "executable": "fish"
+    }
+  },
+  "same_shell_pids": true
+}

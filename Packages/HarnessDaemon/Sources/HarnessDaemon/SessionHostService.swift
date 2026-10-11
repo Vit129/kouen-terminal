@@ -54,12 +54,13 @@ public final class SessionHostService: @unchecked Sendable {
             for frontend in self.frontends.values where frontend.tokens[id] != nil {
                 frontend.tokens.removeValue(forKey: id)
                 _ = self.arbiter.disconnect(client: frontend.channel.fd, surface: id)
-                if frontend.tokens.isEmpty { frontend.channel.closeAfterWrites() }
+                if frontend.tokens.isEmpty { frontend.finishAfterOutput() }
             }
         }
     }
     public func start() throws {
         try HarnessPaths.ensureDirectories()
+        store.queue.sync { store.startObservations() }
         let maintenance = DispatchSource.makeTimerSource(queue: store.queue)
         maintenance.schedule(deadline: .now() + 3600, repeating: 3600)
         maintenance.setEventHandler { [weak self] in self?.store.closedHistory.maintain(); self?.store.workloads.maintain() }
@@ -379,7 +380,7 @@ public final class SessionHostService: @unchecked Sendable {
                 var stats: DaemonStats
                 if let worker, case let .daemonStats(value) = try? DaemonClient(endpoint: .unix(path: worker.socket)).request(.daemonStats, timeout: 1) { stats = value; stats.daemonAvailable = true }
                 else {
-                    stats = DaemonStats(pid: getpid(), uptimeSeconds: Date().timeIntervalSince(self.started), surfaceCount: ptys.count, totalScrollbackBytes: ptys.values.reduce(0) { $0 + $1.scrollbackByteCount }, clientCount: count, subscriberCount: 0, snapshotRevision: 0, capabilities: [DaemonStats.attachStream], protocolLevel: HarnessVersion.protocolLevel)
+                    stats = DaemonStats(pid: getpid(), uptimeSeconds: Date().timeIntervalSince(self.started), surfaceCount: ptys.count, totalScrollbackBytes: ptys.values.reduce(0) { $0 + $1.scrollbackByteCount }, clientCount: count, subscriberCount: 0, snapshotRevision: 0, capabilities: [DaemonStats.attachStream, DaemonStats.acknowledgedOutput], protocolLevel: HarnessVersion.protocolLevel)
                     stats.daemonAvailable = false
                 }
                 stats.daemonPID = stats.daemonAvailable == true ? worker?.process.processIdentifier : nil
@@ -394,10 +395,13 @@ public final class SessionHostService: @unchecked Sendable {
                 stats.capabilities = (stats.capabilities ?? []) + [DaemonStats.sessionHost]
                 self.send(.daemonStats(stats), channel)
             }
+        case let .acknowledgeOutput(id, token, sequence):
+            if frontend.tokens[id] == token { store.ptys[id]?.acknowledgeSubscription(token: token, sequence: sequence) }
         case let .attachStream(attach): attachStream(attach, frontend)
         case let .subscribeSurfaceOutput(id, label): subscribe(id, label: label, readOnly: false, frontend: frontend)
         case let .subscribeSurfaceOutputReadOnly(id, label): subscribe(id, label: label, readOnly: true, frontend: frontend)
         case let .cancelSubscription(id), let .detachSurface(id):
+            frontend.cancelAttach()
             if let token = frontend.tokens.removeValue(forKey: id) { store.ptys[id]?.cancelSubscription(token: token) }
             let size = arbiter.disconnect(client: channel.fd, surface: id)
             let applied = applyDisconnectedSize(size, surface: id)
@@ -439,22 +443,43 @@ public final class SessionHostService: @unchecked Sendable {
         }
     }
     private func subscribe(_ id: String, label: String?, readOnly: Bool, frontend: Frontend) {
+        frontend.cancelAttach()
         guard let pty = store.ptys[id] else { send(.error("Surface not found."), frontend.channel); return }
         frontend.readOnly = readOnly; frontend.label = label ?? frontend.label
         if let old = frontend.tokens[id] { pty.cancelSubscription(token: old) }
         let token = pty.subscribe { [weak frontend] data, sequence in frontend?.output(data, sequence: sequence) }
         frontend.tokens[id] = token; send(.ok, frontend.channel)
     }
-    private func attachStream(_ attach: AttachRequest, _ frontend: Frontend) {
+    private func attachStream(_ attach: AttachRequest, _ frontend: Frontend, requestID: UUID? = nil) {
+        let identity = requestID ?? UUID()
+        if requestID == nil { frontend.attachRequestID = identity }
+        guard frontend.attachRequestID == identity else { return }
+        if let launch = attach.launch {
+            guard let active else { send(.error("Application daemon is unavailable; the pane was not created."), frontend.channel); return }
+            let socket = active.socket
+            DispatchQueue.global(qos: .userInitiated).async { [weak self, weak frontend] in
+                guard let self, let frontend else { return }
+                let result = try? DaemonClient(endpoint: .unix(path: socket)).request(.ensureSurface(surfaceID: attach.surfaceID,
+                    cwd: launch.cwd, shell: launch.shell, rows: launch.rows, cols: launch.cols,
+                    scrollbackBytes: launch.scrollbackBytes, requireInLayout: launch.requireInLayout))
+                self.store.queue.async {
+                    guard self.frontends[ObjectIdentifier(frontend.channel)] === frontend, frontend.attachRequestID == identity else { return }
+                    guard case .ok? = result else { self.send(.error("The pane could not be ensured for attach; programs were preserved."), frontend.channel); return }
+                    var ensured = attach; ensured.launch = nil
+                    self.attachStream(ensured, frontend, requestID: identity)
+                }
+            }
+            return
+        }
         guard let pty = store.ptys[attach.surfaceID] else { send(.error("Surface not found."), frontend.channel); return }
         frontend.readOnly = attach.readOnly; frontend.inputErrors = attach.inputErrors == true; frontend.stream = true
         frontend.label = attach.label ?? frontend.label
         frontend.beginAttach()
         if let old = frontend.tokens[attach.surfaceID] { pty.cancelSubscription(token: old) }
-        frontend.tokens[attach.surfaceID] = pty.subscribe(onResize: attach.geometryEvents == true ? { [weak frontend] size in frontend?.resize(size) } : nil) { [weak frontend] data, sequence in frontend?.output(data, sequence: sequence) }
+        frontend.tokens[attach.surfaceID] = pty.subscribe(acknowledgesOutput: attach.acknowledgesOutput, onResize: attach.geometryEvents == true ? { [weak frontend] size in frontend?.resize(size) } : nil) { [weak frontend] data, sequence in frontend?.output(data, sequence: sequence) }
         let history = pty.attachHistory(history: attach.history, fromSequence: attach.epoch == store.epoch ? attach.fromSequence : nil, screenOnResync: attach.screenOnResync == true, includeCheckpoint: attach.checkpoint == true)
         if attach.checkpoint == true, history.resync, history.screen?.checkpoint == nil { send(.error("Terminal checkpoint unavailable or exceeds its transfer budget."), frontend.channel); detach(frontend); return }
-        let reply = AttachReply(epoch: store.epoch, resync: history.resync, endSequence: history.endSequence, screen: attach.checkpoint == true ? nil : history.screen?.vt, inputErrors: attach.inputErrors, replaySizes: history.replaySizes, checkpoint: history.screen?.checkpoint)
+        let reply = AttachReply(epoch: store.epoch, resync: history.resync, endSequence: history.endSequence, screen: attach.checkpoint == true ? nil : history.screen?.vt, inputErrors: attach.inputErrors, replaySizes: history.replaySizes, checkpoint: history.screen?.checkpoint, outputToken: attach.acknowledgesOutput ? frontend.tokens[attach.surfaceID] : nil)
         frontend.finishAttach(reply: reply, chunks: history.chunks)
         ownership(attach.surfaceID)
     }
@@ -472,6 +497,7 @@ public final class SessionHostService: @unchecked Sendable {
     }
 
     private func detach(_ frontend: Frontend) {
+        frontend.cancelAttach()
         // Votes belong to the connection, not its output subscriptions. A startup
         // resize RPC can vote without subscribing; leaving that vote behind pins
         // every later window to the disconnected client's smaller dimensions.
@@ -559,18 +585,30 @@ public final class SessionHostService: @unchecked Sendable {
     }
 }
 
-private final class Frontend: @unchecked Sendable {
+final class Frontend: @unchecked Sendable {
     let channel: SessionHostChannel, id = UUID(), connectedAt = Date()
     var label = "client", kind = "client", version = "", tunnel = false
     var readOnly = false, inputErrors = false, stream = false
     var tokens: [String: UUID] = [:]
+    var attachRequestID = UUID()
     var worker: SessionHostChannel?
     private let outputLock = NSLock()
     private var held: [TerminalStreamFrame]?
     private var heldBytes = 0, floor: UInt64 = 0
+    private var finishing = false
+    private var replay: (id: UUID, chunks: [RealPty.ScrollbackReplaySegment], index: Int, end: UInt64)?
     init(channel: SessionHostChannel) { self.channel = channel }
     func retireWorker() { guard let prior = worker else { return }; worker = nil; prior.closeChannel(); if tokens.isEmpty { channel.closeChannel() } }
-    func beginAttach() { outputLock.lock(); held = []; heldBytes = 0; outputLock.unlock() }
+    func cancelAttach() {
+        attachRequestID = UUID()
+        outputLock.lock(); replay = nil; held = nil; heldBytes = 0; floor = 0; outputLock.unlock()
+    }
+    func beginAttach() { outputLock.lock(); replay = nil; finishing = false; held = []; heldBytes = 0; outputLock.unlock() }
+    func finishAfterOutput() {
+        outputLock.lock(); defer { outputLock.unlock() }
+        finishing = true
+        if replay == nil { channel.closeAfterWrites(timeout: nil) }
+    }
     func output(_ data: Data, sequence: UInt64) { deliver(.output(data, sequence)) }
     func resize(_ size: ReplaySize) { deliver(.resize(size)) }
     private func deliver(_ event: TerminalStreamFrame) {
@@ -583,10 +621,24 @@ private final class Frontend: @unchecked Sendable {
 
     func finishAttach(reply: AttachReply, chunks: [RealPty.ScrollbackReplaySegment]) {
         outputLock.lock(); defer { outputLock.unlock() }
-        if let frame = try? IPCCodec.encode(IPCReply(response: .attached(reply))) { channel.send(frame) }
-        for chunk in chunks { if let frame = try? IPCCodec.encodeOutputFrame(chunk.data, sequence: chunk.sequence) { channel.send(frame) } }
-        floor = reply.endSequence
+        let identity = UUID()
+        replay = (identity, chunks, 0, reply.endSequence)
+        guard let frame = try? IPCCodec.encode(IPCReply(response: .attached(reply))) else { channel.closeChannel(); return }
+        channel.send(frame) { [weak self] in self?.advanceReplay(identity) }
+    }
+    private func advanceReplay(_ identity: UUID) {
+        outputLock.lock(); defer { outputLock.unlock() }
+        guard var current = replay, current.id == identity else { return }
+        if current.index < current.chunks.count {
+            let chunk = current.chunks[current.index]
+            current.index += 1; replay = current
+            guard let frame = try? IPCCodec.encodeOutputFrame(chunk.data, sequence: chunk.sequence) else { channel.closeChannel(); return }
+            channel.send(frame) { [weak self] in self?.advanceReplay(identity) }
+            return
+        }
+        floor = current.end
         for event in held ?? [] where event.sequence >= floor { if let frame = event.wire { channel.send(frame) } }
-        held = nil; heldBytes = 0
+        held = nil; heldBytes = 0; replay = nil
+        if finishing { channel.closeAfterWrites(timeout: nil) }
     }
 }

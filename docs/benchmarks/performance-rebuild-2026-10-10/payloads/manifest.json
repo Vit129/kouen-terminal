@@ -1,0 +1,20 @@
+[
+  {
+    "case": "plain_ascii",
+    "file": "plain_ascii.vt",
+    "bytes": 67108832,
+    "sha256": "69680914285e69ad93c035539b0a9d370efd607b9f78a4748fd3fd58cb3717ff"
+  },
+  {
+    "case": "ansi_sgr",
+    "file": "ansi_sgr.vt",
+    "bytes": 67108905,
+    "sha256": "e1c4654b1653c1d5274541f62cad44a83ffff56a5d4d01d54ba7d671a87ad583"
+  },
+  {
+    "case": "unicode_mixed",
+    "file": "unicode_mixed.vt",
+    "bytes": 67108899,
+    "sha256": "66c6dc94d051364bc09d33a87520a19a39df1b90117290edd1488b959bf9284c"
+  }
+]

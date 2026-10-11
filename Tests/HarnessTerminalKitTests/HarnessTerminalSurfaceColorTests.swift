@@ -28,6 +28,7 @@ final class HarnessTerminalSurfaceColorTests: XCTestCase {
 
         view.receive("\u{1b}]4;1;?\u{7}")
 
+        waitForProtocolReplies(from: view)
         XCTAssertEqual(responses.wrappedValue.last, "\u{1b}]4;1;rgb:1111/2222/3333\u{1b}\\")
     }
 
@@ -61,6 +62,7 @@ final class HarnessTerminalSurfaceColorTests: XCTestCase {
 
         view.receive("\u{1b}]4;1;?\u{7}")
 
+        waitForProtocolReplies(from: view)
         XCTAssertEqual(responses.wrappedValue.last, "\u{1b}]4;1;rgb:ffff/5555/5555\u{1b}\\")
     }
 
@@ -80,6 +82,7 @@ final class HarnessTerminalSurfaceColorTests: XCTestCase {
         view.receive("\u{1b}]12;?\u{7}")
         view.receive("\u{1b}]4;4;?\u{7}")
 
+        waitForProtocolReplies(from: view)
         XCTAssertEqual(responses.wrappedValue, [
             "\u{1b}]10;rgb:1e1e/2424/3030\u{1b}\\",
             "\u{1b}]11;rgb:f8f8/f9f9/fcfc\u{1b}\\",
@@ -151,12 +154,20 @@ final class HarnessTerminalSurfaceColorTests: XCTestCase {
         view.receive("\u{1b}]12;?\u{7}")
         view.receive("\u{1b}]4;1;?\u{7}")
 
+        waitForProtocolReplies(from: view)
         XCTAssertEqual(responses.wrappedValue, [
             oscColorResponse("10", hex: lightTheme.foregroundHex),
             oscColorResponse("11", hex: lightTheme.backgroundHex),
             oscColorResponse("12", hex: lightTheme.cursorHex ?? lightTheme.foregroundHex),
             oscColorResponse("4;1", hex: try XCTUnwrap(lightTheme.paletteHex[1])),
         ])
+    }
+
+    private func waitForProtocolReplies(from view: HarnessTerminalSurfaceView) {
+        view.testingWaitForEmulatorIdle()
+        let delivered = expectation(description: "main-queue protocol replies")
+        DispatchQueue.main.async { delivered.fulfill() }
+        wait(for: [delivered], timeout: 1)
     }
 
     private func configuredSurface(
@@ -166,7 +177,7 @@ final class HarnessTerminalSurfaceColorTests: XCTestCase {
         canvasForegroundHex: String = "#1D1D1F",
         cursorHex: String = "#0066CC"
     ) -> (HarnessTerminalSurfaceView, Box<[String]>) {
-        let view = HarnessTerminalSurfaceView(offMainParserFramePipeline: false)
+        let view = HarnessTerminalSurfaceView()
         let responses = Box<[String]>([])
         view.onInput = { data in
             responses.wrappedValue.append(String(decoding: data, as: UTF8.self))
@@ -194,8 +205,7 @@ final class HarnessTerminalSurfaceColorTests: XCTestCase {
             linearBlending: false,
             textRendering: .native,
             ligatures: true,
-            promptGutter: false,
-            offMainParserFramePipeline: false
+            promptGutter: false
         )
         return (view, responses)
     }

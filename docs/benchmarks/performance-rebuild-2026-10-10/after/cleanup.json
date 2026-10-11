@@ -1,0 +1,16 @@
+{
+  "stopped_only_isolated_home": "/tmp/harness-performance-after",
+  "temporary_pids": [
+    95004,
+    87762,
+    87765,
+    87767,
+    94652
+  ],
+  "remaining_temporary_pids": [],
+  "shutdown_exit": 0,
+  "normal_daemon_pid": 33220,
+  "normal_daemon_alive": true,
+  "linux_vm": "Colima harness-build stopped",
+  "no_push_release_actions_cloud_dispatch": true
+}

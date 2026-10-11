@@ -15,11 +15,11 @@ are listed in the [changelog](CHANGELOG.md) and [GitHub Releases](https://github
 
 ## Download
 
-**Harness 2.2** adds durable session ownership, agent history and the Overview Board,
-encrypted macOS history, development workflows, and a unified Graphite interface.
-The full changes are documented in the [changelog](CHANGELOG.md).
-See the [release-readiness review](docs/RELEASE-READINESS-2026-10-09.md) and
-[performance results](docs/SCORECARD.md) for measured results and remaining acceptance work.
+**Harness 2.3** improves terminal throughput and history handling, keeps selections and
+search attached to text during resize, adds precise command-output actions and font
+controls, and fixes the startup layout jump. See [terminal quality](docs/TERMINAL-QUALITY.md),
+the [changelog](CHANGELOG.md), and [performance results](docs/SCORECARD.md) for behavior,
+measured results, and verification limits.
 
 **[Download Harness for macOS →](https://github.com/robzilla1738/harness-terminal/releases/latest/download/Harness.dmg)**
 
@@ -67,7 +67,7 @@ History is encrypted on macOS when signed components can access their Keychain k
 - Mainstream-GPU-terminal polish: live re-wrap while resizing (with a grid-size overlay), word / line / block selection, middle-click paste, alternate-screen wheel scrolling, focus reporting, hollow unfocused cursor, minimum contrast, follow-macOS appearance with separate light and dark theme picks (Settings ▸ Appearance), bold-is-bright control, and paste protection
 - Quick terminal: a Quake-style dropdown on a global hotkey (Settings ▸ Keys), sliding over whatever app is frontmost and persisting like any other session
 - Terminal bell (`\a`): audible and/or visual feedback on the focused surface, a bell badge on background tabs, and tmux `visual-bell`/`bell-action` bridging
-- Find bar (⌘F) with regular-expression and case-sensitivity toggles; matches highlight across scrollback
+- Find bar (⌘F) with regular-expression and case-sensitivity toggles; matches highlight across scrollback. Command context actions can restrict search to one command’s output, copy a command or its output, select its output, and navigate failed commands
 - Title-bar tabs level with the traffic lights, each with an app tile (`>_` for a shell, the brand tile for an agent) and a live status mark (working, needs you, done, error). `⌘\` switches to sidebar mode, which lists every session by name with its tabs beneath
 - A sessions popover (`⌃⌘S`, or the stacked-squares button): filter or create a session by typing, ✓ on the current one, New Session, Add Remote Host
 - Every pane is an inset card with a header (identity, split-right / split-down; double-click to zoom), horizontal / vertical splits, and grouped sessions with shared window lists
@@ -205,6 +205,9 @@ Per-agent setup lives in [docs/agent-hooks/README.md](docs/agent-hooks/README.md
 | Toggle sidebar | `Cmd+\` |
 
 The command prefix (default `Ctrl-A`, on in the Full preset) adds the full tmux-style pane / session keymap on top — press prefix then `?` for its cheatsheet.
+
+For local macOS CI and isolated GitHub Actions runners on your own Mac, see
+[the Tartelet setup](docs/LOCAL-MACOS-CI.md).
 
 ## Build from source
 

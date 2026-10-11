@@ -42,7 +42,13 @@ final class FanoutServiceTests: XCTestCase {
         XCTAssertEqual(try group(.inspect(id: id)).participants[0].state, .running) // Turn-complete text does not end a process.
         for participant in started.participants { if let worktreeID = participant.worktreeID { let record = try XCTUnwrap(ledger.object(ManagedWorktree.self, kind: "managed-worktree", id: worktreeID.uuidString)); XCTAssertEqual(record.baseCommit, started.baseCommit) } }
         try Data().write(to: gate)
-        XCTAssertTrue(waitUntil { (try? group(.inspect(id: id)).participants[0].state) == .exited })
+        XCTAssertTrue(waitUntil {
+            if case let .workloadOutcome(outcome) = try? owner.client.request(.workloadOutcome(first.id)) { return outcome?.state == .exited }
+            return false
+        })
+        service.wakeOutcomes()
+        XCTAssertTrue(waitUntil { (try? ledger.object(FanoutGroup.self, kind: "fanout", id: id.uuidString)?.participants[0].state) == .exited },
+            "the outcome wake must update the ledger without an explicit inspect request")
         let finished = try group(.inspect(id: id)); XCTAssertEqual(finished.participants[0].outcome?.exitCode, 7)
         let testID = UUID(), testGate = root.appendingPathComponent("explicit-test-gate")
         let testArguments = ["-c", "while [ ! -f " + ShellQuoting.quote(testGate.path) + " ]; do sleep 0.05; done; exit 0"]

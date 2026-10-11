@@ -1,0 +1,37 @@
+======================================================================
+HarnessSessionHost [238]: 64-bit    Footprint: 7766808 B (16384 bytes per page)
+======================================================================
+
+      Dirty         Clean   Reclaimable    Regions    Category
+        ---           ---           ---        ---    ---
+  3801088 B           0 B      475136 B         12    Malloc Small
+   814957 B       32768 B           0 B        473    __DATA
+   786432 B           0 B           0 B          9    Malloc Metadata
+   595096 B           0 B           0 B        409    __DATA_DIRTY
+   557848 B           0 B           0 B          1    page table
+   376832 B           0 B       49152 B          2    Dispatch Continuations
+   200347 B           0 B           0 B       1399    unused dyld shared cache area
+   163840 B           0 B           0 B          1    Malloc Tiny
+   147456 B           0 B       65536 B         11    Stack
+   114688 B           0 B           0 B          8    Untagged
+    49080 B           0 B           0 B          4    __TPRO_CONST
+    48000 B           0 B           0 B          1    __OBJC_RW
+    45608 B           0 B           0 B        266    __AUTH
+    16384 B      294912 B           0 B        463    __DATA_CONST
+    16384 B           0 B           0 B          1    Deferred Reclaim
+    16384 B           0 B           0 B          1    OS Alloc Once
+    16384 B           0 B           0 B          1    Activity Tracing
+        0 B     4669440 B           0 B        536    __TEXT
+        0 B       81920 B           0 B          2    mapped file
+        0 B       65536 B           0 B          2    __LINKEDIT
+        0 B           0 B           0 B          1    __CTF
+        0 B           0 B           0 B        463    __AUTH_CONST
+        0 B           0 B           0 B          1    __FONT_DATA
+        0 B           0 B           0 B          1    __OBJC_RO
+        ---           ---           ---        ---    ---
+  7766808 B     5144576 B      589824 B       4070    TOTAL
+
+Auxiliary data:
+    phys_footprint: 7766808 B
+    phys_footprint_peak: 7881496 B
+

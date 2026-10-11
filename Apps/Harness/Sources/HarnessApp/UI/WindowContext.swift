@@ -71,6 +71,11 @@ final class WindowContext {
     /// its windows moves to the active one (the others close).
     func update() -> Bool {
         let coordinator = SessionCoordinator.shared
+        // Appearance/settings notifications can arrive before the daemon's first reply.
+        // An empty launch window is waiting for its session, not a closed session.
+        if sessionID == nil, owner == DaemonSidebar.localID, coordinator.isAwaitingInitialSnapshot {
+            return true
+        }
         if !coordinator.isConnected(owner) {
             let open = WindowContexts.all.filter { $0.window != nil }
             let anotherStays = open.contains { $0 !== self && coordinator.isConnected($0.owner) }

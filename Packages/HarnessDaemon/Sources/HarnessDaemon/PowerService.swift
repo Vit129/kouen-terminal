@@ -15,7 +15,8 @@ final class PowerService: @unchecked Sendable {
     private let notificationQueueKey = DispatchSpecificKey<Bool>()
     private let notificationQueue = DispatchQueue(label: "com.harness.power.notifications")
     private let nativeEnabled: Bool
-    private var settingsBytes: Data?
+    private let settingsCache = DaemonSettingsCache.shared
+    private var settingsObservation: UUID?
     private var settingsFailure: String?
     private var settings: PowerSettings
     private var mode: AwakeMode = .auto
@@ -35,6 +36,7 @@ final class PowerService: @unchecked Sendable {
     var onWake: (@Sendable (Double?) -> Void)?
     #if os(macOS)
     private var assertion: IOPMAssertionID?
+    private var powerSourceObservation: PowerSourceObservation?
     private var port: IONotificationPortRef?
     private var rootPort: io_connect_t = 0
     private var notifier: io_object_t = 0
@@ -54,6 +56,43 @@ final class PowerService: @unchecked Sendable {
             if root != 0 { IOServiceClose(root); root = 0 }
         }
     }
+    /// `dispatchMain()` does not run a Core Foundation loop. Battery notifications
+    /// therefore get one sleeping event thread for the daemon, shared by all panes.
+    private final class PowerSourceObservation: @unchecked Sendable {
+        private let lock = NSLock()
+        private let ready = DispatchSemaphore(value: 0)
+        private var runLoop: CFRunLoop?
+        private var worker: Thread?
+        private let context: CallbackContext
+        init(context: CallbackContext) {
+            self.context = context
+            worker = Thread { [self] in run() }
+            worker?.name = "Harness power source events"; worker?.start()
+            ready.wait()
+        }
+        var isAvailable: Bool { lock.lock(); defer { lock.unlock() }; return runLoop != nil }
+        func stop() {
+            lock.lock(); let loop = runLoop; worker = nil; lock.unlock()
+            if let loop {
+                CFRunLoopPerformBlock(loop, CFRunLoopMode.defaultMode.rawValue) { CFRunLoopStop(loop) }
+                CFRunLoopWakeUp(loop)
+            }
+        }
+        private func run() {
+            guard let observer = IOPSNotificationCreateRunLoopSource({ pointer in
+                guard let pointer else { return }
+                Unmanaged<CallbackContext>.fromOpaque(pointer).takeUnretainedValue().service?.refresh()
+            }, Unmanaged.passUnretained(context).toOpaque())?.takeRetainedValue() else {
+                lock.lock(); worker = nil; lock.unlock(); ready.signal(); return
+            }
+            let loop = CFRunLoopGetCurrent()
+            CFRunLoopAddSource(loop, observer, .defaultMode)
+            lock.lock(); runLoop = loop; lock.unlock(); ready.signal()
+            CFRunLoopRun()
+            CFRunLoopRemoveSource(loop, observer, .defaultMode)
+            lock.lock(); runLoop = nil; worker = nil; lock.unlock()
+        }
+    }
     #endif
 
     init(settings: PowerSettings, nativeEnabled: Bool) {
@@ -67,6 +106,7 @@ final class PowerService: @unchecked Sendable {
         #endif
     }
     deinit {
+        if let settingsObservation { settingsCache.removeObserver(settingsObservation) }
         if DispatchQueue.getSpecific(key: queueKey) == true || DispatchQueue.getSpecific(key: notificationQueueKey) == true { stopOnQueue() }
         else { queue.sync { stopOnQueue() } }
     }
@@ -88,9 +128,29 @@ final class PowerService: @unchecked Sendable {
             }
             #endif
             let source = DispatchSource.makeTimerSource(queue: queue)
-            source.schedule(deadline: .now(), repeating: 3)
+            source.schedule(deadline: .distantFuture)
             source.setEventHandler { [weak self] in self?.evaluate() }
             source.resume(); timer = source
+            if settingsObservation == nil {
+                settingsObservation = settingsCache.observe { [weak self] in
+                    self?.queue.async { [weak self] in
+                        guard let self, let result = self.settingsCache.latestResult else { return }
+                        switch result {
+                        case let .success(fresh): self.settings = fresh.power; self.settingsFailure = nil
+                        case .failure: self.settingsFailure = "Power settings could not be reloaded; the last working policy remains active."
+                        }
+                        self.evaluate()
+                    }
+                }
+            }
+            #if os(macOS)
+            if nativeEnabled {
+                let observation = PowerSourceObservation(context: callbackContext)
+                powerSourceObservation = observation
+                if !observation.isAvailable { failure = "Power source observation is unavailable." }
+            }
+            #endif
+            evaluate()
         }
     }
     func suspend() { queue.sync { stopOnQueue() } }
@@ -99,6 +159,7 @@ final class PowerService: @unchecked Sendable {
         try value.validate()
         try queue.sync {
             _ = try SettingsSectionStorage.save(value, key: "power")
+            settingsCache.refresh()
             settings = value; evaluate()
         }
     }
@@ -129,13 +190,16 @@ final class PowerService: @unchecked Sendable {
     }
     private func evaluate() {
         guard enabled else { return }
-        do {
-            if let bytes = try PrivateFile.read(HarnessPaths.settingsURL), bytes != settingsBytes {
-                settings = try HarnessSettings.reload(data: bytes).power
-                settingsBytes = bytes; settingsFailure = nil
-            }
-        } catch { settingsFailure = "Power settings could not be reloaded; the last working policy remains active." }
-        count = workingProvider?() ?? 0
+        var retryAt: Date?
+        defer {
+            let deadline = [graceUntil, retryAt].compactMap { $0 }.min()
+            timer?.schedule(deadline: deadline.map { .now() + max(0, $0.timeIntervalSinceNow) } ?? .distantFuture)
+        }
+        let nextCount = workingProvider?() ?? 0
+        if count > 0, nextCount == 0 {
+            _ = policy.evaluate(settings: settings, mode: mode, source: source, workingAgents: count, at: .now)
+        }
+        count = nextCount
         #if os(macOS)
         guard nativeEnabled else { return }
         source = Self.powerSource()
@@ -147,7 +211,10 @@ final class PowerService: @unchecked Sendable {
                 let result = IOPMAssertionCreateWithName(kIOPMAssertionTypePreventUserIdleSystemSleep as CFString,
                     IOPMAssertionLevel(kIOPMAssertionLevelOn), "Harness working agents" as CFString, &value)
                 if result == kIOReturnSuccess { assertion = value; assertionFailure = nil }
-                else { assertionFailure = "The macOS idle-sleep assertion could not be acquired." }
+                else {
+                    assertionFailure = "The macOS idle-sleep assertion could not be acquired."
+                    retryAt = Date().addingTimeInterval(5)
+                }
             }
         } else { releaseAssertion() }
         #endif
@@ -155,6 +222,7 @@ final class PowerService: @unchecked Sendable {
     private func stopOnQueue() {
         enabled = false; timer?.cancel(); timer = nil; graceUntil = nil
         #if os(macOS)
+        powerSourceObservation?.stop(); powerSourceObservation = nil
         releaseAssertion()
         if notifier != 0 { IODeregisterForSystemPower(&notifier); notifier = 0 }
         callbackContext.closeRoot(); rootPort = 0
@@ -165,6 +233,7 @@ final class PowerService: @unchecked Sendable {
     #if os(macOS)
     private func releaseAssertion() {
         if let assertion { IOPMAssertionRelease(assertion); self.assertion = nil }
+        assertionFailure = nil
     }
     private static func powerSource() -> PowerSource {
         guard let info = IOPSCopyPowerSourcesInfo()?.takeRetainedValue(),

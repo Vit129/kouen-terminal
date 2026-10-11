@@ -10,7 +10,7 @@ import XCTest
 @MainActor
 final class TerminalThumbnailTests: XCTestCase {
     private func makeSurface() -> HarnessTerminalSurfaceView {
-        let view = HarnessTerminalSurfaceView(offMainParserFramePipeline: false)
+        let view = HarnessTerminalSurfaceView()
         view.configureAppearance(
             fontFamily: "Menlo",
             fontSize: 14,
@@ -29,8 +29,7 @@ final class TerminalThumbnailTests: XCTestCase {
             copyOnSelect: false,
             scrollbackLines: 1000,
             linearBlending: false,
-            ligatures: true,
-            offMainParserFramePipeline: false
+            ligatures: true
         )
         view.testingResizeGrid(cols: 80, rows: 24) // headless, the view sized itself to nothing
         return view
@@ -38,7 +37,9 @@ final class TerminalThumbnailTests: XCTestCase {
 
     private func thumbnail(of source: TerminalThumbnailSource) throws -> TerminalThumbnail {
         var built: TerminalThumbnail?
-        source.thumbnail { built = $0 } // synchronous on the main-confined pipeline
+        let finished = expectation(description: "worker thumbnail")
+        source.thumbnail { built = $0; finished.fulfill() }
+        wait(for: [finished], timeout: 2)
         return try XCTUnwrap(built)
     }
 
@@ -135,11 +136,13 @@ final class TerminalThumbnailTests: XCTestCase {
         window.isReleasedWhenClosed = false
         defer { window.contentView = nil }
         window.contentView?.addSubview(thumbnail)
+        _ = try self.thumbnail(of: surface) // Wait for the initial worker request to land.
         XCTAssertEqual(thumbnail.testingBuildCount, 1, "the first frame draws on arrival")
         thumbnail.tick()
         XCTAssertEqual(thumbnail.testingBuildCount, 1, "no output, no rebuild")
 
         for line in 0 ..< 50 { surface.receive("line \(line)\r\n") }
+        surface.testingWaitForEmulatorIdle()
         thumbnail.tick()
         thumbnail.tick()
         XCTAssertEqual(thumbnail.testingBuildCount, 2, "a burst of output is one rebuild per tick")

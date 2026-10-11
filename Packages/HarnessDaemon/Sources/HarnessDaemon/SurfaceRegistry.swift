@@ -56,6 +56,14 @@ public final class SurfaceRegistry: @unchecked Sendable {
         scheduleService = service; return service
     }
     func suspendScheduling() { schedules.suspend() }
+    func wakeSchedulesIfCreated() {
+        schedulesLock.lock(); let service = scheduleService; schedulesLock.unlock()
+        service?.wakeObservations()
+    }
+    func wakeFanoutIfCreated() {
+        fanoutLock.lock(); let service = fanoutService; fanoutLock.unlock()
+        service?.wakeOutcomes()
+    }
     private let aiSummariesLock = NSLock()
     private var aiSummaryService: AISummaryService?
     var aiSummaries: AISummaryService {
@@ -75,6 +83,11 @@ public final class SurfaceRegistry: @unchecked Sendable {
     func suspendAISummaries() { aiSummaries.suspend() }
     let notifications: NotificationService
     let power: PowerService
+    var hostedEventChannel: SessionHostChannel?
+    var hostedEventClient: SessionHostClient?
+    var hostedEventReconnectScheduled = false
+    var hostedAcknowledgements: [String: UInt64] = [:]
+    var hasHostedObservation: Bool { SessionHostClient.configured != nil }
     let observationQueue = DispatchQueue(label: "com.harness.daemon.observations")
     let observationBudget = ObservationBudget()
     let hostedMutations = DispatchGroup()
@@ -166,7 +179,7 @@ public final class SurfaceRegistry: @unchecked Sendable {
     /// monitor timer, including the idle early-return that otherwise skips the
     /// registry lock.
     func parkIdleSurfacesIfDue(now: Date = Date()) {
-        guard now.timeIntervalSince(lastIdleParkCheck) >= 30 else { return }
+        guard !hasHostedObservation, now.timeIntervalSince(lastIdleParkCheck) >= 30 else { return }
         lastIdleParkCheck = now
         lock.lock()
         let ptys = Array(sessions.values)
@@ -260,8 +273,9 @@ public final class SurfaceRegistry: @unchecked Sendable {
                 catch { reportPersistenceError(error.localizedDescription) }
             }
         }
+        usage.onChange = { [weak self] in self?.wakeSchedulesIfCreated() }
         activity.onTranscript = { [weak usage] run, path in usage?.bind(run, path: path) }
-        activity.onChange = { [weak self] run in self?.applyCanonicalRun(run); self?.power.refresh(); self?.notifications.observe(run) }
+        activity.onChange = { [weak self] run in self?.applyCanonicalRun(run); self?.power.refresh(); self?.notifications.observe(run); self?.wakeSchedulesIfCreated(); self?.wakeFanoutIfCreated() }
         power.workingProvider = { [weak activity] in
             activity?.workingProcesses().filter { ProcessScan.generation($0.pid) == $0.generation }.count ?? 0
         }
@@ -270,6 +284,7 @@ public final class SurfaceRegistry: @unchecked Sendable {
             notifications?.submit(NotificationNotice(surfaceID: nil, event: .systemWake, title: "Harness woke", message: seconds.map { "Observed sleep: \(Int($0)) seconds. Local execution paused during sleep." } ?? "macOS woke; elapsed sleep is unavailable."))
         }
         if !quiesced { startMonitorTimer() }
+        startHostedObservations()
     }
 
     private func setHistoryPersistence(scope rawScope: String, target: String?, raw: String) -> IPCResponse {
@@ -1062,6 +1077,8 @@ public final class SurfaceRegistry: @unchecked Sendable {
             // Socket-layer blocking primitive, owned by DaemonServer (intercepted before
             // the registry so it never blocks this lock); stub keeps the switch exhaustive.
             return .error("wait-for must be handled by DaemonServer")
+        case .acknowledgeOutput:
+            return .error("Output acknowledgements require the attached connection.")
         case .cancelSubscription:
             // Per-client cancel is owned by DaemonServer (it knows which connection asked and
             // releases only that client's token). Reaching here means a caller bypassed the server
@@ -1429,12 +1446,13 @@ public final class SurfaceRegistry: @unchecked Sendable {
     public func subscribe(
         surfaceID: String,
         onResize: (@Sendable (ReplaySize) -> Void)? = nil,
+        acknowledgesOutput: Bool = false,
         handler: @escaping @Sendable (Data, UInt64) -> Void
     ) -> UUID? {
         lock.lock()
         let session = sessions[surfaceID]
         lock.unlock()
-        return session?.subscribe(onResize: onResize, handler)
+        return session?.subscribe(acknowledgesOutput: acknowledgesOutput, onResize: onResize, handler)
     }
 
     /// What an attaching client is sent (`SessionPty.attachHistory`).
@@ -1443,6 +1461,11 @@ public final class SurfaceRegistry: @unchecked Sendable {
         let session = sessions[surfaceID]
         lock.unlock()
         return session?.attachHistory(history: history, fromSequence: fromSequence, screenOnResync: screenOnResync, includeCheckpoint: includeCheckpoint)
+    }
+
+    public func acknowledgeSubscription(surfaceID: String, token: UUID, sequence: UInt64) {
+        lock.lock(); let session = sessions[surfaceID]; lock.unlock()
+        session?.acknowledgeSubscription(token: token, sequence: sequence)
     }
 
     public func cancelSubscription(surfaceID: String, token: UUID) {
@@ -1519,7 +1542,7 @@ public final class SurfaceRegistry: @unchecked Sendable {
         let snap = Array(sessions)  // [(key, SessionPty)] — strong refs keep PTYs alive off-lock
         lock.unlock()
         guard !snap.isEmpty else { return }
-        let parents = parents ?? ProcessScan.parentMap()
+        let parents = parents ?? (hasHostedObservation ? [:] : ProcessScan.parentMap())
 
         // Off-lock: walk every surface's process tree without contending with IPC. Keep the
         // exact `session` instance alongside its probed cwd so the re-acquire below can confirm
@@ -1527,7 +1550,6 @@ public final class SurfaceRegistry: @unchecked Sendable {
         // the cwd was computed for so a respawn during the probe (same SessionPty, new child) can't
         // commit the OLD child's cwd for the NEW one.
         let probed: [(key: String, session: SessionPty, uuid: UUID, pid: pid_t, cwd: String, command: String?)] = snap.compactMap { key, session in
-            guard session.local != nil || (try? session.liveState()) != nil else { return nil }
             guard let uuid = UUID(uuidString: key), let result = session.probeWorkingDirectory(parents: parents) else {
                 return nil
             }
@@ -2083,6 +2105,7 @@ public final class SurfaceRegistry: @unchecked Sendable {
             }
             if let failure { return .error(failure) }
             startMonitorTimer(); AgentScanner.shared.start(registry: self); power.activate(); schedules.activate(); aiSummaries.activate()
+            wakeFanoutIfCreated()
         }
         return .ok
     }
@@ -2193,11 +2216,10 @@ public final class SurfaceRegistry: @unchecked Sendable {
             session.onExit = { [weak self, weak session] exitStatus in
                 self?.removeSurfaceIfCurrent(surfaceID: surfaceID, session: session, exitStatus: exitStatus)
             }
-            // Internal monitor subscription (Phase 5): cheap output/bell/idle tracking, drained
-            // by `processMonitors`. Lives for the surface's lifetime (cleared on teardown).
-            // A program-status query is answered here so a pane with no window still replies.
-            session.monitorSubscription = session.subscribe(watching: false) { [weak self, weak session] data, sequence in
-                self?.observeSurfaceOutput(surfaceKey: surfaceID, data: data, sequence: sequence, session: session)
+            if !session.isHosted {
+                session.observeLocally { [weak self, weak session] observation in
+                    self?.observeSurfaceEvents(surfaceKey: surfaceID, observation: observation, session: session)
+                }
             }
             lock.lock(); lockHeld = true
             guard !shuttingDown, quiesced == initiallyQuiesced, !wasInLayout || editor.tab(forSurfaceKey: surfaceID) != nil else {
@@ -2516,10 +2538,12 @@ public final class SurfaceRegistry: @unchecked Sendable {
         let session = sessionID(forSurfaceKey: surfaceID)
         let tab = editor.tab(forSurfaceKey: surfaceID)?.tabID.uuidString
         let owner = sessions[surfaceID]?.probeForegroundProcess()
+        let stream = sessions[surfaceID]?.streamIdentity
         monitorLock.lock()
         var monitor = monitors[surfaceID] ?? SurfaceMonitor()
+        if let previous = monitor.streamIdentity, let stream, previous != stream { monitor = SurfaceMonitor() }
         monitor.sessionID = session
-        monitor.streamIdentity = sessions[surfaceID]?.streamIdentity
+        monitor.streamIdentity = stream
         monitor.tabID = tab
         if let owner {
             monitor.ownerPID = Int(owner.pid)

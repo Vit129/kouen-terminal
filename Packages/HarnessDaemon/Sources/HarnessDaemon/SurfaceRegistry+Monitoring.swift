@@ -20,8 +20,6 @@ extension SurfaceRegistry {
         var lastOutput = Date()
         var lastOutputSequence: UInt64 = 1
         var lastActivityRecordUptime: UInt64 = 0
-        /// OSC-aware bell-scan state, carried across PTY chunks (a sequence can split over reads).
-        var bellScan: SurfaceRegistry.BellScanState = .normal
         var statusScan = PtyStreamScanner()
         var programStatus = ProgramStatusBook()
         var modeMirror = KeyboardModeMirror()
@@ -144,19 +142,26 @@ extension SurfaceRegistry {
     @discardableResult
     func noteSurfaceOutput(surfaceKey: String, data: Data, sequence: UInt64? = nil, replaying: Bool = false) -> Data? {
         monitorLock.lock()
+        var scanner = monitors[surfaceKey]?.statusScan ?? PtyStreamScanner()
+        monitorLock.unlock()
+        let events = scanner.scanAnchored(data, sequence: sequence ?? 0)
+        monitorLock.lock(); var monitor = monitors[surfaceKey] ?? SurfaceMonitor(); monitor.statusScan = scanner; monitors[surfaceKey] = monitor; monitorLock.unlock()
+        return noteSurfaceEvents(surfaceKey: surfaceKey, events: events, byteCount: data.count, sequence: sequence, replaying: replaying)
+    }
+
+    @discardableResult
+    func noteSurfaceEvents(surfaceKey: String, events: [AnchoredPtyScanEvent], byteCount: Int, sequence: UInt64?, replaying: Bool = false) -> Data? {
+        monitorLock.lock()
         // Moved out (not copied) so mutating its scanner/status containers doesn't copy-on-write
         // them per chunk; re-inserted below before the lock drops.
         var m = monitors.removeValue(forKey: surfaceKey) ?? SurfaceMonitor()
         m.sawOutput = true
         m.lastOutput = Date()
-        if let sequence { m.lastOutputSequence = sequence + UInt64(data.count) }
+        if let sequence { m.lastOutputSequence = sequence + UInt64(byteCount) }
         let nowUptime = DispatchTime.now().uptimeNanoseconds
         let recordActivity = nowUptime &- m.lastActivityRecordUptime >= 50_000_000
         if recordActivity { m.lastActivityRecordUptime = nowUptime }
-        // Parser-aware bell: a raw `data.contains(0x07)` mistakes the OSC-terminator BEL that shell
-        // integration emits on every prompt (OSC 133) for a real terminal bell. The scan threads
-        // its state through `m.bellScan` so a sequence spanning chunks is still handled correctly.
-        if Self.scanForBell(data, state: &m.bellScan) { m.sawBell = true }
+        if events.contains(where: { $0.event == .bell }) { m.sawBell = true }
         let before = m.programStatus
         var reply: Data?
         var commandExit: Int?
@@ -166,8 +171,7 @@ extension SurfaceRegistry {
         var explicitNotices: [NotificationNotice] = []
         var completedCommands: [ShellCommandSpan] = []
         var overflow = false
-        var scanner = m.statusScan; m.statusScan = PtyStreamScanner()
-        scanner.visit(data, sequence: sequence ?? m.lastOutputSequence) { anchored in
+        for anchored in events {
             let event = anchored.event
             if case .bell = event, explicitNotices.count < 64 {
                 var notice = NotificationNotice(surfaceID: surfaceKey, event: .bell, title: "Terminal", message: "Bell")
@@ -224,8 +228,7 @@ extension SurfaceRegistry {
                 }
             }
         }
-        if overflow, !shots.isEmpty, shots.last?.book != m.programStatus { shots[shots.count - 1] = (m.programStatus, (sequence ?? m.lastOutputSequence) + UInt64(data.count)) }
-        m.statusScan = scanner
+        if overflow, !shots.isEmpty, shots.last?.book != m.programStatus { shots[shots.count - 1] = (m.programStatus, (sequence ?? m.lastOutputSequence) + UInt64(byteCount)) }
         if m.programStatus != before { m.statusDirty = true }
         let sessionID = m.sessionID, streamIdentity = m.streamIdentity
         monitors[surfaceKey] = m

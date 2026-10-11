@@ -136,7 +136,7 @@ final class PerformanceBenchmarks: XCTestCase {
         return Array(s.utf8)
     }
 
-    private struct SurfaceMainThreadStallSample {
+    private struct ConsumerPipelineSample {
         var totalNanos: UInt64
         var feedNanos: UInt64
         var frameBuildNanos: UInt64
@@ -145,11 +145,11 @@ final class PerformanceBenchmarks: XCTestCase {
         var historyLines: Int
     }
 
-    /// Mirrors today's surface hot path: PTY bytes are parsed on the main thread, then the next
-    /// frame snapshot/damage/build is also produced on the main thread. This is Task 8's gate:
-    /// if this number is not a real stall, the off-main pipeline should not be enabled.
+    /// Measures parser plus production mirror/direct-frame construction synchronously.
+    /// It excludes queueing, transport, Metal encoding and display; this is a CPU component
+    /// measurement, not a main-thread stall in the worker-only production pipeline.
     @MainActor
-    private func sampleSurfaceMainThreadStall(bytes: [UInt8], cols: Int = 160, rows: Int = 48) -> SurfaceMainThreadStallSample {
+    private func sampleConsumerPipeline(bytes: [UInt8], cols: Int = 160, rows: Int = 48) -> ConsumerPipelineSample {
         let term = TerminalEmulator(cols: cols, rows: rows)
         term.maxScrollbackLines = 10_000
         let builder = FrameBuilder(theme: theme)
@@ -160,17 +160,18 @@ final class PerformanceBenchmarks: XCTestCase {
         let feedNanos = DispatchTime.now().uptimeNanoseconds &- feedStart
 
         let frameBuildStart = DispatchTime.now().uptimeNanoseconds
-        let grid = term.readGrid()
         let damage = term.consumeDamage()
-        let frame = builder.build(grid, region: nil, imageProvider: { _ in nil }, reusing: nil, damage: damage)
+        var mirror: TerminalGridSnapshot?
+        term.updateRenderMirror(&mirror, damage: damage)
+        let frame = builder.buildDirect(mirror!, region: nil, imageProvider: { _ in nil })
         let frameBuildNanos = DispatchTime.now().uptimeNanoseconds &- frameBuildStart
 
-        return SurfaceMainThreadStallSample(
+        return ConsumerPipelineSample(
             totalNanos: DispatchTime.now().uptimeNanoseconds &- start,
             feedNanos: feedNanos,
             frameBuildNanos: frameBuildNanos,
             bytes: bytes.count,
-            cells: frame.cells.count,
+            cells: frame.cellCount,
             historyLines: term.historyCount
         )
     }
@@ -184,7 +185,7 @@ final class PerformanceBenchmarks: XCTestCase {
 
     @MainActor
     private func sampleSurfaceOffMainStall(data: Data) -> SurfaceOffMainStallSample {
-        let view = HarnessTerminalSurfaceView(offMainParserFramePipeline: true)
+        let view = HarnessTerminalSurfaceView()
         view.testingResizeGrid(cols: 160, rows: 48)
 
         let mainStart = DispatchTime.now().uptimeNanoseconds
@@ -278,7 +279,7 @@ final class PerformanceBenchmarks: XCTestCase {
     func testConsumerScoreboard() throws {
         try skipUnlessEnabled()
         for (name, bytes) in scoreboardWorkloads() {
-            let sample = sampleSurfaceMainThreadStall(bytes: bytes)
+            let sample = sampleConsumerPipeline(bytes: bytes)
             let mbps = (Double(bytes.count) / 1_000_000) / (Double(sample.totalNanos) / 1_000_000_000)
             printBenchmark("consumer_\(name)", nanos: sample.totalNanos, fields: [
                 ("bytes", "\(bytes.count)"),
@@ -379,7 +380,7 @@ final class PerformanceBenchmarks: XCTestCase {
         try skipUnlessEnabled()
         let flood = floodPayload()
         for chunkSize in [4 * 1024, 64 * 1024] {
-            let view = HarnessTerminalSurfaceView(offMainParserFramePipeline: true)
+            let view = HarnessTerminalSurfaceView()
             view.testingResizeGrid(cols: 160, rows: 48)
             view.testingMainHopCount = 0
 
@@ -554,13 +555,13 @@ final class PerformanceBenchmarks: XCTestCase {
     }
 
     @MainActor
-    func testSurfaceMainThreadStall4MiB() throws {
+    func testConsumerPipeline4MiB() throws {
         try skipUnlessEnabled()
         let bytes = syntheticStream(targetBytes: 4 * 1024 * 1024)
-        let sample = sampleSurfaceMainThreadStall(bytes: bytes)
+        let sample = sampleConsumerPipeline(bytes: bytes)
         XCTAssertEqual(sample.cells, 160 * 48)
         printBenchmark(
-            "surface_main_thread_stall_4mib",
+            "consumer_pipeline_4mib",
             nanos: sample.totalNanos,
             fields: [
                 ("feedNanos", "\(sample.feedNanos)"),
@@ -574,7 +575,7 @@ final class PerformanceBenchmarks: XCTestCase {
         let options = XCTMeasureOptions()
         options.iterationCount = 3
         measure(metrics: [XCTClockMetric()], options: options) {
-            _ = sampleSurfaceMainThreadStall(bytes: bytes)
+            _ = sampleConsumerPipeline(bytes: bytes)
         }
     }
 

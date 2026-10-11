@@ -60,6 +60,24 @@ final class IPCCodecTests: XCTestCase {
         XCTAssertNil(cwd)
     }
 
+    func testOutputSequenceOverflowRejectedInEveryReplyDecoder() throws {
+        let binary = Data([0xF5, 0, 0, 0, 9] + Array(repeating: UInt8(0xFF), count: 8) + [0x58])
+        let json = try IPCCodec.encode(IPCReply(response: .data(Data([0x58]), sequence: .max)))
+        for frame in [binary, json] {
+            var data = frame
+            XCTAssertThrowsError(try IPCCodec.decodeReplyOrData(from: &data))
+            var buffer = IPCReadBuffer()
+            buffer.append(frame)
+            XCTAssertThrowsError(try IPCCodec.decodeReplyOrData(from: &buffer))
+        }
+        var reply = json
+        XCTAssertThrowsError(try IPCCodec.decodeReply(from: &reply))
+        for sequence in [UInt64.max - 1, 0] {
+            var valid = try IPCCodec.encodeOutputFrame(Data([0x58]), sequence: sequence)
+            XCTAssertNotNil(try IPCCodec.decodeReplyOrData(from: &valid))
+        }
+    }
+
     func testResponseRoundTripIsStable() throws {
         // Exhaustive (see `allResponseSamples` + `responseExhaustivenessTripwire`) — every
         // IPCResponse case round-trips, and a new case won't compile until it's covered here.
@@ -650,7 +668,7 @@ final class IPCCodecTests: XCTestCase {
              .unlinkWindow, .killPane, .swapPanes, .resizePane, .resizePaneRatio, .zoomPane,
              .setCopyMode, .renameTab, .renameSession, .renameWorkspace, .detectAgent,
              .subscribeSurfaceOutput, .subscribeSurfaceOutputReadOnly, .cancelSubscription, .replayScrollback,
-             .replayScrollbackSequenced, .resizeSurface, .detachSurface, .identifyClient,
+             .replayScrollbackSequenced, .resizeSurface, .detachSurface, .acknowledgeOutput, .identifyClient,
              .detachClient, .setBuffer, .getBuffer, .deleteBuffer, .pasteBuffer,
              .selectPaneDirectional, .selectPane, .subscribeSnapshot, .applyLayout, .nextLayout,
              .previousLayout, .rotatePanes, .breakPane, .joinPane, .respawnPane, .clearHistory, .setOption,

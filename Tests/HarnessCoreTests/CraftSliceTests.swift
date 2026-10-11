@@ -61,7 +61,7 @@ final class CraftSliceTests: XCTestCase {
             "systemNotificationsEnabled", "notificationSoundEnabled",
             "colorRendering", "textRendering",
             "applyThemeToTerminalOutput", "ligatures", "showPromptGutter",
-            "offMainParserFramePipeline", "liveResizeReflow",
+            "liveResizeReflow",
             "resizeOverlay", "resizeOverlayPosition", "bellMode",
             "scrollMultiplier", "mouseHideWhileTyping", "optionAsMeta",
             "quickTerminalEnabled", "quickTerminalHotkey", "windowPaddingBalance",

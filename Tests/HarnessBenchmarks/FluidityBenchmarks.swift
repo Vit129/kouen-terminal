@@ -26,7 +26,7 @@ final class FluidityBenchmarks: XCTestCase {
     }
 
     private func makeHostedView(in window: NSWindow) throws -> HarnessTerminalSurfaceView {
-        let view = HarnessTerminalSurfaceView(offMainParserFramePipeline: true)
+        let view = HarnessTerminalSurfaceView()
         window.contentView = view
         guard view.testingHasRenderer else { throw XCTSkip("renderer unavailable") }
         view.layoutSubtreeIfNeeded()

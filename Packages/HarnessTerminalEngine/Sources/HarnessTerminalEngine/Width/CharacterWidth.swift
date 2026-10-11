@@ -16,10 +16,8 @@ import Foundation
 /// Deliberate deviations from raw UCD, chosen to match the engine's cell model:
 ///   - Everything below U+0300 is fixed by tier 1 (controls zero, the rest narrow) — so the
 ///     soft hyphen U+00AD stays width 1, never zero.
-///   - Hangul conjoining jamo V/T (1160–11FF, D7B0–D7FF) stay width 1, NOT zero: the
-///     engine's `attachCombining` folds only Grapheme_Extend scalars, so zero-width jamo
-///     would be silently dropped (invisible vowels in NFD Korean). Width 1 keeps decomposed
-///     Hangul legible until the grapheme layer composes syllables (Phase 3).
+///   - Hangul conjoining jamo V/T (1160–11FF, D7B0–D7FF) retain scalar width 1.
+///     Grapheme mode joins them with their leading consonant; scalar placement keeps them visible.
 ///   - Regional indicators (U+1F1E6–FF) are narrow as single scalars; flag pairing is a
 ///     grapheme-layer concern.
 ///

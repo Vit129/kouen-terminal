@@ -25,7 +25,16 @@ final class TerminalFindBar: NSView, NSSearchFieldDelegate {
         TerminalBufferSearchOptions(isRegex: regexButton.state == .on, caseSensitive: caseButton.state == .on)
     }
 
+    func scopeToCommandOutput() {
+        searchField.placeholderString = "Find in command output"
+        searchField.toolTip = "Search this command’s output. Close Find to search the whole terminal again."
+        searchField.setAccessibilityLabel("Find in command output")
+    }
+
     func setQuery(_ query: String, caseSensitive: Bool) {
+        searchField.placeholderString = "Find"
+        searchField.toolTip = nil
+        searchField.setAccessibilityLabel("Find")
         searchField.stringValue = query
         regexButton.state = .off
         caseButton.state = caseSensitive ? .on : .off

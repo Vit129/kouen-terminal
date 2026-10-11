@@ -17,15 +17,62 @@ private final class SurfaceDrawableRequest: @unchecked Sendable {
     let layer: CAMetalLayer
     var drawable: CAMetalDrawable?
     var waitNanos: UInt64 = 0
+    private let lock = NSLock()
+    private var cancelled = false
 
     init(layer: CAMetalLayer) { self.layer = layer }
+    func cancel() { lock.lock(); cancelled = true; lock.unlock() }
+    private var isCancelled: Bool { lock.lock(); defer { lock.unlock() }; return cancelled }
 
     func acquire() {
+        guard !isCancelled else { return }
         let start = DispatchTime.now().uptimeNanoseconds
-        drawable = autoreleasepool { layer.nextDrawable() }
+        let acquired = autoreleasepool { layer.nextDrawable() }
         waitNanos = DispatchTime.now().uptimeNanoseconds &- start
+        if !isCancelled { drawable = acquired }
     }
 }
+
+/// All mutable atlas, instance-cache and upload state belongs to this serial queue.
+/// Layout joins it only for the transaction-synchronized resize path.
+private final class SurfaceRenderExecutor: @unchecked Sendable {
+    let queue: DispatchQueue
+    private let renderer: TerminalMetalRenderer
+
+    init(renderer: TerminalMetalRenderer, queue: DispatchQueue) {
+        self.renderer = renderer
+        self.queue = queue
+    }
+
+    func sync<T>(_ body: (TerminalMetalRenderer) -> T) -> T {
+        queue.sync { autoreleasepool { body(renderer) } }
+    }
+
+    func async(_ body: @escaping @Sendable (TerminalMetalRenderer) -> Void) {
+        // Metal command buffers/encoders are autoreleased; the render queue's inherited
+        // pool may otherwise retain completed frame resources across many work items.
+        queue.async { [self] in autoreleasepool { body(renderer) } }
+    }
+
+    @MainActor func withTransactionOwnership<T>(_ body: (TerminalMetalRenderer) -> T) -> T {
+        // Main is the sole submitter. Draining its earlier jobs transfers ownership for this
+        // call; no later job can be submitted before the current AppKit transaction returns.
+        queue.sync {}
+        return autoreleasepool { body(renderer) }
+    }
+}
+
+private struct SurfacePresentConfiguration: Sendable {
+    var originX: Int
+    var originY: Int
+    var gamma: Float
+    var ligatures: Bool
+    var fractionPx: Float
+    var clipRows: Int?
+    var synchronizedWithTransaction: Bool
+}
+
+private enum SurfacePresentAttempt: Sendable { case presented, nilDrawable, encodeFailure }
 
 private struct SurfaceFrameBuildConfiguration: Sendable {
     // Keep search distinct from selection and legible on both light/dark themes.
@@ -68,10 +115,8 @@ private struct SurfaceFrameBuildResult: Sendable {
     var generation: UInt64
     var frame: TerminalFrame
     var damage: TerminalDamage?
-    /// Non-zero for a pure scrollback scroll: the frame is the previous one shifted by this many
-    /// viewport rows (`FrameBuilder.buildShifted`), and the renderer should rotate its row cache
-    /// by the same amount instead of re-encoding the kept rows. `damage` then lists exactly the
-    /// newly-exposed rows.
+    /// Non-zero for a pure scrollback scroll. The renderer rotates its row cache by this
+    /// amount and encodes only the newly exposed rows listed in `damage`.
     var scrollShift: Int = 0
     /// True when the frame carries the display-only smooth-scroll peek row: one extra row below
     /// the viewport (built whenever the view is scrolled into history) that the fraction translate
@@ -81,6 +126,10 @@ private struct SurfaceFrameBuildResult: Sendable {
     var clearColor: RenderColor
     /// When the next frame of a Kitty animation this frame draws is due (uptime nanoseconds).
     var nextAnimationFrame: UInt64?
+    var cursorCanBlink: Bool = false
+    var hasShellPrompt: Bool = false
+    var source: ObjectIdentifier?
+    var outputGeneration: UInt64 = 0
 }
 
 private final class SurfaceColorProviderState: @unchecked Sendable {
@@ -120,6 +169,7 @@ private final class SurfaceEmulatorState: @unchecked Sendable {
 
     private(set) var emulator: TerminalEmulator
     let queue: DispatchQueue
+    var renderMirror: TerminalGridSnapshot?
     var lastPlainFrame: TerminalFrame?
     /// The `renderGeneration` the cached `lastPlainFrame` was built against. The worker refuses to
     /// reuse a frame from a different generation, so a resize/theme/detach that bumps the generation
@@ -128,9 +178,8 @@ private final class SurfaceEmulatorState: @unchecked Sendable {
     var lastPlainFrameGeneration: UInt64 = 0
     /// Scroll-delta reuse source: the last overlay-free, image-free viewport frame (live at
     /// offset 0 or a scrolled history view), the scroll offset it was built at, and its
-    /// generation. A pure scroll between two such frames rebuilds via
-    /// `FrameBuilder.buildShifted` — re-resolving only the newly-exposed rows — instead of a
-    /// full rebuild. Touched only on the serial queue (same discipline as `lastPlainFrame`).
+    /// generation. A pure scroll between two such frames rotates the renderer row cache
+    /// and resolves only exposed rows. Touched only on the serial emulator queue.
     var lastViewportFrame: TerminalFrame?
     var lastViewportOffset = 0
     var lastViewportGeneration: UInt64 = 0
@@ -140,7 +189,7 @@ private final class SurfaceEmulatorState: @unchecked Sendable {
     /// Touched only on the serial queue (same discipline as `lastPlainFrame`).
     var lastOverlayKeys: [Int: UInt64] = [:]
 
-    /// Latest-wins coalescing for async frame builds. Every `renderNowOffMain()` claims a token; a
+    /// Latest-wins coalescing for frame builds. Every `renderNowOffMain()` claims a token; a
     /// build whose token is no longer the latest (a newer build is already queued behind it on this
     /// serial queue) skips itself. The superseding build still sees all accumulated damage (the
     /// skipped build never called `consumeDamage`), so no rows are lost — a burst of marks coalesces
@@ -148,6 +197,11 @@ private final class SurfaceEmulatorState: @unchecked Sendable {
     /// checked on the worker.
     private let tokenLock = NSLock()
     private var latestFrameToken: UInt64 = 0
+    private var isVisible = true
+
+    func setVisible(_ visible: Bool) {
+        tokenLock.lock(); isVisible = visible; tokenLock.unlock()
+    }
 
     func claimFrameToken() -> UInt64 {
         tokenLock.lock(); defer { tokenLock.unlock() }
@@ -179,13 +233,9 @@ private final class SurfaceEmulatorState: @unchecked Sendable {
         return token == latestPreviewToken
     }
 
-    /// Post-parse state one main hop applies to the main-thread mirrors (see `receiveOffMain`).
-    /// `addedHistory` accumulates across coalesced chunks (the scroll anchor must advance by the
-    /// TOTAL lines pushed into history, not the last chunk's delta); the rest are latest-wins —
-    /// chunks merge in FIFO order on the emulator queue, so "latest" is the emulator's current
-    /// state, which is exactly what the old one-hop-per-chunk delivery converged on.
+    /// Latest parser state published together so main-thread coordinates share one epoch.
     struct PendingMainHop {
-        var addedHistory: Int
+        var textContext: TerminalTextAnchorContext
         var historyCount: Int
         var modes: TerminalModes
         var altScreen: Bool
@@ -200,10 +250,10 @@ private final class SurfaceEmulatorState: @unchecked Sendable {
     /// Merge this chunk's post-parse state into the staged hop. Returns true when the caller
     /// must dispatch a main hop (none is in flight); false when an already-queued hop will
     /// observe this state.
-    func stageMainHop(addedHistory: Int, historyCount: Int, modes: TerminalModes, altScreen: Bool) -> Bool {
+    func stageMainHop(textContext: TerminalTextAnchorContext, historyCount: Int, modes: TerminalModes, altScreen: Bool) -> Bool {
         tokenLock.lock(); defer { tokenLock.unlock() }
         if var hop = pendingHop {
-            hop.addedHistory += addedHistory
+            hop.textContext = textContext
             hop.historyCount = historyCount
             hop.modes = modes
             hop.altScreen = altScreen
@@ -211,7 +261,7 @@ private final class SurfaceEmulatorState: @unchecked Sendable {
             return false
         }
         pendingHop = PendingMainHop(
-            addedHistory: addedHistory, historyCount: historyCount, modes: modes, altScreen: altScreen
+            textContext: textContext, historyCount: historyCount, modes: modes, altScreen: altScreen
         )
         return true
     }
@@ -271,7 +321,7 @@ private final class SurfaceEmulatorState: @unchecked Sendable {
 
     init(columns: Int, rows: Int) {
         self.emulator = TerminalEmulator(cols: columns, rows: rows)
-        self.queue = DispatchQueue(label: "com.robert.harness.terminal-surface.emulator", qos: .userInteractive)
+        self.queue = DispatchQueue(label: "com.robert.harness.terminal-surface.emulator", qos: .utility)
         queue.setSpecific(key: specific, value: ())
     }
 
@@ -285,7 +335,8 @@ private final class SurfaceEmulatorState: @unchecked Sendable {
     }
 
     func async(_ body: @escaping @Sendable (TerminalEmulator) -> Void) {
-        queue.async { [self] in
+        tokenLock.lock(); let visible = isVisible; tokenLock.unlock()
+        queue.async(qos: visible ? .userInteractive : .utility, flags: .enforceQoS) { [self] in
             body(emulator)
         }
     }
@@ -298,10 +349,10 @@ private final class SurfaceEmulatorState: @unchecked Sendable {
         }
     }
 
-    /// Make `next` the emulator. Called where the emulator lives: on `queue`, or on main when
-    /// the pipeline is main-confined. The reuse caches describe the old grid, so they go too.
+    /// Replace the emulator on its worker queue and discard caches describing the old grid.
     func replaceEmulator(with next: TerminalEmulator) {
         emulator = next
+        renderMirror = nil
         lastPlainFrame = nil
         lastViewportFrame = nil
         lastOverlayKeys = [:]
@@ -326,11 +377,13 @@ private final class HistoryRestore: @unchecked Sendable {
         emulator.isReplaying = true
     }
 
-    func feedHistory(_ data: Data, sequence: UInt64) {
+    func feedHistory(_ data: Data, sequence: UInt64, onConsumed: @escaping @Sendable () -> Void) {
         queue.async { [self] in
+            defer { onConsumed() }
             ReplaySize.replay(data, sequence: sequence, sizes: sizes, resize: { cols, rows in
                 if emulator.cols != cols || emulator.rows != rows { emulator.resize(cols: cols, rows: rows) }
             }, feed: emulator.feed)
+            if emulator.isShellPromptReady { StartupMetrics.shared.mark(.firstShellPromptConsumed) }
         }
     }
 
@@ -342,6 +395,10 @@ private final class HistoryRestore: @unchecked Sendable {
 
     func feed(_ data: Data) {
         queue.async { [self] in emulator.feed(data) }
+    }
+
+    func afterPendingFeed(_ consumed: @escaping @Sendable () -> Void) {
+        queue.async(execute: consumed)
     }
 
     func resize(cols: Int, rows: Int, localOnly: Bool) {
@@ -356,6 +413,25 @@ private final class HistoryRestore: @unchecked Sendable {
                 emulator.resize(cols: cols, rows: rows)
             }
         }
+    }
+}
+
+private final class SurfaceOutputConfiguration: @unchecked Sendable {
+    private let lock = NSLock()
+    private var scanner: TriggerScanner?
+    private var restore: HistoryRestore?
+
+    func setScanner(_ value: TriggerScanner?) {
+        lock.lock(); scanner = value; lock.unlock()
+    }
+
+    func setRestore(_ value: HistoryRestore?) {
+        lock.lock(); restore = value; lock.unlock()
+    }
+
+    func snapshot() -> (TriggerScanner?, HistoryRestore?) {
+        lock.lock(); defer { lock.unlock() }
+        return (scanner, restore)
     }
 }
 
@@ -468,13 +544,8 @@ public final class HarnessTerminalSurfaceView: NSView {
         rows = newRows
         invalidateRenderGeneration(contentChanged: true)
         historyRestore?.resize(cols: cols, rows: newRows, localOnly: false)
-        if offMainParserFramePipelineEnabled {
-            emulatorState.setPendingResize((cols, newRows), localOnly: false)
-            renderNowOffMain()
-        } else {
-            emulatorSync { $0.resize(cols: cols, rows: newRows) }
-            scheduler.forceRender()
-        }
+        emulatorState.setPendingResize((cols, newRows), localOnly: false)
+        renderNowOffMain()
     }
     /// Fires while the grid size changes during a resize so the host can show a dimensions HUD.
     /// `committed` is false for the live (mid-drag) tick and true once the size settles. Never
@@ -516,6 +587,9 @@ public final class HarnessTerminalSurfaceView: NSView {
     public var onCopy: ((String) -> Void)?
     /// Optional per-frame renderer stats sink for diagnostics/benchmarks.
     public var onRenderStats: ((TerminalRenderStats) -> Void)?
+    /// First successful CPU frame submission containing an OSC 133 B shell prompt.
+    public var onFirstShellPromptSubmitted: (() -> Void)?
+    private var hasSubmittedShellPrompt = false
     /// Whether a program may set the system clipboard via OSC 52 (tmux
     /// `set-clipboard`). The host sets this from the option; default on.
     public var allowProgramClipboardAccess = true
@@ -532,29 +606,41 @@ public final class HarnessTerminalSurfaceView: NSView {
 
     private let emulatorState: SurfaceEmulatorState
     /// The scrollback a resync is rebuilding behind the screen (`beginHistoryRestore`).
-    private var historyRestore: HistoryRestore?
+    private let outputConfiguration = SurfaceOutputConfiguration()
+    private lazy var outputReceiver = createOutputReceiver()
+    private var historyRestore: HistoryRestore? {
+        didSet { outputConfiguration.setRestore(historyRestore) }
+    }
     private let colorProviderState = SurfaceColorProviderState()
     private let inputEncoder = InputEncoder()
-    private let metalLayer = CAMetalLayer()
+    private var metalLayer = CAMetalLayer()
+    private var drawablePoolReleased = false
     /// Bottom-corner radius applied to the metal layer itself. A parent mask does not
     /// clip an asynchronously presented `CAMetalLayer`, so the surface stays square
     /// unless this layer masks its own drawable.
     private var islandCornerRadius: CGFloat = 0
     private var renderer: TerminalMetalRenderer?
+    private var renderExecutor: SurfaceRenderExecutor?
+    private var nextPresentationID: UInt64 = 0
+    private var completedPresentationID: UInt64 = 0
 
-    private var frameBuilder: FrameBuilder
     private var frameBuildConfiguration: SurfaceFrameBuildConfiguration
     private var colorRendering: TerminalColorRenderingMode
     private var colorGamut: TerminalColorGamut
-    private var offMainParserFramePipelineEnabled = true // production default; always set from init
     private var renderGeneration: UInt64 = 0
     /// The last frame presented on the main thread, kept so a live resize can re-present it at the
     /// new drawable size WITHOUT touching the emulator serial queue (which, during heavy output, is
     /// busy parsing). During a drag the grid content is unchanged — reflow + SIGWINCH is debounced
     /// to drag-end (`scheduleResizeCommit`) — so stretching the last frame is exactly correct and
     /// never blocks main behind the parser. Main-thread only (written in `presentBuiltFrame`).
-    // Only drawable acquisition runs here. Renderer state and presentation stay on main.
+    // Renderer mutation/encoding is serialized independently of potentially stalled acquisition.
     private let drawableQueue = DispatchQueue(label: "com.robert.harness.drawable", qos: .userInteractive)
+    private let drawableAcquisitionQueues = (0..<2).map {
+        DispatchQueue(label: "com.robert.harness.drawable-acquisition.\($0)", qos: .userInteractive)
+    }
+    private var drawableAcquisitionLane = 0
+    private var drawableAcquisitionQueue: DispatchQueue { drawableAcquisitionQueues[drawableAcquisitionLane] }
+    private var activeDrawableRequest: SurfaceDrawableRequest?
     private var drawableRequestInFlight = false
     private var pendingDrawableFrame: SurfaceFrameBuildResult?
     private var pendingDrawableNeedsFullDamage = false
@@ -586,6 +672,8 @@ public final class HarnessTerminalSurfaceView: NSView {
     /// frame sends nothing). Reset at drag end so the next drag starts fresh.
     private var lastSentPTYSize: (cols: Int, rows: Int)?
     private var fontFamily: String
+    private var fontFallbackFamilies: [String]
+    private var fontFeatures: [String: Int]
     private var fontSize: CGFloat
     private var fontThicken: Bool
     private var fontThickenStrength: Int
@@ -645,8 +733,27 @@ public final class HarnessTerminalSurfaceView: NSView {
     /// viewport-anchored, so the selection survives scrolling and new output (#161). A
     /// `SelectionRegion` is derived (expanded by granularity, rebased to viewport rows) for
     /// highlight + extraction.
-    private var selectionAnchor: (line: Int, column: Int)?
-    private var selectionHead: (line: Int, column: Int)?
+    private var textAnchorContext: TerminalTextAnchorContext?
+    private var selectionStartAnchor: TerminalTextAnchor?
+    private var selectionEndAnchor: TerminalTextAnchor?
+    private var selectionAnchor: (line: Int, column: Int)? {
+        get { selectionStartAnchor?.position.map { ($0.line, $0.column) } }
+        set {
+            guard let newValue else { selectionStartAnchor = nil; return }
+            if let anchor = trackTextPosition(line: newValue.line, column: newValue.column) { selectionStartAnchor = anchor }
+        }
+    }
+    private var selectionHead: (line: Int, column: Int)? {
+        get { selectionEndAnchor?.position.map { ($0.line, $0.column) } }
+        set {
+            guard let newValue else { selectionEndAnchor = nil; return }
+            if let anchor = trackTextPosition(line: newValue.line, column: newValue.column) { selectionEndAnchor = anchor }
+        }
+    }
+
+    private func trackTextPosition(line: Int, column: Int) -> TerminalTextAnchor? {
+        textAnchorContext?.makeAnchor(line: line, column: column)
+    }
     /// Selection unit set by click count: 1 = character, 2 = word, 3 = line. A drag extends by
     /// the unit; word/line ranges reuse copy-mode's word definition.
     private enum SelectionGranularity { case character, word, line }
@@ -668,7 +775,20 @@ public final class HarnessTerminalSurfaceView: NSView {
     /// True swallows the key. Installed by the host for the config-file keymap.
     public var consumeScriptKey: (@MainActor (NSEvent) -> Bool)?
     /// Scrollback offset in lines (0 = live bottom; >0 = scrolled up into history).
-    private var scrollOffset = 0
+    private var viewportAnchor: TerminalTextAnchor?
+    private var scrollOffset: Int {
+        get {
+            guard let viewportAnchor else { return 0 }
+            guard let position = viewportAnchor.position else { return historyCountMirror }
+            return max(0, min(historyCountMirror, historyCountMirror - position.line))
+        }
+        set {
+            guard newValue > 0 else { viewportAnchor = nil; return }
+            if let anchor = trackTextPosition(line: max(0, historyCountMirror - newValue), column: 0) {
+                viewportAnchor = anchor
+            }
+        }
+    }
     /// Smooth-scroll sub-line position. The continuous scrollback position is
     /// `P = scrollOffset - scrollFraction` (lines): the frame is built at the integer
     /// `scrollOffset = ceil(P)` — one line further back — and translated UP by
@@ -713,10 +833,6 @@ public final class HarnessTerminalSurfaceView: NSView {
     public private(set) var outputGeneration: UInt64 = 0
     /// Copy-mode `w`/`b`/`e` separator set. The app pushes the `word-separators` option.
     public var copyModeWordSeparators: String = CopyModeWords.tmuxDefault
-    /// The last frame built on the plain live path (no scrollback/selection/copy-mode/IME), kept
-    /// so the next plain render can reuse unchanged rows via the engine's dirty-row damage. Set to
-    /// nil whenever a non-plain frame is drawn or the appearance changes, forcing a full rebuild.
-    private var lastPlainFrame: TerminalFrame?
     /// Coalesces renders to display cadence: `scheduleRender` marks dirty and wakes the link, which
     /// presents at most one frame per tick (resize/first paint/2026-timeout force immediately). Wired
     /// to `renderNow` in `init`.
@@ -728,6 +844,8 @@ public final class HarnessTerminalSurfaceView: NSView {
     /// when the view enters a window, paused while idle, invalidated on detach. nil when not in a
     /// window. Named `renderLink` so it doesn't shadow the `NSView.displayLink(...)` factory.
     private var renderLink: CADisplayLink?
+    private var drawableRetryTimer: Timer?
+    private var drawableRetryDelay: TimeInterval = 0.025
     /// True once the grid has been sized from a real layout — the first sizing commits
     /// immediately (so the terminal opens at the right size); later changes coalesce.
     private var hasSizedGrid = false
@@ -775,6 +893,16 @@ public final class HarnessTerminalSurfaceView: NSView {
     private var findContentRevision: UInt64 = 0
     private var accessibleCache: (revision: UInt64, text: TerminalAccessibilityText, cursorLine: Int, cursorColumn: Int, history: Int)?
     private var findTargetLine: Int?
+    private var findPosition: TerminalTextAnchor?
+    private var findCommandScope: TerminalCommandRegion?
+    public var onRequestCommandFind: (() -> Void)?
+
+    func beginCommandFind(_ command: TerminalCommandRegion) {
+        findCommandScope = command
+        findPosition = nil
+        onRequestCommandFind?()
+        scheduleFind()
+    }
     public var onFindStatusChanged: ((String?) -> Void)?
     public var accessibilityPaneName = "Terminal"
     /// Index of the "current" match within `findMatches` (the one we scrolled to).
@@ -790,7 +918,9 @@ public final class HarnessTerminalSurfaceView: NSView {
 
     /// Compiled rules; nil = scanning disabled. Set on main; immutable, so capturing it
     /// into the emulator-queue feed path is safe.
-    private var triggerScanner: TriggerScanner?
+    private var triggerScanner: TriggerScanner? {
+        didSet { outputConfiguration.setScanner(triggerScanner) }
+    }
     /// Scan bookkeeping confined to the emulator's domain (the serial queue when off-main,
     /// main otherwise — the same confinement the emulator itself has): the buffer line up to
     /// which lines were already scanned, and per-rule notify cooldown stamps.
@@ -842,10 +972,11 @@ public final class HarnessTerminalSurfaceView: NSView {
         themeName: String = ThemeManager.defaultThemeName,
         fontFamily: String = "Menlo",
         fontSize: CGFloat = 14,
+        fontFallbackFamilies: [String] = [],
+        fontFeatures: [String: Int] = [:],
         vivid: Bool = false,
         colorRendering: TerminalColorRenderingMode? = nil,
         colorGamut: TerminalColorGamut = .auto,
-        offMainParserFramePipeline: Bool = true,
         liveResizeReflow: Bool = true
     ) {
         let theme = HarnessThemeCatalog.theme(named: themeName)
@@ -857,15 +988,6 @@ public final class HarnessTerminalSurfaceView: NSView {
         )
         let resolver = CellColorResolver(theme: theme)
         // Baseline appearance; the host immediately overrides via configureAppearance.
-        self.frameBuilder = FrameBuilder(
-            resolver: resolver,
-            cursorColor: theme.cursor ?? theme.foreground,
-            cursorTextColor: theme.cursorText,
-            colorRendering: resolvedColorRendering,
-            colorGamut: resolvedGamut,
-            searchBackground: SurfaceFrameBuildConfiguration.searchBackground,
-            searchForeground: SurfaceFrameBuildConfiguration.searchForeground
-        )
         self.frameBuildConfiguration = SurfaceFrameBuildConfiguration(
             resolver: resolver,
             cursorColor: theme.cursor ?? theme.foreground,
@@ -881,14 +1003,16 @@ public final class HarnessTerminalSurfaceView: NSView {
         self.canvasBackground = theme.background
         self.canvasOpacity = 1
         self.fontFamily = fontFamily
+        self.fontFallbackFamilies = fontFallbackFamilies
+        self.fontFeatures = fontFeatures
         self.fontSize = fontSize
         self.fontThicken = false
         self.fontThickenStrength = 255
         self.colorRendering = resolvedColorRendering
         self.colorGamut = resolvedGamut
-        self.offMainParserFramePipelineEnabled = offMainParserFramePipeline
         self.liveResizeReflowEnabled = liveResizeReflow
         self.emulatorState = SurfaceEmulatorState(columns: columns, rows: rows)
+        self.textAnchorContext = emulatorState.sync { $0.textAnchorContext() }
         super.init(frame: .zero)
         registerForDraggedTypes(Self.droppedPathPasteboardTypes)
         colorProviderState.update(
@@ -922,60 +1046,35 @@ public final class HarnessTerminalSurfaceView: NSView {
     /// chunk's `feed` on the emulator's serialized context.
     public func receive(_ data: Data, replay: Bool) {
         invalidateFindContent()
-        historyRestore?.feed(data)
-        if offMainParserFramePipelineEnabled {
-            receiveOffMain(data, replay: replay)
-            return
-        }
-        let beforeHistory = emulatorState.emulator.historyCount
-        if replay { emulatorState.emulator.isReplaying = true }
-        emulatorState.emulator.feed(data)
-        if replay { emulatorState.emulator.isReplaying = false }
-        outputGeneration &+= 1
-        // Trigger scan on the just-completed lines (emulator is main-confined here). On replay
-        // the scan only advances its high-water (no notifications/highlights for restored output).
-        if let scanner = triggerScanner {
-            let results = Self.scanTriggers(
-                emulator: emulatorState.emulator, scanner: scanner,
-                state: triggerScanState, replay: replay
-            )
-            consumeTriggerResults(results, scanner: scanner)
-        }
-        // If the user is scrolled up, stay anchored on the same content as new lines push
-        // into history; at the bottom (offset 0) we naturally follow new output.
-        if scrollOffset > 0 {
-            let added = emulatorState.emulator.historyCount - beforeHistory
-            if added > 0 { scrollOffset = min(emulatorState.emulator.historyCount, scrollOffset + added) }
-        }
-        wakeCursor()
-        // DEC 2026 synchronized output: hold the last presented frame while the program is
-        // mid-update (no tearing), and present atomically the moment it ends the batch — which
-        // is exactly when this chunk leaves `synchronizedOutput` false. A timeout guards a
-        // program that never closes the update.
-        if emulatorState.emulator.modes.synchronizedOutput {
-            scheduler.setSynchronized(true) // hold the display tick mid-batch (no tearing)
-            armSyncTimeout()
-        } else {
-            syncTimeout?.cancel(); syncTimeout = nil
-            // Releasing 2026 marks dirty; the batched frame presents atomically at the next tick.
-            scheduler.setSynchronized(false)
-            wakeDisplayLink()
-            // Low-latency echo: present this chunk now instead of waiting up to a full display
-            // interval. Coalesced to one paint per interval during a burst by the scheduler.
-            scheduler.presentNow()
-        }
+        receiveOffMain(data, replay: replay)
     }
 
+    public func makeOutputReceiver() -> SurfaceOutputReceiver { outputReceiver }
+
     private func receiveOffMain(_ data: Data, replay: Bool = false) {
-        // Captured on main at enqueue (immutable class) — the queue must not read the var.
-        let scanner = triggerScanner
+        outputReceiver.enqueue(data, replay: replay)
+    }
+
+    private func createOutputReceiver() -> SurfaceOutputReceiver {
+        let state = emulatorState
+        let configuration = outputConfiguration
         let scanState = triggerScanState
-        emulatorState.async { [weak self] emulator in
-            guard let self else { return }
-            let beforeHistory = emulator.historyCount
+        return SurfaceOutputReceiver(schedule: { work in
+            state.async { _ in work() }
+        }, receive: { [weak self] data, replay, consumed in
+            guard let self else { consumed(); return }
+            let emulator = state.emulator
+            let (scanner, restore) = configuration.snapshot()
+            // A restore also parses live output. Its worker must release the ingress budget
+            // after this parser finishes, so neither queue can grow behind a faster sibling.
+            defer {
+                if let restore { restore.afterPendingFeed(consumed) } else { consumed() }
+            }
+            restore?.feed(data)
             if replay { emulator.isReplaying = true }
             FrameSignposter.shared.interval("parse") { emulator.feed(data) }
             if replay { emulator.isReplaying = false }
+            if emulator.isShellPromptReady { StartupMetrics.shared.mark(.firstShellPromptConsumed) }
             let afterHistory = emulator.historyCount
             // Trigger scan on the just-completed lines, here on the emulator queue — results
             // hop to main only when something matched (rare), never per chunk. On replay the
@@ -997,10 +1096,8 @@ public final class HarnessTerminalSurfaceView: NSView {
             // mirrors converge exactly as the old one-hop-per-chunk delivery did, in (at most)
             // one main dispatch per main-thread turn instead of one per chunk. A lone keystroke
             // echo on an idle surface still gets its immediate hop + presentNow.
-            // Only positive history deltas advance the scroll anchor (matching the old per-chunk
-            // `added > 0` guard); shrinks (clear/alt-screen) are clamped by `historyCount`.
-            let needsHop = self.emulatorState.stageMainHop(
-                addedHistory: max(0, afterHistory - beforeHistory),
+            let needsHop = state.stageMainHop(
+                textContext: emulator.textAnchorContext(),
                 historyCount: afterHistory,
                 modes: emulator.modes,
                 altScreen: emulator.isAlternateScreenActive
@@ -1010,7 +1107,7 @@ public final class HarnessTerminalSurfaceView: NSView {
             DispatchQueue.main.async { [weak self] in
                 self?.applyPendingMainHop()
             }
-        }
+        })
     }
 
     /// Apply the staged post-parse state to the main-thread mirrors and the render scheduler.
@@ -1018,6 +1115,7 @@ public final class HarnessTerminalSurfaceView: NSView {
     /// consumed the hop.
     private func applyPendingMainHop() {
         guard let hop = emulatorState.takePendingMainHop() else { return }
+        invalidateFindContent()
         testingMainHopCount &+= 1
         outputGeneration &+= 1
         // Refresh the input-side mirror (see `inputModes()`); chunks merge in FIFO order on the
@@ -1025,9 +1123,7 @@ public final class HarnessTerminalSurfaceView: NSView {
         inputModesMirror = hop.modes
         altScreenMirror = hop.altScreen
         historyCountMirror = hop.historyCount
-        if scrollOffset > 0, hop.addedHistory > 0 {
-            scrollOffset = min(hop.historyCount, scrollOffset + hop.addedHistory)
-        }
+        textAnchorContext = hop.textContext
         wakeCursor()
         if hop.modes.synchronizedOutput {
             scheduler.setSynchronized(true)
@@ -1081,17 +1177,17 @@ public final class HarnessTerminalSurfaceView: NSView {
             emulator.isReplaying = false
             emulator.resize(cols: cols, rows: rows)
         }
-        if offMainParserFramePipelineEnabled { emulatorState.async(prepare) }
-        else { prepare(emulatorState.emulator) }
+         emulatorState.async(prepare)
         receive(Data(), replay: true)
         historyRestore = restore
     }
 
     /// History for the restore `beginHistoryRestore` started, oldest first.
-    public func receiveHistory(_ data: Data, sequence: UInt64 = 0) {
-        guard let restore = historyRestore else { return }
+    public func receiveHistory(_ data: Data, sequence: UInt64 = 0,
+                               onConsumed: @escaping @Sendable () -> Void = {}) {
+        guard let restore = historyRestore else { onConsumed(); return }
         restore.receivedHistory = true
-        restore.feedHistory(data, sequence: sequence)
+        restore.feedHistory(data, sequence: sequence, onConsumed: onConsumed)
     }
 
     /// The history has all arrived. Once the replacement has parsed it, it becomes the pane's
@@ -1128,16 +1224,12 @@ public final class HarnessTerminalSurfaceView: NSView {
             scanState.nextLine += added
             return added
         }
-        guard offMainParserFramePipelineEnabled else {
-            shiftBufferLines(by: swap(emulatorState.emulator))
-            scheduler.forceRender()
-            return
-        }
+
         emulatorState.async { [weak self] previous in
             let added = swap(previous)
             let next = state.emulator
             _ = state.stageMainHop(
-                addedHistory: 0, historyCount: next.historyCount,
+                textContext: next.textAnchorContext(), historyCount: next.historyCount,
                 modes: next.modes, altScreen: next.isAlternateScreenActive
             )
             DispatchQueue.main.async { [weak self] in
@@ -1151,8 +1243,6 @@ public final class HarnessTerminalSurfaceView: NSView {
     private func shiftBufferLines(by added: Int) {
         invalidateFindContent() // The replacement may have landed after an AX getter cached the old grid.
         guard added != 0 else { return }
-        selectionAnchor?.line += added
-        selectionHead?.line += added
         findMatches = findMatches.map { $0.shifted(by: added) }
         triggerHighlightMatches = triggerHighlightMatches.map {
             TerminalBufferMatch(bufferLine: $0.bufferLine + added, columns: $0.columns)
@@ -1176,7 +1266,12 @@ public final class HarnessTerminalSurfaceView: NSView {
         // spinning the runloop, so the mirrors (incl. modes/alt-screen, smooth scrolling clamps
         // against `historyCountMirror`) must not lag the drained state. The already-queued
         // main.async hop then no-ops (the hop was consumed here).
-        let history = emulatorState.sync { $0.historyCount }
+        var history = 0
+        repeat { history = emulatorState.sync { $0.historyCount } }
+        while outputReceiver.hasPendingWork
+        // Restore parsing has its own queue. Drain it too before tests wait for the main
+        // swap callback, rather than relying on a fixed number of run-loop turns.
+        historyRestore?.queue.sync {}
         applyPendingMainHop()
         historyCountMirror = history
     }
@@ -1198,7 +1293,12 @@ public final class HarnessTerminalSurfaceView: NSView {
         // The commit stages the reflow for the next output/commit build to materialize; headless
         // there is no renderer, so no build ever runs — apply the staged target directly (the
         // exact step the first build performs) so tests observe the resize synchronously.
-        emulatorState.sync { _ in _ = emulatorState.applyPendingResize() }
+        let state = emulatorState.sync { emulator in
+            _ = emulatorState.applyPendingResize()
+            return (emulator.historyCount, emulator.textAnchorContext())
+        }
+        historyCountMirror = state.0
+        textAnchorContext = state.1
     }
 
     var testingRenderSynchronized: Bool { scheduler.synchronized }
@@ -1227,15 +1327,40 @@ public final class HarnessTerminalSurfaceView: NSView {
     func testingBlockDrawableQueue(_ block: @escaping @Sendable () -> Void) {
         drawableQueue.async(execute: block)
     }
+    var testingDrawableAcquisitionQueue: DispatchQueue { drawableAcquisitionQueue }
+    var testingMetalLayer: CAMetalLayer { metalLayer }
+    var testingRendererIdentity: ObjectIdentifier? { renderer.map(ObjectIdentifier.init) }
+    var testingDrawableRequestInFlight: Bool { drawableRequestInFlight }
+    /// Join each queue and its main completion without blocking main behind drawable acquisition.
+    func testingDrainRenderPipeline(passesLeft: Int = 8, _ completion: @escaping @MainActor @Sendable (Bool) -> Void) {
+        emulatorState.async { [weak self] _ in
+            DispatchQueue.main.async {
+                guard let self else { completion(true); return }
+                self.drawableAcquisitionQueue.async {
+                    DispatchQueue.main.async {
+                        guard let executor = self.renderExecutor else { completion(true); return }
+                        executor.async { _ in
+                            DispatchQueue.main.async {
+                                let idle = !self.drawableRequestInFlight && self.pendingDrawableFrame == nil
+                                if !idle, passesLeft > 1 {
+                                    self.testingDrainRenderPipeline(passesLeft: passesLeft - 1, completion)
+                                } else { completion(idle) }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
     func testingBlockEmulatorQueue(until gate: DispatchSemaphore) {
         emulatorState.async { _ in gate.wait() }
     }
     // Window-hosted seams (the routing test drives real presents through a real Metal renderer).
     var testingOriginOffset: (x: Int, y: Int) { (originOffsetX, originOffsetY) }
     var testingHasRenderer: Bool { renderer != nil }
-    var testingLastPresentScheduleNanos: UInt64 { renderer?.stats.presentScheduleNanos ?? 0 }
+    var testingLastPresentScheduleNanos: UInt64 { renderExecutor?.sync { $0.stats.presentScheduleNanos } ?? 0 }
     // Full renderer stats for the frame-pacing harness (encodedRows/reusedRows/uploadBytes/...).
-    var testingLastRenderStats: TerminalRenderStats? { renderer?.stats }
+    var testingLastRenderStats: TerminalRenderStats? { renderExecutor?.sync { $0.stats } }
     var testingRepaintCacheCoherent: Bool { lastPresentedResultIsRendererCoherent }
     func testingRepaintLastFrame() -> Bool { repaintLastFrame() }
     // Async resize-preview seams: the current drag target the next landing preview must match,
@@ -1258,7 +1383,7 @@ public final class HarnessTerminalSurfaceView: NSView {
             guard let preview = emulator.previewViewportReflow(cols: cols, rows: rows) else { return nil }
             let reverseVideo = emulator.modes.reverseVideo
             let builder = config.makeBuilder(reverseVideo: reverseVideo)
-            let frame = builder.build(preview, region: nil, imageProvider: { emulator.image(for: $0) })
+            let frame = builder.buildDirect(preview, region: nil, imageProvider: { emulator.image(for: $0) })
             return SurfaceFrameBuildResult(
                 generation: generation, frame: frame, damage: nil,
                 frameBuildNanos: 0, clearColor: builder.renderColor(reverseVideo ? fg : bg, alpha: opacity)
@@ -1325,6 +1450,8 @@ public final class HarnessTerminalSurfaceView: NSView {
     /// theme to every pane; when nothing changed, the renderer (pipelines, glyph atlas) stays.
     private struct AppearanceInputs: Equatable {
         var fontFamily: String
+        var fontFallbackFamilies: [String]
+        var fontFeatures: [String: Int]
         var fontSize: CGFloat
         var vivid: Bool
         var colorRendering: TerminalColorRenderingMode?
@@ -1353,7 +1480,6 @@ public final class HarnessTerminalSurfaceView: NSView {
         var themeFit: Bool
         var boldIsBright: Bool
         var promptGutter: Bool
-        var offMainParserFramePipeline: Bool
         var liveResizeReflow: Bool
     }
 
@@ -1362,6 +1488,8 @@ public final class HarnessTerminalSurfaceView: NSView {
     public func configureAppearance(
         fontFamily: String,
         fontSize: CGFloat,
+        fontFallbackFamilies: [String] = [],
+        fontFeatures: [String: Int] = [:],
         vivid: Bool,
         colorRendering: TerminalColorRenderingMode? = nil,
         colorGamut: TerminalColorGamut = .auto,
@@ -1389,10 +1517,9 @@ public final class HarnessTerminalSurfaceView: NSView {
         themeFit: Bool = false,
         boldIsBright: Bool = true,
         promptGutter: Bool = false,
-        offMainParserFramePipeline: Bool = true,
         liveResizeReflow: Bool = true
     ) {
-        let inputs = AppearanceInputs(fontFamily: fontFamily, fontSize: fontSize, vivid: vivid, colorRendering: colorRendering, colorGamut: colorGamut, canvasBackgroundHex: canvasBackgroundHex, canvasForegroundHex: canvasForegroundHex, cursorHex: cursorHex, outputPaletteHex: outputPaletteHex, oscPaletteHex: oscPaletteHex, canvasOpacity: canvasOpacity, cursorStyle: cursorStyle, cursorBlink: cursorBlink, paddingX: paddingX, paddingY: paddingY, paddingBalance: paddingBalance, selectionBackgroundHex: selectionBackgroundHex, selectionForegroundHex: selectionForegroundHex, cursorTextHex: cursorTextHex, copyOnSelect: copyOnSelect, pasteProtection: pasteProtection, scrollbackLines: scrollbackLines, linearBlending: linearBlending, textRendering: textRendering, ligatures: ligatures, minimumContrast: minimumContrast, themeFit: themeFit, boldIsBright: boldIsBright, promptGutter: promptGutter, offMainParserFramePipeline: offMainParserFramePipeline, liveResizeReflow: liveResizeReflow)
+        let inputs = AppearanceInputs(fontFamily: fontFamily, fontFallbackFamilies: fontFallbackFamilies, fontFeatures: fontFeatures, fontSize: fontSize, vivid: vivid, colorRendering: colorRendering, colorGamut: colorGamut, canvasBackgroundHex: canvasBackgroundHex, canvasForegroundHex: canvasForegroundHex, cursorHex: cursorHex, outputPaletteHex: outputPaletteHex, oscPaletteHex: oscPaletteHex, canvasOpacity: canvasOpacity, cursorStyle: cursorStyle, cursorBlink: cursorBlink, paddingX: paddingX, paddingY: paddingY, paddingBalance: paddingBalance, selectionBackgroundHex: selectionBackgroundHex, selectionForegroundHex: selectionForegroundHex, cursorTextHex: cursorTextHex, copyOnSelect: copyOnSelect, pasteProtection: pasteProtection, scrollbackLines: scrollbackLines, linearBlending: linearBlending, textRendering: textRendering, ligatures: ligatures, minimumContrast: minimumContrast, themeFit: themeFit, boldIsBright: boldIsBright, promptGutter: promptGutter, liveResizeReflow: liveResizeReflow)
         guard inputs != appliedAppearance else { return }
         appliedAppearance = inputs
         liveResizeReflowEnabled = liveResizeReflow
@@ -1401,14 +1528,7 @@ public final class HarnessTerminalSurfaceView: NSView {
         let daemonBytes = TerminalHostView.scrollbackBytes(forLines: scrollbackLines)
         let lineCap = TerminalHostView.historyLineCap(daemonScrollbackBytes: daemonBytes)
         emulatorSync { $0.maxScrollbackLines = lineCap }
-        if offMainParserFramePipelineEnabled && !offMainParserFramePipeline {
-            // Drain any queued parser/frame work before direct main-thread emulator access resumes.
-            emulatorState.sync { _ in }
-        }
-        if offMainParserFramePipelineEnabled != offMainParserFramePipeline {
-            offMainParserFramePipelineEnabled = offMainParserFramePipeline
-            invalidateRenderGeneration()
-        }
+
         let resolvedColorRendering = colorRendering ?? (vivid ? .vivid : .accurate)
         let resolvedGamut = TerminalColorGamut.resolved(
             renderingMode: resolvedColorRendering,
@@ -1442,6 +1562,8 @@ public final class HarnessTerminalSurfaceView: NSView {
             return RGBColor(hex: hex) ?? RGBColor(red: 0, green: 0, blue: 0)
         }
         self.fontFamily = fontFamily
+        self.fontFallbackFamilies = fontFallbackFamilies
+        self.fontFeatures = fontFeatures
         self.fontSize = fontSize
         self.colorRendering = resolvedColorRendering
         self.colorGamut = resolvedGamut
@@ -1481,9 +1603,7 @@ public final class HarnessTerminalSurfaceView: NSView {
             selectionForeground: selFg,
             promptGutterEnabled: promptGutterEnabled
         )
-        self.frameBuilder = self.frameBuildConfiguration.makeBuilder()
         // Resolved colors/opacity changed — cached rows hold the old palette; force a full rebuild.
-        lastPlainFrame = nil
         emulatorState.resetPlainFrame()
         invalidateRenderGeneration()
         restartBlinkTimer()
@@ -1499,10 +1619,7 @@ public final class HarnessTerminalSurfaceView: NSView {
     // MARK: - Setup
 
     private func emulatorSync<T>(_ body: (TerminalEmulator) -> T) -> T {
-        if offMainParserFramePipelineEnabled {
-            return emulatorState.sync(body)
-        }
-        return body(emulatorState.emulator)
+        emulatorState.sync(body)
     }
 
     /// Snapshot the buffer text + cursor position for the accessibility (VoiceOver) layer, taken
@@ -1567,7 +1684,7 @@ public final class HarnessTerminalSurfaceView: NSView {
             canvasBackground: canvasBackground,
             canvasForeground: canvasForeground,
             canvasOpacity: canvasOpacity,
-            font: .init(family: fontFamily, size: fontSize, thicken: fontThicken, thickenStrength: fontThickenStrength),
+            font: .init(family: fontFamily, size: fontSize, thicken: fontThicken, thickenStrength: fontThickenStrength, fallbackFamilies: fontFallbackFamilies, features: fontFeatures),
             gamma: glyphGamma,
             ligatures: ligaturesEnabled,
             colorSpaceName: layerColorSpaceName as String
@@ -1579,10 +1696,7 @@ public final class HarnessTerminalSurfaceView: NSView {
     /// and nothing reaches the PTY.
     public func thumbnail(_ done: @escaping @MainActor @Sendable (TerminalThumbnail) -> Void) {
         let style = thumbnailStyle
-        guard offMainParserFramePipelineEnabled else {
-            done(style.thumbnail(of: emulatorState.emulator))
-            return
-        }
+
         emulatorState.async { emulator in
             let thumbnail = style.thumbnail(of: emulator)
             DispatchQueue.main.async { done(thumbnail) }
@@ -1605,14 +1719,14 @@ public final class HarnessTerminalSurfaceView: NSView {
     private var historyCountMirror = 0
 
     /// The terminal modes input encoding should honor right now (mirror on the off-main pipeline;
-    /// direct read when the emulator lives on main).
+    /// never a synchronous parser read).
     private func inputModes() -> TerminalModes {
-        offMainParserFramePipelineEnabled ? inputModesMirror : emulatorState.emulator.modes
+        inputModesMirror
     }
 
     /// Whether the alternate screen is active, for input-side decisions (alternate scroll).
     private func inputAltScreenActive() -> Bool {
-        offMainParserFramePipelineEnabled ? altScreenMirror : emulatorState.emulator.isAlternateScreenActive
+        altScreenMirror
     }
 
     private func invalidateRenderGeneration(contentChanged: Bool = false) {
@@ -1631,19 +1745,18 @@ public final class HarnessTerminalSurfaceView: NSView {
         // Layer-hosting: assign the custom layer before enabling wantsLayer.
         layer = metalLayer
         wantsLayer = true
-        metalLayer.device = MTLCreateSystemDefaultDevice()
+        metalLayer.device = renderer?.device ?? MTLCreateSystemDefaultDevice()
         metalLayer.pixelFormat = TerminalMetalRenderer.pixelFormat
         metalLayer.framebufferOnly = true
-        metalLayer.isOpaque = true
+        metalLayer.isOpaque = canvasOpacity >= 1
         // Double-buffer (default is 3): triple-buffering adds up to one extra frame of swap latency,
         // which matters for keystroke echo. 2 still lets the next frame render while the current one
         // scans out. Kept in lockstep with the renderer's `maxFramesInFlight` (also 2) so the in-flight
         // semaphore and the drawable pool advertise the same depth — a deeper semaphore would just
         // block on `nextDrawable()` anyway. Keep `allowsNextDrawableTimeout` on (the default): both
-        // render paths run `nextDrawable()` on the main thread/queue, so disabling the timeout would
-        // let a fully occluded window or a stalled GPU block the main thread indefinitely (frozen
-        // input + UI). With the timeout, a stall returns nil after ~1s; both paths re-arm the scheduler
-        // on nil so the next display tick simply retries — nothing is lost, and main never wedges.
+        // regular presents acquire drawables on the render queue; transaction-mode resize
+        // acquires on main. A timeout bounds compositor stalls; failed acquisition uses
+        // an exponential retry deadline instead of waking at display rate.
         metalLayer.maximumDrawableCount = 2
         metalLayer.allowsNextDrawableTimeout = true
         // Pin the grid to the top-left so any sub-cell remainder from flooring rows/cols
@@ -1662,6 +1775,35 @@ public final class HarnessTerminalSurfaceView: NSView {
         bellFlashLayer.opacity = 0
         metalLayer.addSublayer(bellFlashLayer)
         installIslandCornerMask()
+    }
+
+    /// A detached layer otherwise retains its full-size drawable pool for the pane's lifetime.
+    /// Replacing that owner releases the pool after its old requests and GPU work finish, while
+    /// the renderer/atlas stay warm. Two fixed lanes bound outstanding waits across fast remounts.
+    private func releaseDrawablePool() {
+        guard !drawablePoolReleased else { return }
+        drawablePoolReleased = true
+        cancelDrawableRetry()
+        invalidateRenderGeneration()
+        pendingDrawableFrame = nil
+        pendingDrawableNeedsFullDamage = false
+        drawableRequestInFlight = false
+        activeDrawableRequest?.cancel()
+        activeDrawableRequest = nil
+        lastPresentedResult = nil
+        let previous = metalLayer
+        metalLayer = CAMetalLayer()
+        metalLayer.frame = previous.frame
+        metalLayer.bounds = previous.bounds
+        metalLayer.contentsScale = previous.contentsScale
+        metalLayer.drawableSize = previous.drawableSize
+        drawableAcquisitionLane = (drawableAcquisitionLane + 1) % drawableAcquisitionQueues.count
+        linkUnderlineLayer.removeFromSuperlayer()
+        bellFlashLayer.removeFromSuperlayer()
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        configureLayer()
+        CATransaction.commit()
     }
 
     /// Round the bottom corners of the metal drawable so a split island reads as a
@@ -1727,15 +1869,11 @@ public final class HarnessTerminalSurfaceView: NSView {
         // Only the client that sizes the pane answers terminal queries (DA, DSR, Kitty acks),
         // so several attached clients don't each reply to one question.
         emulator.onResponse = { [weak self] data in
-            if Thread.isMainThread {
+            DispatchQueue.main.async { [weak self] in
                 guard let self, self.answersQueries else { return }
                 self.onInput?(data)
-            } else {
-                DispatchQueue.main.async { [weak self] in
-                    guard let self, self.answersQueries else { return }
-                    self.onInput?(data)
-                }
             }
+
         }
         emulator.onClipboardRead = { [weak self] selection in
             DispatchQueue.main.async { [weak self] in
@@ -1746,92 +1884,55 @@ public final class HarnessTerminalSurfaceView: NSView {
             }
         }
         emulator.onTitleChange = { [weak self] title in
-            if Thread.isMainThread {
-                self?.onTitle?(title)
-            } else {
-                DispatchQueue.main.async { [weak self] in self?.onTitle?(title) }
-            }
+            DispatchQueue.main.async { [weak self] in self?.onTitle?(title) }
+
         }
         emulator.onProgress = { [weak self] report in
-            if Thread.isMainThread {
-                self?.onProgress?(report)
-            } else {
-                DispatchQueue.main.async { [weak self] in self?.onProgress?(report) }
-            }
+            DispatchQueue.main.async { [weak self] in self?.onProgress?(report) }
+
         }
         emulator.onWorkingDirectoryChange = { [weak self] path in
-            if Thread.isMainThread {
-                self?.onPwd?(path)
-            } else {
-                DispatchQueue.main.async { [weak self] in self?.onPwd?(path) }
-            }
+            DispatchQueue.main.async { [weak self] in self?.onPwd?(path) }
+
         }
         emulator.onRemoteHostChange = { [weak self] host in
-            if Thread.isMainThread {
-                self?.onRemoteHost?(host)
-            } else {
-                DispatchQueue.main.async { [weak self] in self?.onRemoteHost?(host) }
-            }
+            DispatchQueue.main.async { [weak self] in self?.onRemoteHost?(host) }
+
         }
         emulator.onUserVariableChange = { [weak self] name, value in
-            if Thread.isMainThread {
-                self?.onUserVar?(name, value)
-            } else {
-                DispatchQueue.main.async { [weak self] in self?.onUserVar?(name, value) }
-            }
+            DispatchQueue.main.async { [weak self] in self?.onUserVar?(name, value) }
+
         }
         emulator.onUserVariablesCleared = { [weak self] in
-            if Thread.isMainThread {
-                self?.onUserVarsCleared?()
-            } else {
-                DispatchQueue.main.async { [weak self] in self?.onUserVarsCleared?() }
-            }
+            DispatchQueue.main.async { [weak self] in self?.onUserVarsCleared?() }
+
         }
         emulator.onBell = { [weak self] in
-            if Thread.isMainThread {
-                self?.onBell?()
-            } else {
-                DispatchQueue.main.async { [weak self] in self?.onBell?() }
-            }
+            DispatchQueue.main.async { [weak self] in self?.onBell?() }
+
         }
         emulator.onCommandFinished = { [weak self] duration, exitCode in
-            if Thread.isMainThread {
-                self?.onCommandFinished?(duration, exitCode)
-            } else {
-                DispatchQueue.main.async { [weak self] in self?.onCommandFinished?(duration, exitCode) }
-            }
+            DispatchQueue.main.async { [weak self] in self?.onCommandFinished?(duration, exitCode) }
+
         }
         emulator.onNotification = { [weak self] title, body in
-            if Thread.isMainThread {
-                self?.onDesktopNotification?(title, body)
-            } else {
-                DispatchQueue.main.async { [weak self] in self?.onDesktopNotification?(title, body) }
-            }
+            DispatchQueue.main.async { [weak self] in self?.onDesktopNotification?(title, body) }
+
         }
         emulator.onPointerShapeChange = { [weak self] shape in
-            if Thread.isMainThread {
-                self?.applyPointerShape(shape)
-            } else {
-                DispatchQueue.main.async { [weak self] in self?.applyPointerShape(shape) }
-            }
+            DispatchQueue.main.async { [weak self] in self?.applyPointerShape(shape) }
+
         }
         emulator.onSetClipboard = { [weak self] text in
             guard !text.isEmpty else { return }
-            if Thread.isMainThread {
+            DispatchQueue.main.async { [weak self] in
                 guard let self, self.allowProgramClipboardAccess else { return }
                 let pasteboard = NSPasteboard.general
                 pasteboard.clearContents()
                 pasteboard.setString(text, forType: .string)
                 self.onCopy?(text)   // mirror into the daemon paste buffer, like a yank
-            } else {
-                DispatchQueue.main.async { [weak self] in
-                    guard let self, self.allowProgramClipboardAccess else { return }
-                    let pasteboard = NSPasteboard.general
-                    pasteboard.clearContents()
-                    pasteboard.setString(text, forType: .string)
-                    self.onCopy?(text)   // mirror into the daemon paste buffer, like a yank
-                }
             }
+
         }
         // Answer OSC 10/11/12/4 color queries from the resolved theme (light/dark detection).
         let colorProviderState = colorProviderState
@@ -1906,6 +2007,8 @@ public final class HarnessTerminalSurfaceView: NSView {
             device: device,
             fontFamily: fontFamily,
             fontSize: fontSize,
+            fallbackFamilies: fontFallbackFamilies,
+            features: fontFeatures,
             scale: scale,
             fontThicken: fontThicken,
             fontThickenStrength: fontThickenStrength,
@@ -1916,6 +2019,7 @@ public final class HarnessTerminalSurfaceView: NSView {
         if let renderer {
             emulatorSync { $0.setCellPixelSize(width: renderer.cellPixelWidth, height: renderer.cellPixelHeight) }
             renderer.textBlinkHidden = textBlinkHidden // a fresh renderer adopts the current phase
+            renderExecutor = SurfaceRenderExecutor(renderer: renderer, queue: drawableQueue)
         }
         invalidateRenderGeneration()
     }
@@ -1930,9 +2034,11 @@ public final class HarnessTerminalSurfaceView: NSView {
 
     public override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
+        emulatorState.setVisible(window != nil && !isHiddenOrHasHiddenAncestor)
         windowKeyObservers.forEach(NotificationCenter.default.removeObserver(_:))
         windowKeyObservers.removeAll()
         if let window {
+            if !isHiddenOrHasHiddenAncestor { drawablePoolReleased = false }
             StartupMetrics.shared.mark(.firstSurfaceAttached) // idempotent: first surface in a window
             // Pick up the real backing scale. A pane remounted in the same kind of window (a
             // layout rebuild, a tab moved between windows) keeps its renderer and glyph atlas.
@@ -1987,6 +2093,7 @@ public final class HarnessTerminalSurfaceView: NSView {
             window.makeFirstResponder(self)
             focusStateChanged()
         } else {
+            cancelDrawableRetry()
             // Removed from the window (pane closed / re-mounted): stop the blink timers so
             // they don't keep the run loop (and a dangling render) alive. The timers hold
             // `[weak self]`, so this is the teardown hook (no retain cycle either way).
@@ -1995,9 +2102,9 @@ public final class HarnessTerminalSurfaceView: NSView {
             textBlinkTimer?.invalidate()
             textBlinkTimer = nil
             textBlinkHidden = false
-            renderer?.textBlinkHidden = false
+            renderExecutor?.async { $0.textBlinkHidden = false }
             stopDisplayLink()
-            invalidateRenderGeneration()
+            releaseDrawablePool()
             // A view can leave the window MID-DRAG (tab close / pane remount during a live
             // resize) and AppKit does not guarantee `viewDidEndLiveResize` then. This instance
             // is cached and re-hosted (`TerminalPaneRegistry`), so unwind the live-resize state
@@ -2061,19 +2168,41 @@ public final class HarnessTerminalSurfaceView: NSView {
     /// costs no GPU work. On becoming visible, re-arm: any output that arrived while covered
     /// accumulated engine damage, so the next tick builds and presents one up-to-date frame.
     private func setWindowOccluded(_ occluded: Bool) {
-        guard occluded != scheduler.isOccluded else { return }
-        scheduler.setOccluded(occluded)
+        let hidden = occluded || isHiddenOrHasHiddenAncestor
+        emulatorState.setVisible(window != nil && !hidden)
+        guard hidden != scheduler.isOccluded else { return }
+        scheduler.setOccluded(hidden)
+        if hidden { cancelDrawableRetry() }
         // Blink timers follow visibility (idle efficiency): a covered/minimized pane has
         // nothing to blink — stop the wakeups; re-arm when it can show again.
         restartBlinkTimer()
         updateTextBlinkTimer(frameHasBlink: lastFrameHadBlink)
         updateAnimationWakeTimer()
-        if !occluded { scheduleRender() }
+        if !hidden { scheduleRender() }
+    }
+
+    public override func viewDidHide() {
+        super.viewDidHide()
+        setWindowOccluded(true)
+        renderLink?.isPaused = true
+        releaseDrawablePool()
+    }
+
+    public override func viewDidUnhide() {
+        super.viewDidUnhide()
+        if window != nil {
+            drawablePoolReleased = false
+            updateGridSize()
+        }
+        setWindowOccluded(window.map { !$0.occlusionState.contains(.visible) } ?? true)
     }
 
     public override func viewDidChangeBackingProperties() {
         super.viewDidChangeBackingProperties()
-        buildRenderer()
+        // AppKit also sends this during same-scale remounts. Keep the warm atlas, and
+        // never rebuild against a detached view's synthetic fallback scale.
+        guard let window else { return }
+        if renderer == nil || rendererScale != window.backingScaleFactor { buildRenderer() }
         applyPreferredFrameRateRange() // the view may have moved to a different-refresh display
         // Backing scale changed (e.g. the drag crossed monitors): a frozen drag origin is in
         // old-scale device pixels — drop it, recompute at the new scale, and re-freeze so the
@@ -2152,6 +2281,7 @@ public final class HarnessTerminalSurfaceView: NSView {
 
     public override func layout() {
         super.layout()
+        guard window != nil, !isHiddenOrHasHiddenAncestor, !drawablePoolReleased else { return }
         // Resize the drawable and repaint in the SAME turn, with implicit animations off, so a
         // resize never shows a stale frame stretched to the new bounds (the flicker).
         CATransaction.begin()
@@ -2336,12 +2466,6 @@ public final class HarnessTerminalSurfaceView: NSView {
         case .pty:
             localOnly = false
         }
-        // A text selection can't survive a reflow — its anchors reference the OLD grid extents, so
-        // after a shrink the highlight renders at stale/out-of-grid coordinates and a copy yields
-        // blank/garbage rows. Clear it like the real-time path (`requestLiveResizeCommit`) does;
-        // this debounced/animated/legacy commit (and `testingResizeGrid`) skipped it. `clearSelection`
-        // no-ops when nothing is selected and avoids the `currentSelectionRegion` getter.
-        clearSelection()
         columns = cols
         rows = newRows
         invalidateRenderGeneration(contentChanged: true) // Reflow changes text positions as well as rendering.
@@ -2352,7 +2476,7 @@ public final class HarnessTerminalSurfaceView: NSView {
         onGridSizeWillChange?(cols, newRows, true) // settled size for the HUD
         previewCols = 0; previewRows = 0           // force the next drag to rebuild a fresh preview
         historyRestore?.resize(cols: cols, rows: newRows, localOnly: localOnly)
-        if offMainParserFramePipelineEnabled {
+
             // Off-main pipeline: stage the settled size and let the next build materialize it on
             // the emulator's serial queue (serialized with the output feed) — `setPendingResize`
             // enqueues ahead of the build below, and last-writer-wins overwrites any stale live
@@ -2362,19 +2486,7 @@ public final class HarnessTerminalSurfaceView: NSView {
             // applies the newest staged size.
             emulatorState.setPendingResize((cols, newRows), localOnly: localOnly)
             renderNowOffMain()
-        } else {
-            // Main-confined pipeline: the emulator lives on the main thread (no serial queue to
-            // offload to), so resize + present synchronously — the pre-existing discipline. Going
-            // off-main here would be an unsynchronized mutation of the main-confined emulator.
-            emulatorSync { emulator in
-                if localOnly {
-                    _ = emulator.resizePrimaryLocally(cols: cols, rows: newRows)
-                } else {
-                    emulator.resize(cols: cols, rows: newRows)
-                }
-            }
-            scheduler.forceRender()
-        }
+
     }
 
     /// Real-time authoritative commit fired at EVERY cell boundary during a live drag — the counterpart to `commitGridSize`'s debounced drag-end path. It mutates the real
@@ -2392,18 +2504,8 @@ public final class HarnessTerminalSurfaceView: NSView {
     /// The rebuilt frame presents inside an explicit `CATransaction` (`flushTransaction`) so a
     /// completion landing while the mouse is held *still* (no layout pass to ride) still flushes —
     /// see `presentWithinExplicitTransaction`. Called only while `presentsWithTransaction` (a real
-    /// drag) and `liveResizeReflowEnabled`; `updateGridSize` gates both. Requires the off-main
-    /// pipeline — on the main-confined escape hatch it falls back to the debounced commit below.
+    /// drag) and `liveResizeReflowEnabled`; `updateGridSize` gates both.
     private func requestLiveResizeCommit(cols: Int, rows newRows: Int) {
-        // Only on the off-main pipeline: this commit reflows the emulator ON the serial queue, but
-        // with the flag off the emulator is main-confined (`receive` feeds it synchronously on
-        // main) and the queue hop would mutate it concurrently with a main-thread parse — the same
-        // guard `updateResizePreview` and `commitGridSize` already apply. Fall back to the
-        // debounced drag-end commit, whose `commitGridSize` resizes via `emulatorSync` on main.
-        guard offMainParserFramePipelineEnabled else {
-            scheduleResizeCommit(cols: cols, rows: newRows)
-            return
-        }
         guard cols != columns || newRows != rows else { return }
         let localOnly: Bool
         switch ClientResizePolicy.decide(
@@ -2418,12 +2520,6 @@ public final class HarnessTerminalSurfaceView: NSView {
         }
         columns = cols
         rows = newRows
-        // A text selection can't survive a width reflow (the wrapped rows move under its anchors),
-        // so clear it like Terminal.app/iTerm rather than render a stale region. Copy mode and find
-        // recompute their viewport-relative state per build, so they self-heal across the reflow.
-        // `clearSelection` no-ops when nothing is selected (and avoids the `currentSelectionRegion`
-        // getter, which can `emulatorSync` for a word selection — a main-thread stall mid-drag).
-        clearSelection()
         // DELIBERATELY no `renderGeneration` bump here. A bump would make `layout()`'s
         // `repaintLastFrame` decline (generation mismatch) and fall to the SYNCHRONOUS `forceRender`,
         // whose `state.sync` would block main behind the in-flight O(history) reflow on the emulator
@@ -2477,7 +2573,31 @@ public final class HarnessTerminalSurfaceView: NSView {
     /// Resume the display link so a pending paint reaches the screen. No-op until the link exists
     /// (created on window attach).
     private func wakeDisplayLink() {
+        guard window != nil, !scheduler.isOccluded, drawableRetryTimer == nil,
+              !isHiddenOrHasHiddenAncestor else { return }
         renderLink?.isPaused = false
+    }
+
+    private func cancelDrawableRetry() {
+        drawableRetryTimer?.invalidate()
+        drawableRetryTimer = nil
+        drawableRetryDelay = 0.025
+    }
+
+    private func deferDrawableRetry() {
+        scheduler.markDirty()
+        renderLink?.isPaused = true
+        guard window != nil, !scheduler.isOccluded, !isHiddenOrHasHiddenAncestor,
+              drawableRetryTimer == nil else { return }
+        let timer = Timer(timeInterval: drawableRetryDelay, repeats: false) { [weak self] _ in
+            MainActor.assumeIsolated {
+                self?.drawableRetryTimer = nil
+                self?.wakeDisplayLink()
+            }
+        }
+        drawableRetryDelay = min(1, drawableRetryDelay * 2)
+        drawableRetryTimer = timer
+        RunLoop.main.add(timer, forMode: .common)
     }
 
     /// Kitty animations play unless the user asked macOS to reduce motion; then each image stays
@@ -2520,131 +2640,21 @@ public final class HarnessTerminalSurfaceView: NSView {
         }
     }
 
-    private func renderNow(forced: Bool = false) {
-        // Off-main pipeline first: its entry owns the drag semantics (output presents flow live
-        // under real-time reflow, within explicit CA transactions; the reflow-off escape hatch
-        // defers there). Ordering matters — the main-confined hold below must not swallow the
-        // scheduler's off-main ticks, or mid-drag output would gate on BOTH pipelines.
-        if offMainParserFramePipelineEnabled {
-            renderNowOffMain()
-            return
-        }
-        // Main-confined escape hatch: single present source during a live drag. This legacy
-        // pipeline has no live commits (requestLiveResizeCommit falls back to the debounce) and
-        // a build here runs ON main — an ad-hoc output/tick present would pay the synchronized
-        // commit→waitUntilScheduled stall AND replace `lastPresentedResult` with a fresh frame
-        // the renderer cache hasn't seen, forcing the next layout repaint back onto the
-        // full-rebuild path (defeating the empty-damage reuse that makes drag ticks near-free).
-        // Defer instead: re-mark dirty so the work is never lost (`presentNow`/`tick` cleared the
-        // flag before calling here); `layout()`'s repaint carries the visual per drag step, and
-        // the first tick after `viewDidEndLiveResize` flushes the freshest frame. `forced` keeps
-        // the synchronous path (first paint / no-cached-frame fallback inside layout) open.
-        if !forced, metalLayer.presentsWithTransaction {
-            scheduler.markDirty()
-            return
-        }
-        guard let renderer else { return }
-        guard let drawable = metalLayer.nextDrawable() else { scheduler.markDirty(); return }
-        let emulator = emulatorState.emulator
-        // Copy mode owns the whole surface while active (its own scroll offset + overlay).
-        if renderCopyMode(renderer: renderer, drawable: drawable) { lastPlainFrame = nil; return }
-        let snapshot = scrollOffset > 0 ? emulator.readGrid(scrollbackOffset: scrollOffset) : emulator.readGrid()
-        let (grid, nextAnimationFrame) = Self.animatesImages
-            ? emulator.animateImages(in: snapshot, now: DispatchTime.now().uptimeNanoseconds)
-            : (snapshot, nil)
-        // Consume dirty-row damage every frame to keep the engine's "since last render" window
-        // aligned, then feed it to the builder only on the plain live path. Scrollback, an active
-        // selection, and IME preedit all rebuild every row (they aren't tracked by damage), so
-        // they take the full path and reset the reuse cache.
-        let damage = emulator.consumeDamage()
-        // Trigger highlights ride the find-highlight machinery (same shape, same shading);
-        // both filter to the viewport, so `findHits.isEmpty` — and with it the plain fast
-        // path — still holds whenever neither is on screen.
-        let findHits = (findActive
-            ? Self.viewportFindHighlights(findMatches, scrollOffset: scrollOffset, historyCount: emulator.historyCount, rows: rows)
-            : [])
-            + Self.viewportFindHighlights(triggerHighlightMatches, scrollOffset: scrollOffset,
-                                          historyCount: emulator.historyCount, rows: rows)
-        let selectionRegion = currentSelectionRegion
-        let plain = scrollOffset == 0 && selectionRegion == nil && markedText.isEmpty && findHits.isEmpty
-        // DECSCNM: a flip arrives with full-screen damage (the engine dirties on real change),
-        // so the swapped build repaints everything and the plain-frame cache rebuilds.
-        let reverseVideo = emulator.modes.reverseVideo
-        let builder = reverseVideo ? frameBuildConfiguration.makeBuilder(reverseVideo: true) : frameBuilder
-        let frameBuildStart = DispatchTime.now().uptimeNanoseconds
-        var frame: TerminalFrame
-        if plain {
-            frame = builder.build(grid, region: nil,
-                                  imageProvider: { emulator.image(for: $0) },
-                                  reusing: lastPlainFrame, damage: damage)
-        } else {
-            frame = builder.build(grid, region: selectionRegion,
-                                  searchHighlights: findHits,
-                                  imageProvider: { emulator.image(for: $0) })
-        }
-        let frameBuildNanos = DispatchTime.now().uptimeNanoseconds &- frameBuildStart
-        // IME preedit: draw the in-progress composition over the grid at the cursor.
-        if !markedText.isEmpty, scrollOffset == 0 {
-            overlayPreedit(into: &frame)
-        }
-        // DECSCUSR: a program-requested cursor shape (vim/nvim/fish per-mode) overrides the
-        // user's `cursorStyle` setting; `.default` keeps the setting.
-        switch grid.cursor.shape {
-        case .block: frame.cursor.style = .block
-        case .bar: frame.cursor.style = .bar
-        case .underline: frame.cursor.style = .underline
-        case .default: break
-        }
-        // Cursor blink: hide on the off-beat (only while focused + blink enabled). The program's
-        // DECSCUSR blink preference overrides the setting; a program-hidden cursor stays hidden.
-        let blinkEnabled = grid.cursor.blinking ?? cursorBlinkEnabled
-        if frame.cursor.visible, focused, blinkEnabled, !cursorBlinkVisible {
-            frame.cursor.visible = false
-        }
-        // Unfocused → hollow cursor (outline block / dimmed bar-underline), never blinking.
-        frame.cursor.hollow = !effectivelyFocused
-        // Clear to the canvas color at canvas opacity so any cell-rounding remainder reads
-        // as the canvas (no seam, and translucent when opacity < 1). The grid draws at the
-        // padding origin so the inset region shows the canvas.
-        let didPresent = renderer.present(
-            frame,
-            to: drawable,
-            clearColor: builder.renderColor(reverseVideo ? canvasForeground : canvasBackground, alpha: canvasOpacity),
-            origin: (originOffsetX, originOffsetY),
-            gamma: glyphGamma,
-            ligatures: ligaturesEnabled,
-            damage: plain ? damage : nil,
-            frameBuildNanos: frameBuildNanos,
-            animatingImages: nextAnimationFrame != nil,
-            synchronizedWithTransaction: metalLayer.presentsWithTransaction
-        )
-        if didPresent {
-            onRenderStats?(renderer.stats)
-            updateTextBlinkTimer(frameHasBlink: frame.hasBlink)
-            scheduleAnimationFrame(at: nextAnimationFrame)
-        } else { scheduleRender() } // transient encode/present failure — retry next tick
-        StartupMetrics.shared.mark(.firstDrawablePresented) // idempotent: only the first present counts
-        // Retain only a plain frame for row reuse; a selection/scrollback/preedit frame would
-        // poison the cache with overlay-baked cells, so drop it. (`plain` already excludes IME.)
-        lastPlainFrame = plain ? frame : nil
+    private func renderNow() {
+        renderNowOffMain()
     }
 
-    /// Force path (resize / first-paint / 2026-timeout): present in the SAME runloop turn so the
-    /// frame is on screen before the caller's `CATransaction` commits. The on-main pipeline already
-    /// renders synchronously; the off-main pipeline must build-and-present inline rather than via its
-    /// normal async hop (which would flash a stale grid stretched to the new bounds).
+    /// Force path builds the current frame before returning. Actual transaction-mode resize
+    /// submits inline; ordinary first paint/settle uses the bounded off-main drawable pipeline.
     private func renderNowSynchronous() {
-        if offMainParserFramePipelineEnabled {
-            renderNowOffMain(synchronous: true)
-        } else {
-            renderNow(forced: true)
-        }
+        renderNowOffMain(synchronous: true)
     }
 
     private func renderNowOffMain(
         synchronous: Bool = false,
         flushTransaction: Bool = false
     ) {
+        guard !isHiddenOrHasHiddenAncestor else { return }
         // Live-drag hold for the scheduler's async entry — ESCAPE HATCH ONLY. With real-time
         // reflow off, the drag's contract is defer-to-release: the grid stays at its pre-drag
         // size while the re-wrap PREVIEW (a different cell count) owns the glass, so an output
@@ -2663,7 +2673,7 @@ public final class HarnessTerminalSurfaceView: NSView {
         let generation = renderGeneration
         let state = emulatorState
         let config = frameBuildConfiguration
-        let requestedScrollOffset = scrollOffset
+        let requestedViewportAnchor = viewportAnchor
         // Capture the RAW selection here (cheap, no emulator access) and resolve it on the emulator
         // queue inside the build — see `resolveSelectionRegion`. Resolving on main would `emulatorSync`
         // for a word selection and stall main behind the in-flight feed every build.
@@ -2683,6 +2693,8 @@ public final class HarnessTerminalSurfaceView: NSView {
         let findMatchesSnapshot = findMatches
         let triggerMatchesSnapshot = triggerHighlightMatches
         let animatesImages = Self.animatesImages
+        let source = ObjectIdentifier(self)
+        let frameOutputGeneration = outputGeneration
 
         // The frame build, identical for the async (coalesced) and synchronous (forced) paths. Pure
         // over the captured value snapshot + the emulator; the only mutations are `state`'s
@@ -2702,7 +2714,12 @@ public final class HarnessTerminalSurfaceView: NSView {
                 state.lastPlainFrame = nil
                 state.lastViewportFrame = nil
                 state.lastOverlayKeys = [:]
+                _ = state.stageMainHop(textContext: emulator.textAnchorContext(), historyCount: emulator.historyCount,
+                                      modes: emulator.modes, altScreen: emulator.isAlternateScreenActive)
             }
+            let requestedScrollOffset = requestedViewportAnchor.map { anchor in
+                max(0, min(emulator.historyCount, emulator.historyCount - (anchor.position?.line ?? 0)))
+            } ?? 0
             // DECSCNM: read on the emulator's queue (serialized with the feed that set it);
             // a flip arrives with full-screen damage, so the swap repaints everything.
             let reverseVideo = emulator.modes.reverseVideo
@@ -2713,6 +2730,7 @@ public final class HarnessTerminalSurfaceView: NSView {
             var scrollShift = 0
             var peekRow = false
             var nextAnimationFrame: UInt64?
+            var cursorCanBlink = false
             if let cm = copyModeState {
                 let offset = cm.scrollbackOffset(historyCount: emulator.historyCount)
                 let grid = emulator.readGrid(scrollbackOffset: offset)
@@ -2727,7 +2745,7 @@ public final class HarnessTerminalSurfaceView: NSView {
                 let hits = cm.viewportSearchHits(rows: viewRows).map { m in
                     TerminalSelection((m.line, m.startColumn), (m.line, max(m.startColumn, m.endColumn - 1)))
                 }
-                frame = builder.build(grid, region: region, searchHighlights: hits,
+                frame = builder.buildDirect(grid, region: region, searchHighlights: hits,
                                       copyModeCursor: cm.viewportCursor(rows: viewRows),
                                       imageProvider: { emulator.image(for: $0) })
                 let statusText = searchEntry.map { (cm.search.reverse ? "?" : "/") + $0 } ?? cm.statusLine()
@@ -2741,20 +2759,22 @@ public final class HarnessTerminalSurfaceView: NSView {
                 // the fraction translate always has real content to reveal; the live view (offset
                 // 0) stays byte-identical. Augmenting whenever scrolled — not just when a fraction
                 // is active — keeps the frame shape uniform across the whole scrolled regime, so
-                // `buildShifted` keeps rotating instead of bailing on a rows mismatch.
+                // row cache reuse keeps rotating instead of bailing on a rows mismatch.
                 peekRow = requestedScrollOffset > 0
                 // `gridRead` brackets boundary 1 (the engine→renderer grid snapshot) on the
                 // signpost track, so a per-boundary trace can attribute build time to the
                 // snapshot copy vs the RenderCell resolve that follows.
                 let (snapshot, damage) = FrameSignposter.shared.interval("gridRead") {
                     () -> (TerminalGridSnapshot, TerminalDamage) in
+                    let damage = emulator.consumeDamage()
+                    emulator.updateRenderMirror(&state.renderMirror, damage: damage)
                     let grid = peekRow
                         ? Self.appendingPeekRow(
                             to: emulator.readGrid(scrollbackOffset: requestedScrollOffset),
                             emulator: emulator, offset: requestedScrollOffset
                         )
-                        : emulator.readGrid()
-                    return (grid, emulator.consumeDamage())
+                        : state.renderMirror!
+                    return (grid, damage)
                 }
                 // Kitty animations move on only for the images this frame draws; the present
                 // hands their next deadline to the scheduler.
@@ -2783,64 +2803,42 @@ public final class HarnessTerminalSurfaceView: NSView {
                 let plain = requestedScrollOffset == 0
                 // Scroll-delta fast path: a pure scrollback scroll (the offset changed, nothing
                 // else did — no output since the last overlay-free frame, no overlays now) is the
-                // previous frame shifted by the offset delta. `buildShifted` re-resolves only the
-                // newly-exposed rows; `scrollShift` + the exposed-row damage let the renderer
+                // previous viewport shifted by the offset delta. Only newly exposed rows
+                // are resolved; `scrollShift` + the exposed-row damage let the renderer
                 // rotate its row cache the same way. This covers k→k′ scrolls AND the 0→k / k→0
                 // transitions (landing at 0 yields a byte-identical plain frame, so the plain
                 // cache below stays coherent). `damage.rows.isEmpty` is the no-output guard —
                 // cursor moves list their rows there, so they conservatively take the full path.
                 let scrollDelta = requestedScrollOffset - state.lastViewportOffset
-                if overlayFree, scrollDelta != 0,
-                   damage.rows.isEmpty, !damage.full,
+                frame = builder.buildDirect(
+                    grid, region: plain ? nil : selectionRegion,
+                    searchHighlights: plain ? [] : findHits,
+                    imageProvider: { emulator.image(for: $0) }
+                )
+                if overlayFree, scrollDelta != 0, damage.rows.isEmpty, !damage.full,
                    state.lastViewportGeneration == generation,
                    let previous = state.lastViewportFrame,
-                   let shifted = builder.buildShifted(grid, reusing: previous, shift: scrollDelta) {
-                    frame = shifted
+                   previous.columns == grid.cols, previous.rows == grid.rows,
+                   abs(scrollDelta) < grid.rows, previous.images.isEmpty, grid.images.isEmpty {
                     scrollShift = scrollDelta
-                    // Exposed band in FRAME rows (grid.rows == viewRows + 1 when the peek row is
-                    // appended): a shift toward live exposes the bottom band including the peek.
                     let exposed = scrollDelta > 0
-                        ? IndexSet(integersIn: 0 ..< min(scrollDelta, grid.rows))
-                        : IndexSet(integersIn: max(0, grid.rows + scrollDelta) ..< grid.rows)
+                        ? IndexSet(integersIn: 0 ..< scrollDelta)
+                        : IndexSet(integersIn: grid.rows + scrollDelta ..< grid.rows)
                     renderDamage = TerminalDamage(rows: exposed)
                 } else if plain {
-                    // Only reuse a cached frame built for THIS generation — a stale-generation frame
-                    // describes the old grid and would tear when diffed against fresh damage.
-                    let reuse = state.lastPlainFrameGeneration == generation ? state.lastPlainFrame : nil
-                    let fresh = damage.rows.subtracting(damage.scrolledRows)
-                    // Output-scroll fast path: the engine reported a whole-viewport scroll
-                    // (`damage.scroll`), so the moved band shift-copies from the previous frame
-                    // and only the fresh rows (writes, blank band, cursor rows) re-resolve.
-                    // `scrollShift` lets the renderer rotate its row-instance cache the same way
-                    // it does for scrollback scrolls; the fresh band is its re-encode set. Any
-                    // bail (no reusable frame, images, geometry) falls back to the plain build,
-                    // whose `damage.rows` still covers the whole moved band.
                     if damage.scroll != 0, !damage.full, !damage.scrolledRows.isEmpty,
-                       let prev = reuse,
-                       let shifted = builder.buildShifted(grid, reusing: prev,
-                                                          shift: damage.scroll, freshRows: fresh) {
-                        frame = shifted
+                       abs(damage.scroll) < grid.rows,
+                       state.lastPlainFrameGeneration == generation,
+                       let previous = state.lastPlainFrame,
+                       previous.columns == grid.cols, previous.rows == grid.rows,
+                       previous.images.isEmpty, grid.images.isEmpty {
                         scrollShift = damage.scroll
-                        renderDamage = TerminalDamage(rows: fresh)
+                        renderDamage = TerminalDamage(rows: damage.rows.subtracting(damage.scrolledRows))
                     } else {
-                        frame = builder.build(grid, region: nil,
-                                              imageProvider: { emulator.image(for: $0) },
-                                              reusing: reuse, damage: damage)
                         renderDamage = damage
                     }
                 } else {
-                    frame = builder.build(grid, region: selectionRegion,
-                                          searchHighlights: findHits,
-                                          imageProvider: { emulator.image(for: $0) })
-                    // Overlay-free full rebuilds (scrolled views) present with FULL damage, not
-                    // nil: the instances are identical, but the encode routes through the
-                    // cache-populating path, so the row cache is warm for the next scroll
-                    // rotation or fraction-only repaint (nil would reset it and force the next
-                    // tick to re-encode everything). Overlay frames keep nil — their baked
-                    // highlight cells must not poison the cache.
-                    if overlayFree {
-                        renderDamage = TerminalDamage(full: true)
-                    }
+                    renderDamage = TerminalDamage(full: true)
                 }
                 switch grid.cursor.shape {
                 case .block: frame.cursor.style = .block
@@ -2849,6 +2847,7 @@ public final class HarnessTerminalSurfaceView: NSView {
                 case .default: break
                 }
                 let blinkEnabled = grid.cursor.blinking ?? blinkSetting
+                cursorCanBlink = frame.cursor.visible && isFocused && blinkEnabled
                 if frame.cursor.visible, isFocused, blinkEnabled, !blinkVisible {
                     frame.cursor.visible = false
                 }
@@ -2907,19 +2906,22 @@ public final class HarnessTerminalSurfaceView: NSView {
                 hasPeekRow: peekRow,
                 frameBuildNanos: DispatchTime.now().uptimeNanoseconds &- frameBuildStart,
                 clearColor: builder.renderColor(reverseVideo ? fg : bg, alpha: opacity),
-                nextAnimationFrame: nextAnimationFrame
+                nextAnimationFrame: nextAnimationFrame,
+                cursorCanBlink: cursorCanBlink,
+                hasShellPrompt: emulator.isShellPromptReady,
+                source: source, outputGeneration: frameOutputGeneration
             )
         }
 
+        let token = state.claimFrameToken()
         if synchronous {
-            // Block until the worker builds this frame, then present inline (we're on main inside the
-            // caller's CATransaction). `state.sync` queues behind any in-flight build, preserving order.
+            // Build in queue order; only a real transaction-mode resize acquires on main.
             let result = state.sync { emulator in
                 FrameSignposter.shared.interval("frameBuild") { build(emulator) }
             }
+            applyPendingMainHop()
             presentBuiltFrame(result)
         } else {
-            let token = state.claimFrameToken()
             let flush = flushTransaction
             state.async { [weak self] emulator in
                 // Latest-wins coalescing: if a newer build is already queued behind this one, skip —
@@ -2930,6 +2932,19 @@ public final class HarnessTerminalSurfaceView: NSView {
                 let result = FrameSignposter.shared.interval("frameBuild") { build(emulator) }
                 DispatchQueue.main.async { [weak self] in
                     guard let self else { return }
+                    self.applyPendingMainHop()
+                    guard state.isLatestFrameToken(token) else {
+                        // This build consumed parser damage before a newer build superseded it.
+                        // Its main hop precedes the newer drawable's landing (serial build queue),
+                        // so invalidate reuse before that frame can encode the missing rows.
+                        self.pendingDrawableNeedsFullDamage = true
+                        self.lastPresentedResultIsRendererCoherent = false
+                        if self.pendingDrawableFrame == nil, !self.drawableRequestInFlight {
+                            // A synchronous transaction may already have submitted its successor.
+                            self.scheduleRender()
+                        }
+                        return
+                    }
                     // Any present landing while the layer is in transaction mode flushes its own
                     // explicit CATransaction: a live-resize commit by contract, and an un-gated
                     // mid-drag output build because the mouse may be held still (no layout pass
@@ -2951,58 +2966,131 @@ public final class HarnessTerminalSurfaceView: NSView {
     /// This preserves display synchronization without parking input, output delivery or AppKit
     /// behind the compositor's next refresh. Live resize retains its explicit transaction path.
     private func enqueueDrawableFrame(_ result: SurfaceFrameBuildResult) {
-        guard renderGeneration == result.generation, window != nil, renderer != nil else { return }
+        guard renderGeneration == result.generation, window != nil, !drawablePoolReleased,
+              !isHiddenOrHasHiddenAncestor, renderExecutor != nil else { return }
         if pendingDrawableFrame != nil { pendingDrawableNeedsFullDamage = true }
         pendingDrawableFrame = result
-        guard !drawableRequestInFlight else { return }
+        startDrawableRequest()
+    }
+
+    private func startDrawableRequest() {
+        guard !drawableRequestInFlight, pendingDrawableFrame != nil,
+              !drawablePoolReleased, let executor = renderExecutor else { return }
         drawableRequestInFlight = true
         let request = SurfaceDrawableRequest(layer: metalLayer)
-        drawableQueue.async { [weak self] in
+        activeDrawableRequest = request
+        drawableAcquisitionQueue.async { [weak self] in
             request.acquire()
             DispatchQueue.main.async { [weak self] in
                 guard let self else { return }
-                self.drawableRequestInFlight = false
-                guard let pending = self.pendingDrawableFrame else { return }
+                // An old acquisition must not consume a remounted layer's latest pending frame
+                // or clear its in-flight flag, even when both drawable sizes happen to match.
+                guard request.layer === self.metalLayer else { return }
+                self.activeDrawableRequest = nil
+                guard self.renderExecutor === executor else {
+                    self.drawableRequestInFlight = false
+                    self.startDrawableRequest()
+                    return
+                }
+                guard var pending = self.pendingDrawableFrame else {
+                    self.drawableRequestInFlight = false
+                    return
+                }
                 self.pendingDrawableFrame = nil
+                if let latest = self.lastPresentedResult,
+                   latest.generation == pending.generation,
+                   latest.frame.columns == pending.frame.columns, latest.frame.rows == pending.frame.rows,
+                   latest.outputGeneration > pending.outputGeneration {
+                    // A cached repaint queued during a newer encode must reuse that completed
+                    // output, rather than restore the older content on its next drawable.
+                    pending = latest
+                    pending.damage = TerminalDamage(full: !self.lastPresentedResultIsRendererCoherent)
+                    pending.scrollShift = 0
+                }
                 if self.pendingDrawableNeedsFullDamage {
-                    self.renderer?.invalidateRowReuseCache()
+                    pending.damage = TerminalDamage(full: true)
+                    pending.scrollShift = 0
                     self.lastPresentedResultIsRendererCoherent = false
                 }
                 self.pendingDrawableNeedsFullDamage = false
                 guard let drawable = request.drawable,
                       drawable.texture.width == Int(self.metalLayer.drawableSize.width),
                       drawable.texture.height == Int(self.metalLayer.drawableSize.height) else {
-                    self.renderer?.invalidateRowReuseCache()
+                    executor.sync { $0.invalidateRowReuseCache() }
+                    self.drawableRequestInFlight = false
                     self.lastPresentedResultIsRendererCoherent = false
-                    self.scheduleRender()
+                    self.deferDrawableRetry()
                     return
                 }
                 if self.metalLayer.presentsWithTransaction {
+                    self.drawableRequestInFlight = false
                     self.presentWithinExplicitTransaction {
                         self.presentBuiltFrame(pending, drawable: drawable, drawableWaitNanos: request.waitNanos)
                     }
                 } else {
-                    self.presentBuiltFrame(pending, drawable: drawable, drawableWaitNanos: request.waitNanos)
+                    self.presentOffMain(pending, request: request, executor: executor)
                 }
             }
         }
     }
 
-    /// Present an already-built off-main frame (main thread). A stale generation / no window / no
-    /// renderer is an intentional drop; a nil drawable or a failed present is transient, so re-arm the
-    /// scheduler (and wake the link) to retry on the next tick rather than leaving a frame unshown.
+    private func presentOffMain(_ result: SurfaceFrameBuildResult, request: SurfaceDrawableRequest,
+                                executor: SurfaceRenderExecutor) {
+        guard result.generation == renderGeneration, renderExecutor === executor,
+              let configuration = presentConfiguration(for: result) else {
+            drawableRequestInFlight = false
+            startDrawableRequest()
+            return
+        }
+        nextPresentationID &+= 1
+        let presentationID = nextPresentationID
+        executor.async { [weak self] renderer in
+            let outcome = Self.encodePresentation(result, configuration: configuration,
+                                                  renderer: renderer, drawable: request.drawable,
+                                                  waitNanos: request.waitNanos)
+            if outcome != .presented { renderer.invalidateRowReuseCache() }
+            let stats = renderer.stats
+            DispatchQueue.main.async { [weak self] in
+                guard let self, request.layer === self.metalLayer else { return }
+                self.drawableRequestInFlight = false
+                if self.renderExecutor === executor {
+                    self.finishPresentation(result, outcome: outcome, stats: stats, id: presentationID)
+                }
+                self.startDrawableRequest()
+            }
+        }
+    }
+
+    /// Accept a built frame. Ordinary frames submit through bounded off-main acquisition;
+    /// actual transaction-mode resize submits inline. Completion handles transient failures.
     private func presentBuiltFrame(
         _ result: SurfaceFrameBuildResult, drawable: CAMetalDrawable? = nil, drawableWaitNanos: UInt64 = 0
     ) {
-        guard renderGeneration == result.generation, window != nil, let renderer else { return }
+        guard renderGeneration == result.generation, window != nil, !drawablePoolReleased,
+              !isHiddenOrHasHiddenAncestor, let executor = renderExecutor else { return }
+        if !metalLayer.presentsWithTransaction {
+            enqueueDrawableFrame(result)
+            return
+        }
         // A synchronous layout/resize frame supersedes any older frame waiting for a drawable.
-        if pendingDrawableFrame != nil {
+        if pendingDrawableFrame != nil || pendingDrawableNeedsFullDamage {
             pendingDrawableFrame = nil
             pendingDrawableNeedsFullDamage = false
-            renderer.invalidateRowReuseCache()
+            executor.sync { $0.invalidateRowReuseCache() }
         }
-        let outcome = presentFrame(result, damage: result.damage, scrollShift: result.scrollShift, drawable: drawable, acquiredWaitNanos: drawableWaitNanos)
+        nextPresentationID &+= 1
+        let outcome = presentTransactionFrame(result, damage: result.damage, scrollShift: result.scrollShift, drawable: drawable, acquiredWaitNanos: drawableWaitNanos)
+        let stats = executor.sync { $0.stats }
+        if outcome != .presented { executor.sync { $0.invalidateRowReuseCache() } }
+        finishPresentation(result, outcome: outcome, stats: stats, id: nextPresentationID)
+    }
+
+    private func finishPresentation(_ result: SurfaceFrameBuildResult, outcome: PresentAttempt,
+                                    stats: TerminalRenderStats, id: UInt64) {
+        guard result.generation == renderGeneration, id >= completedPresentationID else { return }
+        completedPresentationID = id
         if outcome == .presented {
+            cancelDrawableRetry()
             // Remember the presented frame so a live resize can re-stretch it without rebuilding
             // (and without touching the emulator queue). See `repaintLastFrame`.
             lastPresentedResult = result
@@ -3010,10 +3098,15 @@ public final class HarnessTerminalSurfaceView: NSView {
             // frame's rows — false for the cache-bypassing paths (nil damage) AND for a
             // mid-encode atlas reset that wiped the cache (which a damage-only heuristic here
             // could not distinguish from a normal full encode).
-            lastPresentedResultIsRendererCoherent = renderer.stats.rowCacheCoherent
-            onRenderStats?(renderer.stats)
+            lastPresentedResultIsRendererCoherent = stats.rowCacheCoherent
+            onRenderStats?(stats)
             updateTextBlinkTimer(frameHasBlink: result.frame.hasBlink)
             scheduleAnimationFrame(at: result.nextAnimationFrame)
+            if result.hasShellPrompt { StartupMetrics.shared.mark(.firstShellPromptFrameSubmitted) }
+            if !hasSubmittedShellPrompt, result.hasShellPrompt {
+                hasSubmittedShellPrompt = true
+                onFirstShellPromptSubmitted?()
+            }
         } else {
             // A genuine drop: nothing reached the glass this turn (repaintLastFrame failures
             // don't count — their callers fall back to another present in the same turn).
@@ -3023,87 +3116,82 @@ public final class HarnessTerminalSurfaceView: NSView {
             // (nil drawable drops before encode) or holds rows the screen never showed (encode
             // failed after mutating them). Either way the cache and the next frame's damage
             // disagree about what's on the glass, so drop the cache: the retry re-encodes fully.
-            renderer.invalidateRowReuseCache()
             lastPresentedResultIsRendererCoherent = false
             FrameSignposter.shared.recordFrameDrop(
                 outcome == .nilDrawable ? .nilDrawable : .encodeFailure)
-            scheduleRender() // transient encode/present failure — retry next tick
+            deferDrawableRetry()
         }
-        StartupMetrics.shared.mark(.firstDrawablePresented)
+        if outcome == .presented { StartupMetrics.shared.mark(.firstDrawablePresented) }
     }
 
-    /// Present `result` at the current origin. Regular asynchronous frames supply a drawable
-    /// acquired off main; synchronous layout/repaint callers acquire here. While the layer is
-    /// in `presentsWithTransaction` mode (live resize) the present is routed through the renderer's
-    /// transaction-synchronized path, keyed off the layer property itself so present modes can
-    /// never mix while the mode is on — DELIBERATE for output/tick presents mid-drag too: an async
-    /// `commandBuffer.present` against a transaction-mode layer presents at an indeterminate later
-    /// commit (the glitch class this change eliminates), and the uniform sync cost is the bounded
-    /// schedule wait (sub-ms, measured as `presentScheduleNanos`), paid only while dragging.
-    /// The `present` signpost brackets main-thread encoding/presentation. Rolling timing
-    /// statistics also include any off-main drawable wait, so moving that wait does not make
-    /// it disappear from the total / drawable / semaphore / schedule breakdown. A `false` return is a skipped present
-    /// (nil drawable or encode failure) — callers decide whether to retry or fall back; only
-    /// `presentBuiltFrame` counts a genuine drop (`recordFrameDrop`), keyed by which failure it was.
-    private enum PresentAttempt { case presented, nilDrawable, encodeFailure }
+    /// CPU submission outcome, distinct from GPU completion or visible scanout.
+    private typealias PresentAttempt = SurfacePresentAttempt
 
-    private func presentFrame(
+    private func presentConfiguration(for result: SurfaceFrameBuildResult) -> SurfacePresentConfiguration? {
+        guard let renderer else { return nil }
+        let canTranslate = result.hasPeekRow && result.frame.images.isEmpty
+        return SurfacePresentConfiguration(
+            originX: originOffsetX, originY: originOffsetY,
+            gamma: glyphGamma, ligatures: ligaturesEnabled,
+            fractionPx: canTranslate && scrollFraction > 0
+                ? Float((scrollFraction * CGFloat(renderer.cellPixelHeight)).rounded()) : 0,
+            clipRows: result.hasPeekRow ? result.frame.rows - 1 : nil,
+            synchronizedWithTransaction: metalLayer.presentsWithTransaction
+        )
+    }
+
+    /// Submit within the current AppKit transaction. Only actual transaction-mode resize
+    /// enters this main-thread acquisition path; ordinary force/repaint stays off main.
+    private func presentTransactionFrame(
         _ result: SurfaceFrameBuildResult, damage: TerminalDamage?, scrollShift: Int = 0,
         drawable acquiredDrawable: CAMetalDrawable? = nil, acquiredWaitNanos: UInt64 = 0
     ) -> PresentAttempt {
-        guard let renderer else { return .encodeFailure }
-        // Smooth scroll is applied at present time from the CURRENT fraction (render-only state):
-        // a fraction-only tick re-presents the same frame with just a new uniform. Rounded to
-        // whole device pixels so glyphs stay crisp mid-scroll (no sub-pixel resampling).
-        // The translate is gated on the FRAME, not just the fraction: (1) a frame without the
-        // peek row (built at offset 0 — e.g. the cached live frame re-presented while the first
-        // scrolled build is still in flight) must present untranslated, or the translate would
-        // open a background gap at the bottom with no row to fill it — the worst case is one
-        // un-smooth frame, never a hole; (2) image-bearing frames present untranslated too
-        // (`image_vertex` has no scrollPx), so an image scrolling INTO a fractional viewport
-        // can never sit misaligned against its text — `scrollByContinuous` quantizes the next
-        // position the same way. The clip rides the peek row itself: hidden at fraction 0, and
-        // rows slide out of the fixed grid box mid-fraction.
-        let canTranslate = result.hasPeekRow && result.frame.images.isEmpty
-        let fractionPx = canTranslate && scrollFraction > 0
-            ? Float((scrollFraction * CGFloat(renderer.cellPixelHeight)).rounded())
-            : 0
-        let clipRows = result.hasPeekRow ? result.frame.rows - 1 : nil
-        let sp = FrameSignposter.shared
-        let presentStart = sp.enabled ? DispatchTime.now().uptimeNanoseconds : 0
-        var drawableWaitNanos = acquiredWaitNanos
-        let outcome = sp.interval("present") { () -> PresentAttempt in
-            let drawableStart = sp.enabled ? DispatchTime.now().uptimeNanoseconds : 0
-            guard let drawable = acquiredDrawable ?? sp.interval("drawableWait", { metalLayer.nextDrawable() })
-            else { return .nilDrawable }
-            if sp.enabled, acquiredDrawable == nil {
-                drawableWaitNanos = DispatchTime.now().uptimeNanoseconds &- drawableStart
+        guard window != nil, !drawablePoolReleased, !isHiddenOrHasHiddenAncestor,
+              let executor = renderExecutor, let configuration = presentConfiguration(for: result)
+        else { return .encodeFailure }
+        return autoreleasepool {
+            let start = DispatchTime.now().uptimeNanoseconds
+            let drawable = acquiredDrawable ?? metalLayer.nextDrawable()
+            let wait = acquiredDrawable == nil
+                ? DispatchTime.now().uptimeNanoseconds &- start : acquiredWaitNanos
+            var frame = result
+            frame.damage = damage
+            frame.scrollShift = scrollShift
+            return executor.withTransactionOwnership { renderer in
+                Self.encodePresentation(frame, configuration: configuration, renderer: renderer,
+                                        drawable: drawable, waitNanos: wait)
             }
+        }
+    }
+
+    private nonisolated static func encodePresentation(
+        _ result: SurfaceFrameBuildResult, configuration: SurfacePresentConfiguration,
+        renderer: TerminalMetalRenderer, drawable: CAMetalDrawable?, waitNanos: UInt64
+    ) -> PresentAttempt {
+        let sp = FrameSignposter.shared
+        let start = DispatchTime.now().uptimeNanoseconds
+        let outcome = sp.interval("present") { () -> PresentAttempt in
+            guard let drawable else { return .nilDrawable }
             let presented = renderer.present(
-                result.frame,
-                to: drawable,
-                clearColor: result.clearColor,
-                origin: (originOffsetX, originOffsetY),
-                gamma: glyphGamma,
-                ligatures: ligaturesEnabled,
-                damage: damage,
-                scrollShift: scrollShift,
-                scrollFractionPx: fractionPx,
-                smoothScrollClipRows: clipRows,
+                result.frame, to: drawable, clearColor: result.clearColor,
+                origin: (configuration.originX, configuration.originY),
+                gamma: configuration.gamma, ligatures: configuration.ligatures,
+                damage: result.damage, scrollShift: result.scrollShift,
+                scrollFractionPx: configuration.fractionPx,
+                smoothScrollClipRows: configuration.clipRows,
                 frameBuildNanos: result.frameBuildNanos,
                 animatingImages: result.nextAnimationFrame != nil,
-                synchronizedWithTransaction: metalLayer.presentsWithTransaction
+                synchronizedWithTransaction: configuration.synchronizedWithTransaction
             )
             return presented ? .presented : .encodeFailure
         }
         if sp.enabled, outcome == .presented {
             sp.recordPresent(
-                nanos: (DispatchTime.now().uptimeNanoseconds &- presentStart) &+ acquiredWaitNanos,
-                drawableWait: drawableWaitNanos,
-                semaphoreWait: renderer.stats.semaphoreWaitNanos,
+                nanos: (DispatchTime.now().uptimeNanoseconds &- start) &+ waitNanos,
+                drawableWait: waitNanos, semaphoreWait: renderer.stats.semaphoreWaitNanos,
                 schedule: renderer.stats.presentScheduleNanos,
-                instanceBuild: renderer.stats.buildInstancesNanos,
-                upload: renderer.stats.uploadNanos
+                instanceBuild: renderer.stats.buildInstancesNanos, upload: renderer.stats.uploadNanos,
+                source: result.source, outputGeneration: result.outputGeneration
             )
         }
         return outcome
@@ -3111,7 +3199,7 @@ public final class HarnessTerminalSurfaceView: NSView {
 
     /// Append the buffer line just below the scrolled viewport as a display-only (rows+1)th row —
     /// the smooth-scroll peek row the fraction translate reveals. The snapshot stays a uniform
-    /// window over `[history ++ viewport]`, so `buildShifted` rotates it like any other row.
+    /// window over `[history ++ viewport]`, so the renderer rotates it like any other row.
     /// `offset ≥ 1` guarantees the line below the viewport exists (it is at worst the live bottom
     /// row); a defensive blank-pad covers width races during reflow. Runs on the emulator queue
     /// (called from the build closure).
@@ -3135,8 +3223,9 @@ public final class HarnessTerminalSurfaceView: NSView {
     /// Re-present the last built frame at the *current* drawable size with no emulator-queue access
     /// — the smooth-resize fast path. Used by `layout()` during a live drag/animation: the grid
     /// hasn't reflowed yet (deferred to drag-end), so the cached frame is still the correct content;
-    /// we just need to redraw it into the freshly-resized drawable. Returns false when there's no
-    /// valid cached frame for this generation, so the caller falls back to a full synchronous build.
+    /// we just need to redraw it into the freshly-resized drawable. Returns whether a repaint
+    /// was accepted (ordinary mode) or submitted (transaction mode). Without a valid cached
+    /// frame, the caller builds a current frame before scheduling its submission.
     ///
     /// Damage selection is the per-tick cost lever. Under the drag-frozen origin every row-cache
     /// key (cols/rows/origin/atlas) is stable, so when the cache verifiably holds this exact
@@ -3151,17 +3240,37 @@ public final class HarnessTerminalSurfaceView: NSView {
     private func repaintLastFrame() -> Bool {
         guard let result = lastPresentedResult,
               result.generation == renderGeneration,
-              window != nil, let renderer else { return false }
+              window != nil, let executor = renderExecutor else { return false }
         let damage: TerminalDamage?
-        if lastPresentedResultIsRendererCoherent {
+        if lastPresentedResultIsRendererCoherent, !drawableRequestInFlight,
+           !pendingDrawableNeedsFullDamage {
             damage = TerminalDamage(rows: [], full: false)
         } else {
             damage = TerminalDamage(full: true)
         }
-        let didPresent = presentFrame(result, damage: damage) == .presented
+        if !metalLayer.presentsWithTransaction {
+            // Layout repaints must not replace a newer output frame already awaiting a drawable.
+            if pendingDrawableFrame == nil {
+                var repaint = result
+                repaint.damage = damage
+                repaint.scrollShift = 0
+                enqueueDrawableFrame(repaint)
+            }
+            return true
+        }
+        // Joining an older encode can enqueue its main completion during this transaction.
+        // The repaint owns a later submission ID so that completion cannot restore stale
+        // frame metadata or cache coherence after the newer transaction has submitted.
+        nextPresentationID &+= 1
+        let presentationID = nextPresentationID
+        let didPresent = presentTransactionFrame(result, damage: damage) == .presented
         if didPresent {
-            lastPresentedResultIsRendererCoherent = renderer.stats.rowCacheCoherent
-            onRenderStats?(renderer.stats)
+            var repaint = result
+            repaint.damage = damage
+            repaint.scrollShift = 0
+            repaint.frameBuildNanos = 0
+            finishPresentation(repaint, outcome: .presented, stats: executor.sync { $0.stats },
+                               id: presentationID)
         }
         return didPresent
     }
@@ -3188,9 +3297,6 @@ public final class HarnessTerminalSurfaceView: NSView {
     /// SKIPPED the re-wrap entirely under parser load). Frame pacing wins over single-frame wrap
     /// fidelity; under load the async path is strictly better (stale wrap either way, no stall).
     private func updateResizePreview(cols nc: Int, rows nr: Int) {
-        // Only on the off-main pipeline (the emulator lives on its serial queue; when the flag is
-        // off it is main-confined and the async hop below would touch it off its confinement domain).
-        guard offMainParserFramePipelineEnabled else { return }
         guard scrollOffset == 0, copyMode == nil, selectionAnchor == nil,
               markedText.isEmpty, !findActive else { return }
         let config = frameBuildConfiguration
@@ -3199,6 +3305,8 @@ public final class HarnessTerminalSurfaceView: NSView {
         let opacity = canvasOpacity
         let isFocused = effectivelyFocused
         let generation = renderGeneration
+        let source = ObjectIdentifier(self)
+        let frameOutputGeneration = outputGeneration
         let state = emulatorState
         // Preview-namespace token (NOT claimFrameToken): the output pipeline must not cancel an
         // in-flight re-wrap — during an animated resize both pipelines run concurrently.
@@ -3212,7 +3320,7 @@ public final class HarnessTerminalSurfaceView: NSView {
             let reverseVideo = emulator.modes.reverseVideo
             let builder = config.makeBuilder(reverseVideo: reverseVideo)
             var frame = FrameSignposter.shared.interval("frameBuild") {
-                builder.build(preview, region: nil, imageProvider: { emulator.image(for: $0) })
+                builder.buildDirect(preview, region: nil, imageProvider: { emulator.image(for: $0) })
             }
             frame.cursor.hollow = !isFocused
             // NOTE: must not touch `state.lastPlainFrame`/`lastViewportFrame` — the preview has
@@ -3220,7 +3328,9 @@ public final class HarnessTerminalSurfaceView: NSView {
             let result = SurfaceFrameBuildResult(
                 generation: generation, frame: frame, damage: nil,
                 frameBuildNanos: DispatchTime.now().uptimeNanoseconds &- buildStart,
-                clearColor: builder.renderColor(reverseVideo ? fg : bg, alpha: opacity)
+                clearColor: builder.renderColor(reverseVideo ? fg : bg, alpha: opacity),
+                hasShellPrompt: emulator.isShellPromptReady,
+                source: source, outputGeneration: frameOutputGeneration
             )
             DispatchQueue.main.async { [weak self] in
                 self?.presentResizePreview(result, cols: nc, rows: nr, token: token)
@@ -3233,8 +3343,8 @@ public final class HarnessTerminalSurfaceView: NSView {
     /// after the settled commit bumped the generation — stashing a frame for the wrong grid would
     /// re-present mis-wrapped content on every subsequent sub-cell repaint. A current preview is
     /// stashed exactly like the old synchronous path (coherence broken: the renderer cache still
-    /// holds the previous frame's rows) and repainted immediately — the repaint pays the one
-    /// cache-populating full rebuild per geometry change, and the tick after it is free again.
+    /// holds the previous frame's rows) and accepted for repaint — the submission pays the one
+    /// cache-populating rebuild per geometry change, and the tick after it is free again.
     /// Returns whether the preview was accepted (stashed + repaint attempted) — false = dropped
     /// as stale. The Bool is for tests pinning the guards; production callers ignore it.
     @discardableResult
@@ -3244,6 +3354,8 @@ public final class HarnessTerminalSurfaceView: NSView {
         guard renderGeneration == result.generation,         // not superseded by commitGridSize
               emulatorState.isLatestPreviewToken(token),      // not superseded by a newer preview
               cols == previewCols, rows == previewRows,       // still the current drag target
+              scrollOffset == 0, copyMode == nil, selectionAnchor == nil,
+              markedText.isEmpty, !findActive,                // overlays may change during the build
               window != nil else { return false }
         lastPresentedResult = result
         // The preview replaced the frame WITHOUT a present: the renderer cache still holds the
@@ -3257,10 +3369,8 @@ public final class HarnessTerminalSurfaceView: NSView {
 
     // MARK: - Cursor blink
 
-    // Blink is overlay-cheap: the cursor quad lives in the renderer's per-frame extras and a
-    // block cursor's glyph inversion re-encodes exactly its own row (`previousCursor` key diff),
-    // so each toggle costs ≤1 encoded row + one present — never a grid rebuild. Pinned by
-    // `testCursorBlinkReencodesAtMostTheCursorRow`.
+    // Cursor blink updates the fragment overlay uniform and extras, retaining all glyph rows.
+    // Pinned by `testCursorBlinkReusesAllRowsWithPixelParity`.
     //
     // The timer exists only while a blink can actually show: focused (first responder in the
     // key window), un-occluded, and in a window. Focus + occlusion transitions re-enter here,
@@ -3276,11 +3386,7 @@ public final class HarnessTerminalSurfaceView: NSView {
         let timer = Timer(timeInterval: 0.53, repeats: true) { [weak self] _ in
             guard let self else { return }
             MainActor.assumeIsolated {
-                // Belt-and-braces: transitions stop the timer synchronously, but a tick already
-                // queued on the runloop when focus flips must still not toggle.
-                guard self.effectivelyFocused else { return }
-                self.cursorBlinkVisible.toggle()
-                self.scheduleRender()
+                self.advanceCursorBlink()
             }
         }
         RunLoop.main.add(timer, forMode: .common)
@@ -3290,6 +3396,29 @@ public final class HarnessTerminalSurfaceView: NSView {
     /// Test seam: whether the blink timer is currently scheduled (the idle-efficiency
     /// contract — no timer while unfocused or occluded).
     func testingBlinkTimerIsScheduled() -> Bool { blinkTimer != nil }
+    func testingAdvanceCursorBlink() { advanceCursorBlink() }
+
+    private func advanceCursorBlink() {
+        // A timer callback already queued when focus changes must not toggle.
+        guard effectivelyFocused else { return }
+        cursorBlinkVisible.toggle()
+        if !repaintCursorBlink() { scheduleRender() }
+    }
+
+    private func repaintCursorBlink() -> Bool {
+        // A cached blink cannot replace newer output or overlays awaiting submission.
+        // Rebuild current state through the scheduler while either pipeline stage is busy.
+        guard pendingDrawableFrame == nil, !drawableRequestInFlight else { return false }
+        guard var result = lastPresentedResult, result.generation == renderGeneration,
+              result.cursorCanBlink, !scheduler.isOccluded else { return false }
+        result.frame.cursor.visible = cursorBlinkVisible
+        result.damage = lastPresentedResultIsRendererCoherent
+            ? TerminalDamage(rows: [], full: false) : TerminalDamage(full: true)
+        result.scrollShift = 0
+        result.frameBuildNanos = 0
+        enqueueDrawableFrame(result)
+        return true
+    }
 
     /// Reset the cursor to solid after activity (typing/output), matching common terminals.
     private func wakeCursor() {
@@ -3318,7 +3447,7 @@ public final class HarnessTerminalSurfaceView: NSView {
                 guard let self else { return }
                 MainActor.assumeIsolated {
                     self.textBlinkHidden.toggle()
-                    self.renderer?.textBlinkHidden = self.textBlinkHidden
+                    self.renderExecutor?.sync { $0.textBlinkHidden = self.textBlinkHidden }
                     self.scheduleRender()
                 }
             }
@@ -3329,7 +3458,7 @@ public final class HarnessTerminalSurfaceView: NSView {
             textBlinkTimer = nil
             if textBlinkHidden {
                 textBlinkHidden = false
-                renderer?.textBlinkHidden = false
+                renderExecutor?.sync { $0.textBlinkHidden = false }
                 scheduleRender()
             }
         }
@@ -3355,10 +3484,8 @@ public final class HarnessTerminalSurfaceView: NSView {
         guard delta != 0 else { return }
         // Mirror read on the off-main pipeline (see `historyCountMirror`): a precise trackpad
         // fires this at event rate, and a `queue.sync` here would stall every wheel event behind
-        // an in-flight parse. Direct read when the emulator is main-confined (legacy pipeline).
-        let historyCount = offMainParserFramePipelineEnabled
-            ? historyCountMirror
-            : emulatorState.emulator.historyCount
+        // an in-flight parse.
+        let historyCount = historyCountMirror
         var position = CGFloat(scrollOffset) - scrollFraction + delta
         position = max(0, min(CGFloat(historyCount), position))
         // Snap float dust onto whole lines: P fractionally ABOVE an integer would ceil to the
@@ -3368,11 +3495,8 @@ public final class HarnessTerminalSurfaceView: NSView {
         if abs(position - nearest) < 0.0005 { position = nearest }
         // Inline images don't ride the smooth-scroll translate (image quads draw window-relative,
         // outside the scrollPx uniform); quantize to whole lines while any are visible so they
-        // never sit misaligned mid-cell. The legacy on-main pipeline quantizes too: it presents
-        // without the fraction uniform (and never builds the peek row), so a fractional position
-        // there would render one whole line off instead of in between.
-        if !offMainParserFramePipelineEnabled
-            || lastPresentedResult.map({ !$0.frame.images.isEmpty }) == true {
+        // never sit misaligned mid-cell.
+        if lastPresentedResult.map({ !$0.frame.images.isEmpty }) == true {
             position = position.rounded()
         }
         let newOffset = Int(position.rounded(.up))
@@ -3430,26 +3554,92 @@ public final class HarnessTerminalSurfaceView: NSView {
         scrollToBufferLine(target)
     }
 
-    /// Select the output of the most recently finished command: the lines strictly between
-    /// the last two OSC 133 prompt marks (full-width rows; the prompt rows themselves are
-    /// excluded). Scrolls to reveal the output when it's outside the viewport. No-op without
-    /// two prompt marks, or when the command printed nothing.
+    /// Select exactly the output delimited by OSC 133 C/D, excluding prompt and input.
     public func selectLastCommandOutput() {
-        let (prompts, historyCount) = emulatorSync { ($0.promptRows, $0.historyCount) }
-        guard prompts.count >= 2 else { return }
-        let lastPrompt = prompts[prompts.count - 1]
-        let previousPrompt = prompts[prompts.count - 2]
-        let start = previousPrompt + 1
-        let end = lastPrompt - 1
-        guard start <= end else { return } // the command printed nothing
+        guard let command = emulatorSync({ $0.lastCompletedCommand }) else { return }
+        selectCommandOutput(command)
+    }
+
+    public func jumpToPreviousFailedCommand() {
+        let target = emulatorSync { emulator -> Int? in
+            let top = emulator.historyCount - scrollOffset
+            return emulator.commandRegions.last { command in
+                guard let position = command.prompt.position, let status = command.exitCode else { return false }
+                return status != 0 && position.line < top
+            }?.prompt.position?.line
+        }
+        if let target { scrollToBufferLine(target) }
+    }
+
+    public func jumpToNextFailedCommand() {
+        let target = emulatorSync { emulator -> Int? in
+            let top = emulator.historyCount - scrollOffset
+            return emulator.commandRegions.first { command in
+                guard let position = command.prompt.position, let status = command.exitCode else { return false }
+                return status != 0 && position.line > top
+            }?.prompt.position?.line
+        }
+        if let target { scrollToBufferLine(target) }
+    }
+
+    private nonisolated static func commandSelection(_ range: TerminalTextRange, columns: Int) -> TerminalSelection {
+        let end = range.end.column == 0
+            ? (range.end.line - 1, max(0, columns - 1))
+            : (range.end.line, range.end.column - 1)
+        return TerminalSelection((range.start.line, range.start.column), end)
+    }
+
+    private func selectCommandOutput(_ command: TerminalCommandRegion) {
+        let anchors = emulatorSync { emulator -> (TerminalTextAnchor, TerminalTextAnchor)? in
+            guard let range = command.outputRange else { return nil }
+            let selection = Self.commandSelection(range, columns: emulator.cols)
+            return (emulator.makeTextAnchor(line: selection.startRow, column: selection.startColumn),
+                    emulator.makeTextAnchor(line: selection.endRow, column: selection.endColumn))
+        }
+        guard let anchors else { return }
         selectionGranularity = .character
         selectionRectangular = false
-        selectionAnchor = (line: start, column: 0)
-        selectionHead = (line: end, column: max(0, columns - 1))
-        let top = historyCount - scrollOffset
-        if start < top || end >= top + rows { scrollToBufferLine(start) }
+        selectionStartAnchor = anchors.0
+        selectionEndAnchor = anchors.1
+        let top = viewportTopBufferLine
+        if let start = anchors.0.position, let end = anchors.1.position,
+           start.line < top || end.line >= top + rows { scrollToBufferLine(start.line) }
         scheduleRender()
     }
+
+    private func copyCommandText(_ command: TerminalCommandRegion, range: KeyPath<TerminalCommandRegion, TerminalTextRange?>) {
+        let text = emulatorSync { emulator -> String? in
+            guard let range = command[keyPath: range] else { return nil }
+            return Self.selectedText(Self.commandSelection(range, columns: emulator.cols), emulator: emulator)
+        }
+        guard let text, !text.isEmpty else { return }
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(text, forType: .string)
+        onCopy?(text)
+    }
+
+    @objc private func copyContextCommand(_ sender: NSMenuItem) {
+        guard let command = sender.representedObject as? TerminalCommandRegion else { return }
+        copyCommandText(command, range: \.inputRange)
+    }
+
+    @objc private func copyContextCommandOutput(_ sender: NSMenuItem) {
+        guard let command = sender.representedObject as? TerminalCommandRegion else { return }
+        copyCommandText(command, range: \.outputRange)
+    }
+
+    @objc private func selectContextCommandOutput(_ sender: NSMenuItem) {
+        guard let command = sender.representedObject as? TerminalCommandRegion else { return }
+        selectCommandOutput(command)
+    }
+
+    @objc private func findContextCommandOutput(_ sender: NSMenuItem) {
+        guard let command = sender.representedObject as? TerminalCommandRegion else { return }
+        beginCommandFind(command)
+    }
+
+    @objc private func previousFailedCommand(_ sender: NSMenuItem) { jumpToPreviousFailedCommand() }
+    @objc private func nextFailedCommand(_ sender: NSMenuItem) { jumpToNextFailedCommand() }
 
     // MARK: - Output trigger scanning
 
@@ -3561,16 +3751,15 @@ public final class HarnessTerminalSurfaceView: NSView {
     /// output feed on every build while the word selection is held (the stall the off-main pipeline
     /// exists to avoid). `Sendable` so the `@Sendable` build closure can capture it.
     private struct RawSelection: Sendable {
-        let anchorLine: Int, anchorColumn: Int
-        let headLine: Int, headColumn: Int
+        let anchor: TerminalTextAnchor
+        let head: TerminalTextAnchor
         let granularity: SelectionGranularity
         let rectangular: Bool
     }
 
     private var currentRawSelection: RawSelection? {
-        guard let a = selectionAnchor, let h = selectionHead else { return nil }
-        return RawSelection(anchorLine: a.line, anchorColumn: a.column,
-                            headLine: h.line, headColumn: h.column,
+        guard let anchor = selectionStartAnchor, let head = selectionEndAnchor else { return nil }
+        return RawSelection(anchor: anchor, head: head,
                             granularity: selectionGranularity, rectangular: selectionRectangular)
     }
 
@@ -3578,7 +3767,7 @@ public final class HarnessTerminalSurfaceView: NSView {
     /// coordinates and viewport rows. Mirror read on the off-main pipeline (same discipline as
     /// `scrollByContinuous`): mouse handlers must never `queue.sync` behind a busy parse.
     private var viewportTopBufferLine: Int {
-        (offMainParserFramePipelineEnabled ? historyCountMirror : emulatorState.emulator.historyCount)
+        historyCountMirror
             - scrollOffset
     }
 
@@ -3606,15 +3795,16 @@ public final class HarnessTerminalSurfaceView: NSView {
     }
 
     /// The selection region in ABSOLUTE buffer-line space: endpoints ordered, granularity
-    /// expansion applied, lines clamped to the retained buffer (a clamped endpoint after
-    /// scrollback eviction selects the oldest retained line — copy mode's convention). Shared
+    /// expansion applied. Evicted anchors invalidate the selection rather than selecting
+    /// unrelated retained text. Shared
     /// by rendering (rebased to viewport rows above) and extraction (read via `bufferLine`).
     private nonisolated static func resolveAbsoluteSelectionRegion(
         _ sel: RawSelection, emulator: TerminalEmulator, columns: Int
     ) -> SelectionRegion? {
         let maxLine = max(0, emulator.bufferLineCount - 1)
-        let a = (line: min(max(0, sel.anchorLine), maxLine), column: sel.anchorColumn)
-        let h = (line: min(max(0, sel.headLine), maxLine), column: sel.headColumn)
+        guard let start = sel.anchor.position, let end = sel.head.position else { return nil }
+        let a = (line: min(max(0, start.line), maxLine), column: start.column)
+        let h = (line: min(max(0, end.line), maxLine), column: end.column)
         if sel.rectangular {
             return .block(BlockSelection((a.line, a.column), (h.line, h.column)))
         }
@@ -3644,8 +3834,8 @@ public final class HarnessTerminalSurfaceView: NSView {
     }
 
     /// The active selection region in viewport rows (nil when nothing is selected), resolved
-    /// through the same pure resolver as the off-main build. Only the legacy (main-confined)
-    /// render path and copy actions read this; guards that just need "is something selected"
+    /// through the worker build's resolver. Copy actions read this; guards that only need
+    /// "is something selected"
     /// must check `selectionAnchor` instead — this getter can `emulatorSync`.
     private var currentSelectionRegion: SelectionRegion? {
         guard let raw = currentRawSelection else { return nil }
@@ -3657,9 +3847,9 @@ public final class HarnessTerminalSurfaceView: NSView {
     private func clearSelection() {
         selectionGranularity = .character
         selectionRectangular = false
-        guard selectionAnchor != nil || selectionHead != nil else { return }
-        selectionAnchor = nil
-        selectionHead = nil
+        guard selectionStartAnchor != nil || selectionEndAnchor != nil else { return }
+        selectionStartAnchor = nil
+        selectionEndAnchor = nil
         scheduleRender()
     }
 
@@ -4037,6 +4227,8 @@ public final class HarnessTerminalSurfaceView: NSView {
 
     /// Close the find bar: drop matches + highlights (the bar stays a host concern).
     public func endFind() {
+        findPosition = nil
+        findCommandScope = nil
         guard findActive else { return }
         findActive = false
         findQuery = ""
@@ -4052,6 +4244,7 @@ public final class HarnessTerminalSurfaceView: NSView {
     /// match mode (`options`). Empty clears matches.
     public func updateFind(query: String, options: TerminalBufferSearchOptions = .default) {
         findActive = true
+        findPosition = nil
         findQuery = query
         findOptions = options
         findCurrentIndex = 0
@@ -4073,14 +4266,16 @@ public final class HarnessTerminalSurfaceView: NSView {
         let cancellation = TerminalSearchCancellation()
         findCancellation = cancellation
         let query = findQuery, options = findOptions, revision = findContentRevision
+        let commandScope = findCommandScope
         onFindStatusChanged?("Searching…")
         let work = DispatchWorkItem { [weak self] in
             guard let self, !cancellation.isCancelled else { return }
-            let search: @Sendable (TerminalTextSnapshot) -> Void = { [weak self] snapshot in
+            let search: @Sendable (TerminalTextSnapshot, TerminalTextRange?) -> Void = { [weak self] snapshot, scope in
                 DispatchQueue.global(qos: .userInitiated).async { [weak self] in
                     guard !cancellation.isCancelled else { return }
                     let result = TerminalBufferSearch.search(query: query, options: options,
-                        lineCount: snapshot.lineCount, clusters: snapshot.clusters,
+                        lineCount: commandScope != nil && scope == nil ? 0 : snapshot.lineCount,
+                        clusters: snapshot.clusters, within: scope,
                         isWrapped: snapshot.isWrapped, cancelled: { cancellation.isCancelled }, line: snapshot.line)
                     DispatchQueue.main.async { [weak self] in
                         guard let self, !cancellation.isCancelled, self.findActive,
@@ -4088,8 +4283,13 @@ public final class HarnessTerminalSurfaceView: NSView {
                         switch result {
                         case let .matches(matches, limited):
                             self.findMatches = matches
+                            let position = self.findPosition?.position
                             self.findCurrentIndex = self.findTargetLine.flatMap { target in
                                 matches.firstIndex { $0.bufferLine == target }
+                            } ?? position.flatMap { position in
+                                matches.firstIndex { match in
+                                    match.spans.contains { $0.bufferLine == position.line && $0.columns.contains(position.column) }
+                                }
                             } ?? 0
                             self.findTargetLine = nil
                             if !matches.isEmpty { self.scrollToCurrentMatch() }
@@ -4103,9 +4303,9 @@ public final class HarnessTerminalSurfaceView: NSView {
                     }
                 }
             }
-            if self.offMainParserFramePipelineEnabled {
-                self.emulatorState.async { emulator in search(emulator.textSnapshot()) }
-            } else { search(self.emulatorState.emulator.textSnapshot()) }
+
+            self.emulatorState.async { emulator in search(emulator.textSnapshot(), commandScope?.outputRange) }
+
         }
         findDebounce = work
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.12, execute: work)
@@ -4114,6 +4314,7 @@ public final class HarnessTerminalSurfaceView: NSView {
 
     public func revealSearchResult(query: String, caseSensitive: Bool, line: Int, fingerprint: UInt64) -> Bool {
         guard let target = recordedSearchText(line: line, fingerprint: fingerprint) else { return false }
+        findCommandScope = nil
         findTargetLine = target.line
         updateFind(query: query, options: TerminalBufferSearchOptions(caseSensitive: caseSensitive))
         return true
@@ -4175,6 +4376,8 @@ public final class HarnessTerminalSurfaceView: NSView {
     /// Scroll so the current match sits a little below the top of the viewport (context above it).
     private func scrollToCurrentMatch() {
         guard findMatches.indices.contains(findCurrentIndex) else { return }
+        let match = findMatches[findCurrentIndex]
+        findPosition = trackTextPosition(line: match.bufferLine, column: match.columns.lowerBound)
         let line = findMatches[findCurrentIndex].bufferLine
         scrollToBufferLine(max(0, line - max(0, rows / 3)))
     }
@@ -4509,6 +4712,39 @@ public final class HarnessTerminalSurfaceView: NSView {
         let selectAllItem = NSMenuItem(title: "Select All", action: #selector(selectAll(_:)), keyEquivalent: "")
         selectAllItem.target = self
         menu.addItem(selectAllItem)
+        if let cell = cell(at: event.locationInWindow) {
+            let line = viewportTopBufferLine + cell.row
+            let context = emulatorSync { emulator -> (command: TerminalCommandRegion?, hasInput: Bool, hasOutput: Bool, hasFailures: Bool) in
+                let command = emulator.command(atBufferLine: line, column: cell.column)
+                return (command, command?.inputRange != nil, command?.outputRange != nil,
+                        emulator.commandRegions.contains { ($0.exitCode ?? 0) != 0 })
+            }
+            if let command = context.command, context.hasInput || context.hasOutput {
+                menu.addItem(.separator())
+                var actions: [(String, Selector)] = []
+                if context.hasInput { actions.append(("Copy Command", #selector(copyContextCommand(_:)))) }
+                if context.hasOutput {
+                    actions += [("Copy Output", #selector(copyContextCommandOutput(_:))),
+                                ("Select Output", #selector(selectContextCommandOutput(_:))),
+                                ("Find in Command Output", #selector(findContextCommandOutput(_:)))]
+                }
+                for (title, action) in actions {
+                    let item = NSMenuItem(title: title, action: action, keyEquivalent: "")
+                    item.target = self
+                    item.representedObject = command
+                    menu.addItem(item)
+                }
+            }
+            if context.hasFailures {
+                menu.addItem(.separator())
+                for (title, action) in [("Previous Failed Command", #selector(previousFailedCommand(_:))),
+                                        ("Next Failed Command", #selector(nextFailedCommand(_:)))] {
+                    let item = NSMenuItem(title: title, action: action, keyEquivalent: "")
+                    item.target = self
+                    menu.addItem(item)
+                }
+            }
+        }
         return menu
     }
 
@@ -4544,14 +4780,21 @@ public final class HarnessTerminalSurfaceView: NSView {
     /// columns, skipping the trailing spacer of wide chars, trailing whitespace trimmed, rows
     /// joined by \n.
     private nonisolated static func selectedText(_ sel: TerminalSelection, emulator: TerminalEmulator) -> String {
-        var lines: [String] = []
+        var text = ""
         for row in sel.startRow ... sel.endRow {
             let cells = emulator.bufferLine(row)
-            let startCol = (row == sel.startRow) ? sel.startColumn : 0
-            let endCol = (row == sel.endRow) ? sel.endColumn : cells.count - 1
-            lines.append(rowText(cells: cells, startCol: startCol, endCol: endCol, clusters: emulator.clusters))
+            let start = row == sel.startRow ? sel.startColumn : 0
+            var end = row == sel.endRow ? sel.endColumn : cells.count - 1
+            let continues = row < sel.endRow && emulator.isBufferLineWrapped(row)
+            if continues, cells.last == .blank, emulator.bufferLine(row + 1).first?.width == .wide {
+                end = min(end, cells.count - 2)
+            }
+            let segment = rowText(cells: cells, startCol: start, endCol: end,
+                                  clusters: emulator.clusters, ending: continues ? .soft : .hard)
+            text += segment
+            if row < sel.endRow && !continues { text += "\n" }
         }
-        return lines.joined(separator: "\n")
+        return text
     }
 
     /// Extract a rectangular (block) selection: the same column span on every line, joined by \n.
@@ -4563,7 +4806,10 @@ public final class HarnessTerminalSurfaceView: NSView {
 
     /// One buffer line's text over `[startCol, endCol]` (clamped to the line): drop wide-char
     /// spacer tails, blanks → space, trailing whitespace trimmed.
-    private nonisolated static func rowText(cells: [TerminalGridCell], startCol: Int, endCol: Int, clusters: [UInt32: String]) -> String {
+    private enum TextLineEnding { case soft, hard }
+
+    private nonisolated static func rowText(cells: [TerminalGridCell], startCol: Int, endCol: Int,
+                                           clusters: [UInt32: String], ending: TextLineEnding = .hard) -> String {
         var line = ""
         var col = max(0, startCol)
         let last = min(endCol, cells.count - 1)
@@ -4577,7 +4823,7 @@ public final class HarnessTerminalSurfaceView: NSView {
             }
             col += 1
         }
-        while line.hasSuffix(" ") { line.removeLast() }
+        if ending == .hard { while line.hasSuffix(" ") { line.removeLast() } }
         return line
     }
 
@@ -4587,11 +4833,6 @@ public final class HarnessTerminalSurfaceView: NSView {
     /// cursor at its end. Combining marks (Thai vowels/tones, accents) are folded onto the base
     /// cell — never given their own column — so composing Thai through the IME renders the same as
     /// committed text, instead of dropping vowels / exploding tone marks.
-    private func overlayPreedit(into frame: inout TerminalFrame) {
-        Self.applyPreedit(into: &frame, text: markedText, builder: frameBuilder,
-                          canvasForeground: canvasForeground, canvasBackground: canvasBackground)
-    }
-
     /// Per-row fingerprint of the cell-overlay pass (selection + find shading + IME preedit):
     /// what the pass paints on each row, hashed from the overlay GEOMETRY (no cell walks). Two
     /// builds whose fingerprints agree for a row shaded it identically, so the rows whose
@@ -4650,58 +4891,39 @@ public final class HarnessTerminalSurfaceView: NSView {
         return keys
     }
 
-    nonisolated private static func applyPreedit(
-        into frame: inout TerminalFrame,
-        text: String,
-        builder: FrameBuilder,
-        canvasForeground: RGBColor,
-        canvasBackground: RGBColor
+    nonisolated static func applyPreedit(
+        into frame: inout TerminalFrame, text: String, builder: FrameBuilder,
+        canvasForeground: HarnessTheme.RGBColor, canvasBackground: HarnessTheme.RGBColor
     ) {
         let row = frame.cursor.row
-        guard row >= 0, row < frame.rows else { return }
-        var col = frame.cursor.column
+        let start = frame.cursor.column
+        guard row >= 0, row < frame.rows, start >= 0, start < frame.columns else { return }
+        let layout = TerminalTextLayout(text: text, columns: frame.columns - start)
         let fg = builder.renderColor(canvasForeground)
         let bg = builder.renderColor(canvasBackground)
-        var lastBaseIdx: Int? = nil
-        for scalar in text.unicodeScalars {
-            // Zero-width scalar: fold a TRUE combining mark onto the preceding preedit base cell
-            // (mirrors the engine's attachCombining); drop a non-extending format scalar (ZWSP, BOM,
-            // bidi) so the cell's cluster stays one grapheme. Never advances the column.
-            if CharacterWidth.width(of: scalar) == 0 {
-                if scalar.properties.isGraphemeExtend, let bi = lastBaseIdx {
-                    if frame.cells[bi].combining0 == 0 { frame.cells[bi].combining0 = scalar.value }
-                    else if frame.cells[bi].combining1 == 0 { frame.cells[bi].combining1 = scalar.value }
-                }
-                continue
+        var nextClusterID: UInt32 = 0x7fff_ffff
+        for (offset, source) in layout.cells.enumerated() {
+            var combining1 = source.combining1
+            if source.clusterID != 0, let cluster = layout.clusters[source.clusterID] {
+                while frame.clusters[nextClusterID] != nil { nextClusterID -= 1 }
+                frame.clusters[nextClusterID] = cluster
+                combining1 = nextClusterID | 0x8000_0000
+                nextClusterID -= 1
             }
-            let width = max(1, CharacterWidth.width(of: scalar))
-            guard col >= 0, col + width <= frame.columns else { break }
-            let idx = row * frame.columns + col
-            guard idx >= 0, idx < frame.cells.count else { break }
-            frame.cells[idx].codepoint = scalar.value
-            frame.cells[idx].combining0 = 0
-            frame.cells[idx].combining1 = 0
-            frame.cells[idx].foreground = fg
-            frame.cells[idx].underline = .single
-            frame.cells[idx].width = (width == 2) ? .wide : .normal
-            // Preedit sits on the *canvas* background: reset the background to it and clear
-            // `drawBackground` (canvas cells draw no quad, so window translucency is preserved).
-            // Without this the cell kept whatever the overlay pass painted — composing over a
-            // selection or find hit rendered the preedit indistinguishable from highlighted text.
-            frame.cells[idx].background = bg
-            frame.cells[idx].drawBackground = false
-            // Mark the trailing cell of a wide composing glyph as its spacer.
-            if width == 2, idx + 1 < frame.cells.count {
-                frame.cells[idx + 1].codepoint = 0
-                frame.cells[idx + 1].width = .spacerTail
-                frame.cells[idx + 1].underline = .single
-                frame.cells[idx + 1].background = bg
-                frame.cells[idx + 1].drawBackground = false
+            frame.updateCell(row: row, column: start + offset) { cell in
+                cell.codepoint = source.codepoint
+                cell.combining0 = source.combining0
+                cell.combining1 = combining1
+                cell.foreground = fg; cell.background = bg
+                cell.underline = .single; cell.underlineColor = fg
+                cell.width = source.width
+                cell.bold = false; cell.italic = false; cell.blink = false
+                cell.strikethrough = false; cell.overline = false
+                cell.colorGlyphOpacity = 1
+                cell.drawBackground = false
             }
-            lastBaseIdx = idx
-            col += width
         }
-        frame.cursor.column = min(col, frame.columns - 1)
+        frame.cursor.column = min(start + layout.cells.count, frame.columns - 1)
     }
 
     // MARK: - Input
@@ -4826,7 +5048,7 @@ public final class HarnessTerminalSurfaceView: NSView {
         let eventType: KeyEventType = event.isARepeat ? .repeat : .press
 
         if let special = Self.specialKey(for: event) {
-            FrameSignposter.shared.noteKeystroke()
+            FrameSignposter.shared.noteKeystroke(source: ObjectIdentifier(self), outputGeneration: outputGeneration)
             emit(inputEncoder.encode(special, modifiers: mods, event: eventType, modes: modes))
             return
         }
@@ -4850,7 +5072,7 @@ public final class HarnessTerminalSurfaceView: NSView {
                 from: rawUnshifted,
                 controlPressed: mods.contains(.control)
             )
-            FrameSignposter.shared.noteKeystroke()
+            FrameSignposter.shared.noteKeystroke(source: ObjectIdentifier(self), outputGeneration: outputGeneration)
             emit(inputEncoder.encode(
                 text: unshifted,
                 shifted: event.characters,
@@ -5280,108 +5502,37 @@ public final class HarnessTerminalSurfaceView: NSView {
         return KeySpec(key: key, modifiers: modifiers)
     }
 
-    /// Render copy mode: the grid at the model's scroll offset, with selection / search
-    /// highlights and the copy-mode cursor, plus a status row. Returns false when not in
-    /// copy mode so `renderNow` falls through to the normal path.
-    private func renderCopyMode(renderer: TerminalMetalRenderer, drawable: CAMetalDrawable) -> Bool {
-        guard let cm = copyMode else { return false }
-        let emulator = emulatorState.emulator
-        let offset = cm.scrollbackOffset(historyCount: emulator.historyCount)
-        let grid = emulator.readGrid(scrollbackOffset: offset)
-        let region: SelectionRegion? = cm.viewportSelection(rows: rows, columns: columns).map { vs in
-            switch vs.kind {
-            case .linear:
-                return .linear(TerminalSelection((vs.startRow, vs.startColumn), (vs.endRow, vs.endColumn)))
-            case .block:
-                return .block(BlockSelection((vs.startRow, vs.startColumn), (vs.endRow, vs.endColumn)))
-            }
-        }
-        let hits = cm.viewportSearchHits(rows: rows).map { m in
-            TerminalSelection((m.line, m.startColumn), (m.line, max(m.startColumn, m.endColumn - 1)))
-        }
-        let reverseVideo = emulator.modes.reverseVideo
-        let builder = reverseVideo ? frameBuildConfiguration.makeBuilder(reverseVideo: true) : frameBuilder
-        let frameBuildStart = DispatchTime.now().uptimeNanoseconds
-        var frame = builder.build(grid, region: region, searchHighlights: hits,
-                                  copyModeCursor: cm.viewportCursor(rows: rows),
-                                  imageProvider: { emulator.image(for: $0) })
-        let frameBuildNanos = DispatchTime.now().uptimeNanoseconds &- frameBuildStart
-        let statusText = copyModeSearchEntry.map { (cm.search.reverse ? "?" : "/") + $0 } ?? cm.statusLine()
-        overlayCopyModeStatus(into: &frame, text: statusText)
-        let didPresent = renderer.present(
-            frame, to: drawable,
-            clearColor: builder.renderColor(reverseVideo ? canvasForeground : canvasBackground, alpha: canvasOpacity),
-            origin: (originOffsetX, originOffsetY), gamma: glyphGamma, ligatures: ligaturesEnabled,
-            frameBuildNanos: frameBuildNanos,
-            synchronizedWithTransaction: metalLayer.presentsWithTransaction
-        )
-        if didPresent { onRenderStats?(renderer.stats) }
-        return true
-    }
-
-    /// Draw the copy-mode status into the bottom frame row (mode, position, match count, or
-    /// the live search query) on an inverted band.
-    private func overlayCopyModeStatus(into frame: inout TerminalFrame, text: String) {
-        Self.applyCopyModeStatus(
-            into: &frame,
-            text: text,
-            builder: frameBuilder,
-            selectionBackground: selectionBackground,
-            canvasForeground: canvasForeground,
-            canvasBackground: canvasBackground
-        )
-    }
-
-    nonisolated private static func applyCopyModeStatus(
-        into frame: inout TerminalFrame,
-        text: String,
-        builder: FrameBuilder,
-        selectionBackground: RGBColor?,
-        canvasForeground: RGBColor,
-        canvasBackground: RGBColor
+    nonisolated static func applyCopyModeStatus(
+        into frame: inout TerminalFrame, text: String, builder: FrameBuilder,
+        selectionBackground: HarnessTheme.RGBColor?, canvasForeground: HarnessTheme.RGBColor, canvasBackground: HarnessTheme.RGBColor
     ) {
         let row = frame.rows - 1
         guard row >= 0, frame.columns > 0 else { return }
         let bandBg = builder.renderColor(selectionBackground ?? canvasForeground)
         let bandFg = builder.renderColor(canvasBackground)
+        let layout = TerminalTextLayout(text: text, columns: frame.columns)
+        var nextClusterID: UInt32 = 0x7fff_ffff
         for col in 0 ..< frame.columns {
-            let idx = row * frame.columns + col
-            frame.cells[idx].codepoint = 0x20
-            frame.cells[idx].foreground = bandFg
-            frame.cells[idx].background = bandBg
-            // The band is an opaque highlight, not the canvas color, so force its fill even
-            // though the underlying cell may have been built as a skippable canvas cell.
-            frame.cells[idx].drawBackground = true
-            frame.cells[idx].underlineColor = bandFg
-            frame.cells[idx].bold = false
-            frame.cells[idx].italic = false
-            frame.cells[idx].underline = .none
-            frame.cells[idx].strikethrough = false
-            frame.cells[idx].overline = false
-            frame.cells[idx].width = .normal
-            frame.cells[idx].combining0 = 0
-            frame.cells[idx].combining1 = 0
-        }
-        // Write the status text one base scalar per column, folding combining marks onto their base
-        // so a Thai search query renders correctly instead of exploding across the band.
-        var col = 0
-        var lastBaseIdx: Int? = nil
-        for scalar in text.unicodeScalars {
-            if CharacterWidth.width(of: scalar) == 0 {
-                // Fold a true combining mark onto the base; drop non-extending format scalars.
-                if scalar.properties.isGraphemeExtend, let bi = lastBaseIdx {
-                    if frame.cells[bi].combining0 == 0 { frame.cells[bi].combining0 = scalar.value }
-                    else if frame.cells[bi].combining1 == 0 { frame.cells[bi].combining1 = scalar.value }
-                }
-                continue
+            let source = col < layout.cells.count ? layout.cells[col] : .blank
+            var combining1 = source.combining1
+            if source.clusterID != 0, let cluster = layout.clusters[source.clusterID] {
+                while frame.clusters[nextClusterID] != nil { nextClusterID -= 1 }
+                frame.clusters[nextClusterID] = cluster
+                combining1 = nextClusterID | 0x8000_0000
+                nextClusterID -= 1
             }
-            guard col < frame.columns else { break }
-            let idx = row * frame.columns + col
-            frame.cells[idx].codepoint = scalar.value
-            lastBaseIdx = idx
-            col += 1
+            frame.updateCell(row: row, column: col) { cell in
+                cell.codepoint = source.codepoint == 0 && source.width != .spacerTail ? 0x20 : source.codepoint
+                cell.foreground = bandFg; cell.background = bandBg
+                cell.drawBackground = true; cell.underlineColor = bandFg
+                cell.bold = false; cell.italic = false; cell.underline = .none; cell.blink = false
+                cell.strikethrough = false; cell.overline = false; cell.colorGlyphOpacity = 1
+                cell.width = source.width
+                cell.combining0 = source.combining0; cell.combining1 = combining1
+            }
         }
     }
+
 }
 
 // MARK: - NSTextInputClient (dead keys + IME)
@@ -5399,7 +5550,7 @@ extension HarnessTerminalSurfaceView: @preconcurrency NSTextInputClient {
         let text = plainString(string)
         guard !text.isEmpty else { scheduleRender(); return }
         // Plain typing reaches the PTY here (via interpretKeyEvents), not in keyDown.
-        FrameSignposter.shared.noteKeystroke()
+        FrameSignposter.shared.noteKeystroke(source: ObjectIdentifier(self), outputGeneration: outputGeneration)
         emit(inputEncoder.encode(text: text))
         scheduleRender()
     }

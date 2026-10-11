@@ -75,20 +75,6 @@ struct RowSegment {
     var deco: Range<Int>
 }
 
-struct CursorCacheKey: Equatable {
-    var row: Int
-    var column: Int
-    var visible: Bool
-    var style: CursorStyle
-    var textColor: RenderColor
-    var hollow: Bool
-
-    /// A solid block inverts the glyph under it for legibility; a hollow (unfocused) block does
-    /// not — the cell shows through the outline. So a focus change flips this, which dirties the
-    /// cursor row below (via `previousCursor != cursorKey`) and re-renders the glyph correctly.
-    var invertsGlyph: Bool { visible && style == .block && !hollow }
-}
-
 struct RowInstanceCache {
     var columns = 0
     var rows = 0
@@ -102,7 +88,6 @@ struct RowInstanceCache {
     var cellPixelWidth = 0
     var cellPixelHeight = 0
     var rowInstances: [EncodedRowInstances?] = []
-    var previousCursor: CursorCacheKey?
     /// The SGR blink phase the cached rows were encoded under; a mismatch with the
     /// renderer's current phase dirties exactly the `hasBlink` rows.
     var textBlinkHidden = false
@@ -139,10 +124,17 @@ struct GlyphInstance {
     var size: SIMD2<Float>
     var uvOrigin: SIMD2<Float>
     var uvSize: SIMD2<Float>
-    /// Must mirror Metal `GlyphInstance.pageIndex` (uint@32, padding to color@48).
+    /// Must mirror Metal layout: pageIndex@32, cellOrigin@40, color@48 (stride 64).
     /// The high bit selects the intrinsic-color atlas; the remaining bits select its page.
     var pageIndex: UInt32
+    /// Source cell before glyph bearings, retained for cursor inversion of a wide glyph.
+    var cellOrigin: SIMD2<Float>
     var color: SIMD4<Float>
+}
+
+struct CursorGlyphOverlay {
+    var bounds: SIMD4<Float>
+    var textColor: SIMD4<Float>
 }
 
 /// Procedural line decoration (underline family / strikethrough / overline). Field order +

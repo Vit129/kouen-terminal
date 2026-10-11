@@ -1,0 +1,26 @@
+{
+  "label": "baseline-focused-100x30",
+  "focus": "Terminal clicked through native UI before settle; cursor blinking enabled",
+  "settle_seconds": 30,
+  "sample_seconds": 60.041811499999994,
+  "processes": [
+    {
+      "role": "app",
+      "pid": 85338,
+      "one_core_cpu_percent": 0.04996518134700188,
+      "rss_bytes": 134643712
+    },
+    {
+      "role": "daemon",
+      "pid": 85344,
+      "one_core_cpu_percent": 0.21651578583700795,
+      "rss_bytes": 28835840
+    },
+    {
+      "role": "host",
+      "pid": 85341,
+      "one_core_cpu_percent": 0.1665506044900061,
+      "rss_bytes": 25837568
+    }
+  ]
+}

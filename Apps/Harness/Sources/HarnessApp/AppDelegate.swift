@@ -29,7 +29,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         HarnessTerminalSurfaceView.warmRenderer()
         ThemeLibrary.reload()
         // Build the UI immediately so launch never blocks on the daemon. The
-        // coordinator starts from a default snapshot and repopulates the moment
+        // coordinator starts from an empty snapshot and repopulates the moment
         // the daemon answers (below) — no frozen window, no modal timeout dialog.
         openWindow(showing: nil)
         StartupMetrics.shared.mark(.firstWindow)
@@ -48,7 +48,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         installContextClickFocus()
         PaletteShortcuts.shared.reload()
         QuickTerminalController.shared.start()
-        SurfaceShellTracker.shared.start()
         // Secure keyboard entry: take the process-global keylogging lock while frontmost iff the
         // user enabled it. Observes app-active transitions and releases the lock on resign/terminate.
         SecureKeyboardEntry.shared.start()
@@ -145,14 +144,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// one (placed at `origin` when given, else cascaded from the key window). nil opens a
     /// window that follows the active session (the first window at launch).
     @discardableResult
-    func openWindow(showing session: SessionID?, owner: String = DaemonSidebar.localID, at origin: NSPoint? = nil) -> NSWindow? {
+    func openWindow(showing session: SessionID?, owner: String = DaemonSidebar.localID, at origin: NSPoint? = nil,
+                    restoring frame: NSRect? = nil) -> NSWindow? {
         if let session, let existing = WindowContexts.window(showing: session) {
             existing.makeKeyAndOrderFront(nil)
             return existing
         }
         let controller = MainWindowController(sessionID: session, owner: owner)
         guard let window = controller.window else { return nil }
-        if let origin {
+        if let frame, frame.width >= window.minSize.width, frame.height >= window.minSize.height,
+           NSScreen.screens.contains(where: { $0.visibleFrame.intersects(frame) }) {
+            window.setFrame(frame, display: false)
+        } else if let origin {
             window.setFrameTopLeftPoint(origin)
         } else if let key = NSApp.keyWindow, windowControllers.contains(where: { $0.window === key }) {
             window.setFrameTopLeftPoint(window.cascadeTopLeft(from: NSPoint(x: key.frame.minX, y: key.frame.maxY)))
@@ -195,7 +198,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         coordinator.createSession(in: workspace, cwd: cwd, name: name) { [weak self] session in
             guard let session else { return }
             self?.openWindow(showing: session, owner: owner)
-            SurfaceShellTracker.shared.bumpScan()
         }
     }
 
@@ -284,12 +286,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // The first window already shows the active session.
         let active = SessionCoordinator.shared.activeOwner == owner ? snapshot.activeWorkspace?.activeSessionID : nil
         for entry in entries where sessions.contains(entry.session) && entry.session != active {
-            guard WindowContexts.window(showing: entry.session) == nil,
-                  let window = openWindow(showing: entry.session, owner: owner) else { continue }
-            let frame = NSRectFromString(entry.frame)
-            if frame.width >= window.minSize.width, NSScreen.screens.contains(where: { $0.visibleFrame.intersects(frame) }) {
-                window.setFrame(frame, display: false)
-            }
+            guard WindowContexts.window(showing: entry.session) == nil else { continue }
+            openWindow(showing: entry.session, owner: owner, restoring: NSRectFromString(entry.frame))
         }
         front?.makeKeyAndOrderFront(nil)
     }

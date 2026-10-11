@@ -104,7 +104,7 @@ final class OwnershipDaemonTests: XCTestCase {
         }
         defer { desktop.cancel() }
         desktop.resize(target.surfaceID, rows: 40, cols: 120, takeOwnership: true)
-        let mobile = try client.attachStream(AttachRequest(surfaceID: target.surfaceID), onAttached: { _ in }, onData: { _, _ in }, onError: { XCTFail($0) })
+        let mobile = try client.attachStream(AttachRequest(surfaceID: target.surfaceID), onAttached: { _, _ in }, onData: { _, _, _ in }, onError: { XCTFail($0) })
         defer { mobile.cancel() }
         mobile.resize(target.surfaceID, rows: 15, cols: 50, takeOwnership: true)
         usleep(200_000)

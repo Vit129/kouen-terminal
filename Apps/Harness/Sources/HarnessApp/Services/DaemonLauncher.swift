@@ -11,7 +11,7 @@ import HarnessCore
 /// start; debug builds and launchd failures fall back to a directly-spawned child.
 ///
 /// **Startup must never block the main thread.** `ensureRunning(then:)` runs the
-/// whole discover→install→poll dance on a background queue and calls back on the
+/// whole discovery and readiness wait on a background queue and calls back on the
 /// main thread once the daemon answers (or gives up). The strategy is
 /// *launchd-first in release*: if a quick ping fails we install/bootstrap the
 /// LaunchAgent and let launchd bring the daemon up, so it is launchd-owned and
@@ -22,11 +22,12 @@ import HarnessCore
 /// the fallback only when launchd cannot bring one up — and is the normal path in
 /// DEBUG, which skips the LaunchAgent entirely.
 ///
-/// @unchecked Sendable: launch/poll state is confined to the serial `queue`.
+/// @unchecked Sendable: launch state is confined to the serial `queue`.
 final class DaemonLauncher: @unchecked Sendable {
     static let shared = DaemonLauncher()
 
     private var fallbackProcess: Process?
+    private var refreshedAfterPrompt = false
     private let queue = DispatchQueue(label: "com.robert.harness.daemon-launcher")
     private let upgradeLock = NSLock()
     private var upgrade: DaemonUpgrade?
@@ -62,8 +63,11 @@ final class DaemonLauncher: @unchecked Sendable {
     /// main thread with `true` if the daemon answers. Safe to call at launch — the
     /// UI can build immediately and refresh from the callback.
     func ensureRunning(then completion: @escaping @MainActor (Bool) -> Void = { _ in }) {
+        StartupMetrics.shared.mark(.daemonReadinessEnqueued)
         queue.async { [weak self] in
+            StartupMetrics.shared.mark(.daemonReadinessStarted)
             let ok = self?.ensureRunningBlocking() ?? false
+            StartupMetrics.shared.mark(.daemonReadinessCompleted)
             DispatchQueue.main.async { MainActor.assumeIsolated { completion(ok) } }
         }
     }
@@ -74,7 +78,10 @@ final class DaemonLauncher: @unchecked Sendable {
             do {
                 _ = try DaemonRestart.stop(force: force)
                 #if !DEBUG
-                if !HarnessPaths.hasHomeOverride { _ = self?.installLaunchAgentIfPossible(activateChanges: true) }
+                if !HarnessPaths.hasHomeOverride {
+                    self?.refreshInstalledBinaries()
+                    _ = self?.installLaunchAgentIfPossible(activateChanges: true)
+                }
                 #endif
                 failure = self?.ensureRunningBlocking() == true ? nil : "The replacement is not ready. Inspect the session-service logs."
             } catch { failure = String(describing: error) }
@@ -87,10 +94,6 @@ final class DaemonLauncher: @unchecked Sendable {
     func ensureRunningBlocking() -> Bool {
         #if !DEBUG
         var adoptServiceChanges = false
-        #endif
-        // Refresh only the on-disk candidates. A running daemon retains its executable inode.
-        #if !DEBUG
-        if !HarnessPaths.hasHomeOverride { refreshInstalledBinaries() }
         #endif
         if let stats = daemonStats(timeout: 0.4) {
             if stats.shutdownPending == true { setUpgrade(DaemonUpgrade(stats: stats)); return false }
@@ -128,14 +131,19 @@ final class DaemonLauncher: @unchecked Sendable {
         // daemon underneath a launchd service that then retries every throttle
         // interval.
         #if !DEBUG
-        if !HarnessPaths.hasHomeOverride, installLaunchAgentIfPossible(activateChanges: adoptServiceChanges), pollUntilResponding(timeoutSeconds: 4) { return true }
+        if !HarnessPaths.hasHomeOverride {
+            // With no live owner, boot the bundled version rather than starting a stale
+            // installed helper that cannot reach the prompt which normally defers refresh.
+            refreshInstalledBinaries()
+            if installLaunchAgentIfPossible(activateChanges: adoptServiceChanges), waitUntilResponding(timeoutSeconds: 4) { return true }
+        }
         #endif
 
         // A service may be slow to start. Recheck ownership before considering a fallback.
         if case .alive = DaemonOwnership.probe() { return false }
         if case .uncertain = DaemonOwnership.probe() { return false }
         spawnFallbackProcess()
-        if pollUntilResponding(timeoutSeconds: 3) { return true }
+        if waitUntilResponding(timeoutSeconds: 3) { return true }
         return false
     }
 
@@ -152,23 +160,35 @@ final class DaemonLauncher: @unchecked Sendable {
         return stats
     }
 
-    private func pollUntilResponding(timeoutSeconds: Double) -> Bool {
-        let deadline = Date().addingTimeInterval(timeoutSeconds)
-        while Date() < deadline {
-            if let stats = daemonStats(timeout: 0.3) {
+    private func waitUntilResponding(timeoutSeconds: Double) -> Bool {
+        let ready = DispatchSemaphore(value: 0)
+        let watcher = FileWatcher(url: HarnessPaths.socketURL, debounce: .milliseconds(0),
+            callbackQueue: DispatchQueue.global(qos: .utility)) { ready.signal() }
+        defer { withExtendedLifetime(watcher) {} }
+        let deadline = DispatchTime.now() + timeoutSeconds
+        repeat {
+            if let stats = daemonStats(timeout: min(timeoutSeconds, 1)) {
                 setUpgrade(stats.updateAvailable || stats.compatibility != .compatible
                     ? DaemonUpgrade(stats: stats) : nil)
                 return stats.compatibility == .compatible
             }
             if daemonResponds(timeout: 0.2) { setUpgrade(DaemonUpgrade(stats: nil)); return false }
-            // Thread.sleep is preferred over usleep here: both park the calling thread for
-            // 100 ms, but Thread.sleep carries clearer intent and integrates better with the
-            // Swift runtime's thread accounting. These polls run exclusively on `queue` — a
-            // private serial DispatchQueue — so blocking its one worker thread for up to ~4 s
-            // is intentional and bounded; no other work is queued behind them.
-            Thread.sleep(forTimeInterval: 0.1)
+        } while ready.wait(timeout: deadline) == .success && DispatchTime.now() < deadline
+        // bind() publishes the pathname before listen() accepts connections. Socket
+        // readiness can advance after the last filesystem event, so verify once more.
+        guard let stats = daemonStats(timeout: 0.3) else { return false }
+        setUpgrade(stats.updateAvailable || stats.compatibility != .compatible ? DaemonUpgrade(stats: stats) : nil)
+        return stats.compatibility == .compatible
+    }
+
+    func firstPromptReady() {
+        #if !DEBUG
+        queue.async { [weak self] in
+            guard let self, !refreshedAfterPrompt, !HarnessPaths.hasHomeOverride else { return }
+            refreshedAfterPrompt = true
+            refreshInstalledBinaries()
         }
-        return false
+        #endif
     }
 
     private func installLaunchAgentIfPossible(activateChanges: Bool = false) -> Bool {
@@ -205,24 +225,18 @@ final class DaemonLauncher: @unchecked Sendable {
         }
     }
 
-    /// Refresh the installed `bin/` daemon + CLI from this app bundle so an app update actually
-    /// advances the launchd-supervised daemon and the on-PATH CLI (issue #60 — Sparkle replaces
-    /// the bundle copies, never these). Only refreshes copies an installer already created, and
-    /// only when bytes differ, so the common up-to-date case is just a content compare and the
-    /// refresh is independent of whether the running daemon can be replaced.
+    /// Refresh installed helpers after the first prompt. Unchanged signed bundles
+    /// keep their executable inodes; running services adopt candidates on restart.
     private func refreshInstalledBinaries() {
-        let owner = bundledBinaryURL(named: "HarnessSessionHost")
-        if let owner, FileManager.default.fileExists(atPath: BinaryRefresher.installedDaemonPath.path) {
-            try? BinaryRefresher.copyExecutable(from: owner, to: BinaryRefresher.installedSessionHostPath)
+        if let owner = bundledBinaryURL(named: "HarnessSessionHost"),
+           FileManager.default.fileExists(atPath: BinaryRefresher.installedDaemonPath.path) {
+            do { try BinaryRefresher.copyExecutable(from: owner, to: BinaryRefresher.installedSessionHostPath) }
+            catch { fputs("Harness: session-host refresh failed: \(error)\n", harnessStderr) }
         }
-        _ = try? BinaryRefresher.refreshIfChanged(
-            source: bundledBinaryURL(named: "HarnessDaemon"),
-            destination: BinaryRefresher.installedDaemonPath
-        )
-        _ = try? BinaryRefresher.refreshIfChanged(
-            source: bundledBinaryURL(named: "harness-cli"),
-            destination: BinaryRefresher.installedCLIPath
-        )
+        for (name, destination) in [("HarnessDaemon", BinaryRefresher.installedDaemonPath), ("harness-cli", BinaryRefresher.installedCLIPath)] {
+            do { try BinaryRefresher.refreshIfChanged(source: bundledBinaryURL(named: name), destination: destination) }
+            catch { fputs("Harness: \(name) refresh failed: \(error)\n", harnessStderr) }
+        }
     }
 
     /// A binary shipped next to the app executable (`Contents/MacOS/`), where the release
@@ -235,7 +249,7 @@ final class DaemonLauncher: @unchecked Sendable {
 
     /// The daemon the LaunchAgent should supervise: the installed AppSupport copy when present
     /// (canonical — what onboarding/`harness-cli install` write, survives the app moving, and
-    /// just refreshed above in release), else wherever the bundle/dev daemon lives. DEBUG keeps
+    /// refreshed after the first prompt), else wherever the bundle/dev daemon lives. DEBUG keeps
     /// the bundle/dev path so the Xcode loop restarts into the freshly built daemon, not a
     /// previously installed release copy.
     private func launchAgentDaemonTarget() -> URL? {

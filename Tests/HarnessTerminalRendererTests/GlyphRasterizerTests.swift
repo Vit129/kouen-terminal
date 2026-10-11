@@ -4,6 +4,41 @@ import XCTest
 @testable import HarnessTerminalRenderer
 
 final class GlyphRasterizerTests: XCTestCase {
+    func testFontFeaturesReachShapingAndDoNotChangeCellMetrics() throws {
+        let plain = TerminalFontResolver.resolve(fontFamily: "Times", size: 16)
+        let configured = TerminalFontResolver.resolve(fontFamily: "Times", size: 16, features: ["liga": 0])
+        let normal = GlyphRasterizer(resolvedFont: plain)
+        let disabled = GlyphRasterizer(resolvedFont: configured)
+        XCTAssertEqual(normal.metrics(), disabled.metrics())
+        XCTAssertEqual(disabled.shape("fi", bold: false, italic: false).count, 2)
+        XCTAssertLessThan(normal.shape("fi", bold: false, italic: false).count, 2)
+        XCTAssertNotNil(disabled.rasterize(codepoint: 65))
+        XCTAssertNotNil(disabled.rasterize(cluster: "ที่"))
+    }
+
+    func testConfiguredFallbackOrderReachesCoreText() throws {
+        let resolved = TerminalFontResolver.resolve(fontFamily: "Menlo", size: 16,
+                                                   fallbackFamilies: ["Missing Harness Font", "Hiragino Sans", "Apple Color Emoji"])
+        let font = TerminalFontResolver.makeFont(from: resolved)
+        let descriptors = try XCTUnwrap(CTFontCopyAttribute(font, kCTFontCascadeListAttribute) as? [CTFontDescriptor])
+        let families = descriptors.map { CTFontCopyFamilyName(CTFontCreateWithFontDescriptor($0, 16, nil)) as String }
+        XCTAssertEqual(families, ["Hiragino Sans", "Apple Color Emoji"])
+    }
+
+    func testFallbackFontsFitThePrimaryBaselineAndLineBox() throws {
+        let rasterizer = GlyphRasterizer(fontFamily: "Menlo", size: 16)
+        let metrics = rasterizer.metrics()
+        for text in ["漢", "ที่", "😀"] {
+            let shaped = rasterizer.shape(text, bold: false, italic: false)
+            XCTAssertFalse(shaped.isEmpty, text)
+            for glyph in shaped {
+                let bitmap = try XCTUnwrap(rasterizer.rasterize(glyph: glyph.glyph, font: glyph.font), text)
+                XCTAssertLessThanOrEqual(bitmap.bearingY, Int(ceil(metrics.ascent * 2)) + 1, text)
+                XCTAssertLessThanOrEqual(bitmap.height - bitmap.bearingY, Int(ceil(metrics.descent * 2)) + 1, text)
+            }
+        }
+    }
+
     func testColorEmojiRasterizeWithIntrinsicColorsIncludingCompoundClusters() throws {
         let rasterizer = GlyphRasterizer(fontFamily: "Menlo", size: 16, scale: 2)
         for text in ["😀", "👩🏽‍💻", "🇺🇸", "❤️"] {

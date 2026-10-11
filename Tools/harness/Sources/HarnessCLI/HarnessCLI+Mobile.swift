@@ -259,10 +259,10 @@ final class MobileBridge: @unchecked Sendable {
         stateLock.lock(); generation = id; currentAttach = attach; stateLock.unlock()
         let request = AttachRequest(surfaceID: attach.address.surfaceID, label: "Harness Remote", readOnly: attach.readOnly,
             history: attach.fromSequence != nil, fromSequence: attach.fromSequence, epoch: attach.epoch, inputErrors: true, screenOnResync: true, checkpoint: true)
-        let subscription = try client.attachStream(request, onAttached: { [weak self] reply in
+        let subscription = try client.attachStream(request, onAttached: { [weak self] reply, _ in
             guard let self, self.isCurrent(id) else { return }
             self.emit(.attached(RemoteAttached(epoch: reply.epoch, resync: reply.resync, endSequence: reply.endSequence, screen: reply.screen, checkpoint: reply.checkpoint, inputErrors: reply.inputErrors == true)))
-        }, onData: { [weak self] data, sequence in
+        }, onData: { [weak self] data, sequence, _ in
             guard let self, self.isCurrent(id) else { return }
             self.emit(.output(RemoteOutput(surfaceID: attach.address.surfaceID, sequence: sequence, data: data)))
         }, onOwnership: { [weak self] owner in

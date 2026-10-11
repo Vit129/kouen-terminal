@@ -5,35 +5,38 @@ final class DaemonStatsTests: XCTestCase {
     func testProtocolCompatibilityDoesNotDependOnBuildOrder() throws {
         XCTAssertEqual(DaemonOwnership.normalizeLinuxExecutablePath("/opt/harness/HarnessDaemon (deleted)"), "/opt/harness/HarnessDaemon")
         XCTAssertEqual(DaemonOwnership.normalizeLinuxExecutablePath("/opt/harness/HarnessDaemon"), "/opt/harness/HarnessDaemon")
-        func stats(build: Int?, protocolLevel: Int?, capabilities: [String]? = nil) -> DaemonStats {
+        func stats(build: Int?, protocolLevel: Int?, capabilities: [String]? = [DaemonStats.acknowledgedOutput]) -> DaemonStats {
             DaemonStats(pid: 1, uptimeSeconds: 0, surfaceCount: 2, totalScrollbackBytes: 0,
                         clientCount: 0, subscriberCount: 0, snapshotRevision: 0,
                         build: build, capabilities: capabilities, protocolLevel: protocolLevel)
         }
         for build in [1, HarnessVersion.build, 99999] {
-            XCTAssertEqual(stats(build: build, protocolLevel: 1).compatibility, .compatible)
+            XCTAssertEqual(stats(build: build, protocolLevel: HarnessVersion.protocolLevel).compatibility, .compatible)
             XCTAssertEqual(stats(build: build, protocolLevel: 0).compatibility, .incompatible)
-            XCTAssertEqual(stats(build: build, protocolLevel: 2).compatibility, .incompatible)
+            XCTAssertEqual(stats(build: build, protocolLevel: HarnessVersion.protocolLevel + 1).compatibility, .incompatible)
         }
+        XCTAssertEqual(stats(build: HarnessVersion.build, protocolLevel: 1).compatibility, .incompatible)
+        XCTAssertEqual(stats(build: HarnessVersion.build, protocolLevel: HarnessVersion.protocolLevel, capabilities: [DaemonStats.attachStream]).compatibility, .incompatible)
         XCTAssertEqual(stats(build: nil, protocolLevel: nil).compatibility, .unknown)
         XCTAssertEqual(stats(build: 99999, protocolLevel: nil).compatibility, .unknown)
         XCTAssertEqual(stats(build: 132, protocolLevel: nil,
-                             capabilities: [DaemonStats.attachStream]).compatibility, .compatible)
+                             capabilities: [DaemonStats.attachStream]).compatibility, .unknown)
         XCTAssertEqual(stats(build: 133, protocolLevel: nil,
                              capabilities: [DaemonStats.attachStream]).compatibility, .unknown)
-        XCTAssertTrue(stats(build: HarnessVersion.build, protocolLevel: 1,
+        XCTAssertTrue(stats(build: HarnessVersion.build, protocolLevel: HarnessVersion.protocolLevel,
                             capabilities: [DaemonStats.attachStream]).updateAvailable,
                       "a same-build daemon missing capabilities must show the pending update")
-        XCTAssertFalse(stats(build: HarnessVersion.build, protocolLevel: 1,
+        XCTAssertFalse(stats(build: HarnessVersion.build, protocolLevel: HarnessVersion.protocolLevel,
                              capabilities: DaemonStats.currentCapabilities).updateAvailable)
-        let roundTrip = try JSONDecoder().decode(DaemonStats.self, from: JSONEncoder().encode(stats(build: 1, protocolLevel: 1)))
-        XCTAssertEqual(roundTrip.protocolLevel, 1)
-        var owner = stats(build: HarnessVersion.build, protocolLevel: 1, capabilities: DaemonStats.currentCapabilities)
+        let roundTrip = try JSONDecoder().decode(DaemonStats.self, from: JSONEncoder().encode(stats(build: 1, protocolLevel: HarnessVersion.protocolLevel)))
+        XCTAssertEqual(roundTrip.protocolLevel, HarnessVersion.protocolLevel)
+        var owner = stats(build: HarnessVersion.build, protocolLevel: HarnessVersion.protocolLevel, capabilities: DaemonStats.currentCapabilities)
         owner.sessionHostPID = 2; owner.sessionHostBuild = HarnessVersion.build
         XCTAssertTrue(owner.sessionHostUpdateAvailable, "An old host with unknown worker protocol needs an owner update even at the same build")
         owner.sessionHostProtocolLevel = DaemonStats.currentSessionHostProtocolLevel
         XCTAssertFalse(owner.sessionHostUpdateAvailable)
         owner.sessionHostProtocolLevel = DaemonStats.currentSessionHostProtocolLevel - 1
+        XCTAssertEqual(owner.compatibility, .incompatible)
         XCTAssertTrue(owner.sessionHostUpdateAvailable)
         owner.surfaceCount = 0; owner.pipeConsumerCount = 1
         XCTAssertFalse(owner.mayRestartWithoutInterruption, "A pending pipe drain is still owned work")

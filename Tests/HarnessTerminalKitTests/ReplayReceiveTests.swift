@@ -3,7 +3,7 @@ import XCTest
 @testable import HarnessTerminalKit
 
 /// #168 at the kit layer: `receive(_:replay:)` must bracket exactly the replayed chunk's feed
-/// with `isReplaying` on the emulator's serialized context, in BOTH pipelines — replayed
+/// with `isReplaying` on the emulator's serialized context, on the worker — replayed
 /// queries emit nothing on `onInput`, while live queries before and after keep answering.
 @MainActor
 final class ReplayReceiveTests: XCTestCase {
@@ -15,31 +15,24 @@ final class ReplayReceiveTests: XCTestCase {
         }
     }
 
-    private func runSuppressionCheck(offMain: Bool) async {
-        let view = HarnessTerminalSurfaceView(offMainParserFramePipeline: offMain)
+    func testReplayReceiveSuppressesQueries() async {
+        let view = HarnessTerminalSurfaceView()
         var emitted: [String] = []
         view.onInput = { emitted.append(String(decoding: $0, as: UTF8.self)) }
 
         view.receive("history line\r\n" + Self.query + "more history\r\n", replay: true)
         view.testingWaitForEmulatorIdle()
         await drainMainQueue()
-        XCTAssertTrue(emitted.isEmpty, "replayed queries leaked to the PTY (offMain=\(offMain)): \(emitted)")
+        XCTAssertTrue(emitted.isEmpty, "replayed queries leaked to the PTY: \(emitted)")
 
         view.receive(Self.query)
         view.testingWaitForEmulatorIdle()
         await drainMainQueue()
-        XCTAssertFalse(emitted.isEmpty, "live queries must answer after a replay (offMain=\(offMain))")
+        XCTAssertFalse(emitted.isEmpty, "live queries must answer after a replay")
 
         // The replayed content itself must have landed.
         let grid = view.testingReadGridSnapshot()
         XCTAssertEqual(grid.cell(row: 0, col: 0)?.codepoint, Unicode.Scalar("h").value)
     }
 
-    func testReplayReceiveSuppressesQueriesSyncPipeline() async {
-        await runSuppressionCheck(offMain: false)
-    }
-
-    func testReplayReceiveSuppressesQueriesOffMainPipeline() async {
-        await runSuppressionCheck(offMain: true)
-    }
 }

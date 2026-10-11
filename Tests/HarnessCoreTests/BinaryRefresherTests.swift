@@ -30,7 +30,10 @@ final class BinaryRefresherTests: XCTestCase {
         let running = Process(); running.executableURL = destination
         try running.run(); running.waitUntilExit(); XCTAssertEqual(running.terminationStatus, 0)
         var original = try Data(contentsOf: destination)
+        let installedInode = try inode(destination)
         XCTAssertFalse(try BinaryRefresher.refreshIfChanged(source: executable, destination: destination))
+        try BinaryRefresher.copyExecutable(from: executable, to: destination)
+        XCTAssertEqual(try inode(destination), installedInode, "An unchanged verified helper keeps its executable inode")
         let renewedProfile = Data("renewed opaque profile fixture".utf8)
         try renewedProfile.write(to: bundle.appendingPathComponent("Contents/embedded.provisionprofile"))
         let renewal = Process(); renewal.executableURL = signing.executableURL; renewal.arguments = signing.arguments

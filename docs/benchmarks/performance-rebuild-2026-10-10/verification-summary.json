@@ -1,0 +1,23 @@
+{
+  "source_sha256": "59285da821de96f23043dba9979401881361c9cee4728ca857940af758ecbada",
+  "workflow": "one full live-enabled run; repair affected classes and complete daemon classes skipped by expectation-overfulfill crash; final resize-only rerun",
+  "xctest_passed": 2381,
+  "xctest_skipped": 63,
+  "unresolved_failures": [],
+  "swift_testing_passed": 6,
+  "logs": [
+    "swift-test-final.log",
+    "swift-test-remaining-repair.log",
+    "swift-test-resize-repair.log",
+    "swift-test-autorelease.log",
+    "swift-test-startup-final.log",
+    "swift-test-drawable-main-fix.log",
+    "swift-test-drawable-ordering-final.log"
+  ],
+  "linux": "Locked arm64 Swift6.0.3 release and dependency checks passed after final sharedCore layout RPC change. Later changes are macOS-only Kit and a CLI comment; shared Linux functional code unchanged. Local Colima stopped.",
+  "xcode": "Final Harness Debug scheme passes after complete drawable/order repair",
+  "project_sha256": "66e0ced84a8fb48ba2285ecd67497c6e44d8d526b0709a4a9f41f8bff278cc63",
+  "mac_release": "Final macOS release build passed in70.52s; isolated bundle packaged and ad-hoc signed",
+  "final_graphics_check": "66 affected terminal tests plus actual cursor pixel-parity pass after asynchronous forced/repaint presentation and stale-frame ordering repair; visual assertions unchanged",
+  "final_startup_check": "16 existing DaemonClient, DaemonSessionService and StartupMetrics tests pass after removing the redundant layout health probe"
+}

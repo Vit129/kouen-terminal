@@ -48,6 +48,7 @@ final class TranscriptUsageService: @unchecked Sendable {
     private var serviceFailure: String?
     private var lastPrune = Date.distantPast
     private var nextBindingIndex = 0
+    var onChange: (@Sendable () -> Void)?
     init(store: ActivityStore, hostID: UUID, warm: Bool, settings: ActivitySettings = HarnessSettings.load().activity) {
         self.store = store; self.hostID = hostID; accepting = !warm; self.settings = settings
         do { try reloadBindings() }
@@ -330,6 +331,7 @@ final class TranscriptUsageService: @unchecked Sendable {
         cursor.anchor = Data(data[max(0, position - 64)..<position])
         pending["cursor"] = try LedgerObject(kind: "transcript-cursor", id: binding.id, value: cursor)
         try store.saveObjects(Array(pending.values))
+        if limits != nil { onChange?() }
         return count
     }
     func summary(from: Date, to: Date) throws -> UsageSummary {

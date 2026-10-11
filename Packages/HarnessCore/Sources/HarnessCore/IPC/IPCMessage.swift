@@ -125,6 +125,8 @@ public enum IPCRequest: Codable, Sendable {
     case writeTempFile(name: String, data: Data)
     case resizeSurface(surfaceID: String, rows: UInt16, cols: UInt16)
     case detachSurface(surfaceID: String)
+    /// Consumption fence for an acknowledged attach on this same connection.
+    case acknowledgeOutput(surfaceID: String, token: UUID, sequence: UInt64)
     /// Identify this connection to the daemon so it shows up in `list-clients`
     /// and can be addressed by `detach-client`. Idempotent; safe to send once
     /// per persistent connection.
@@ -249,6 +251,19 @@ public enum DirectionalAxis: String, Codable, Sendable {
 /// `attachStream`. With `history`, the daemon streams the ring after `fromSequence` (a resume
 /// when `epoch` matches and the bytes are still held) or all of it (a resync). Without it,
 /// the reply carries the screen as VT bytes and only live output follows (`harness-cli attach`).
+public struct AttachLaunch: Codable, Equatable, Sendable {
+    public var cwd: String
+    public var shell: String?
+    public var rows: UInt16
+    public var cols: UInt16
+    public var scrollbackBytes: Int
+    public var requireInLayout: Bool
+    public init(cwd: String, shell: String?, rows: UInt16, cols: UInt16, scrollbackBytes: Int, requireInLayout: Bool) {
+        self.cwd = cwd; self.shell = shell; self.rows = rows; self.cols = cols
+        self.scrollbackBytes = scrollbackBytes; self.requireInLayout = requireInLayout
+    }
+}
+
 public struct AttachRequest: Codable, Equatable, Sendable {
     public var surfaceID: String
     public var label: String?
@@ -261,8 +276,10 @@ public struct AttachRequest: Codable, Equatable, Sendable {
     public var screenOnResync: Bool?
     public var checkpoint: Bool?
     public var geometryEvents: Bool?
+    public var launch: AttachLaunch?
+    public var acknowledgesOutput: Bool
 
-    public init(surfaceID: String, label: String? = nil, readOnly: Bool = false, history: Bool = true, fromSequence: UInt64? = nil, epoch: String? = nil, inputErrors: Bool? = nil, screenOnResync: Bool? = nil, checkpoint: Bool? = nil, geometryEvents: Bool? = nil) {
+    public init(surfaceID: String, label: String? = nil, readOnly: Bool = false, history: Bool = true, fromSequence: UInt64? = nil, epoch: String? = nil, inputErrors: Bool? = nil, screenOnResync: Bool? = nil, checkpoint: Bool? = nil, geometryEvents: Bool? = nil, launch: AttachLaunch? = nil, acknowledgesOutput: Bool = false) {
         self.surfaceID = surfaceID
         self.label = label
         self.readOnly = readOnly
@@ -271,7 +288,7 @@ public struct AttachRequest: Codable, Equatable, Sendable {
         self.epoch = epoch
         self.inputErrors = inputErrors
         self.screenOnResync = screenOnResync
-        self.checkpoint = checkpoint; self.geometryEvents = geometryEvents
+        self.checkpoint = checkpoint; self.geometryEvents = geometryEvents; self.launch = launch; self.acknowledgesOutput = acknowledgesOutput
     }
 }
 
@@ -288,15 +305,16 @@ public struct AttachReply: Codable, Equatable, Sendable {
     public var checkpoint: Data?
     public var inputErrors: Bool?
     public var replaySizes: [ReplaySize]?
+    public var outputToken: UUID?
 
-    public init(epoch: String, resync: Bool, endSequence: UInt64, screen: Data? = nil, inputErrors: Bool? = nil, replaySizes: [ReplaySize]? = nil, checkpoint: Data? = nil) {
+    public init(epoch: String, resync: Bool, endSequence: UInt64, screen: Data? = nil, inputErrors: Bool? = nil, replaySizes: [ReplaySize]? = nil, checkpoint: Data? = nil, outputToken: UUID? = nil) {
         self.epoch = epoch
         self.resync = resync
         self.endSequence = endSequence
         self.screen = screen
         self.checkpoint = checkpoint
         self.inputErrors = inputErrors
-        self.replaySizes = replaySizes
+        self.replaySizes = replaySizes; self.outputToken = outputToken
     }
 }
 

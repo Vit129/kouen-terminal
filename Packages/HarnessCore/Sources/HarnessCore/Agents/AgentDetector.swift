@@ -140,7 +140,7 @@ public enum AgentDetector {
                 resolved = r
             }
             if !isSameState(resolved, publishedSnapshots[key]) {
-                changes[key] = resolved
+                changes.updateValue(resolved, forKey: key)
                 publishedSnapshots[key] = resolved
             }
             lastSurfaceSnapshots[key] = resolved
@@ -530,21 +530,5 @@ public struct AgentTable: Codable, Sendable {
         AgentTableEntry(kind: .trae, executables: ["traecli"]),
     ])
 
-    /// Last decoded `agents.json`, keyed by its modification date, so the ~1.5s scan
-    /// re-reads and re-decodes the file only when it actually changes.
-    nonisolated(unsafe) private static var cached: (modified: Date, table: AgentTable)?
-    private static let cacheLock = NSLock()
-
-    public static func loadFromDisk() -> AgentTable {
-        let path = HarnessPaths.applicationSupport.appendingPathComponent("agents.json")
-        guard let attributes = try? FileManager.default.attributesOfItem(atPath: path.path),
-              let modified = attributes[.modificationDate] as? Date
-        else { return .default }
-        cacheLock.lock()
-        defer { cacheLock.unlock() }
-        if let cached, cached.modified == modified { return cached.table }
-        let table = (try? Data(contentsOf: path)).flatMap { try? JSONDecoder().decode(AgentTable.self, from: $0) } ?? .default
-        cached = (modified, table)
-        return table
-    }
+    public static func loadFromDisk() -> AgentTable { AgentTableCache.shared.value }
 }

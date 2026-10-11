@@ -178,7 +178,7 @@ final class DaemonRoundTripTests: XCTestCase {
     /// (the daemon does no backfill). This drove the worst case: a tight marker burst lands in that
     /// window, so a re-replay sees them but the live attach stream is missing them.
     ///
-    /// `attachReplayingSurfaceOutput` closes it (subscribe-first → buffer → replay → dedup-flush).
+    /// One-step attach closes it with an ordered history-to-live barrier.
     /// The test bursts N distinct markers, attaches gap-free WHILE more markers keep flowing, and
     /// asserts every marker is present in union(replay, live) — i.e. the gap-free attach loses none
     /// of what a fresh full re-replay would show (0 missing). Pre-fix this fails with a gap.
@@ -221,11 +221,10 @@ final class DaemonRoundTripTests: XCTestCase {
         // Attach mid-stream, AFTER a few markers have accumulated (non-empty replay) but with the
         // bulk still to come (the gap/live window).
         usleep(200_000)
-        let subscription = try client.attachReplayingSurfaceOutput(
-            surfaceID: sid,
-            label: "gap-test",
-            onReplay: { text in _ = combined.appendAndContains(text, marker: "") },
-            onData: { data, _ in _ = combined.appendAndContains(String(decoding: data, as: UTF8.self), marker: "") }
+        let subscription = try client.attachStream(
+            AttachRequest(surfaceID: sid, label: "gap-test", acknowledgesOutput: true),
+            onAttached: { _, _ in },
+            onData: { data, _, consumed in _ = combined.appendAndContains(String(decoding: data, as: UTF8.self), marker: ""); consumed() }
         )
         defer { subscription.cancel() }
 
@@ -252,7 +251,8 @@ final class DaemonRoundTripTests: XCTestCase {
     /// daemon sends only what was missed, with no reset. A screen-only attach paints the screen.
     func testStreamedAttachIsGapFreeAndResumesWithoutARepaint() throws {
         let client = DaemonClient()
-        XCTAssertTrue(client.supportsAttachStream())
+        guard case let .daemonStats(stats) = try client.request(.daemonStats) else { return XCTFail("Missing daemon capabilities") }
+        XCTAssertTrue(stats.supports(DaemonStats.acknowledgedOutput))
         // A plain sh with no prompt or echo, so the markers land in the output untouched.
         let sid = UUID().uuidString
         _ = try client.request(.ensureSurface(surfaceID: sid, cwd: nil, shell: "/bin/sh", rows: 24, cols: 80, scrollbackBytes: nil))
@@ -295,7 +295,7 @@ final class DaemonRoundTripTests: XCTestCase {
         let screen = AtomicBox<Data>()
         let watcher = try client.attachStream(
             AttachRequest(surfaceID: sid, label: "screen-test", readOnly: true, history: false),
-            onAttached: { if let vt = $0.screen { screen.set(vt) } }, onData: { _, _ in }
+            onAttached: { reply, _ in if let vt = reply.screen { screen.set(vt) } }, onData: { _, _, _ in }
         )
         defer { watcher.cancel() }
         XCTAssertTrue(waitUntil(timeout: 5) { screen.value != nil })

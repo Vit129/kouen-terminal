@@ -1,0 +1,14 @@
+{
+  "app": {
+    "pid": 234,
+    "physical_bytes": 106071264
+  },
+  "daemon": {
+    "pid": 239,
+    "physical_bytes": 7717632
+  },
+  "host": {
+    "pid": 238,
+    "physical_bytes": 12124952
+  }
+}

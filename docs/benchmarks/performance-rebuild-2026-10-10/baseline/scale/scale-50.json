@@ -1,0 +1,1355 @@
+{
+  "sessions": 50,
+  "agent_processes_requested": 10,
+  "settle_seconds": 30,
+  "sample_seconds": 60.046471792000034,
+  "styled_lines": 10000,
+  "processes": [
+    {
+      "pid": 31117,
+      "role": "host",
+      "command": "/Users/rcourson/Desktop/Harness Terminal/.benchmark-results/performance-rebuild/baseline/Harness.app/Contents/Helpers/HarnessSessionHost.app/Contents/MacOS/HarnessSessionHost",
+      "rss_bytes": 114130944,
+      "one_core_cpu_percent": 2.814486762609682,
+      "phys_footprint_bytes": 65258312
+    },
+    {
+      "pid": 31118,
+      "role": "daemon",
+      "command": "/Users/rcourson/Desktop/Harness Terminal/.benchmark-results/performance-rebuild/baseline/Harness.app/Contents/Helpers/HarnessDaemon.app/Contents/MacOS/HarnessDaemon",
+      "rss_bytes": 35192832,
+      "one_core_cpu_percent": 1.5488004078266373,
+      "phys_footprint_bytes": 11223856
+    },
+    {
+      "pid": 31119,
+      "role": "shell-or-agent",
+      "command": "/opt/homebrew/bin/fish",
+      "rss_bytes": 9224192,
+      "one_core_cpu_percent": 0.0,
+      "phys_footprint_bytes": 5620168
+    },
+    {
+      "pid": 31335,
+      "role": "app",
+      "command": "/Users/rcourson/Desktop/Harness Terminal/.benchmark-results/performance-rebuild/baseline/Harness.app/Contents/MacOS/Harness",
+      "rss_bytes": 572669952,
+      "one_core_cpu_percent": 0.033307535652190835,
+      "phys_footprint_bytes": 1437730592
+    },
+    {
+      "pid": 41578,
+      "role": "shell-or-agent",
+      "command": "/opt/homebrew/bin/fish",
+      "rss_bytes": 9207808,
+      "one_core_cpu_percent": 0.0,
+      "phys_footprint_bytes": 5636576
+    },
+    {
+      "pid": 41580,
+      "role": "shell-or-agent",
+      "command": "/opt/homebrew/bin/fish",
+      "rss_bytes": 9256960,
+      "one_core_cpu_percent": 0.0,
+      "phys_footprint_bytes": 5702136
+    },
+    {
+      "pid": 41582,
+      "role": "shell-or-agent",
+      "command": "/opt/homebrew/bin/fish",
+      "rss_bytes": 9273344,
+      "one_core_cpu_percent": 0.0,
+      "phys_footprint_bytes": 5685704
+    },
+    {
+      "pid": 41584,
+      "role": "shell-or-agent",
+      "command": "/opt/homebrew/bin/fish",
+      "rss_bytes": 9289728,
+      "one_core_cpu_percent": 0.0,
+      "phys_footprint_bytes": 5702088
+    },
+    {
+      "pid": 41586,
+      "role": "shell-or-agent",
+      "command": "/opt/homebrew/bin/fish",
+      "rss_bytes": 9207808,
+      "one_core_cpu_percent": 0.0,
+      "phys_footprint_bytes": 5620168
+    },
+    {
+      "pid": 41588,
+      "role": "shell-or-agent",
+      "command": "/opt/homebrew/bin/fish",
+      "rss_bytes": 9175040,
+      "one_core_cpu_percent": 0.0,
+      "phys_footprint_bytes": 5587400
+    },
+    {
+      "pid": 41590,
+      "role": "shell-or-agent",
+      "command": "/opt/homebrew/bin/fish",
+      "rss_bytes": 9158656,
+      "one_core_cpu_percent": 0.0,
+      "phys_footprint_bytes": 5587424
+    },
+    {
+      "pid": 41592,
+      "role": "shell-or-agent",
+      "command": "/opt/homebrew/bin/fish",
+      "rss_bytes": 9158656,
+      "one_core_cpu_percent": 0.0,
+      "phys_footprint_bytes": 5587424
+    },
+    {
+      "pid": 41594,
+      "role": "shell-or-agent",
+      "command": "/opt/homebrew/bin/fish",
+      "rss_bytes": 9175040,
+      "one_core_cpu_percent": 0.0,
+      "phys_footprint_bytes": 5587400
+    },
+    {
+      "pid": 42022,
+      "role": "shell-or-agent",
+      "command": "/opt/homebrew/bin/fish",
+      "rss_bytes": 9273344,
+      "one_core_cpu_percent": 0.0,
+      "phys_footprint_bytes": 5718520
+    },
+    {
+      "pid": 42024,
+      "role": "shell-or-agent",
+      "command": "/opt/homebrew/bin/fish",
+      "rss_bytes": 9273344,
+      "one_core_cpu_percent": 0.0,
+      "phys_footprint_bytes": 5685704
+    },
+    {
+      "pid": 42026,
+      "role": "shell-or-agent",
+      "command": "/opt/homebrew/bin/fish",
+      "rss_bytes": 9306112,
+      "one_core_cpu_percent": 0.0,
+      "phys_footprint_bytes": 5718472
+    },
+    {
+      "pid": 42028,
+      "role": "shell-or-agent",
+      "command": "/opt/homebrew/bin/fish",
+      "rss_bytes": 9289728,
+      "one_core_cpu_percent": 0.0,
+      "phys_footprint_bytes": 5734904
+    },
+    {
+      "pid": 42030,
+      "role": "shell-or-agent",
+      "command": "/opt/homebrew/bin/fish",
+      "rss_bytes": 9240576,
+      "one_core_cpu_percent": 0.0,
+      "phys_footprint_bytes": 5669344
+    },
+    {
+      "pid": 42032,
+      "role": "shell-or-agent",
+      "command": "/opt/homebrew/bin/fish",
+      "rss_bytes": 9256960,
+      "one_core_cpu_percent": 0.0,
+      "phys_footprint_bytes": 5685728
+    },
+    {
+      "pid": 42034,
+      "role": "shell-or-agent",
+      "command": "/opt/homebrew/bin/fish",
+      "rss_bytes": 9306112,
+      "one_core_cpu_percent": 0.0,
+      "phys_footprint_bytes": 5751288
+    },
+    {
+      "pid": 42036,
+      "role": "shell-or-agent",
+      "command": "/opt/homebrew/bin/fish",
+      "rss_bytes": 9289728,
+      "one_core_cpu_percent": 0.0,
+      "phys_footprint_bytes": 5702112
+    },
+    {
+      "pid": 42038,
+      "role": "shell-or-agent",
+      "command": "/opt/homebrew/bin/fish",
+      "rss_bytes": 9322496,
+      "one_core_cpu_percent": 0.0,
+      "phys_footprint_bytes": 5734880
+    },
+    {
+      "pid": 42040,
+      "role": "shell-or-agent",
+      "command": "/opt/homebrew/bin/fish",
+      "rss_bytes": 9338880,
+      "one_core_cpu_percent": 0.0,
+      "phys_footprint_bytes": 5734856
+    },
+    {
+      "pid": 42042,
+      "role": "shell-or-agent",
+      "command": "/opt/homebrew/bin/fish",
+      "rss_bytes": 9289728,
+      "one_core_cpu_percent": 0.0,
+      "phys_footprint_bytes": 5718520
+    },
+    {
+      "pid": 42044,
+      "role": "shell-or-agent",
+      "command": "/opt/homebrew/bin/fish",
+      "rss_bytes": 9289728,
+      "one_core_cpu_percent": 0.0,
+      "phys_footprint_bytes": 5718520
+    },
+    {
+      "pid": 42046,
+      "role": "shell-or-agent",
+      "command": "/opt/homebrew/bin/fish",
+      "rss_bytes": 9273344,
+      "one_core_cpu_percent": 0.0,
+      "phys_footprint_bytes": 5702136
+    },
+    {
+      "pid": 42048,
+      "role": "shell-or-agent",
+      "command": "/opt/homebrew/bin/fish",
+      "rss_bytes": 9322496,
+      "one_core_cpu_percent": 0.0,
+      "phys_footprint_bytes": 5751288
+    },
+    {
+      "pid": 42050,
+      "role": "shell-or-agent",
+      "command": "/opt/homebrew/bin/fish",
+      "rss_bytes": 9289728,
+      "one_core_cpu_percent": 0.0,
+      "phys_footprint_bytes": 5702112
+    },
+    {
+      "pid": 42052,
+      "role": "shell-or-agent",
+      "command": "/opt/homebrew/bin/fish",
+      "rss_bytes": 9306112,
+      "one_core_cpu_percent": 0.0,
+      "phys_footprint_bytes": 5718496
+    },
+    {
+      "pid": 42054,
+      "role": "shell-or-agent",
+      "command": "/opt/homebrew/bin/fish",
+      "rss_bytes": 9322496,
+      "one_core_cpu_percent": 0.0,
+      "phys_footprint_bytes": 5734880
+    },
+    {
+      "pid": 42056,
+      "role": "shell-or-agent",
+      "command": "/opt/homebrew/bin/fish",
+      "rss_bytes": 9256960,
+      "one_core_cpu_percent": 0.0,
+      "phys_footprint_bytes": 5685752
+    },
+    {
+      "pid": 42058,
+      "role": "shell-or-agent",
+      "command": "/opt/homebrew/bin/fish",
+      "rss_bytes": 9306112,
+      "one_core_cpu_percent": 0.0,
+      "phys_footprint_bytes": 5734904
+    },
+    {
+      "pid": 42060,
+      "role": "shell-or-agent",
+      "command": "/opt/homebrew/bin/fish",
+      "rss_bytes": 9322496,
+      "one_core_cpu_percent": 0.0,
+      "phys_footprint_bytes": 5751288
+    },
+    {
+      "pid": 42758,
+      "role": "shell-or-agent",
+      "command": "/opt/homebrew/bin/fish",
+      "rss_bytes": 9306112,
+      "one_core_cpu_percent": 0.0,
+      "phys_footprint_bytes": 5734904
+    },
+    {
+      "pid": 42760,
+      "role": "shell-or-agent",
+      "command": "/opt/homebrew/bin/fish",
+      "rss_bytes": 9355264,
+      "one_core_cpu_percent": 0.0,
+      "phys_footprint_bytes": 5784056
+    },
+    {
+      "pid": 42762,
+      "role": "shell-or-agent",
+      "command": "/opt/homebrew/bin/fish",
+      "rss_bytes": 9355264,
+      "one_core_cpu_percent": 0.0,
+      "phys_footprint_bytes": 5767648
+    },
+    {
+      "pid": 42764,
+      "role": "shell-or-agent",
+      "command": "/opt/homebrew/bin/fish",
+      "rss_bytes": 9355264,
+      "one_core_cpu_percent": 0.0,
+      "phys_footprint_bytes": 5751240
+    },
+    {
+      "pid": 42766,
+      "role": "shell-or-agent",
+      "command": "/opt/homebrew/bin/fish",
+      "rss_bytes": 9289728,
+      "one_core_cpu_percent": 0.0,
+      "phys_footprint_bytes": 5702112
+    },
+    {
+      "pid": 42768,
+      "role": "shell-or-agent",
+      "command": "/opt/homebrew/bin/fish",
+      "rss_bytes": 9322496,
+      "one_core_cpu_percent": 0.0,
+      "phys_footprint_bytes": 5734880
+    },
+    {
+      "pid": 42770,
+      "role": "shell-or-agent",
+      "command": "/opt/homebrew/bin/fish",
+      "rss_bytes": 9306112,
+      "one_core_cpu_percent": 0.0,
+      "phys_footprint_bytes": 5718496
+    },
+    {
+      "pid": 42772,
+      "role": "shell-or-agent",
+      "command": "/opt/homebrew/bin/fish",
+      "rss_bytes": 9371648,
+      "one_core_cpu_percent": 0.0,
+      "phys_footprint_bytes": 5784032
+    },
+    {
+      "pid": 42774,
+      "role": "shell-or-agent",
+      "command": "/opt/homebrew/bin/fish",
+      "rss_bytes": 9338880,
+      "one_core_cpu_percent": 0.0,
+      "phys_footprint_bytes": 5767672
+    },
+    {
+      "pid": 42776,
+      "role": "shell-or-agent",
+      "command": "/opt/homebrew/bin/fish",
+      "rss_bytes": 9322496,
+      "one_core_cpu_percent": 0.0,
+      "phys_footprint_bytes": 5751288
+    },
+    {
+      "pid": 42778,
+      "role": "shell-or-agent",
+      "command": "/opt/homebrew/bin/fish",
+      "rss_bytes": 11730944,
+      "one_core_cpu_percent": 0.0,
+      "phys_footprint_bytes": 8143328
+    },
+    {
+      "pid": 42780,
+      "role": "shell-or-agent",
+      "command": "/opt/homebrew/bin/fish",
+      "rss_bytes": 9420800,
+      "one_core_cpu_percent": 0.0,
+      "phys_footprint_bytes": 5833208
+    },
+    {
+      "pid": 42783,
+      "role": "shell-or-agent",
+      "command": "/opt/homebrew/bin/fish",
+      "rss_bytes": 9355264,
+      "one_core_cpu_percent": 0.0,
+      "phys_footprint_bytes": 5734856
+    },
+    {
+      "pid": 42785,
+      "role": "shell-or-agent",
+      "command": "/opt/homebrew/bin/fish",
+      "rss_bytes": 9338880,
+      "one_core_cpu_percent": 0.0,
+      "phys_footprint_bytes": 5751288
+    },
+    {
+      "pid": 42787,
+      "role": "shell-or-agent",
+      "command": "/opt/homebrew/bin/fish",
+      "rss_bytes": 11927552,
+      "one_core_cpu_percent": 0.0,
+      "phys_footprint_bytes": 8339936
+    },
+    {
+      "pid": 42789,
+      "role": "shell-or-agent",
+      "command": "/opt/homebrew/bin/fish",
+      "rss_bytes": 9355264,
+      "one_core_cpu_percent": 0.0,
+      "phys_footprint_bytes": 5734856
+    },
+    {
+      "pid": 42793,
+      "role": "shell-or-agent",
+      "command": "/opt/homebrew/bin/fish",
+      "rss_bytes": 9338880,
+      "one_core_cpu_percent": 0.0,
+      "phys_footprint_bytes": 5734880
+    },
+    {
+      "pid": 42796,
+      "role": "shell-or-agent",
+      "command": "/opt/homebrew/bin/fish",
+      "rss_bytes": 9289728,
+      "one_core_cpu_percent": 0.0,
+      "phys_footprint_bytes": 5685728
+    },
+    {
+      "pid": 42798,
+      "role": "shell-or-agent",
+      "command": "/opt/homebrew/bin/fish",
+      "rss_bytes": 9371648,
+      "one_core_cpu_percent": 0.0,
+      "phys_footprint_bytes": 5767648
+    },
+    {
+      "pid": 42800,
+      "role": "shell-or-agent",
+      "command": "/opt/homebrew/bin/fish",
+      "rss_bytes": 9322496,
+      "one_core_cpu_percent": 0.0,
+      "phys_footprint_bytes": 5718496
+    },
+    {
+      "pid": 43190,
+      "role": "shell-or-agent",
+      "command": "codex",
+      "rss_bytes": 427245568,
+      "one_core_cpu_percent": 0.09992260695655661,
+      "phys_footprint_bytes": 125552080
+    },
+    {
+      "pid": 43205,
+      "role": "shell-or-agent",
+      "command": "codex",
+      "rss_bytes": 385007616,
+      "one_core_cpu_percent": 0.09992260695655698,
+      "phys_footprint_bytes": 121832960
+    },
+    {
+      "pid": 43226,
+      "role": "shell-or-agent",
+      "command": "/Applications/ChatGPT.app/Contents/Resources/cua_node/bin/node_repl",
+      "rss_bytes": 22986752,
+      "one_core_cpu_percent": 0.0,
+      "phys_footprint_bytes": 12829728
+    },
+    {
+      "pid": 43227,
+      "role": "shell-or-agent",
+      "command": "/Applications/ChatGPT.app/Contents/Resources/cua_node/bin/node",
+      "rss_bytes": 52756480,
+      "one_core_cpu_percent": 0.0,
+      "phys_footprint_bytes": 16418904
+    },
+    {
+      "pid": 43228,
+      "role": "shell-or-agent",
+      "command": "/opt/homebrew/bin/uv",
+      "rss_bytes": 35569664,
+      "one_core_cpu_percent": 0.0,
+      "phys_footprint_bytes": 16433872
+    },
+    {
+      "pid": 43269,
+      "role": "shell-or-agent",
+      "command": "/Applications/ChatGPT.app/Contents/Resources/cua_node/bin/node_repl",
+      "rss_bytes": 23461888,
+      "one_core_cpu_percent": 0.0,
+      "phys_footprint_bytes": 13337680
+    },
+    {
+      "pid": 43306,
+      "role": "shell-or-agent",
+      "command": "codex",
+      "rss_bytes": 384253952,
+      "one_core_cpu_percent": 0.11657637478264944,
+      "phys_footprint_bytes": 114263504
+    },
+    {
+      "pid": 43352,
+      "role": "shell-or-agent",
+      "command": "/opt/homebrew/Cellar/python@3.14/3.14.8_2/Frameworks/Python.framework/Versions/3.14/Resources/Python.app/Contents/MacOS/Python",
+      "rss_bytes": 75087872,
+      "one_core_cpu_percent": 0.0,
+      "phys_footprint_bytes": 57655992
+    },
+    {
+      "pid": 43362,
+      "role": "shell-or-agent",
+      "command": "/Applications/ChatGPT.app/Contents/Resources/cua_node/bin/node",
+      "rss_bytes": 97189888,
+      "one_core_cpu_percent": 0.0,
+      "phys_footprint_bytes": 58218616
+    },
+    {
+      "pid": 43375,
+      "role": "shell-or-agent",
+      "command": "node",
+      "rss_bytes": 139804672,
+      "one_core_cpu_percent": 0.0,
+      "phys_footprint_bytes": 110896152
+    },
+    {
+      "pid": 43376,
+      "role": "shell-or-agent",
+      "command": "node",
+      "rss_bytes": 44220416,
+      "one_core_cpu_percent": 0.0,
+      "phys_footprint_bytes": 14403696
+    },
+    {
+      "pid": 43409,
+      "role": "shell-or-agent",
+      "command": "/Applications/ChatGPT.app/Contents/Resources/cua_node/bin/node_repl",
+      "rss_bytes": 23740416,
+      "one_core_cpu_percent": 0.0,
+      "phys_footprint_bytes": 13550768
+    },
+    {
+      "pid": 43410,
+      "role": "shell-or-agent",
+      "command": "/Applications/ChatGPT.app/Contents/Resources/cua_node/bin/node",
+      "rss_bytes": 53002240,
+      "one_core_cpu_percent": 0.0,
+      "phys_footprint_bytes": 16648256
+    },
+    {
+      "pid": 43412,
+      "role": "shell-or-agent",
+      "command": "/opt/homebrew/bin/uv",
+      "rss_bytes": 30654464,
+      "one_core_cpu_percent": 0.0,
+      "phys_footprint_bytes": 14156352
+    },
+    {
+      "pid": 43438,
+      "role": "shell-or-agent",
+      "command": "/Applications/ChatGPT.app/Contents/Resources/cua_node/bin/node",
+      "rss_bytes": 96911360,
+      "one_core_cpu_percent": 0.0,
+      "phys_footprint_bytes": 58005720
+    },
+    {
+      "pid": 43446,
+      "role": "shell-or-agent",
+      "command": "node",
+      "rss_bytes": 140689408,
+      "one_core_cpu_percent": 0.0,
+      "phys_footprint_bytes": 111698800
+    },
+    {
+      "pid": 43447,
+      "role": "shell-or-agent",
+      "command": "node",
+      "rss_bytes": 43991040,
+      "one_core_cpu_percent": 0.0,
+      "phys_footprint_bytes": 14174320
+    },
+    {
+      "pid": 43459,
+      "role": "shell-or-agent",
+      "command": "/Applications/ChatGPT.app/Contents/Resources/cua_node/bin/node_repl",
+      "rss_bytes": 23642112,
+      "one_core_cpu_percent": 0.0,
+      "phys_footprint_bytes": 13419672
+    },
+    {
+      "pid": 43460,
+      "role": "shell-or-agent",
+      "command": "/opt/homebrew/Cellar/python@3.14/3.14.8_2/Frameworks/Python.framework/Versions/3.14/Resources/Python.app/Contents/MacOS/Python",
+      "rss_bytes": 75530240,
+      "one_core_cpu_percent": 0.0,
+      "phys_footprint_bytes": 58114768
+    },
+    {
+      "pid": 43468,
+      "role": "shell-or-agent",
+      "command": "codex",
+      "rss_bytes": 375472128,
+      "one_core_cpu_percent": 0.11657637478264944,
+      "phys_footprint_bytes": 113706496
+    },
+    {
+      "pid": 43491,
+      "role": "shell-or-agent",
+      "command": "codex",
+      "rss_bytes": 452968448,
+      "one_core_cpu_percent": 0.09992260695655698,
+      "phys_footprint_bytes": 132154904
+    },
+    {
+      "pid": 43522,
+      "role": "shell-or-agent",
+      "command": "/opt/homebrew/bin/uv",
+      "rss_bytes": 30834688,
+      "one_core_cpu_percent": 0.0,
+      "phys_footprint_bytes": 14336576
+    },
+    {
+      "pid": 43527,
+      "role": "shell-or-agent",
+      "command": "/Applications/ChatGPT.app/Contents/Resources/cua_node/bin/node_repl",
+      "rss_bytes": 23609344,
+      "one_core_cpu_percent": 0.0,
+      "phys_footprint_bytes": 13501568
+    },
+    {
+      "pid": 43528,
+      "role": "shell-or-agent",
+      "command": "/Applications/ChatGPT.app/Contents/Resources/cua_node/bin/node",
+      "rss_bytes": 97501184,
+      "one_core_cpu_percent": 0.0,
+      "phys_footprint_bytes": 58677584
+    },
+    {
+      "pid": 43529,
+      "role": "shell-or-agent",
+      "command": "/Applications/ChatGPT.app/Contents/Resources/cua_node/bin/node",
+      "rss_bytes": 52789248,
+      "one_core_cpu_percent": 0.0,
+      "phys_footprint_bytes": 16451672
+    },
+    {
+      "pid": 43538,
+      "role": "shell-or-agent",
+      "command": "node",
+      "rss_bytes": 140214272,
+      "one_core_cpu_percent": 0.0,
+      "phys_footprint_bytes": 111404080
+    },
+    {
+      "pid": 43540,
+      "role": "shell-or-agent",
+      "command": "node",
+      "rss_bytes": 44023808,
+      "one_core_cpu_percent": 0.0,
+      "phys_footprint_bytes": 14190680
+    },
+    {
+      "pid": 43586,
+      "role": "shell-or-agent",
+      "command": "/opt/homebrew/Cellar/python@3.14/3.14.8_2/Frameworks/Python.framework/Versions/3.14/Resources/Python.app/Contents/MacOS/Python",
+      "rss_bytes": 74661888,
+      "one_core_cpu_percent": 0.0,
+      "phys_footprint_bytes": 57246416
+    },
+    {
+      "pid": 43591,
+      "role": "shell-or-agent",
+      "command": "/Applications/ChatGPT.app/Contents/Resources/cua_node/bin/node_repl",
+      "rss_bytes": 23789568,
+      "one_core_cpu_percent": 0.0,
+      "phys_footprint_bytes": 13567080
+    },
+    {
+      "pid": 43602,
+      "role": "shell-or-agent",
+      "command": "codex",
+      "rss_bytes": 375537664,
+      "one_core_cpu_percent": 0.11657637478265019,
+      "phys_footprint_bytes": 122930688
+    },
+    {
+      "pid": 43641,
+      "role": "shell-or-agent",
+      "command": "/Applications/ChatGPT.app/Contents/Resources/cua_node/bin/node_repl",
+      "rss_bytes": 23314432,
+      "one_core_cpu_percent": 0.0,
+      "phys_footprint_bytes": 13173888
+    },
+    {
+      "pid": 43642,
+      "role": "shell-or-agent",
+      "command": "/opt/homebrew/bin/uv",
+      "rss_bytes": 30883840,
+      "one_core_cpu_percent": 0.0,
+      "phys_footprint_bytes": 14385728
+    },
+    {
+      "pid": 43643,
+      "role": "shell-or-agent",
+      "command": "/Applications/ChatGPT.app/Contents/Resources/cua_node/bin/node",
+      "rss_bytes": 52576256,
+      "one_core_cpu_percent": 0.0,
+      "phys_footprint_bytes": 16205864
+    },
+    {
+      "pid": 43684,
+      "role": "shell-or-agent",
+      "command": "/opt/homebrew/Cellar/python@3.14/3.14.8_2/Frameworks/Python.framework/Versions/3.14/Resources/Python.app/Contents/MacOS/Python",
+      "rss_bytes": 75431936,
+      "one_core_cpu_percent": 0.0,
+      "phys_footprint_bytes": 58000056
+    },
+    {
+      "pid": 43686,
+      "role": "shell-or-agent",
+      "command": "/Applications/ChatGPT.app/Contents/Resources/cua_node/bin/node_repl",
+      "rss_bytes": 23904256,
+      "one_core_cpu_percent": 0.0,
+      "phys_footprint_bytes": 13780072
+    },
+    {
+      "pid": 43710,
+      "role": "shell-or-agent",
+      "command": "codex",
+      "rss_bytes": 402915328,
+      "one_core_cpu_percent": 0.1332301426087419,
+      "phys_footprint_bytes": 129238528
+    },
+    {
+      "pid": 43752,
+      "role": "shell-or-agent",
+      "command": "/Applications/ChatGPT.app/Contents/Resources/cua_node/bin/node",
+      "rss_bytes": 97353728,
+      "one_core_cpu_percent": 0.0,
+      "phys_footprint_bytes": 58480880
+    },
+    {
+      "pid": 43753,
+      "role": "shell-or-agent",
+      "command": "/Applications/ChatGPT.app/Contents/Resources/cua_node/bin/node_repl",
+      "rss_bytes": 23461888,
+      "one_core_cpu_percent": 0.0,
+      "phys_footprint_bytes": 13337704
+    },
+    {
+      "pid": 43754,
+      "role": "shell-or-agent",
+      "command": "/opt/homebrew/bin/uv",
+      "rss_bytes": 30736384,
+      "one_core_cpu_percent": 0.0,
+      "phys_footprint_bytes": 14254656
+    },
+    {
+      "pid": 43758,
+      "role": "shell-or-agent",
+      "command": "/Applications/ChatGPT.app/Contents/Resources/cua_node/bin/node",
+      "rss_bytes": 52740096,
+      "one_core_cpu_percent": 0.0,
+      "phys_footprint_bytes": 16386112
+    },
+    {
+      "pid": 43766,
+      "role": "shell-or-agent",
+      "command": "node",
+      "rss_bytes": 44023808,
+      "one_core_cpu_percent": 0.0,
+      "phys_footprint_bytes": 14207088
+    },
+    {
+      "pid": 43770,
+      "role": "shell-or-agent",
+      "command": "node",
+      "rss_bytes": 142065664,
+      "one_core_cpu_percent": 0.0,
+      "phys_footprint_bytes": 113288288
+    },
+    {
+      "pid": 43817,
+      "role": "shell-or-agent",
+      "command": "/Applications/ChatGPT.app/Contents/Resources/cua_node/bin/node_repl",
+      "rss_bytes": 23969792,
+      "one_core_cpu_percent": 0.0,
+      "phys_footprint_bytes": 13796528
+    },
+    {
+      "pid": 43818,
+      "role": "shell-or-agent",
+      "command": "/opt/homebrew/Cellar/python@3.14/3.14.8_2/Frameworks/Python.framework/Versions/3.14/Resources/Python.app/Contents/MacOS/Python",
+      "rss_bytes": 74563584,
+      "one_core_cpu_percent": 0.0,
+      "phys_footprint_bytes": 57148112
+    },
+    {
+      "pid": 43830,
+      "role": "shell-or-agent",
+      "command": "codex",
+      "rss_bytes": 373096448,
+      "one_core_cpu_percent": 0.11657637478264944,
+      "phys_footprint_bytes": 120129000
+    },
+    {
+      "pid": 43860,
+      "role": "shell-or-agent",
+      "command": "codex",
+      "rss_bytes": 397524992,
+      "one_core_cpu_percent": 0.11657637478264944,
+      "phys_footprint_bytes": 114853352
+    },
+    {
+      "pid": 43901,
+      "role": "shell-or-agent",
+      "command": "/Applications/ChatGPT.app/Contents/Resources/cua_node/bin/node",
+      "rss_bytes": 97140736,
+      "one_core_cpu_percent": 0.0,
+      "phys_footprint_bytes": 58202256
+    },
+    {
+      "pid": 43908,
+      "role": "shell-or-agent",
+      "command": "node",
+      "rss_bytes": 43925504,
+      "one_core_cpu_percent": 0.0,
+      "phys_footprint_bytes": 14092376
+    },
+    {
+      "pid": 43915,
+      "role": "shell-or-agent",
+      "command": "node",
+      "rss_bytes": 142983168,
+      "one_core_cpu_percent": 0.0,
+      "phys_footprint_bytes": 114058168
+    },
+    {
+      "pid": 43947,
+      "role": "shell-or-agent",
+      "command": "/Applications/ChatGPT.app/Contents/Resources/cua_node/bin/node_repl",
+      "rss_bytes": 23068672,
+      "one_core_cpu_percent": 0.0,
+      "phys_footprint_bytes": 12862568
+    },
+    {
+      "pid": 43948,
+      "role": "shell-or-agent",
+      "command": "/Applications/ChatGPT.app/Contents/Resources/cua_node/bin/node",
+      "rss_bytes": 97222656,
+      "one_core_cpu_percent": 0.0,
+      "phys_footprint_bytes": 58333400
+    },
+    {
+      "pid": 43949,
+      "role": "shell-or-agent",
+      "command": "/opt/homebrew/bin/uv",
+      "rss_bytes": 30769152,
+      "one_core_cpu_percent": 0.0,
+      "phys_footprint_bytes": 14271040
+    },
+    {
+      "pid": 43953,
+      "role": "shell-or-agent",
+      "command": "/Applications/ChatGPT.app/Contents/Resources/cua_node/bin/node",
+      "rss_bytes": 53100544,
+      "one_core_cpu_percent": 0.0,
+      "phys_footprint_bytes": 16762968
+    },
+    {
+      "pid": 43969,
+      "role": "shell-or-agent",
+      "command": "node",
+      "rss_bytes": 44351488,
+      "one_core_cpu_percent": 0.0,
+      "phys_footprint_bytes": 14534768
+    },
+    {
+      "pid": 43970,
+      "role": "shell-or-agent",
+      "command": "node",
+      "rss_bytes": 141934592,
+      "one_core_cpu_percent": 0.0,
+      "phys_footprint_bytes": 113075176
+    },
+    {
+      "pid": 44004,
+      "role": "shell-or-agent",
+      "command": "/Applications/ChatGPT.app/Contents/Resources/cua_node/bin/node_repl",
+      "rss_bytes": 23822336,
+      "one_core_cpu_percent": 0.0,
+      "phys_footprint_bytes": 13567056
+    },
+    {
+      "pid": 44005,
+      "role": "shell-or-agent",
+      "command": "/opt/homebrew/Cellar/python@3.14/3.14.8_2/Frameworks/Python.framework/Versions/3.14/Resources/Python.app/Contents/MacOS/Python",
+      "rss_bytes": 74334208,
+      "one_core_cpu_percent": 0.0,
+      "phys_footprint_bytes": 56902328
+    },
+    {
+      "pid": 44046,
+      "role": "shell-or-agent",
+      "command": "codex",
+      "rss_bytes": 376455168,
+      "one_core_cpu_percent": 0.11657637478264944,
+      "phys_footprint_bytes": 115312104
+    },
+    {
+      "pid": 44095,
+      "role": "shell-or-agent",
+      "command": "/Applications/ChatGPT.app/Contents/Resources/cua_node/bin/node",
+      "rss_bytes": 52625408,
+      "one_core_cpu_percent": 0.0,
+      "phys_footprint_bytes": 16255016
+    },
+    {
+      "pid": 44097,
+      "role": "shell-or-agent",
+      "command": "/Applications/ChatGPT.app/Contents/Resources/cua_node/bin/node",
+      "rss_bytes": 97566720,
+      "one_core_cpu_percent": 0.0,
+      "phys_footprint_bytes": 58759504
+    },
+    {
+      "pid": 44098,
+      "role": "shell-or-agent",
+      "command": "/Applications/ChatGPT.app/Contents/Resources/cua_node/bin/node_repl",
+      "rss_bytes": 23625728,
+      "one_core_cpu_percent": 0.0,
+      "phys_footprint_bytes": 13534360
+    },
+    {
+      "pid": 44100,
+      "role": "shell-or-agent",
+      "command": "/opt/homebrew/bin/uv",
+      "rss_bytes": 30818304,
+      "one_core_cpu_percent": 0.0,
+      "phys_footprint_bytes": 14336576
+    },
+    {
+      "pid": 44112,
+      "role": "shell-or-agent",
+      "command": "node",
+      "rss_bytes": 44089344,
+      "one_core_cpu_percent": 0.0,
+      "phys_footprint_bytes": 14207040
+    },
+    {
+      "pid": 44113,
+      "role": "shell-or-agent",
+      "command": "node",
+      "rss_bytes": 141787136,
+      "one_core_cpu_percent": 0.0,
+      "phys_footprint_bytes": 112911336
+    },
+    {
+      "pid": 44147,
+      "role": "shell-or-agent",
+      "command": "/opt/homebrew/Cellar/python@3.14/3.14.8_2/Frameworks/Python.framework/Versions/3.14/Resources/Python.app/Contents/MacOS/Python",
+      "rss_bytes": 74809344,
+      "one_core_cpu_percent": 0.0,
+      "phys_footprint_bytes": 57393872
+    },
+    {
+      "pid": 44148,
+      "role": "shell-or-agent",
+      "command": "/Applications/ChatGPT.app/Contents/Resources/cua_node/bin/node_repl",
+      "rss_bytes": 23609344,
+      "one_core_cpu_percent": 0.0,
+      "phys_footprint_bytes": 13436008
+    },
+    {
+      "pid": 44244,
+      "role": "shell-or-agent",
+      "command": "/opt/homebrew/bin/uv",
+      "rss_bytes": 30818304,
+      "one_core_cpu_percent": 0.0,
+      "phys_footprint_bytes": 14320192
+    },
+    {
+      "pid": 44246,
+      "role": "shell-or-agent",
+      "command": "/Applications/ChatGPT.app/Contents/Resources/cua_node/bin/node",
+      "rss_bytes": 52707328,
+      "one_core_cpu_percent": 0.0,
+      "phys_footprint_bytes": 16386160
+    },
+    {
+      "pid": 44247,
+      "role": "shell-or-agent",
+      "command": "/Applications/ChatGPT.app/Contents/Resources/cua_node/bin/node_repl",
+      "rss_bytes": 23920640,
+      "one_core_cpu_percent": 0.0,
+      "phys_footprint_bytes": 13731040
+    },
+    {
+      "pid": 44248,
+      "role": "shell-or-agent",
+      "command": "/Applications/ChatGPT.app/Contents/Resources/cua_node/bin/node",
+      "rss_bytes": 98189312,
+      "one_core_cpu_percent": 0.0,
+      "phys_footprint_bytes": 59283672
+    },
+    {
+      "pid": 44260,
+      "role": "shell-or-agent",
+      "command": "node",
+      "rss_bytes": 43859968,
+      "one_core_cpu_percent": 0.0,
+      "phys_footprint_bytes": 14026840
+    },
+    {
+      "pid": 44261,
+      "role": "shell-or-agent",
+      "command": "node",
+      "rss_bytes": 141770752,
+      "one_core_cpu_percent": 0.0,
+      "phys_footprint_bytes": 112829344
+    },
+    {
+      "pid": 44330,
+      "role": "shell-or-agent",
+      "command": "/Applications/ChatGPT.app/Contents/Resources/cua_node/bin/node",
+      "rss_bytes": 98107392,
+      "one_core_cpu_percent": 0.0,
+      "phys_footprint_bytes": 59218136
+    },
+    {
+      "pid": 44334,
+      "role": "shell-or-agent",
+      "command": "node",
+      "rss_bytes": 140525568,
+      "one_core_cpu_percent": 0.0,
+      "phys_footprint_bytes": 111551320
+    },
+    {
+      "pid": 44335,
+      "role": "shell-or-agent",
+      "command": "/opt/homebrew/bin/uv",
+      "rss_bytes": 30982144,
+      "one_core_cpu_percent": 0.0,
+      "phys_footprint_bytes": 14484032
+    },
+    {
+      "pid": 44337,
+      "role": "shell-or-agent",
+      "command": "/Applications/ChatGPT.app/Contents/Resources/cua_node/bin/node",
+      "rss_bytes": 53018624,
+      "one_core_cpu_percent": 0.0,
+      "phys_footprint_bytes": 16697456
+    },
+    {
+      "pid": 44347,
+      "role": "shell-or-agent",
+      "command": "node",
+      "rss_bytes": 43909120,
+      "one_core_cpu_percent": 0.0,
+      "phys_footprint_bytes": 14092376
+    },
+    {
+      "pid": 44348,
+      "role": "shell-or-agent",
+      "command": "/Applications/ChatGPT.app/Contents/Resources/cua_node/bin/node_repl",
+      "rss_bytes": 23822336,
+      "one_core_cpu_percent": 0.0,
+      "phys_footprint_bytes": 13698200
+    },
+    {
+      "pid": 44353,
+      "role": "shell-or-agent",
+      "command": "/opt/homebrew/Cellar/python@3.14/3.14.8_2/Frameworks/Python.framework/Versions/3.14/Resources/Python.app/Contents/MacOS/Python",
+      "rss_bytes": 74874880,
+      "one_core_cpu_percent": 0.0,
+      "phys_footprint_bytes": 57443000
+    },
+    {
+      "pid": 44354,
+      "role": "shell-or-agent",
+      "command": "/Applications/ChatGPT.app/Contents/Resources/cua_node/bin/node_repl",
+      "rss_bytes": 23789568,
+      "one_core_cpu_percent": 0.0,
+      "phys_footprint_bytes": 13632616
+    },
+    {
+      "pid": 44388,
+      "role": "shell-or-agent",
+      "command": "/Applications/ChatGPT.app/Contents/Resources/cua_node/bin/node_repl",
+      "rss_bytes": 23789568,
+      "one_core_cpu_percent": 0.0,
+      "phys_footprint_bytes": 13567056
+    },
+    {
+      "pid": 44397,
+      "role": "shell-or-agent",
+      "command": "/opt/homebrew/Cellar/python@3.14/3.14.8_2/Frameworks/Python.framework/Versions/3.14/Resources/Python.app/Contents/MacOS/Python",
+      "rss_bytes": 75169792,
+      "one_core_cpu_percent": 0.0,
+      "phys_footprint_bytes": 57754320
+    },
+    {
+      "pid": 44463,
+      "role": "shell-or-agent",
+      "command": "/opt/homebrew/bin/uv",
+      "rss_bytes": 30851072,
+      "one_core_cpu_percent": 0.0,
+      "phys_footprint_bytes": 14369344
+    },
+    {
+      "pid": 44468,
+      "role": "shell-or-agent",
+      "command": "/Applications/ChatGPT.app/Contents/Resources/cua_node/bin/node",
+      "rss_bytes": 97173504,
+      "one_core_cpu_percent": 0.0,
+      "phys_footprint_bytes": 58235048
+    },
+    {
+      "pid": 44469,
+      "role": "shell-or-agent",
+      "command": "/Applications/ChatGPT.app/Contents/Resources/cua_node/bin/node",
+      "rss_bytes": 52838400,
+      "one_core_cpu_percent": 0.0,
+      "phys_footprint_bytes": 16517232
+    },
+    {
+      "pid": 44470,
+      "role": "shell-or-agent",
+      "command": "/Applications/ChatGPT.app/Contents/Resources/cua_node/bin/node_repl",
+      "rss_bytes": 23625728,
+      "one_core_cpu_percent": 0.0,
+      "phys_footprint_bytes": 13567056
+    },
+    {
+      "pid": 44480,
+      "role": "shell-or-agent",
+      "command": "node",
+      "rss_bytes": 44056576,
+      "one_core_cpu_percent": 0.0,
+      "phys_footprint_bytes": 14223448
+    },
+    {
+      "pid": 44481,
+      "role": "shell-or-agent",
+      "command": "node",
+      "rss_bytes": 142213120,
+      "one_core_cpu_percent": 0.0,
+      "phys_footprint_bytes": 113255328
+    },
+    {
+      "pid": 44539,
+      "role": "shell-or-agent",
+      "command": "/opt/homebrew/Cellar/python@3.14/3.14.8_2/Frameworks/Python.framework/Versions/3.14/Resources/Python.app/Contents/MacOS/Python",
+      "rss_bytes": 74760192,
+      "one_core_cpu_percent": 0.0,
+      "phys_footprint_bytes": 57344720
+    },
+    {
+      "pid": 44551,
+      "role": "shell-or-agent",
+      "command": "/Applications/ChatGPT.app/Contents/Resources/cua_node/bin/node_repl",
+      "rss_bytes": 23658496,
+      "one_core_cpu_percent": 0.0,
+      "phys_footprint_bytes": 13518024
+    }
+  ],
+  "panes": [
+    {
+      "session": "4346E5A3-A1C4-48FA-819C-8AF38762D8BE",
+      "surface": "988F1B5D-A6A5-4B86-9216-5CAD4676A69F"
+    },
+    {
+      "session": "472CFCF9-25AD-4678-B895-3E2E9555B823",
+      "surface": "2FF74107-2FDB-48B1-AD9A-04487001738D"
+    },
+    {
+      "session": "8A44E1E5-90DC-455C-AD59-F244E45D39BF",
+      "surface": "D8FCE888-3FE2-4848-870C-268B069179E9"
+    },
+    {
+      "session": "45867179-2801-4B6D-95C4-4AAB92D2702C",
+      "surface": "F282886F-FC38-4680-BA35-1106F0EB0D0B"
+    },
+    {
+      "session": "FF6299A4-300B-4E60-B364-4CBAEF35A883",
+      "surface": "2854979A-4B66-4CC0-BE25-76DED3F38C17"
+    },
+    {
+      "session": "9E441D7A-61C0-428D-8478-1AD3ADBE2454",
+      "surface": "56D0C279-AE10-4C43-978E-A84DB8A72773"
+    },
+    {
+      "session": "3F34AC80-D81D-4A43-A504-72B0B1555E5A",
+      "surface": "87A755DC-F88C-456E-AB2D-FFB91A5A51B1"
+    },
+    {
+      "session": "225EC8D6-63E8-4BD2-8BE7-3F97A1C9300B",
+      "surface": "E9D78D39-50A5-46FB-B08D-D538DF0BCA60"
+    },
+    {
+      "session": "5EC4159F-32B7-435B-B939-A2CAFE4707F3",
+      "surface": "CE9E09AD-1C53-4809-AACE-67AD50BEA9F7"
+    },
+    {
+      "session": "0F260239-D926-4ADD-9DB4-A40E3E2FA60D",
+      "surface": "977E8663-1D29-4AD0-B424-6B72DCBDAE94"
+    },
+    {
+      "session": "C73CFC5E-BBE9-4C32-86A4-002B7E96742C",
+      "surface": "E268A2FB-76A8-4E3F-9BCE-571FAD42A05D"
+    },
+    {
+      "session": "2815B5F4-A845-4DAA-8AF3-673289D7933F",
+      "surface": "5355DD12-1018-40F9-8E97-BD23E0533D85"
+    },
+    {
+      "session": "A6DBDB0A-4700-420C-8061-FCABFFC6ECF0",
+      "surface": "E80FCAE4-E48F-4B1A-B533-03899CDA0F51"
+    },
+    {
+      "session": "3CAFF9AC-A31C-42F8-B421-2BD5EAF01BFD",
+      "surface": "0DB5358B-507E-4176-9FA7-AEEC31E37114"
+    },
+    {
+      "session": "9DA21CCF-D300-4BDF-90AC-759058A3757A",
+      "surface": "F69D30AA-5AAA-43E2-A2A3-4548EB06BB14"
+    },
+    {
+      "session": "444D23FD-D561-4400-A177-2AE5879BEB1C",
+      "surface": "B2619563-DE6D-429C-B98C-DC3F31FA3140"
+    },
+    {
+      "session": "C93BA3C2-F503-41D3-A4F5-E3D95A4CBCA1",
+      "surface": "E1719253-99C8-4B2B-95F0-74007C4BDB9A"
+    },
+    {
+      "session": "90CFD805-051E-42FA-B14C-B124DD197BEF",
+      "surface": "32557D9B-706C-466B-BFB3-F1AD7CAB9E50"
+    },
+    {
+      "session": "46C8D675-168B-4944-B83D-6A8E88209F45",
+      "surface": "5FEAA63B-A6D8-47AB-AECE-DF602F813CE3"
+    },
+    {
+      "session": "32452211-72B5-468D-B28A-B415C48D50C3",
+      "surface": "A39B06E5-D9E1-4D35-AD8E-61DE11BA1659"
+    },
+    {
+      "session": "118643B7-2025-4E31-9BBA-B4BA52657FD3",
+      "surface": "979AD0C0-160F-44AD-96BA-C6509CEDA08B"
+    },
+    {
+      "session": "EF2E87AB-D544-4C10-8C44-B54D26498051",
+      "surface": "8054DF8B-948B-408E-8078-115AFE17EA30"
+    },
+    {
+      "session": "9F9670FD-4164-4B08-9ED4-3150D91CED9B",
+      "surface": "0D952DA9-7A96-42D1-A3FD-76BE8B98608A"
+    },
+    {
+      "session": "90892E32-3387-4A99-84A8-B3B8D10BB1B7",
+      "surface": "7010AE36-893E-4CC6-B6C8-127B71824F3A"
+    },
+    {
+      "session": "C7B5D3D0-9FC0-40BE-81A0-5E85E75249BC",
+      "surface": "7AC26A5E-D8AE-4C07-8A86-E98DC87D6A86"
+    },
+    {
+      "session": "60CFA9A6-8031-465E-BEB6-27BD84A4052B",
+      "surface": "CC22DAD9-A9F2-4153-B2F9-B198F1EA1602"
+    },
+    {
+      "session": "7AE312EF-3E15-4B38-BE66-166227571680",
+      "surface": "5A82DCB3-078B-49D9-B7E0-C8BF5916109B"
+    },
+    {
+      "session": "01382353-4D47-41FE-874D-0BAEBC7BDE96",
+      "surface": "940976AF-E94E-4388-AEE3-81C7A6C968A7"
+    },
+    {
+      "session": "51F39872-E197-4F0B-BE0B-2B64D91EF763",
+      "surface": "5652CC06-D23C-4CE6-B001-4187AF57C68D"
+    },
+    {
+      "session": "E20B3CBC-03BF-415D-8D25-9A140E678BB2",
+      "surface": "2D8FA52F-F92C-47BE-9E51-60FC1CC43FD3"
+    },
+    {
+      "session": "077D65AE-67C0-4CC3-BF26-AD77891CD3BA",
+      "surface": "61CAA940-66C5-46A5-AE13-6ABA79E574F8"
+    },
+    {
+      "session": "DA3E7A00-0586-428C-B28B-465EF390AC4D",
+      "surface": "59046379-E616-41D4-B4A6-3013A2FDB439"
+    },
+    {
+      "session": "955978F1-A066-42A7-8A61-F2FD906B4418",
+      "surface": "E3074A24-9E4A-436B-BD68-54052DFB6E3A"
+    },
+    {
+      "session": "8ACFE1C1-76C9-40AD-9ECD-28631F7B154D",
+      "surface": "2CAD1A28-4F65-4621-A06E-87FF1C40FA0D"
+    },
+    {
+      "session": "AD30374E-FCCD-4088-8243-DD9B1DB807DC",
+      "surface": "3D753FCF-F18D-4D2B-93DD-292C8B3A7D86"
+    },
+    {
+      "session": "E2648404-5A52-4C2F-B172-A1B352287760",
+      "surface": "93384285-EB63-40B0-9C26-873DD48ECFFF"
+    },
+    {
+      "session": "3373F180-66A4-4340-BAE1-E5B67BA9426F",
+      "surface": "DF16BF28-013C-4CBF-9273-84B2DBD6F3BA"
+    },
+    {
+      "session": "D40C0A43-1C56-44DB-BA73-865487970E17",
+      "surface": "DBFC99E9-BEB5-4C53-82C3-FFA8A6F03FDE"
+    },
+    {
+      "session": "CD7C0756-00BF-4DE1-BC1F-3FEB670DE908",
+      "surface": "FD030D19-61F1-4931-B4FB-28914DB2DD97"
+    },
+    {
+      "session": "C6A9FD9B-FDE0-4495-8583-16C66EA4D14E",
+      "surface": "95A7838F-3786-4115-B35E-D0471C12B4A0"
+    },
+    {
+      "session": "91E2B228-B7D0-47B5-A82F-ED9AE469B1DD",
+      "surface": "FA4BE89D-67B2-444A-A125-D4D1876BC549"
+    },
+    {
+      "session": "F0B6E1D1-0246-4329-8597-A29A67537859",
+      "surface": "9583EEBB-4984-4846-9076-7A5B065680C6"
+    },
+    {
+      "session": "C54A2D31-F8B8-4677-BD4C-BD38072119E1",
+      "surface": "939F2F22-FF5C-488E-AD87-FBBF8EE6F21E"
+    },
+    {
+      "session": "07C3B537-942A-4305-92CE-F6E89D1DF8CD",
+      "surface": "A94CEB2E-5683-4462-95B5-859E245540A1"
+    },
+    {
+      "session": "48921702-28A0-4463-B2EB-8883C9D98E59",
+      "surface": "3FCAC50C-374A-4E73-AD17-BDB5FC49B861"
+    },
+    {
+      "session": "8B9C1F68-B07C-4359-82EA-1E0DD6D988A7",
+      "surface": "2C5E8654-DD76-47E2-B9B3-ECBE816D5FFB"
+    },
+    {
+      "session": "09637A8A-6CC2-4AF2-AFBF-33FBDD2C1EEA",
+      "surface": "471CA35D-658A-4E74-A170-054E21779C1C"
+    },
+    {
+      "session": "71C43E30-7757-415E-8A09-C91D822EC860",
+      "surface": "7BFCFB7F-C80A-4B7C-862C-DF59E29F8C06"
+    },
+    {
+      "session": "184B14AF-6022-4593-9F99-60FC429B6731",
+      "surface": "0694C6E4-63A7-4A8A-96EF-749CB8B5AEEC"
+    },
+    {
+      "session": "B1223E22-7816-4269-8940-6196EF71B001",
+      "surface": "48529127-5315-417A-8965-98E328F7F2CC"
+    }
+  ]
+}

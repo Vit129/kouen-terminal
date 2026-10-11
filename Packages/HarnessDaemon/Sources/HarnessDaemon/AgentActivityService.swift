@@ -26,6 +26,10 @@ final class AgentActivityService: @unchecked Sendable {
     private var lastPrune = Date()
     private var processMonitor: DispatchSourceTimer?
     private var processCursor: UUID?
+    private var processRetryAt: Date?
+    #if os(macOS)
+    private var processSources: [UUID: DispatchSourceProcess] = [:]
+    #endif
     private var privateSurfaces: Set<String> = []
     var onTranscript: (@Sendable (AgentRun, String) -> Void)?
     var onChange: (@Sendable (AgentRun) -> Void)?
@@ -136,6 +140,7 @@ final class AgentActivityService: @unchecked Sendable {
                     try reconcileProcess(prior, at: at)
                 }
             } catch { failure = error.localizedDescription }
+            armProcessMonitor()
         }
     }
     func registerLaunch(id: UUID, surfaceID: String, paneID: String, pid: Int32, generation: String, provider: AgentKind, specification: AgentLaunchSpecification, startedAt: Date, outcome: WorkloadOutcome? = nil) throws {
@@ -263,7 +268,15 @@ final class AgentActivityService: @unchecked Sendable {
         } else { _ = try store.record(event, reducing: &run) }
     }
     func drain() { queue.sync {} }
-    func suspend() throws { try queue.sync { accepting = false; processMonitor?.cancel(); processMonitor = nil; try store.suspend() } }
+    func suspend() throws {
+        try queue.sync {
+            accepting = false; processMonitor?.cancel(); processMonitor = nil
+            #if os(macOS)
+            for source in processSources.values { source.cancel() }; processSources.removeAll()
+            #endif
+            try store.suspend()
+        }
+    }
     func activate(memoryCheckpoint: ActivityMemoryCheckpoint? = nil) throws {
         try queue.sync {
             if let hostIdentityFailure { throw SessionHostError.refused(hostIdentityFailure) }
@@ -280,6 +293,11 @@ final class AgentActivityService: @unchecked Sendable {
             guard accepting else { throw LedgerError.noLease }
             try store.recover(protection: protection)
             try reloadActive(); failure = nil
+            #if os(macOS)
+            for source in processSources.values { source.cancel() }
+            processSources.removeAll()
+            #endif
+            startProcessMonitor()
         }
     }
     func checkpoint() throws -> ActivityMemoryCheckpoint? { try queue.sync { try store.memoryCheckpoint() } }
@@ -289,6 +307,11 @@ final class AgentActivityService: @unchecked Sendable {
         projectionLock.lock(); defer { projectionLock.unlock() }; return projection[surfaceID]
     }
     private func publish(_ run: AgentRun) {
+        #if os(macOS)
+        if run.process == .exited { processSources.removeValue(forKey: run.id)?.cancel() }
+        else { observeProcessExit(run) }
+        #endif
+        armProcessMonitor()
         identifyRepository(run)
         projectionLock.lock()
         if run.process == .exited {
@@ -327,24 +350,52 @@ final class AgentActivityService: @unchecked Sendable {
     /// Pane closure or root deregistration cannot abandon a live execution's
     /// lifetime. Inspect a bounded rotating batch, independently of pane polling.
     private func startProcessMonitor() {
-        guard accepting, processMonitor == nil else { return }
-        let timer = DispatchSource.makeTimerSource(queue: queue)
-        timer.schedule(deadline: .now() + 1, repeating: 1)
-        timer.setEventHandler { [weak self] in
-            guard let self, accepting else { return }
-            if Date().timeIntervalSince(lastPrune) >= 3600 {
-                do { try store.prune(); lastPrune = .now } catch { failure = error.localizedDescription }
-            }
-            let executions = active.values.filter { $0.parentRunID == nil && $0.pid != nil }
-                .sorted { $0.id.uuidString < $1.id.uuidString }
-            let start = processCursor.flatMap { cursor in executions.firstIndex { $0.id.uuidString > cursor.uuidString } } ?? 0
-            let batch = executions.dropFirst(start).prefix(256)
-            do { for run in batch { try reconcileProcess(run, at: .now) } }
-            catch { failure = error.localizedDescription }
-            processCursor = batch.last?.id
-            if start + batch.count >= executions.count { processCursor = nil }
+        guard accepting else { return }
+        if processMonitor == nil {
+            let timer = DispatchSource.makeTimerSource(queue: queue)
+            timer.setEventHandler { [weak self] in self?.inspectProcesses() }
+            processMonitor = timer; timer.schedule(deadline: .distantFuture); timer.resume()
         }
-        processMonitor = timer; timer.resume()
+        #if os(macOS)
+        for run in active.values { observeProcessExit(run) }
+        #endif
+        // Restored PIDs may already belong to a different process. An exit source watches
+        // the current PID, so validate persisted generations once before relying on events.
+        processCursor = nil
+        processRetryAt = .now
+        armProcessMonitor()
+    }
+    private func armProcessMonitor() {
+        guard accepting else { return }
+        #if os(macOS)
+        let hasProcesses = false
+        #else
+        let hasProcesses = active.values.contains { $0.parentRunID == nil && $0.pid != nil }
+        #endif
+        let now = Date(), maintenance = lastPrune.addingTimeInterval(3600)
+        var deadline = maintenance
+        if let processRetryAt { deadline = maintenance <= now ? processRetryAt : min(maintenance, processRetryAt) }
+        if hasProcesses { deadline = min(deadline, now.addingTimeInterval(1)) }
+        if processCursor != nil { deadline = min(deadline, now.addingTimeInterval(0.1)) }
+        processMonitor?.schedule(deadline: .now() + max(0, deadline.timeIntervalSinceNow), leeway: .milliseconds(100))
+    }
+    private func inspectProcesses() {
+        guard accepting else { return }
+        defer { armProcessMonitor() }
+        let now = Date()
+        if processRetryAt.map({ $0 <= now }) ?? true { processRetryAt = nil }
+        if now.timeIntervalSince(lastPrune) >= 3600, processRetryAt == nil {
+            do { try store.prune(); lastPrune = now }
+            catch { failure = error.localizedDescription; processRetryAt = now.addingTimeInterval(5) }
+        }
+        let executions = active.values.filter { $0.parentRunID == nil && $0.pid != nil }
+            .sorted { $0.id.uuidString < $1.id.uuidString }
+        let start = processCursor.flatMap { cursor in executions.firstIndex { $0.id.uuidString > cursor.uuidString } } ?? 0
+        let batch = executions.dropFirst(start).prefix(256)
+        do { for run in batch { try reconcileProcess(run, at: .now) } }
+        catch { failure = error.localizedDescription; processRetryAt = now.addingTimeInterval(5) }
+        processCursor = batch.last?.id
+        if start + batch.count >= executions.count { processCursor = nil }
     }
     private func reconcileProcess(_ prior: AgentRun, at: Date) throws {
         guard let pid = prior.pid, active[prior.id] != nil else { return }
@@ -356,7 +407,11 @@ final class AgentActivityService: @unchecked Sendable {
         }
         var run = prior
         try record(RunEvent(runID: run.id, kind: .processExited, source: .exit, at: max(at, run.observedAt)), reducing: &run)
-        active.removeValue(forKey: run.id); publish(run)
+        active.removeValue(forKey: run.id)
+        #if os(macOS)
+        processSources.removeValue(forKey: run.id)?.cancel()
+        #endif
+        publish(run)
         // The parent's end does not invent a reported subagent outcome. Its
         // unreported children are closed with unknown process/turn state.
         for var child in Array(active.values) where child.parentRunID == run.id {
@@ -364,7 +419,26 @@ final class AgentActivityService: @unchecked Sendable {
             try store.save(child); active.removeValue(forKey: child.id)
         }
     }
-    deinit { processMonitor?.cancel() }
+    #if os(macOS)
+    private func observeProcessExit(_ run: AgentRun) {
+        guard accepting, run.parentRunID == nil, run.process != .exited,
+              let pid = run.pid, processSources[run.id] == nil else { return }
+        let source = DispatchSource.makeProcessSource(identifier: pid, eventMask: .exit, queue: queue)
+        source.setEventHandler { [weak self] in
+            guard let self, accepting, let current = active[run.id] else { return }
+            do { try reconcileProcess(current, at: .now) }
+            catch { failure = error.localizedDescription; processRetryAt = Date().addingTimeInterval(5) }
+            armProcessMonitor()
+        }
+        processSources[run.id] = source; source.resume()
+    }
+    #endif
+    deinit {
+        processMonitor?.cancel()
+        #if os(macOS)
+        for source in processSources.values { source.cancel() }
+        #endif
+    }
     private func markOverflow() {
         projectionLock.lock(); let report = !overflowReported; overflowReported = true; projectionLock.unlock()
         if report { queue.async { [weak self] in self?.failure = "Activity capture reached its bounded queue; some observations were not captured." } }

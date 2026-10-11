@@ -1,0 +1,13 @@
+launchStart +0.0ms
+firstSurfaceAttached +70.1ms
+firstDrawablePresented +79.5ms
+firstWindow +99.0ms
+daemonReadinessEnqueued +121.8ms
+daemonReadinessStarted +130.8ms
+daemonReadinessCompleted +136.6ms
+daemonConnected +180.6ms
+firstSnapshotRequestStarted +181.2ms
+firstSnapshotResponseReceived +184.9ms
+firstSnapshot +195.3ms
+firstShellPromptConsumed +216.8ms
+firstShellPromptFrameSubmitted +236.6ms

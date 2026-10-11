@@ -1,0 +1,1062 @@
+{
+  "-[HarnessCoreTests.HarnessSettingsTests testAppearanceModeDefaultsToThemeAndRoundTripsMacOSSystem]": {
+    "log": "harness-qol-tests-2.log",
+    "result": "passed"
+  },
+  "-[HarnessCoreTests.HarnessSettingsTests testAppearanceModeLoadMigrationPreservesMacOSSystemChoice]": {
+    "log": "harness-qol-tests-2.log",
+    "result": "passed"
+  },
+  "-[HarnessCoreTests.HarnessSettingsTests testAppearanceModeMissingFromLegacySettingsMigratesToTheme]": {
+    "log": "harness-qol-tests-2.log",
+    "result": "passed"
+  },
+  "-[HarnessCoreTests.HarnessSettingsTests testClampedBlurStaysInUsefulRange]": {
+    "log": "harness-qol-tests-2.log",
+    "result": "passed"
+  },
+  "-[HarnessCoreTests.HarnessSettingsTests testClampedFontSizeStaysInZoomRange]": {
+    "log": "harness-qol-tests-2.log",
+    "result": "passed"
+  },
+  "-[HarnessCoreTests.HarnessSettingsTests testClampedOpacityAllowsFullRangeAboveTinyFloor]": {
+    "log": "harness-qol-tests-2.log",
+    "result": "passed"
+  },
+  "-[HarnessCoreTests.HarnessSettingsTests testClampedPaddingNeverNegative]": {
+    "log": "harness-qol-tests-2.log",
+    "result": "passed"
+  },
+  "-[HarnessCoreTests.HarnessSettingsTests testClearThemeColorOverridesClearsPaletteOverrides]": {
+    "log": "harness-qol-tests-2.log",
+    "result": "passed"
+  },
+  "-[HarnessCoreTests.HarnessSettingsTests testClearedColorOverridesStayClearedAcrossSaveLoad]": {
+    "log": "harness-qol-tests-2.log",
+    "result": "passed"
+  },
+  "-[HarnessCoreTests.HarnessSettingsTests testColorRenderingLoadMigrationPreservesExplicitNewChoice]": {
+    "log": "harness-qol-tests-2.log",
+    "result": "passed"
+  },
+  "-[HarnessCoreTests.HarnessSettingsTests testCorruptSettingsAreBackedUpNotOverwritten]": {
+    "log": "harness-qol-tests-2.log",
+    "result": "passed"
+  },
+  "-[HarnessCoreTests.HarnessSettingsTests testEffectiveAppearanceRefreshPolicyOnlyRefreshesMacOSSystem]": {
+    "log": "harness-qol-tests-2.log",
+    "result": "passed"
+  },
+  "-[HarnessCoreTests.HarnessSettingsTests testEmptyObjectDecodesWithoutThrowing]": {
+    "log": "harness-qol-tests-2.log",
+    "result": "passed"
+  },
+  "-[HarnessCoreTests.HarnessSettingsTests testEveryFieldTypeSurvivesACodingRoundTrip]": {
+    "log": "harness-qol-tests-2.log",
+    "result": "passed"
+  },
+  "-[HarnessCoreTests.HarnessSettingsTests testExplicitEventMapWinsOverLegacyCommandFinishedFlag]": {
+    "log": "harness-qol-tests-2.log",
+    "result": "passed"
+  },
+  "-[HarnessCoreTests.HarnessSettingsTests testExplicitImportedPaletteIsPreserved]": {
+    "log": "harness-qol-tests-2.log",
+    "result": "passed"
+  },
+  "-[HarnessCoreTests.HarnessSettingsTests testExplicitRenderingModesRoundTripWithLegacyAliases]": {
+    "log": "harness-qol-tests-2.log",
+    "result": "passed"
+  },
+  "-[HarnessCoreTests.HarnessSettingsTests testFirstLaunchKeepsHarnessAppearanceWhenAnotherTerminalIsConfigured]": {
+    "log": "harness-qol-tests-2.log",
+    "result": "passed"
+  },
+  "-[HarnessCoreTests.HarnessSettingsTests testFontConfigurationRoundTrips]": {
+    "log": "harness-qol-tests-2.log",
+    "result": "passed"
+  },
+  "-[HarnessCoreTests.HarnessSettingsTests testFontFeatureInputRejectsMalformedOrAmbiguousSettings]": {
+    "log": "harness-qol-tests-2.log",
+    "result": "passed"
+  },
+  "-[HarnessCoreTests.HarnessSettingsTests testFontSizeIsClampedAtEveryPersistenceBoundary]": {
+    "log": "harness-qol-tests-2.log",
+    "result": "passed"
+  },
+  "-[HarnessCoreTests.HarnessSettingsTests testFontSizeIsHarnessOwnedNotImported]": {
+    "log": "harness-qol-tests-2.log",
+    "result": "passed"
+  },
+  "-[HarnessCoreTests.HarnessSettingsTests testFreshSettingsUseSlimBarCursorByDefault]": {
+    "log": "harness-qol-tests-2.log",
+    "result": "passed"
+  },
+  "-[HarnessCoreTests.HarnessSettingsTests testImportedDefaultsKeepFullColorSet]": {
+    "log": "harness-qol-tests-2.log",
+    "result": "passed"
+  },
+  "-[HarnessCoreTests.HarnessSettingsTests testImportedSplitThemesSeedMacOSSystemAppearance]": {
+    "log": "harness-qol-tests-2.log",
+    "result": "passed"
+  },
+  "-[HarnessCoreTests.HarnessSettingsTests testLegacyAgentColorsRoundTripWhileIdentityUsesFixedDefaults]": {
+    "log": "harness-qol-tests-2.log",
+    "result": "passed"
+  },
+  "-[HarnessCoreTests.HarnessSettingsTests testLegacyAutoLightDarkSettingsMigrateToMacOSSystemAndRoundTrip]": {
+    "log": "harness-qol-tests-2.log",
+    "result": "passed"
+  },
+  "-[HarnessCoreTests.HarnessSettingsTests testLegacyCommandFinishedNotificationsMigratesIntoEventMap]": {
+    "log": "harness-qol-tests-2.log",
+    "result": "passed"
+  },
+  "-[HarnessCoreTests.HarnessSettingsTests testLegacyVividColorsMapsToVividRenderingMode]": {
+    "log": "harness-qol-tests-2.log",
+    "result": "passed"
+  },
+  "-[HarnessCoreTests.HarnessSettingsTests testLiveReloadLeavesInvalidOriginalUntouched]": {
+    "log": "harness-qol-tests-2.log",
+    "result": "passed"
+  },
+  "-[HarnessCoreTests.HarnessSettingsTests testLiveResizeReflowDefaultsOnAndRoundTrips]": {
+    "log": "harness-qol-tests-2.log",
+    "result": "passed"
+  },
+  "-[HarnessCoreTests.HarnessSettingsTests testLoadClampsRunawayFontSizeAndPaddingAndRewritesOnce]": {
+    "log": "harness-qol-tests-2.log",
+    "result": "passed"
+  },
+  "-[HarnessCoreTests.HarnessSettingsTests testLoadMigrationAppliesNewImportWhenUserHasNoVisualCustomizations]": {
+    "log": "harness-qol-tests-2.log",
+    "result": "passed"
+  },
+  "-[HarnessCoreTests.HarnessSettingsTests testLoadMigrationPreservesHandEditedVisualsAcrossImportSignatureBump]": {
+    "log": "harness-qol-tests-2.log",
+    "result": "passed"
+  },
+  "-[HarnessCoreTests.HarnessSettingsTests testLoadMigrationRecordsNewImportSignatureWithoutReimportingCustomPalette]": {
+    "log": "harness-qol-tests-2.log",
+    "result": "passed"
+  },
+  "-[HarnessCoreTests.HarnessSettingsTests testLoadMigrationRecordsSignatureWithoutClearingPreviouslyImportedPalette]": {
+    "log": "harness-qol-tests-2.log",
+    "result": "passed"
+  },
+  "-[HarnessCoreTests.HarnessSettingsTests testLoadMigrationRefreshesPreviouslyImportedSystemThemesAndClearsStalePalette]": {
+    "log": "harness-qol-tests-2.log",
+    "result": "passed"
+  },
+  "-[HarnessCoreTests.HarnessSettingsTests testMachineIndicatorDefaultsOffAndPreservesExplicitPreference]": {
+    "log": "harness-qol-tests-2.log",
+    "result": "passed"
+  },
+  "-[HarnessCoreTests.HarnessSettingsTests testMissingKeysDecodeToDefaultInstanceValues]": {
+    "log": "harness-qol-tests-2.log",
+    "result": "passed"
+  },
+  "-[HarnessCoreTests.HarnessSettingsTests testNotificationEventDefaultsMatchPriorBehavior]": {
+    "log": "harness-qol-tests-2.log",
+    "result": "passed"
+  },
+  "-[HarnessCoreTests.HarnessSettingsTests testNotificationSoundRoundTripsAndDefaultsTrueWhenMissing]": {
+    "log": "harness-qol-tests-2.log",
+    "result": "passed"
+  },
+  "-[HarnessCoreTests.HarnessSettingsTests testOldSettingsWithCustomHexDoNotSilentlyOverrideThemes]": {
+    "log": "harness-qol-tests-2.log",
+    "result": "passed"
+  },
+  "-[HarnessCoreTests.HarnessSettingsTests testOptionAsMetaDefaultsToComposedAndRoundTrips]": {
+    "log": "harness-qol-tests-2.log",
+    "result": "passed"
+  },
+  "-[HarnessCoreTests.HarnessSettingsTests testResetToImportedConfigResetsVisualFieldsToDefaultsAndPreservesShell]": {
+    "log": "harness-qol-tests-2.log",
+    "result": "passed"
+  },
+  "-[HarnessCoreTests.HarnessSettingsTests testResetToImportedSplitThemeClearsStalePaletteWhenImportHasNoExplicitPalette]": {
+    "log": "harness-qol-tests-2.log",
+    "result": "passed"
+  },
+  "-[HarnessCoreTests.HarnessSettingsTests testRestoreWindowSizeDefaultsOnAndPreservesExplicitPreference]": {
+    "log": "harness-qol-tests-2.log",
+    "result": "passed"
+  },
+  "-[HarnessCoreTests.HarnessSettingsTests testRetiredNotchKeysStillDecode]": {
+    "log": "harness-qol-tests-2.log",
+    "result": "passed"
+  },
+  "-[HarnessCoreTests.HarnessSettingsTests testRetiredParserSwitchIsDroppedOnLoad]": {
+    "log": "harness-qol-tests-2.log",
+    "result": "passed"
+  },
+  "-[HarnessCoreTests.HarnessSettingsTests testScrollMultiplierAndMouseHideDefaults]": {
+    "log": "harness-qol-tests-2.log",
+    "result": "passed"
+  },
+  "-[HarnessCoreTests.HarnessSettingsTests testScrollMultiplierClampsToSaneRange]": {
+    "log": "harness-qol-tests-2.log",
+    "result": "passed"
+  },
+  "-[HarnessCoreTests.HarnessSettingsTests testScrollMultiplierIsClampedOnDecode]": {
+    "log": "harness-qol-tests-2.log",
+    "result": "passed"
+  },
+  "-[HarnessCoreTests.HarnessSettingsTests testSecureKeyboardEntryDefaultsOffAndRoundTrips]": {
+    "log": "harness-qol-tests-2.log",
+    "result": "passed"
+  },
+  "-[HarnessCoreTests.HarnessSettingsTests testSetEventEnabledRoundTripsThroughCoding]": {
+    "log": "harness-qol-tests-2.log",
+    "result": "passed"
+  },
+  "-[HarnessCoreTests.HarnessSettingsTests testSettingsWithNoNotificationKeysDecodeToDefaults]": {
+    "log": "harness-qol-tests-2.log",
+    "result": "passed"
+  },
+  "-[HarnessCoreTests.HarnessSettingsTests testStoredOldLightDefaultMovesToHarnessLightButOtherChoicesStay]": {
+    "log": "harness-qol-tests-2.log",
+    "result": "passed"
+  },
+  "-[HarnessCoreTests.HarnessSettingsTests testSystemThemeNamesDefaultAndRoundTrip]": {
+    "log": "harness-qol-tests-2.log",
+    "result": "passed"
+  },
+  "-[HarnessCoreTests.HarnessSettingsTests testUnknownEnumRawValuesFallBackPerFieldInsteadOfFailingDecode]": {
+    "log": "harness-qol-tests-2.log",
+    "result": "passed"
+  },
+  "-[HarnessCoreTests.HarnessSettingsTests testUnknownKeysAreIgnoredOnDecode]": {
+    "log": "harness-qol-tests-2.log",
+    "result": "passed"
+  },
+  "-[HarnessCoreTests.HarnessSettingsTests testUnknownOptionAsMetaRawValueFallsBackWithoutFailingDecode]": {
+    "log": "harness-qol-tests-2.log",
+    "result": "passed"
+  },
+  "-[HarnessCoreTests.HarnessSettingsTests testVividColorsDefaultsToAccurateSRGBWhenMissing]": {
+    "log": "harness-qol-tests-2.log",
+    "result": "passed"
+  },
+  "-[HarnessCoreTests.HarnessSettingsTests testVividColorsLoadMigrationDefaultsMissingKeyToSRGB]": {
+    "log": "harness-qol-tests-2.log",
+    "result": "passed"
+  },
+  "-[HarnessCoreTests.HarnessSettingsTests testVividColorsLoadMigrationPreservesExplicitChoice]": {
+    "log": "harness-qol-tests-2.log",
+    "result": "passed"
+  },
+  "-[HarnessCoreTests.HarnessSettingsTests testWindowInheritCWDDefaultsOnAndDecodesExplicitOff]": {
+    "log": "harness-qol-tests-2.log",
+    "result": "passed"
+  },
+  "-[HarnessCoreTests.ShellIntegrationInjectorTests testBashBelowFloorGetsNoPlan]": {
+    "log": "harness-qol-tests-2.log",
+    "result": "passed"
+  },
+  "-[HarnessCoreTests.ShellIntegrationInjectorTests testBashPlanSwapsLoginForPosixAndReplaysStartup]": {
+    "log": "harness-qol-tests-2.log",
+    "result": "passed"
+  },
+  "-[HarnessCoreTests.ShellIntegrationInjectorTests testFishPlanPrependsVendorDirAndPreservesExistingDataDirs]": {
+    "log": "harness-qol-tests-2.log",
+    "result": "passed"
+  },
+  "-[HarnessCoreTests.ShellIntegrationInjectorTests testFishPlanUsesXDGSpecDefaultWhenUnset]": {
+    "log": "harness-qol-tests-2.log",
+    "result": "passed"
+  },
+  "-[HarnessCoreTests.ShellIntegrationInjectorTests testPlanIsIdempotentOnDisk]": {
+    "log": "harness-qol-tests-2.log",
+    "result": "passed"
+  },
+  "-[HarnessCoreTests.ShellIntegrationInjectorTests testUnknownShellGetsNoPlan]": {
+    "log": "harness-qol-tests-2.log",
+    "result": "passed"
+  },
+  "-[HarnessCoreTests.ShellIntegrationInjectorTests testZshPlanUsesZdotdirShimAndPreservesOriginal]": {
+    "log": "harness-qol-tests-2.log",
+    "result": "passed"
+  },
+  "-[HarnessCoreTests.ShellIntegrationInjectorTests testZshPlanWithoutOriginalZdotdirOmitsTheChainVariable]": {
+    "log": "harness-qol-tests-2.log",
+    "result": "passed"
+  },
+  "-[HarnessCoreTests.ShellIntegrationTests testDetectFromShellPath]": {
+    "log": "harness-qol-tests-2.log",
+    "result": "passed"
+  },
+  "-[HarnessCoreTests.ShellIntegrationTests testInstallPreservesExistingRCContent]": {
+    "log": "harness-qol-tests-2.log",
+    "result": "passed"
+  },
+  "-[HarnessCoreTests.ShellIntegrationTests testInstallWritesScriptAndWiresRCIdempotently]": {
+    "log": "harness-qol-tests-2.log",
+    "result": "passed"
+  },
+  "-[HarnessCoreTests.ShellIntegrationTests testScriptsGateOnHarnessEnv]": {
+    "log": "harness-qol-tests-2.log",
+    "result": "passed"
+  },
+  "-[HarnessCoreTests.ShellPromptBoundaryTests testBashStringPromptHookKeepsItsOutputAndFreshPrompt]": {
+    "log": "harness-qol-tests-3.log",
+    "result": "passed"
+  },
+  "-[HarnessCoreTests.ShellPromptBoundaryTests testBashWrapsDynamicallyReplacedPromptAfterExistingHooks]": {
+    "log": "harness-qol-tests-3.log",
+    "result": "passed"
+  },
+  "-[HarnessCoreTests.ShellPromptBoundaryTests testFishPreservesUserPromptAndRefreshesAfterThemeReplacement]": {
+    "log": "harness-qol-tests-3.log",
+    "result": "passed"
+  },
+  "-[HarnessCoreTests.ShellPromptBoundaryTests testPromptHooksPreserveFailureStatus]": {
+    "log": "harness-qol-tests-3.log",
+    "result": "passed"
+  },
+  "-[HarnessCoreTests.ShellPromptBoundaryTests testZshPromptRedrawRetainsInputBoundaryWithoutDuplicatingMarkers]": {
+    "log": "harness-qol-tests-3.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalEngineTests.CommandCheckpointTests testCompletedViewportCommandRetainsBoundariesAfterRestoreAndReflow]": {
+    "log": "harness-qol-final-tests.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalEngineTests.CommandCheckpointTests testHistoryCommandsAreDroppedAndViewportCoordinatesRebased]": {
+    "log": "harness-qol-final-tests.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalEngineTests.CommandCheckpointTests testInputBoundaryContinuesThroughCheckpoint]": {
+    "log": "harness-qol-final-tests.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalEngineTests.CommandCheckpointTests testInvalidCommandCheckpointDoesNotReplaceLiveTerminal]": {
+    "log": "harness-qol-final-tests.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalEngineTests.CommandRegionTests testMultilineCommandAndCompletedOutputBoundariesSurviveResize]": {
+    "log": "harness-qol-final-tests.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalEngineTests.CommandRegionTests testPromptRedrawDoesNotFinishACommandOrRetainAbandonedInput]": {
+    "log": "harness-qol-final-tests.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalEngineTests.CommandRegionTests testSearchAcrossWideDeferralUsesTheSameTextAsCopyAndReflow]": {
+    "log": "harness-qol-final-tests.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalEngineTests.CommandRegionTests testSearchScopeUsesExactColumnsAndRegexBoundaries]": {
+    "log": "harness-qol-final-tests.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalEngineTests.GraphemeBreakTests testASCIIScreenCaptureChangesGraphemeModeOnlyAtItsBoundaries]": {
+    "log": "harness-qol-final-tests.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalEngineTests.GraphemeBreakTests testClusterMembershipIncludesIndicHangulAndNewUnicodeMarks]": {
+    "log": "harness-qol-final-tests.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalEngineTests.GraphemeBreakTests testMixedPlacementModesSurviveScreenCaptureAndCheckpoint]": {
+    "log": "harness-qol-final-tests.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalEngineTests.GraphemeBreakTests testMode2027ControlsFutureGraphemePlacement]": {
+    "log": "harness-qol-final-tests.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalEngineTests.GraphemeBreakTests testMode2027NegotiationAndReset]": {
+    "log": "harness-qol-final-tests.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalEngineTests.GraphemeBreakTests testOfficialUnicode18BoundaryCorpus]": {
+    "log": "harness-qol-final-tests.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalEngineTests.GraphemeBreakTests testPinnedClustersSurviveByteBoundariesAndResize]": {
+    "log": "harness-qol-final-tests.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalEngineTests.GraphemeBreakTests testPrependBeforeASCIIPreservesBothRunPaths]": {
+    "log": "harness-qol-final-tests.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalEngineTests.GraphemeBreakTests testWidthUsesPinnedClusterProperties]": {
+    "log": "harness-qol-final-tests.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalEngineTests.GraphemeHistoryTests testCompactHistoryPreservesAllCellAttributesAndSnapshotOwnership]": {
+    "log": "harness-qol-tests-2.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalEngineTests.GraphemeHistoryTests testCompoundEmojiAndDeepCombiningSurviveEveryReadPath]": {
+    "log": "harness-qol-tests-2.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalEngineTests.GraphemeHistoryTests testDecodedBudgetAccountsForRetainedWidthsAfterResizeAndClear]": {
+    "log": "harness-qol-tests-2.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalEngineTests.GraphemeHistoryTests testNewUnicodeCombiningMarksSurviveWithoutHostUnicodeSupport]": {
+    "log": "harness-qol-tests-2.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalEngineTests.GraphemeHistoryTests testOversizedGeometryIsBoundedBeforeAllocation]": {
+    "log": "harness-qol-tests-2.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalEngineTests.GraphemeHistoryTests testSearchMapsWideTextAndSoftWrapsAndReportsInvalidPattern]": {
+    "log": "harness-qol-tests-2.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalEngineTests.GraphemeHistoryTests testShortHistoryRowsDoNotRetainFullWidthCellArrays]": {
+    "log": "harness-qol-tests-2.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalEngineTests.PaneCaptureTests testTextHTMLAndVTShareOneGrid]": {
+    "log": "harness-qol-final-tests.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalEngineTests.PaneCaptureTests testTrimDropsTrailingSpacesAndBlankLines]": {
+    "log": "harness-qol-final-tests.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalEngineTests.PaneCaptureTests testUnwrapJoinsASoftWrappedRow]": {
+    "log": "harness-qol-final-tests.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalEngineTests.TerminalCheckpointTests testBothScreensSurviveWithOldHistoryPagedSeparately]": {
+    "log": "harness-qol-final-tests.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalEngineTests.TerminalCheckpointTests testContinuationAtEveryByteBoundary]": {
+    "log": "harness-qol-final-tests.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalEngineTests.TerminalCheckpointTests testCustomTabsScrollMarginsAndPenSurvive]": {
+    "log": "harness-qol-final-tests.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalEngineTests.TerminalCheckpointTests testImagesAndPendingKittyChunksSurviveAndIDsRemainUnique]": {
+    "log": "harness-qol-final-tests.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalEngineTests.TerminalCheckpointTests testPackedCellsRejectInvalidAttributeTags]": {
+    "log": "harness-qol-final-tests.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalEngineTests.TerminalCheckpointTests testPartialClipboardSequenceCompletesExactlyOnceAfterRestore]": {
+    "log": "harness-qol-final-tests.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalEngineTests.TerminalCheckpointTests testRestoreIsSilentAndClientOwnsFilesystemAccess]": {
+    "log": "harness-qol-final-tests.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalEngineTests.TerminalCheckpointTests testWireRoundTripAndInvalidCheckpointLeaveExistingStateIntact]": {
+    "log": "harness-qol-final-tests.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalEngineTests.TerminalTextAnchorTests testAnchorsFollowNarrowWideAndInclusiveWideTailThroughRepeatedReflow]": {
+    "log": "harness-qol-final-tests.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalEngineTests.TerminalTextAnchorTests testCommandBoundarySurvivesPromptEraseButSelectedCellDoesNot]": {
+    "log": "harness-qol-final-tests.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalEngineTests.TerminalTextAnchorTests testContextAndAnchorInvalidationWhenScreenIsDestroyed]": {
+    "log": "harness-qol-final-tests.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalEngineTests.TerminalTextAnchorTests testContextCannotRegisterAnUnmappedAnchorDuringReflow]": {
+    "log": "harness-qol-final-tests.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalEngineTests.TerminalTextAnchorTests testContextTranslatesEvictionAndRejectsCoordinatesChangedByReflow]": {
+    "log": "harness-qol-final-tests.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalEngineTests.TerminalTextAnchorTests testEndExclusiveBoundaryAtFullRowSurvivesResize]": {
+    "log": "harness-qol-final-tests.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalEngineTests.TerminalTextAnchorTests testHistoryEvictionInvalidatesOnlyLostAnchorsAndHeightResizeKeepsText]": {
+    "log": "harness-qol-final-tests.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalEngineTests.TerminalTextAnchorTests testRegionScrollAndCharacterEditsMoveOrInvalidateAnchors]": {
+    "log": "harness-qol-final-tests.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalEngineTests.TerminalTextAnchorTests testRestorationTransfersReferencesAndOldScreenDestructionDoesNotInvalidateThem]": {
+    "log": "harness-qol-final-tests.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalEngineTests.TerminalTextLayoutTests testClusterExactlyFillingRowRetainsAllExtenders]": {
+    "log": "harness-qol-final-tests.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalEngineTests.TerminalTextLayoutTests testEmptyAndClippedWideTextHaveNoPartialCells]": {
+    "log": "harness-qol-final-tests.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalEngineTests.TerminalTextLayoutTests testLiteralLayoutDoesNotInterpretEscapeCommands]": {
+    "log": "harness-qol-final-tests.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalEngineTests.ThaiCombiningMarkTests testBulkAndScalarwisePathsAgree]": {
+    "log": "harness-qol-tests-2.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalEngineTests.ThaiCombiningMarkTests testCaptureReconstructsThaiClusters]": {
+    "log": "harness-qol-tests-2.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalEngineTests.ThaiCombiningMarkTests testCaptureReflectsSaraAmDecomposition]": {
+    "log": "harness-qol-tests-2.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalEngineTests.ThaiCombiningMarkTests testMarkAfterWideBaseAttachesToHead]": {
+    "log": "harness-qol-tests-2.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalEngineTests.ThaiCombiningMarkTests testMarkOverSpaceAttachesButNotOverBlank]": {
+    "log": "harness-qol-tests-2.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalEngineTests.ThaiCombiningMarkTests testMarkWithPendingWrapAttachesAndDoesNotWrap]": {
+    "log": "harness-qol-tests-2.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalEngineTests.ThaiCombiningMarkTests testNamWaterLaysOutAsTwoColumns]": {
+    "log": "harness-qol-tests-2.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalEngineTests.ThaiCombiningMarkTests testNonExtendingFormatScalarsAreDropped]": {
+    "log": "harness-qol-tests-2.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalEngineTests.ThaiCombiningMarkTests testOrphanSaraAmKeepsOriginalScalar]": {
+    "log": "harness-qol-tests-2.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalEngineTests.ThaiCombiningMarkTests testOverwriteClearsStaleMarks]": {
+    "log": "harness-qol-tests-2.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalEngineTests.ThaiCombiningMarkTests testReviewWordNeitherDropsNorExplodes]": {
+    "log": "harness-qol-tests-2.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalEngineTests.ThaiCombiningMarkTests testSaraAmAfterFullClusterUsesOverflowStorage]": {
+    "log": "harness-qol-tests-2.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalEngineTests.ThaiCombiningMarkTests testSaraAmDecomposesOntoMarkedBase]": {
+    "log": "harness-qol-tests-2.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalEngineTests.ThaiCombiningMarkTests testSaraAmDecomposesOntoUnmarkedBase]": {
+    "log": "harness-qol-tests-2.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalEngineTests.ThaiCombiningMarkTests testSearchLeadingSaraAmMatchesFaithfulCellOnly]": {
+    "log": "harness-qol-tests-2.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalEngineTests.ThaiCombiningMarkTests testSearchMatchesSaraAmAfterMarkedBase]": {
+    "log": "harness-qol-tests-2.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalEngineTests.ThaiCombiningMarkTests testSearchMatchesSaraAmWords]": {
+    "log": "harness-qol-tests-2.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalEngineTests.ThaiCombiningMarkTests testSearchMatchesThaiClusterAtColumn]": {
+    "log": "harness-qol-tests-2.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalEngineTests.ThaiCombiningMarkTests testSearchNormalizesNFCvsNFD]": {
+    "log": "harness-qol-tests-2.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalEngineTests.ThaiCombiningMarkTests testSearchSaraAmAfterFullClusterMatchesFaithfulCell]": {
+    "log": "harness-qol-tests-2.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalEngineTests.ThaiCombiningMarkTests testThaiSyllableStacksIntoOneCell]": {
+    "log": "harness-qol-tests-2.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalEngineTests.ThaiCombiningMarkTests testThirdMarkIsDropped]": {
+    "log": "harness-qol-tests-2.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalKitTests.AsyncFindTests testCurrentMatchSurvivesWidthReflow]": {
+    "log": "harness-qol-final-tests.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalKitTests.AsyncFindTests testNewQueryReplacesPendingSearchAndInvalidRegexIsReported]": {
+    "log": "harness-qol-final-tests.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalKitTests.AsyncFindTests testRecordedRegexHighlightSurvivesRemountAndClearsOnOutput]": {
+    "log": "harness-qol-final-tests.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalKitTests.AsyncFindTests testRecordedRegexMatchIsShadedInPresentedFrame]": {
+    "log": "harness-qol-final-tests.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalKitTests.AsyncFindTests testReturnCommitsMarkedTextBeforeNavigatingMatches]": {
+    "log": "harness-qol-final-tests.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalKitTests.CellOverlayTests testClearingSelectionDirtiesExactlyItsRows]": {
+    "log": "harness-qol-final-tests.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalKitTests.CellOverlayTests testHorizontalDragChangesOnlyTheEndRow]": {
+    "log": "harness-qol-final-tests.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalKitTests.CellOverlayTests testInsertTextCommitsMarkedTextAndClearsIt]": {
+    "log": "harness-qol-final-tests.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalKitTests.CellOverlayTests testNoOverlaysYieldNoKeys]": {
+    "log": "harness-qol-final-tests.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalKitTests.CellOverlayTests testOffViewportSelectionIsClamped]": {
+    "log": "harness-qol-final-tests.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalKitTests.CellOverlayTests testOutputDuringActiveSelectionKeepsShadingAndDamage]": {
+    "log": "harness-qol-final-tests.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalKitTests.CellOverlayTests testPreeditKeysItsRowByTextAndPosition]": {
+    "log": "harness-qol-final-tests.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalKitTests.CellOverlayTests testPreeditOverSelectionUsesCanvasBackground]": {
+    "log": "harness-qol-final-tests.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalKitTests.CellOverlayTests testPreeditRidesDamageAndRestoresCleanly]": {
+    "log": "harness-qol-final-tests.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalKitTests.CellOverlayTests testSelectionAndFindOnTheSameRowKeySeparately]": {
+    "log": "harness-qol-final-tests.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalKitTests.CellOverlayTests testSelectionPresentsBakedEquivalentCellsAndKeepsReuseWarm]": {
+    "log": "harness-qol-final-tests.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalKitTests.CellOverlayTests testStaticOverlayAddsNoDamage]": {
+    "log": "harness-qol-final-tests.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalKitTests.CellOverlayTests testUnmarkTextDropsPreeditWithoutEmitting]": {
+    "log": "harness-qol-final-tests.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalKitTests.CellOverlayTests testVerticalDragChangesOnlyTheCrossedRows]": {
+    "log": "harness-qol-final-tests.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalKitTests.CellOverlayTests testWideMarkedTextWritesASpacerCell]": {
+    "log": "harness-qol-final-tests.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalKitTests.HistoryRestoreTests testARestoreWithNoHistoryKeepsTheScreen]": {
+    "log": "harness-qol-tests-3.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalKitTests.HistoryRestoreTests testRestoreAtAnotherWidthPreservesRedrawsAndLiveOutput]": {
+    "log": "harness-qol-tests-3.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalKitTests.HistoryRestoreTests testRestoreSwapsInTheHistory]": {
+    "log": "harness-qol-tests-3.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalKitTests.LiveResizeTests testAsyncRenderPathStillPresentsOutsideDrag]": {
+    "log": "harness-qol-tests-2.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalKitTests.LiveResizeTests testBalancedPaddingCentersSubCellRemainder]": {
+    "log": "harness-qol-tests-2.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalKitTests.LiveResizeTests testBoundaryTickDoesNotBlockMainOnBusyParser]": {
+    "log": "harness-qol-tests-2.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalKitTests.LiveResizeTests testBoundaryTickPaysExactlyOneCachePopulatingRebuildThenFree]": {
+    "log": "harness-qol-tests-2.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalKitTests.LiveResizeTests testCommitFiresLiveAtBoundaryWithReflowOn]": {
+    "log": "harness-qol-tests-2.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalKitTests.LiveResizeTests testComputeGridGeometryMatchesLegacyInlineMath]": {
+    "log": "harness-qol-tests-2.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalKitTests.LiveResizeTests testDebouncedCommitDefersWhileDragHolds]": {
+    "log": "harness-qol-tests-2.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalKitTests.LiveResizeTests testDebouncedCommitStillFiresWithoutLiveResize]": {
+    "log": "harness-qol-tests-2.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalKitTests.LiveResizeTests testDetachMidDragClearsStagedResizeTarget]": {
+    "log": "harness-qol-tests-2.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalKitTests.LiveResizeTests testDetachMidDragUnwindsLiveResizeState]": {
+    "log": "harness-qol-tests-2.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalKitTests.LiveResizeTests testDetachedDrawableWaitCannotBlockRemountAndPoolRestoresWithoutRendererChurn]": {
+    "log": "harness-qol-tests-2.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalKitTests.LiveResizeTests testDragEndInvalidatesInFlightPreview]": {
+    "log": "harness-qol-tests-2.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalKitTests.LiveResizeTests testEncodeStatsSplitIsPopulatedAndBounded]": {
+    "log": "harness-qol-tests-2.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalKitTests.LiveResizeTests testFlushedCommitDoesNotResurrectStaleSizeAfterDebounce]": {
+    "log": "harness-qol-tests-2.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalKitTests.LiveResizeTests testFrozenOriginClampSlidesWhenGrowthCrossesCellBoundary]": {
+    "log": "harness-qol-tests-2.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalKitTests.LiveResizeTests testFrozenOriginClampsWhenShrinkWouldClipLastColumn]": {
+    "log": "harness-qol-tests-2.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalKitTests.LiveResizeTests testFrozenOriginHeldSteadyAcrossSubCellWidths]": {
+    "log": "harness-qol-tests-2.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalKitTests.LiveResizeTests testLivePTYVoteCoalescesToDistinctCellCounts]": {
+    "log": "harness-qol-tests-2.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalKitTests.LiveResizeTests testLiveReflowCommitsGridAndPresentsMidDrag]": {
+    "log": "harness-qol-tests-2.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalKitTests.LiveResizeTests testLiveReflowDisabledDefersCommitToRelease]": {
+    "log": "harness-qol-tests-2.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalKitTests.LiveResizeTests testLiveResizeFreezesOriginOnlyAfterFirstLayout]": {
+    "log": "harness-qol-tests-2.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalKitTests.LiveResizeTests testLiveResizeLifecycleTogglesTransactionPresentMode]": {
+    "log": "harness-qol-tests-2.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalKitTests.LiveResizeTests testMidDragOutputPresentsLiveWithReflowOn]": {
+    "log": "harness-qol-tests-2.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalKitTests.LiveResizeTests testOutputPresentsDeferDuringDragAndFlushAfter]": {
+    "log": "harness-qol-tests-2.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalKitTests.LiveResizeTests testPresentPercentileMath]": {
+    "log": "harness-qol-tests-2.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalKitTests.LiveResizeTests testPresentResizePreviewGuardsDropStaleLandings]": {
+    "log": "harness-qol-tests-2.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalKitTests.LiveResizeTests testStackedLiveCommitsApplyOnlyTheLatestTarget]": {
+    "log": "harness-qol-tests-2.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalKitTests.LiveResizeTests testStalePreviewBuildIsDroppedNotStashed]": {
+    "log": "harness-qol-tests-2.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalKitTests.LiveResizeTests testSubCellDragRepaintsReuseEveryRow]": {
+    "log": "harness-qol-tests-2.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalKitTests.LiveResizeTests testTokenSupersededCommitBuildStillAppliesResize]": {
+    "log": "harness-qol-tests-2.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalKitTests.LiveResizeTests testTransactionRepaintSupersedesAnEarlierEncodeCompletion]": {
+    "log": "harness-qol-tests-2.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalKitTests.LiveResizeTests testTransientLayoutReturningToOriginalSizeCancelsResize]": {
+    "log": "harness-qol-tests-2.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalKitTests.LiveResizeTests testUnbalancedOriginIsPaddingInset]": {
+    "log": "harness-qol-tests-2.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalKitTests.LiveResizeTests testUnmountedGeometryDoesNotVotePlaceholderPTYSize]": {
+    "log": "harness-qol-tests-2.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalKitTests.LiveResizeTests testViewDidEndLiveResizeFlushesPendingCommitImmediately]": {
+    "log": "harness-qol-tests-2.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalKitTests.LiveResizeTests testWindowHostedLiveResizeRoutesPresentsThroughTransactionSyncPath]": {
+    "log": "harness-qol-tests-2.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalKitTests.ScrollReuseTests testContinuousScrollSplitMath]": {
+    "log": "harness-qol-tests-2.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalKitTests.ScrollReuseTests testFractionOnlyScrollTickReusesEveryRow]": {
+    "log": "harness-qol-tests-2.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalKitTests.ScrollReuseTests testOutputWhileScrolledFallsBackToFullRebuild]": {
+    "log": "harness-qol-tests-2.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalKitTests.ScrollReuseTests testPureScrollRotatesRowCacheInsteadOfFullEncode]": {
+    "log": "harness-qol-tests-2.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalKitTests.SelectLastCommandOutputTests testCommandOutputBoundariesSurviveReflow]": {
+    "log": "harness-qol-final-tests.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalKitTests.SelectLastCommandOutputTests testFailedCommandNavigationSkipsSuccessfulCommands]": {
+    "log": "harness-qol-final-tests.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalKitTests.SelectLastCommandOutputTests testNoOpWhenTheCommandPrintedNothing]": {
+    "log": "harness-qol-final-tests.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalKitTests.SelectLastCommandOutputTests testNoOpWithoutCommandBoundaries]": {
+    "log": "harness-qol-final-tests.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalKitTests.SelectLastCommandOutputTests testOutputWithoutTrailingNewlineExcludesFollowingPrompt]": {
+    "log": "harness-qol-final-tests.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalKitTests.SelectLastCommandOutputTests testScrollsToRevealOffscreenOutput]": {
+    "log": "harness-qol-final-tests.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalKitTests.SelectLastCommandOutputTests testSelectsTheLastFinishedCommandsOutput]": {
+    "log": "harness-qol-final-tests.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalKitTests.SelectLastCommandOutputTests testWrappedPromptAndInputAreExcludedFromOutput]": {
+    "log": "harness-qol-final-tests.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalKitTests.SelectionScrollTests testEvictedSelectionClampsInsteadOfCrashing]": {
+    "log": "harness-qol-final-tests.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalKitTests.SelectionScrollTests testPresentedSelectionShadingRebasesAcrossScroll]": {
+    "log": "harness-qol-final-tests.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalKitTests.SelectionScrollTests testSelectionAndReadingPositionSurviveRepeatedReflow]": {
+    "log": "harness-qol-final-tests.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalKitTests.SelectionScrollTests testSelectionStaysOnContentAsNewOutputArrives]": {
+    "log": "harness-qol-final-tests.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalKitTests.SelectionScrollTests testSelectionSurvivesScrolling]": {
+    "log": "harness-qol-final-tests.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalKitTests.SelectionScrollTests testWrappedSelectionPreservesInteriorSpacesAndWideDeferral]": {
+    "log": "harness-qol-final-tests.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalKitTests.SurfaceOutputReceiverTests testBatchingPreservesReplayBoundariesAndReleasesEveryPacketAfterParsing]": {
+    "log": "harness-qol-tests-2.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalKitTests.SurfaceOutputReceiverTests testDisconnectBeforeReplayConsumptionDoesNotInventAResumeFence]": {
+    "log": "harness-qol-tests-2.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalKitTests.SurfaceOutputReceiverTests testEmptyPacketFloodHasBoundedTurnsAndPreservesQueueOrder]": {
+    "log": "harness-qol-tests-2.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalKitTests.SurfaceOutputReceiverTests testLargePacketYieldsToQueuedWorkWithoutReleasingIngressBudgetEarly]": {
+    "log": "harness-qol-tests-2.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalKitTests.SurfaceOutputReceiverTests testPartialPacketKeepsReplayBoundariesAndCompletionOrder]": {
+    "log": "harness-qol-tests-2.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalKitTests.SurfaceOutputReceiverTests testReconnectWaitsForAdmittedParserWorkAndPublishesItsExactResumeFence]": {
+    "log": "harness-qol-tests-2.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalKitTests.TextOverlayLayoutTests testCopyStatusUsesCellWidthsAndCompleteClusters]": {
+    "log": "harness-qol-final-tests.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalKitTests.TextOverlayLayoutTests testPreeditClipsWholeWideClusterAtRightEdge]": {
+    "log": "harness-qol-final-tests.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalKitTests.TextOverlayLayoutTests testPreeditMatchesCommittedClustersAndAvoidsExistingClusterIDs]": {
+    "log": "harness-qol-final-tests.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalRendererTests.GlyphRasterizerTests test3270NerdFontCrispRasterizationUsesSyntheticThickeningOnly]": {
+    "log": "harness-qol-tests-2.log",
+    "result": "skipped"
+  },
+  "-[HarnessTerminalRendererTests.GlyphRasterizerTests test3270NerdFontThickeningStaysNoHeavierThanBold]": {
+    "log": "harness-qol-tests-2.log",
+    "result": "skipped"
+  },
+  "-[HarnessTerminalRendererTests.GlyphRasterizerTests testBoldVariantRasterizes]": {
+    "log": "harness-qol-tests-2.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalRendererTests.GlyphRasterizerTests testCachedAndUncachedShapeResultsMatch]": {
+    "log": "harness-qol-tests-2.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalRendererTests.GlyphRasterizerTests testColorEmojiConvertToTheTargetColorSpace]": {
+    "log": "harness-qol-tests-2.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalRendererTests.GlyphRasterizerTests testColorEmojiRasterizeWithIntrinsicColorsIncludingCompoundClusters]": {
+    "log": "harness-qol-tests-2.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalRendererTests.GlyphRasterizerTests testCompactUnavailableNerdFontDoesNotResolveToHelvetica]": {
+    "log": "harness-qol-tests-2.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalRendererTests.GlyphRasterizerTests testConfiguredFallbackOrderReachesCoreText]": {
+    "log": "harness-qol-tests-2.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalRendererTests.GlyphRasterizerTests testDefaultFontResolutionMatchesRasterizerConstruction]": {
+    "log": "harness-qol-tests-2.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalRendererTests.GlyphRasterizerTests testEmptyFamilyFallsBackToMonospaceMenlo]": {
+    "log": "harness-qol-tests-2.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalRendererTests.GlyphRasterizerTests testFallbackFontsFitThePrimaryBaselineAndLineBox]": {
+    "log": "harness-qol-tests-2.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalRendererTests.GlyphRasterizerTests testFallbackRendersCJK]": {
+    "log": "harness-qol-tests-2.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalRendererTests.GlyphRasterizerTests testFontFeaturesReachShapingAndDoNotChangeCellMetrics]": {
+    "log": "harness-qol-tests-2.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalRendererTests.GlyphRasterizerTests testFontThickenAppliesToComposedClusters]": {
+    "log": "harness-qol-tests-2.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalRendererTests.GlyphRasterizerTests testFontThickenIncreasesGlyphCoverageWithoutChangingMetricsOrBoxDrawing]": {
+    "log": "harness-qol-tests-2.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalRendererTests.GlyphRasterizerTests testInvalidScalarReturnsNil]": {
+    "log": "harness-qol-tests-2.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalRendererTests.GlyphRasterizerTests testMetricsArePositiveAndMonospace]": {
+    "log": "harness-qol-tests-2.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalRendererTests.GlyphRasterizerTests testNativeRasterizationUsesUnsmoothedCoreGraphicsCoverage]": {
+    "log": "harness-qol-tests-2.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalRendererTests.GlyphRasterizerTests testRasterizerCanUsePreResolvedFontIdentity]": {
+    "log": "harness-qol-tests-2.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalRendererTests.GlyphRasterizerTests testRasterizesLetterWithInk]": {
+    "log": "harness-qol-tests-2.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalRendererTests.GlyphRasterizerTests testScreenshotLikeStringsDoNotExceedMonospaceCellBudget]": {
+    "log": "harness-qol-tests-2.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalRendererTests.GlyphRasterizerTests testShapeEmptyIsEmpty]": {
+    "log": "harness-qol-tests-2.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalRendererTests.GlyphRasterizerTests testShapePlainTextMapsOneGlyphPerCharacterInOrder]": {
+    "log": "harness-qol-tests-2.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalRendererTests.GlyphRasterizerTests testShapedRunCacheDoesNotExceedCap]": {
+    "log": "harness-qol-tests-2.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalRendererTests.GlyphRasterizerTests testShapedRunCacheHitsOnRepeat]": {
+    "log": "harness-qol-tests-2.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalRendererTests.GlyphRasterizerTests testShapedRunCacheIsScopedByFontSize]": {
+    "log": "harness-qol-tests-2.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalRendererTests.GlyphRasterizerTests testShapedRunCacheKeysBoldAndItalicSeparately]": {
+    "log": "harness-qol-tests-2.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalRendererTests.GlyphRasterizerTests testSpaceHasNoInk]": {
+    "log": "harness-qol-tests-2.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalRendererTests.GlyphRasterizerTests testTextPresentationSymbolsDoNotBecomeEmoji]": {
+    "log": "harness-qol-tests-2.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalRendererTests.GlyphRasterizerTests testUnavailableConfiguredFontReportsFallbackStatus]": {
+    "log": "harness-qol-tests-2.log",
+    "result": "passed"
+  }
+}

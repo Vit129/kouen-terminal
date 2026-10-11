@@ -16,6 +16,8 @@ public final class DaemonServer: @unchecked Sendable {
     private var listener: DispatchSourceRead?
     private var checkpointTimer: DispatchSourceTimer?
     private let checkpointTimerLock = NSLock()
+    private let checkpointQueue = DispatchQueue(label: "com.harness.daemon.checkpoints", qos: .utility)
+    private var lastCheckpointRevision: Int?
     private var listenerSocketIdentity: (device: dev_t, inode: ino_t)?
     private let queue = DispatchQueue(label: "com.robert.harness.daemon")
     private var clientBuffers: [Int32: IPCReadBuffer] = [:]
@@ -35,6 +37,7 @@ public final class DaemonServer: @unchecked Sendable {
     private struct PendingWrite {
         var data: Data
         var consumed: Int = 0
+        var completions: [(offset: Int, callback: @Sendable () -> Void)] = []
         var remaining: Int { data.count - consumed }
     }
     private var writeBuffers: [Int32: PendingWrite] = [:]
@@ -49,6 +52,7 @@ public final class DaemonServer: @unchecked Sendable {
     /// peer turning `clientBuffers` into a per-connection memory sink.
     private let maxPartialFrameBytes = IPCCodec.maxPayloadLength + 4096
     private var outputSubscriptions: [Int32: [(surfaceID: String, token: UUID, deliveryID: UUID)]] = [:]
+    private var attachRequests: [Int32: [String: UUID]] = [:]
     /// FDs subscribed to layout-change pushes (`subscribeSnapshot`).
     private var snapshotSubscribers: Set<Int32> = []
     /// FDs subscribed to `events --follow`.
@@ -133,6 +137,7 @@ public final class DaemonServer: @unchecked Sendable {
         registry.onSnapshotCommitted = { [weak self] revision in
             guard let self else { return }
             self.queue.async { [weak self] in self?.pushSnapshotRevision(revision) }
+            self.scheduleHostCheckpoint()
         }
         registry.onFollowEvent = { [weak self] event in
             guard let self else { return }
@@ -423,6 +428,12 @@ public final class DaemonServer: @unchecked Sendable {
             }
             if case let .attachStream(attach) = request {
                 handleAttach(attach, fd: fd)
+                continue
+            }
+            if case let .acknowledgeOutput(surfaceID, token, sequence) = request {
+                for subscription in outputSubscriptions[fd] ?? [] where subscription.surfaceID == surfaceID && subscription.token == token {
+                    registry.acknowledgeSubscription(surfaceID: surfaceID, token: subscription.token, sequence: sequence)
+                }
                 continue
             }
             if case let .sendData(surfaceID, payload) = request, readOnlyClients.contains(fd) {
@@ -797,7 +808,7 @@ public final class DaemonServer: @unchecked Sendable {
 
     private enum WriteOutcome { case complete, wouldBlock, failed }
 
-    private func send(_ response: IPCResponse, to fd: Int32) {
+    private func send(_ response: IPCResponse, to fd: Int32, onFlushed: (@Sendable () -> Void)? = nil) {
         guard let data = try? IPCCodec.encode(IPCReply(response: response)) else {
             // Encoding a reply should be infallible; if it isn't, the client would hang forever
             // waiting for bytes that never come. Send a minimal error instead, and if even that
@@ -811,12 +822,12 @@ public final class DaemonServer: @unchecked Sendable {
             }
             return
         }
-        enqueue(data, to: fd)
+        enqueue(data, to: fd, onFlushed: onFlushed)
     }
 
     /// Hot-path PTY output as a raw binary frame (no JSON/base64). Shares the exact buffering,
     /// backlog cap, and writable-source flush as `send`, so ordering and backpressure are identical.
-    private func sendDataFrame(_ payload: Data, sequence: UInt64, to fd: Int32) {
+    private func sendDataFrame(_ payload: Data, sequence: UInt64, to fd: Int32, onFlushed: (@Sendable () -> Void)? = nil) {
         guard let data = try? IPCCodec.encodeOutputFrame(payload, sequence: sequence) else {
             // A dropped output frame leaves a gap in the client's byte stream (visible terminal
             // corruption). This should be impossible — a frame is ≤64 KiB, far under the 16 MiB
@@ -825,16 +836,19 @@ public final class DaemonServer: @unchecked Sendable {
             clientSources[fd]?.cancel()
             return
         }
-        enqueue(data, to: fd)
+        enqueue(data, to: fd, onFlushed: onFlushed)
     }
 
     /// Append framed bytes to `fd`'s pending tail (so frames stay in order), enforce the backlog
     /// cap, and flush what the non-blocking socket takes now. The single owner of `writeBuffers`
     /// growth — both JSON replies and binary frames go through here.
-    private func enqueue(_ data: Data, to fd: Int32) {
+    private func enqueue(_ data: Data, to fd: Int32, onFlushed: (@Sendable () -> Void)? = nil) {
         // Mutate in place through the subscript: copying the entry out would copy-on-write the
         // whole backlog per frame (quadratic once a client falls behind).
         writeBuffers[fd, default: PendingWrite(data: Data())].data.append(data) // amortized O(1)
+        if let onFlushed, let offset = writeBuffers[fd]?.data.count {
+            writeBuffers[fd]?.completions.append((offset, onFlushed))
+        }
         let backlog = writeBuffers[fd]?.remaining ?? 0
         // Read-only instrumentation of the peak backlog (the cap/flush/drop logic below is
         // unchanged); captured here so a client that's about to be dropped still registers its high.
@@ -873,6 +887,8 @@ public final class DaemonServer: @unchecked Sendable {
             }
         }
         pending.consumed = newConsumed
+        let completed = pending.completions.filter { $0.offset <= newConsumed }
+        pending.completions.removeAll { $0.offset <= newConsumed }
         switch outcome {
         case .complete:
             suspendWriteSource(fd: fd)
@@ -880,6 +896,7 @@ public final class DaemonServer: @unchecked Sendable {
             // Compact the consumed prefix in one batch once it dominates the buffer (≈O(1)
             // amortized), bounding retained memory without an O(remaining) shift every flush.
             if pending.consumed > 65_536, pending.consumed >= pending.remaining {
+                for index in pending.completions.indices { pending.completions[index].offset -= pending.consumed }
                 pending.data.removeFirst(pending.consumed)
                 pending.consumed = 0
             }
@@ -889,6 +906,8 @@ public final class DaemonServer: @unchecked Sendable {
             suspendWriteSource(fd: fd)
             clientSources[fd]?.cancel() // EPIPE / peer gone
         }
+        if case .failed = outcome { return }
+        for completion in completed { queue.async(execute: completion.callback) }
     }
 
     private func ensureWriteSource(fd: Int32) {
@@ -918,12 +937,31 @@ public final class DaemonServer: @unchecked Sendable {
     /// while this client's live frames are held. Back on the queue the reply and history go
     /// out, then the held frames the history doesn't cover: nothing is missed or sent twice.
     /// History is binary frames, so its size is bounded by the ring, not the JSON frame cap.
-    private func handleAttach(_ attach: AttachRequest, fd: Int32) {
+    private func handleAttach(_ attach: AttachRequest, fd: Int32, requestID: UUID? = nil) {
+        let requestID = requestID ?? UUID()
+        attachRequests[fd, default: [:]][attach.surfaceID] = requestID
+        cancelSurfaceSubscriptions(surfaceID: attach.surfaceID, fd: fd)
+        if let launch = attach.launch {
+            guard let descriptor = clientDescriptors[fd] else { return }
+            DispatchQueue.global(qos: .userInitiated).async { [weak self, registry] in
+                let result = registry.handle(.ensureSurface(surfaceID: attach.surfaceID, cwd: launch.cwd, shell: launch.shell,
+                    rows: launch.rows, cols: launch.cols, scrollbackBytes: launch.scrollbackBytes, requireInLayout: launch.requireInLayout))
+                self?.queue.async { [weak self] in
+                    guard let self, self.clientDescriptors[fd] === descriptor,
+                          self.attachRequests[fd]?[attach.surfaceID] == requestID else { return }
+                    guard case .ok = result else { self.send(result, to: fd); return }
+                    var ready = attach; ready.launch = nil
+                    self.handleAttach(ready, fd: fd, requestID: requestID)
+                }
+            }
+            return
+        }
         if attach.readOnly { readOnlyClients.insert(fd) } else { readOnlyClients.remove(fd) }
         streamClients.insert(fd)
         if attach.inputErrors == true { inputErrorClients.insert(fd) }
         let gate = AttachGate()
-        guard let token = addOutputSubscription(surfaceID: attach.surfaceID, label: attach.label, fd: fd, gate: gate, geometryEvents: attach.geometryEvents == true) else {
+        guard let token = addOutputSubscription(surfaceID: attach.surfaceID, label: attach.label, fd: fd, gate: gate,
+            geometryEvents: attach.geometryEvents == true, acknowledgesOutput: attach.acknowledgesOutput) else {
             send(.error("Surface not found"), to: fd)
             return
         }
@@ -932,7 +970,8 @@ public final class DaemonServer: @unchecked Sendable {
             let start = registry.attachHistory(surfaceID: attach.surfaceID, history: attach.history, fromSequence: resumeFrom, screenOnResync: attach.screenOnResync == true, includeCheckpoint: attach.checkpoint == true)
             self?.queue.async { [weak self] in
                 // The client may have gone, and its fd been reused, while the history was read.
-                guard let self, self.outputSubscriptions[fd]?.contains(where: { $0.token == token }) == true else { return }
+                guard let self, self.attachRequests[fd]?[attach.surfaceID] == requestID,
+                      self.outputSubscriptions[fd]?.contains(where: { $0.token == token }) == true else { return }
                 guard let start else {
                     self.send(.error("Surface not found"), to: fd)
                     return
@@ -943,22 +982,37 @@ public final class DaemonServer: @unchecked Sendable {
                 }
                 self.send(.attached(AttachReply(
                     epoch: self.epoch, resync: start.resync, endSequence: start.endSequence, screen: attach.checkpoint == true ? nil : start.screen?.vt, inputErrors: attach.inputErrors == true ? true : nil,
-                    replaySizes: start.replaySizes, checkpoint: attach.checkpoint == true ? start.screen?.checkpoint : nil
-                )), to: fd)
-                for chunk in start.chunks {
-                    self.sendDataFrame(chunk.data, sequence: chunk.sequence, to: fd)
-                }
-                for frame in gate.open(floor: start.endSequence) {
-                    if let wire = frame.wire { self.enqueue(wire, to: fd) }
-                }
+                    replaySizes: start.replaySizes, checkpoint: attach.checkpoint == true ? start.screen?.checkpoint : nil,
+                    outputToken: attach.acknowledgesOutput ? token : nil
+                )), to: fd, onFlushed: { [weak self] in
+                    self?.pumpAttachHistory(start, index: 0, surfaceID: attach.surfaceID, token: token, requestID: requestID, gate: gate, fd: fd)
+                })
             }
         }
+    }
+
+    /// Keep only one historical segment in the socket queue, regardless of retained history size.
+    private func pumpAttachHistory(_ history: AttachHistory, index: Int, surfaceID: String, token: UUID,
+                                   requestID: UUID, gate: AttachGate, fd: Int32) {
+        guard attachRequests[fd]?[surfaceID] == requestID,
+              outputSubscriptions[fd]?.contains(where: { $0.token == token }) == true else { return }
+        guard index < history.chunks.count else {
+            for frame in gate.open(floor: history.endSequence) {
+                if let wire = frame.wire { enqueue(wire, to: fd) }
+            }
+            return
+        }
+        let chunk = history.chunks[index]
+        sendDataFrame(chunk.data, sequence: chunk.sequence, to: fd, onFlushed: { [weak self] in
+            self?.pumpAttachHistory(history, index: index + 1, surfaceID: surfaceID, token: token,
+                                    requestID: requestID, gate: gate, fd: fd)
+        })
     }
 
     /// Streams `surfaceID`'s output to `fd` and registers `fd` as a client. `gate` holds live
     /// frames until an attach's history is out. The subscription's token, or nil when the
     /// surface doesn't exist.
-    private func addOutputSubscription(surfaceID: String, label: String?, fd: Int32, gate: AttachGate?, geometryEvents: Bool = false) -> UUID? {
+    private func addOutputSubscription(surfaceID: String, label: String?, fd: Int32, gate: AttachGate?, geometryEvents: Bool = false, acknowledgesOutput: Bool = false) -> UUID? {
         let deliveryID = UUID()
         let resizeHandler: (@Sendable (ReplaySize) -> Void)?
         if geometryEvents {
@@ -970,7 +1024,7 @@ public final class DaemonServer: @unchecked Sendable {
             }
             }
         } else { resizeHandler = nil }
-        guard let token = registry.subscribe(surfaceID: surfaceID, onResize: resizeHandler, handler: { [weak self] data, sequence in
+        guard let token = registry.subscribe(surfaceID: surfaceID, onResize: resizeHandler, acknowledgesOutput: acknowledgesOutput, handler: { [weak self] data, sequence in
             guard let server = self else { return }
             server.queue.async { [weak server] in
                 // Cancellation cannot retract a callback already captured by the PTY's
@@ -1089,13 +1143,8 @@ public final class DaemonServer: @unchecked Sendable {
     /// `cancelSubscriptions(for:)` (which tears down a whole connection). Runs on `queue`, like
     /// every other subscription/size mutation, so the maps are never touched off-queue.
     private func handleDetachSurface(surfaceID: String, fd: Int32) {
-        if var subs = outputSubscriptions[fd] {
-            for sub in subs where sub.surfaceID == surfaceID {
-                registry.cancelSubscription(surfaceID: surfaceID, token: sub.token)
-            }
-            subs.removeAll { $0.surfaceID == surfaceID }
-            if subs.isEmpty { outputSubscriptions.removeValue(forKey: fd) } else { outputSubscriptions[fd] = subs }
-        }
+        attachRequests[fd]?[surfaceID] = nil
+        cancelSurfaceSubscriptions(surfaceID: surfaceID, fd: fd)
         if let size = sizeArbiter.disconnect(client: fd, surface: surfaceID) {
             _ = registry.handle(.resizeSurface(surfaceID: surfaceID, rows: size.rows, cols: size.cols))
         }
@@ -1103,7 +1152,18 @@ public final class DaemonServer: @unchecked Sendable {
         pushOwnership(surfaceID)
     }
 
+    private func cancelSurfaceSubscriptions(surfaceID: String, fd: Int32) {
+        if var subs = outputSubscriptions[fd] {
+            for sub in subs where sub.surfaceID == surfaceID {
+                registry.cancelSubscription(surfaceID: surfaceID, token: sub.token)
+            }
+            subs.removeAll { $0.surfaceID == surfaceID }
+            if subs.isEmpty { outputSubscriptions.removeValue(forKey: fd) } else { outputSubscriptions[fd] = subs }
+        }
+    }
+
     private func cancelSubscriptions(for fd: Int32) {
+        attachRequests.removeValue(forKey: fd)
         let subscriptions = outputSubscriptions.removeValue(forKey: fd) ?? []
         for subscription in subscriptions {
             registry.cancelSubscription(surfaceID: subscription.surfaceID, token: subscription.token)
@@ -1164,15 +1224,28 @@ public final class DaemonServer: @unchecked Sendable {
     /// daemon teardown).
     private func startHostCheckpointTimer() {
         checkpointTimerLock.lock(); defer { checkpointTimerLock.unlock() }
-        guard checkpointTimer == nil, let host = SessionHostClient.configured else { return }
-        let timer = DispatchSource.makeTimerSource(queue: DispatchQueue(label: "com.harness.daemon.checkpoints"))
-        timer.schedule(deadline: .now(), repeating: 1)
+        guard checkpointTimer == nil, registry.hasHostedObservation else { return }
+        let timer = DispatchSource.makeTimerSource(queue: checkpointQueue)
+        timer.schedule(deadline: .now())
         timer.setEventHandler { [weak self] in
-            guard let self, !self.registry.isQuiesced,
-                  case let .text(text) = self.registry.observationCheckpoint() else { return }
-            _ = try? host.request(.applicationCheckpoint(Data(text.utf8)), timeout: 1)
+            guard let self, !registry.isQuiesced else { return }
+            let revision = registry.revision
+            guard revision != lastCheckpointRevision,
+                  case let .text(text) = registry.observationCheckpoint() else { return }
+            do {
+                try registry.sendHostCheckpoint(Data(text.utf8))
+                lastCheckpointRevision = revision
+            } catch {
+                fputs("Harness: host checkpoint delivery failed; retrying: \(error)\n", harnessStderr)
+                scheduleHostCheckpoint()
+            }
         }
         timer.resume(); checkpointTimer = timer
+    }
+
+    private func scheduleHostCheckpoint() {
+        checkpointTimerLock.lock(); defer { checkpointTimerLock.unlock() }
+        checkpointTimer?.schedule(deadline: .now() + 1, leeway: .milliseconds(100))
     }
 
     public func stop() {

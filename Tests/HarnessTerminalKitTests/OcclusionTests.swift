@@ -9,10 +9,11 @@ import XCTest
 @MainActor
 final class OcclusionTests: XCTestCase {
     private func makeHostedView(in window: NSWindow) throws -> HarnessTerminalSurfaceView {
-        let view = HarnessTerminalSurfaceView(offMainParserFramePipeline: true)
+        let view = HarnessTerminalSurfaceView()
         window.contentView = view
         guard view.testingHasRenderer else { throw XCTSkip("renderer unavailable") }
         view.layoutSubtreeIfNeeded()
+        drainRenderPipeline(view)
         return view
     }
 
@@ -40,6 +41,7 @@ final class OcclusionTests: XCTestCase {
         view.receive("before\r\n")
         view.testingWaitForEmulatorIdle()
         view.testingForceRender()
+        drainRenderPipeline(view)
         guard view.testingLastPresentedFrame != nil else {
             throw XCTSkip("no present happened (drawable unavailable)")
         }
@@ -66,7 +68,7 @@ final class OcclusionTests: XCTestCase {
         // Uncover: the accumulated damage presents on the next tick.
         view.testingSetWindowOccluded(false)
         XCTAssertTrue(view.testingSchedulerTick(), "visibility back → the held frame presents")
-        pump() // the off-main build's present lands on a main hop
+        drainRenderPipeline(view) // acquisition, encoding and submission finish
         XCTAssertTrue(presentedText(view).contains("HIDDENMARKER"))
     }
 
@@ -82,6 +84,7 @@ final class OcclusionTests: XCTestCase {
         view.receive("idle repaint\r\n")
         view.testingWaitForEmulatorIdle()
         view.testingForceRender()
+        drainRenderPipeline(view)
         guard view.testingLastPresentedFrame != nil else {
             throw XCTSkip("no present happened (drawable unavailable)")
         }
@@ -93,6 +96,7 @@ final class OcclusionTests: XCTestCase {
         view.onRenderStats = { _ in presents += 1 }
         view.needsDisplay = true
         view.displayIfNeeded()
+        drainRenderPipeline(view)
 
         XCTAssertEqual(presents, 1, "AppKit display invalidation must repaint idle cached Metal contents")
         guard let stats = view.testingLastRenderStats else { return XCTFail("missing stats") }
@@ -129,7 +133,7 @@ final class OcclusionTests: XCTestCase {
         view.receive("initial")
         view.testingWaitForEmulatorIdle()
         view.testingRenderNowOffMainAsync()
-        pump()
+        drainRenderPipeline(view)
         guard view.testingLastPresentedFrame != nil else {
             throw XCTSkip("drawable unavailable")
         }
@@ -150,7 +154,7 @@ final class OcclusionTests: XCTestCase {
         XCTAssertTrue(replied, "query replies must not wait for the display")
         XCTAssertFalse(presentedText(view).contains("second"), "the drawable is still held")
         release.signal()
-        pump(0.1)
+        drainRenderPipeline(view)
         XCTAssertTrue(presentedText(view).contains("first"), "coalescing preserves earlier row damage")
         XCTAssertTrue(presentedText(view).contains("second"), "the newest frame reaches the display")
     }

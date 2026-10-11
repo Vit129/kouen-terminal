@@ -1,21 +1,27 @@
 # Harness shell integration for zsh — OSC 133 semantic prompts.
-#
-#   Add to ~/.zshrc:   source "/path/to/harness.zsh"
-#
-# Emits OSC 133;A to mark each prompt line and OSC 133;D;<exit> to report the previous
-# command's status, so Harness can draw the prompt gutter, color success/failure, and
-# jump between prompts. Only active inside a Harness terminal (the daemon exports $HARNESS).
-
+# A/B bracket the rendered prompt; C starts output; D reports command status.
+# Active only inside a Harness pane (the daemon exports $HARNESS).
 if [[ -n "$HARNESS" && "$TERM" != "dumb" ]]; then
   autoload -Uz add-zsh-hook 2>/dev/null
   __harness_precmd() {
-    # Runs before each prompt: report the previous command's exit, then mark the new prompt.
-    printf '\033]133;D;%s\007' "$?"
-    printf '\033]133;A\007'
+    local __harness_status=$?
+    printf '\033]133;D;%s\007' "$__harness_status"
+    case "$PS1" in
+      *'133;A'*) ;;
+      *) PS1=$'%{\033]133;A\007%}'"$PS1" ;;
+    esac
+    case "$PS1" in
+      *'133;B'*) ;;
+      *) PS1="$PS1"$'%{\033]133;B\007%}' ;;
+    esac
+    return "$__harness_status"
   }
+  __harness_preexec() { printf '\033]133;C\007'; }
   if (( ${+functions[add-zsh-hook]} )); then
     add-zsh-hook precmd __harness_precmd
+    add-zsh-hook preexec __harness_preexec
   else
-    precmd_functions+=(__harness_precmd)
+    (( ${precmd_functions[(Ie)__harness_precmd]} )) || precmd_functions+=(__harness_precmd)
+    (( ${preexec_functions[(Ie)__harness_preexec]} )) || preexec_functions+=(__harness_preexec)
   fi
 fi

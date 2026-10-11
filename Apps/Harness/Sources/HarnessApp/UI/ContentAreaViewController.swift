@@ -141,10 +141,14 @@ final class ContentAreaViewController: NSViewController, TerminalTabBarDelegate 
         retryButton.target = self; retryButton.action = #selector(retryRemote)
         connectionNotice.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(connectionNotice)
+        // The split can have zero width during installation. Its hidden connection
+        // notice must not require a negative width and break the host's edge constraints.
+        let noticeWidth = connectionNotice.widthAnchor.constraint(lessThanOrEqualTo: terminalHost.widthAnchor, constant: -24)
+        noticeWidth.priority = .defaultHigh
         NSLayoutConstraint.activate([
             connectionNotice.topAnchor.constraint(equalTo: terminalHost.topAnchor, constant: 10),
             connectionNotice.centerXAnchor.constraint(equalTo: terminalHost.centerXAnchor),
-            connectionNotice.widthAnchor.constraint(lessThanOrEqualTo: terminalHost.widthAnchor, constant: -24),
+            noticeWidth,
         ])
         refreshConnectionNotice()
 

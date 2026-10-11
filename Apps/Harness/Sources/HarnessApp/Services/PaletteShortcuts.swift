@@ -28,7 +28,8 @@ final class PaletteShortcuts {
             monitor = nil
         } else if monitor == nil {
             monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
-                self?.handle(event) ?? event
+                guard let self else { return event }
+                return self.handle(event)
             }
         }
     }

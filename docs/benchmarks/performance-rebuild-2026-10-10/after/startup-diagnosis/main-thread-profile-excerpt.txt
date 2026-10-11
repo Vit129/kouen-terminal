@@ -1,0 +1,65 @@
+Analysis of sampling Harness (pid 85696) every 1 millisecond
+Process:         Harness [85696]
+Path:            /Users/USER/Desktop/*/Harness.app/Contents/MacOS/Harness
+Load Address:    0x102300000
+Identifier:      com.robert.harness.performance.after
+Version:         2.2.0 (133)
+Code Type:       ARM64
+Platform:        macOS
+Parent Process:  Python [85693]
+Target Type:     live task
+
+Date/Time:       2026-10-10 21:22:35.611 -0500
+Launch Time:     2026-10-10 21:22:35.501 -0500
+OS Version:      macOS 27.0.1 (26A434)
+Report Version:  7
+Analysis Tool:   /usr/bin/sample
+
+Physical footprint:         59.5M
+Physical footprint (peak):  244.1M
+Idle exit:                  untracked
+----
+
+Call graph:
+    2302 Thread_5169850: Main Thread   DispatchQueue_<multiple>
+    + 2302 start  (in dyld) + 6688  [0x1979d7e80]
+    +   2302 main  (in Harness) + 100  [0x102301e24]  main.swift:7
+    +     2278 -[NSApplication run]  (in AppKit) + 396  [0x19c41790c]
+    +     ! 2278 -[NSApplication(NSEventRouting) nextEventMatchingMask:untilDate:inMode:dequeue:]  (in AppKit) + 292  [0x19cc9c26c]
+    +     !   2277 -[NSApplication(NSEventRouting) _nextEventMatchingEventMask:untilDate:inMode:dequeue:]  (in AppKit) + 780  [0x19cc9c748]
+    +     !   : 2273 _DPSNextEvent  (in AppKit) + 580  [0x19c4244fc]
+    +     !   : | 2273 _DPSBlockUntilNextEventMatchingListInMode  (in AppKit) + 292  [0x19c76729c]
+    +     !   : |   2273 _BlockUntilNextEventMatchingListInMode  (in HIToolbox) + 48  [0x1a5426380]
+    +     !   : |     1714 ReceiveNextEventCommon  (in HIToolbox) + 276  [0x1a52a3844]
+    +     !   : |     + 1714 RunCurrentEventLoopInMode  (in HIToolbox) + 320  [0x1a52a0590]
+    +     !   : |     +   1714 _CFRunLoopRunSpecificWithOptions  (in CoreFoundation) + 536  [0x197f4782c]
+    +     !   : |     +     1652 __CFRunLoopRun  (in CoreFoundation) + 1980  [0x197e6d65c]
+    +     !   : |     +     ! 1652 __CFRUNLOOP_IS_SERVICING_THE_MAIN_DISPATCH_QUEUE__  (in CoreFoundation) + 16  [0x197eab9cc]
+    +     !   : |     +     !   1652 _dispatch_main_queue_callback_4CF  (in libdispatch.dylib) + 44  [0x197bfba4c]
+    +     !   : |     +     !     1652 _dispatch_main_queue_drain  (in libdispatch.dylib) + 176  [0x197bfbb0c]
+    +     !   : |     +     !       1652 _dispatch_main_queue_drain.cold.6  (in libdispatch.dylib) + 832  [0x197c24998]
+    +     !   : |     +     !         1652 _dispatch_client_callout  (in libdispatch.dylib) + 16  [0x197c065a0]
+    +     !   : |     +     !           1651 _dispatch_call_block_and_release  (in libdispatch.dylib) + 32  [0x197beca34]
+    +     !   : |     +     !           : 1633 thunk for @escaping @callee_guaranteed @Sendable () -> ()  (in Harness) + 28  [0x102b04d78]
+    +     !   : |     +     !           : | 1631 closure #2 in closure #1 in HarnessTerminalSurfaceView.updateResizePreview(cols:rows:)  (in Harness) + 504  [0x102b15a28]  HarnessTerminalSurfaceView.swift:3257
+    +     !   : |     +     !           : | + 1631 HarnessTerminalSurfaceView.repaintLastFrame()  (in Harness) + 1240  [0x102b07ae4]  HarnessTerminalSurfaceView.swift:3194
+    +     !   : |     +     !           : | +   1631 -[CAMetalLayer nextDrawable]  (in QuartzCore) + 128  [0x1a2504a94]
+    +     !   : |     +     !           : | +     1631 CAMetalLayerPrivateNextDrawableLocked(CAMetalLayer*, CAMetalDrawable**, unsigned long*)  (in QuartzCore) + 1172  [0x1a27c8050]
+    +     !   : |     +     !           : | +       1631 _dispatch_semaphore_wait_slow  (in libdispatch.dylib) + 76  [0x197beeaf0]
+    +     !   : |     +     !           : | +         1631 _dispatch_sema4_timedwait  (in libdispatch.dylib) + 64  [0x197c22328]
+    +     !   : |     +     !           : | +           1631 semaphore_timedwait_trap  (in libsystem_kernel.dylib) + 8  [0x197d68bb4]
+    +     !   : |     +     !           : | 2 closure #1 in closure #1 in TerminalHostView.makeOutputEndHandler()  (in Harness) + 172  [0x102b4d2ec]  TerminalHostView.swift:1216
+
+[Other stacks omitted; second main-thread drawable wait follows.]
+
+    +     !   : |     +     !         :       |             +                             !                                             333 @objc HarnessTerminalSurfaceView.resetCursorRects()  (in Harness) + 140  [0x102b19088]
+    +     !   : |     +     !         :       |             +                             !                                               332 HarnessTerminalSurfaceView.layout()  (in Harness) + 268  [0x102b0f79c]  HarnessTerminalSurfaceView.swift:0
+    +     !   : |     +     !         :       |             +                             !                                               : 332 partial apply for closure #2 in HarnessTerminalSurfaceView.scheduler.getter  (in Harness) + 20  [0x102b3335c]  /<compiler-generated>:0
+    +     !   : |     +     !         :       |             +                             !                                               :   332 closure #1 in HarnessTerminalSurfaceView.scheduler.getter  (in Harness) + 72  [0x102b02618]
+    +     !   : |     +     !         :       |             +                             !                                               :     332 HarnessTerminalSurfaceView.renderNowOffMain(synchronous:flushTransaction:)  (in Harness) + 16096  [0x102b01134]  HarnessTerminalSurfaceView.swift:2879
+    +     !   : |     +     !         :       |             +                             !                                               :       332 HarnessTerminalSurfaceView.presentBuiltFrame(_:drawable:drawableWaitNanos:)  (in Harness) + 1108  [0x102b127fc]  HarnessTerminalSurfaceView.swift:3013
+    +     !   : |     +     !         :       |             +                             !                                               :         332 -[CAMetalLayer nextDrawable]  (in QuartzCore) + 128  [0x1a2504a94]
+    +     !   : |     +     !         :       |             +                             !                                               :           331 CAMetalLayerPrivateNextDrawableLocked(CAMetalLayer*, CAMetalDrawable**, unsigned long*)  (in QuartzCore) + 1172  [0x1a27c8050]
+    +     !   : |     +     !         :       |             +                             !                                               :           | 331 _dispatch_semaphore_wait_slow  (in libdispatch.dylib) + 76  [0x197beeaf0]
+    +     !   : |     +     !         :       |             +                             !                                               :           |   331 _dispatch_sema4_timedwait  (in libdispatch.dylib) + 64  [0x197c22328]
+    +     !   : |     +     !         :       |             +                             !                                               :           |     331 semaphore_timedwait_trap  (in libsystem_kernel.dylib) + 8  [0x197d68bb4]

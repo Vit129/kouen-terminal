@@ -1,0 +1,14 @@
+{
+  "source_sha256": "59285da821de96f23043dba9979401881361c9cee4728ca857940af758ecbada",
+  "boundary": "real PTY read-only CLI attach with history; Ctrl-A d detach; output drained concurrently",
+  "cli_pid": 95238,
+  "exit_code": 0,
+  "bytes": 1597662,
+  "sha256": "72e1876c985d464f31151c4df9d7b330fcd3098aa8b018146d74f0db886e3749",
+  "marker_received": true,
+  "last_scroll_row_received": true,
+  "unicode_received": true,
+  "detach_sent": true,
+  "gui_grid_not_voted_by_read_only_client": true,
+  "setup_note": "First harness script stopped draining the outer PTY during detach and timed out. This attempt drains concurrently and explicitly removes inherited HARNESS routing variables."
+}

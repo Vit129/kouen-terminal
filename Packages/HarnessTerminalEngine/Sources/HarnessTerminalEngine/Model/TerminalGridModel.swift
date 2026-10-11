@@ -15,6 +15,22 @@ public enum TerminalGridColor: Equatable, Sendable, Codable {
     case none
     case palette(UInt8)
     case rgb(r: UInt8, g: UInt8, b: UInt8)
+
+    @inlinable var packed: UInt32 {
+        switch self {
+        case .none: return 0
+        case .palette(let index): return 0x0100_0000 | UInt32(index)
+        case .rgb(let r, let g, let b): return 0x0200_0000 | UInt32(r) << 16 | UInt32(g) << 8 | UInt32(b)
+        }
+    }
+
+    @inlinable init(packed word: UInt32) {
+        switch word >> 24 {
+        case 1: self = .palette(UInt8(truncatingIfNeeded: word))
+        case 2: self = .rgb(r: UInt8(truncatingIfNeeded: word >> 16), g: UInt8(truncatingIfNeeded: word >> 8), b: UInt8(truncatingIfNeeded: word))
+        default: self = .none
+        }
+    }
 }
 
 /// Underline style (ECMA-48 SGR 4 plus the `4:N` substyles modern terminals understand).
@@ -47,9 +63,23 @@ public struct TerminalGridCell: Equatable, Sendable {
     /// Second stacked combining scalar (0 = none) — e.g. a Thai tone over an upper vowel.
     /// A Thai syllable stacks at most base + upper-vowel + tone, so two slots cover it fully.
     public var combining1: UInt32
-    public var foreground: TerminalGridColor
-    public var background: TerminalGridColor
-    public var underlineColor: TerminalGridColor
+    // Canonical color words make style comparison and history packing integer operations,
+    // while the public color values retain their renderer-independent enum shape.
+    @usableFromInline var foregroundWord: UInt32 = 0
+    @usableFromInline var backgroundWord: UInt32 = 0
+    @usableFromInline var underlineColorWord: UInt32 = 0
+    @inlinable public var foreground: TerminalGridColor {
+        get { TerminalGridColor(packed: foregroundWord) }
+        set { foregroundWord = newValue.packed }
+    }
+    @inlinable public var background: TerminalGridColor {
+        get { TerminalGridColor(packed: backgroundWord) }
+        set { backgroundWord = newValue.packed }
+    }
+    @inlinable public var underlineColor: TerminalGridColor {
+        get { TerminalGridColor(packed: underlineColorWord) }
+        set { underlineColorWord = newValue.packed }
+    }
     // The eight switches, underline style and width fit in 13 bits. Keeping them in
     // one word preserves the POD representation and brings each hot-path cell to 32 bytes.
     @usableFromInline var attributes: UInt16 = 0
@@ -124,9 +154,9 @@ public struct TerminalGridCell: Equatable, Sendable {
         self.codepoint = codepoint
         self.combining0 = combining0
         self.combining1 = combining1
-        self.foreground = foreground
-        self.background = background
-        self.underlineColor = underlineColor
+        foregroundWord = foreground.packed
+        backgroundWord = background.packed
+        underlineColorWord = underlineColor.packed
         self.placeholderMark = placeholderMark
         self.hyperlinkID = hyperlinkID
         self.bold = bold
@@ -248,11 +278,28 @@ public struct ImagePlacementSnapshot: Equatable, Sendable {
 public struct TerminalGridSnapshot: Equatable, Sendable {
     public let cols: Int
     public let rows: Int
-    /// Row-major: index `row * cols + col`. Always `cols * rows` long.
-    public let cells: [TerminalGridCell]
+    private enum CellStorage: Sendable {
+        case flat([TerminalGridCell])
+        case rows([[TerminalGridCell]])
+    }
+    private let cellStorage: CellStorage
+    /// Explicit row-major export. Renderers borrow rows to avoid flattening the render mirror.
+    public var cells: [TerminalGridCell] {
+        switch cellStorage {
+        case .flat(let cells): return cells
+        case .rows(let rows): return rows.flatMap { $0 }
+        }
+    }
+    var rowBuffers: [[TerminalGridCell]] {
+        switch cellStorage {
+        case .rows(let rows): return rows
+        case .flat:
+            return (0..<rows).map { row in withRowCells(row: row) { Array($0) } }
+        }
+    }
     public let cursor: TerminalCursor
     /// Inline images overlaid on this viewport (Sixel / Kitty graphics / iTerm2). Empty when none.
-    public let images: [ImagePlacementSnapshot]
+    public internal(set) var images: [ImagePlacementSnapshot]
     /// Semantic prompt marks (OSC 133) for the rows visible in this snapshot, keyed by viewport
     /// row. Empty when the program emits no shell integration. A row's presence marks a shell
     /// prompt; its `exit` is filled in once the command launched from it finishes.
@@ -264,19 +311,52 @@ public struct TerminalGridSnapshot: Equatable, Sendable {
                 clusters: [UInt32: String] = [:]) {
         self.cols = cols
         self.rows = rows
-        self.cells = cells
+        self.cellStorage = .flat(cells)
         self.cursor = cursor
         self.images = images
         self.marks = marks
         self.clusters = clusters
     }
 
-    /// The cell at (`row`, `col`), or `nil` if out of bounds. Bounds-checked so callers
-    /// (compositor, tests) can index defensively.
+    init(cols: Int, rows: [[TerminalGridCell]], cursor: TerminalCursor,
+         images: [ImagePlacementSnapshot], marks: [Int: SemanticMark], clusters: [UInt32: String]) {
+        self.cols = cols
+        self.rows = rows.count
+        self.cellStorage = .rows(rows)
+        self.cursor = cursor
+        self.images = images
+        self.marks = marks
+        self.clusters = clusters
+    }
+
+    /// The buffer is borrowed for this call only. Rows must be within the snapshot geometry.
+    public func withRowCells<Result>(row: Int, _ body: (UnsafeBufferPointer<TerminalGridCell>) -> Result) -> Result {
+        precondition(row >= 0 && row < rows)
+        switch cellStorage {
+        case .flat(let cells):
+            return cells.withUnsafeBufferPointer { body(UnsafeBufferPointer(rebasing: $0[row * cols..<(row + 1) * cols])) }
+        case .rows(let rows): return rows[row].withUnsafeBufferPointer(body)
+        }
+    }
+
+    /// The cell at (`row`, `col`), or `nil` if out of bounds.
     public func cell(row: Int, col: Int) -> TerminalGridCell? {
         guard row >= 0, row < rows, col >= 0, col < cols else { return nil }
-        return cells[row * cols + col]
+        return withRowCells(row: row) { $0[col] }
     }
+
+    public static func == (lhs: Self, rhs: Self) -> Bool {
+        guard lhs.cols == rhs.cols, lhs.rows == rhs.rows, lhs.cursor == rhs.cursor,
+              lhs.images == rhs.images, lhs.marks == rhs.marks, lhs.clusters == rhs.clusters else { return false }
+        for row in 0..<lhs.rows {
+            let equal = lhs.withRowCells(row: row) { left in
+                rhs.withRowCells(row: row) { left.elementsEqual($0) }
+            }
+            if !equal { return false }
+        }
+        return true
+    }
+
 }
 
 /// A semantic mark on a terminal row, recorded from OSC 133 shell integration. The mark's

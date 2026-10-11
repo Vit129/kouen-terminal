@@ -1,0 +1,30 @@
+{
+  "idle": {
+    "captured_keys": 180,
+    "attempted_keys": 180,
+    "p50_ms": 0.339208,
+    "p95_ms": 0.388667,
+    "p99_ms": 2.884833,
+    "max_ms": 5.875125,
+    "source_ids": [
+      "ObjectIdentifier(0x00000079de1a8000)"
+    ]
+  },
+  "ten_floods": {
+    "captured_keys": 180,
+    "attempted_keys": 180,
+    "p50_ms": 0.34225,
+    "p95_ms": 0.435041,
+    "p99_ms": 9.373,
+    "max_ms": 9.39075,
+    "source_ids": [
+      "ObjectIdentifier(0x00000079de1a8000)"
+    ]
+  },
+  "percentile_method": "nearest rank",
+  "frame_budget_ms": 8.333333333333334,
+  "p99_added_ms": 6.488166999999999,
+  "within_one_frame": true,
+  "boundary": "native keyDown to CPU frame submission containing a newer output generation on same surface; not photons",
+  "source_sha256": "59285da821de96f23043dba9979401881361c9cee4728ca857940af758ecbada"
+}

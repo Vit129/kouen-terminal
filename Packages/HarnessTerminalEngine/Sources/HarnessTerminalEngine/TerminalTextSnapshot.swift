@@ -26,7 +26,10 @@ public struct TerminalTextSnapshot: Sendable {
     public func logicalText(startingAt start: Int) -> (text: TerminalMappedText, nextLine: Int) {
         var mapped = TerminalMappedText(), index = start
         while index >= 0, index < lineCount {
-            mapped.append(line(index), line: index, clusters: clusters)
+            var cells = line(index)
+            if isWrapped(index), index + 1 < lineCount, cells.last == .blank,
+               line(index + 1).first?.width == .wide { cells.removeLast() }
+            mapped.append(cells, line: index, clusters: clusters)
             index += 1
             if !isWrapped(index - 1) || mapped.utf16Count >= 262_144 { break }
         }
@@ -61,10 +64,11 @@ public struct TerminalMappedText: Sendable {
         append(cells, line: line, clusters: clusters, resolver: &resolver)
     }
 
-    mutating func append(_ cells: [TerminalGridCell], line: Int, clusters: [UInt32: String], resolver: inout TerminalTextResolver) {
+    mutating func append(_ cells: [TerminalGridCell], line: Int, clusters: [UInt32: String], resolver: inout TerminalTextResolver, columnOffset: Int = 0) {
         units.reserveCapacity(units.count + cells.count)
         var runColumn = 0, runOffset = units.count, runLength = 0
-        for (column, cell) in cells.enumerated() where cell.width != .spacerTail {
+        for (index, cell) in cells.enumerated() where cell.width != .spacerTail {
+            let column = index + columnOffset
             let offset = units.count
             let count: Int
             // ASCII and box/block drawing scalars are already normalized and fit in one
@@ -78,7 +82,7 @@ public struct TerminalMappedText: Sendable {
                 count = unit.utf16.count
                 units.append(contentsOf: unit.utf16)
             }
-            let columns = column..<min(cells.count, column + (cell.width == .wide ? 2 : 1))
+            let columns = column..<min(cells.count + columnOffset, column + (cell.width == .wide ? 2 : 1))
             let linear = count == 1 && cell.width == .normal
             if runLength > 0, !linear || runColumn + runLength != column {
                 spans.append(Span(range: NSRange(location: runOffset, length: runLength), line: line,

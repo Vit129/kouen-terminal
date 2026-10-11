@@ -2,6 +2,23 @@ import XCTest
 @testable import HarnessCore
 
 final class HarnessSettingsTests: XCTestCase {
+    func testFontConfigurationRoundTrips() throws {
+        var settings = HarnessSettings()
+        settings.fontFallbackFamilies = ["Hiragino Sans", "Apple Color Emoji"]
+        settings.fontFeatures = ["calt": 0, "ss01": 1]
+        let decoded = try JSONDecoder().decode(HarnessSettings.self, from: JSONEncoder().encode(settings))
+        XCTAssertEqual(decoded.fontFallbackFamilies, settings.fontFallbackFamilies)
+        XCTAssertEqual(decoded.fontFeatures, settings.fontFeatures)
+    }
+
+    func testFontFeatureInputRejectsMalformedOrAmbiguousSettings() {
+        XCTAssertEqual(HarnessSettings.parseFontFeatures(" calt=0, ss01=2 "), ["calt": 0, "ss01": 2])
+        XCTAssertEqual(HarnessSettings.parseFontFeatures(" "), [:])
+        for invalid in ["calt", "cal=1", "calt=-1", "calt=1,", "calt=1,calt=0", "calt=1=2"] {
+            XCTAssertNil(HarnessSettings.parseFontFeatures(invalid), invalid)
+        }
+    }
+
     private let colorMigrationKey = "HarnessColorFidelityMigrationV1"
 
     // MARK: - Decoder guard (roadmap PR-11)
@@ -448,29 +465,12 @@ final class HarnessSettingsTests: XCTestCase {
         XCTAssertFalse(reencoded.contains("notchVisibilityMode"))
     }
 
-    func testOffMainParserFramePipelineDefaultsOnAndRoundTrips() throws {
-        // Now the production default: parse + frame build run off the main thread.
-        XCTAssertTrue(HarnessSettings().offMainParserFramePipeline)
-
-        // A legacy settings.json with no key gets the fast path on upgrade.
-        let legacy = Data("""
-        { "fontSize": 14, "customBackgroundHex": "#000000" }
-        """.utf8)
-        let migrated = try JSONDecoder().decode(HarnessSettings.self, from: legacy)
-        XCTAssertTrue(migrated.offMainParserFramePipeline, "absent key defaults to on")
-
-        // An explicitly stored `false` is honored as an opt-out.
-        let optedOut = Data("""
-        { "fontSize": 14, "offMainParserFramePipeline": false }
-        """.utf8)
-        let decodedOptOut = try JSONDecoder().decode(HarnessSettings.self, from: optedOut)
-        XCTAssertFalse(decodedOptOut.offMainParserFramePipeline, "explicit false is preserved")
-
-        var settings = HarnessSettings()
-        settings.offMainParserFramePipeline = false
-        let encoded = try JSONEncoder().encode(settings)
-        let decoded = try JSONDecoder().decode(HarnessSettings.self, from: encoded)
-        XCTAssertFalse(decoded.offMainParserFramePipeline)
+    func testRetiredParserSwitchIsDroppedOnLoad() throws {
+        let legacy = Data("{\"fontSize\":14,\"offMainParserFramePipeline\":false}".utf8)
+        let decoded = try JSONDecoder().decode(HarnessSettings.self, from: legacy)
+        XCTAssertEqual(decoded.fontSize, 14)
+        let encoded = String(decoding: try JSONEncoder().encode(decoded), as: UTF8.self)
+        XCTAssertFalse(encoded.contains("offMainParserFramePipeline"))
     }
 
     func testLiveResizeReflowDefaultsOnAndRoundTrips() throws {

@@ -21,6 +21,7 @@ public final class AgentScanner: @unchecked Sendable {
     private var scanInFlight = false
 
     public func start(registry: SurfaceRegistry) {
+        guard !registry.hasHostedObservation else { stop(); return }
         self.registry = registry
         timer?.cancel() // idempotent: a second start() must not leak the prior timer
         let timer = DispatchSource.makeTimerSource(queue: queue)
@@ -47,7 +48,7 @@ public final class AgentScanner: @unchecked Sendable {
         // One `pid → ppid` walk per tick, shared by the cwd probe and the agent scan.
         let parents = ProcessScan.parentMap()
         registry?.refreshSurfaceMetadata(parents: parents)
-        let table = AgentTable.loadFromDisk()
+        let table = AgentTableCache.shared.value
         let changes = AgentDetector.scan(table: table, parents: parents)
         guard !changes.isEmpty, let registry else { return }
         registry.applyAgentChanges(changes)

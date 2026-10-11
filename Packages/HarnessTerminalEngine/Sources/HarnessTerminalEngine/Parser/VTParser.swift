@@ -104,7 +104,7 @@ extension VTParserHandler {
 /// Scope: ground/escape/CSI (with colon sub-parameters, e.g. `4:3`)/OSC, plus
 /// DCS/PM/APC/SOS string *consumption* (their payloads are skipped until the string
 /// terminator). Acting on DCS device-control payloads is tracked as a follow-up.
-final class VTParser {
+final class VTParser<Handler: VTParserHandler> {
     private enum State: String {
         case ground
         case escape
@@ -120,22 +120,20 @@ final class VTParser {
 
     private enum StringKind: String { case dcs, apc }
 
-    /// The event sink. Held `unowned` (not `weak`): the emulator owns the parser and is the only
-    /// `VTParserHandler`, so the handler always outlives every `feed`. `unowned` drops the per-emit
-    /// ARC weak-load + the optional-chain branch on the byte hot path (the parser emits a print /
-    /// execute / CSI for nearly every input byte), and lets the optimizer devirtualize the witness
-    /// call. The parser never escapes the emulator and is never fed after the emulator deinits, so
-    /// the non-optional reference is strictly correct.
-    private unowned let handler: VTParserHandler
+    // The emulator owns this parser and outlives every feed. An unsafe unowned concrete
+    // sink avoids ARC traffic and existential dispatch on each parser event.
+    private unowned(unsafe) let handler: Handler
     private var state: State = .ground
 
     // CSI accumulation, allocation-free across sequences. Parameters are grouped
     // (semicolon-separated), each holding its colon-separated sub-parameters. Sub-parameter values
-    // are stored flattened in `paramValues`; `groupStarts[g]` marks where group `g` begins. Both are
-    // reused via `removeAll(keepingCapacity: true)` so a flood of SGR sequences never allocates.
+    // are stored flattened in `paramValues`; `groupStarts[g]` marks where group `g` begins.
+    // Fixed buffers avoid Array ownership/reset work on every CSI dispatch.
     // `currentNumber` accumulates the in-progress digits.
-    private var paramValues: [Int] = []
-    private var groupStarts: [Int] = []
+    private let paramValues = UnsafeMutablePointer<Int>.allocate(capacity: 128)
+    private let groupStarts = UnsafeMutablePointer<Int>.allocate(capacity: 32)
+    private var paramValueCount = 0
+    private var groupCount = 0
     private var currentNumber: Int? = nil
     private var intermediates: [UInt8] = []
     private var csiPrivate = false
@@ -162,13 +160,6 @@ final class VTParser {
     /// run (cleared with `removeAll(keepingCapacity: true)`), matching the allocation-free contract
     /// of the CSI/OSC buffers.
     private var codepointScratch: [UInt32] = []
-
-    /// Runtime kill-switch for the bulk codepoint run path (`HARNESS_DISABLE_BULK_UTF8=1` to fall
-    /// back to the proven per-byte scalar decode). Read once at process start. The bulk path is
-    /// proven byte-identical by `CodepointRunFastPathTests`; this exists purely as a no-rebuild
-    /// escape hatch.
-    static let bulkCodepointRunEnabled =
-        ProcessInfo.processInfo.environment["HARNESS_DISABLE_BULK_UTF8"] == nil
 
     private let maxParams = 32
     /// Bounds the flattened sub-parameter store so a hostile colon-flood (`CSI 1:1:1:…`) can't grow
@@ -204,8 +195,17 @@ final class VTParser {
         if intermediates.count < maxIntermediates { intermediates.append(byte) }
     }
 
-    init(handler: VTParserHandler) {
+    init(handler: Handler) {
         self.handler = handler
+        paramValues.initialize(repeating: 0, count: maxParamValues)
+        groupStarts.initialize(repeating: 0, count: maxParams)
+    }
+
+    deinit {
+        paramValues.deinitialize(count: maxParamValues)
+        paramValues.deallocate()
+        groupStarts.deinitialize(count: maxParams)
+        groupStarts.deallocate()
     }
 
     func reset() {
@@ -273,7 +273,7 @@ final class VTParser {
                 let j = printableASCIIRunEnd(buf, from: i + 1, end: n)
                 handler.parserPrintRun(UnsafeBufferPointer(rebasing: buf[i ..< j]))
                 i = j
-            } else if Self.bulkCodepointRunEnabled, state == .ground, utf8Remaining == 0, buf[i] >= 0x80 {
+            } else if state == .ground, utf8Remaining == 0, buf[i] >= 0x80 {
                 // A printable run that begins with a UTF-8 lead byte. Bulk-decode it (incl. any
                 // trailing ASCII) into `codepointScratch` and emit in one call, amortizing the
                 // per-byte dispatch + decode. `decodePrintableRun` stops at the first control/ESC/DEL
@@ -667,19 +667,15 @@ final class VTParser {
     private func dispatchCSI(_ final: UInt8) {
         finalizeCurrentGroup()
         if !csiOverflow {
-            // Borrow the reused buffers for the call only — `CSIParams` must not escape, so the
-            // whole dispatch (incl. screen mutation) runs inside the buffer-pointer scope.
-            paramValues.withUnsafeBufferPointer { vbuf in
-                groupStarts.withUnsafeBufferPointer { gbuf in
-                    handler.parserCSI(
-                        final: final,
-                        params: CSIParams(values: vbuf, starts: gbuf),
-                        intermediates: intermediates,
-                        isPrivate: csiPrivate,
-                        privateMarker: csiPrivateMarker
-                    )
-                }
-            }
+            // Borrow the fixed buffers for this synchronous call only; CSIParams cannot escape.
+            handler.parserCSI(
+                final: final,
+                params: CSIParams(values: UnsafeBufferPointer(start: paramValues, count: paramValueCount),
+                    starts: UnsafeBufferPointer(start: groupStarts, count: groupCount)),
+                intermediates: intermediates,
+                isPrivate: csiPrivate,
+                privateMarker: csiPrivateMarker
+            )
         }
         state = .ground
         clearCSI()
@@ -696,8 +692,9 @@ final class VTParser {
 
     /// Append a value to the flattened store, dropping (and flagging overflow) past the cap.
     private func appendValue(_ value: Int) {
-        if paramValues.count >= maxParamValues { csiOverflow = true; return }
-        paramValues.append(value)
+        if paramValueCount >= maxParamValues { csiOverflow = true; return }
+        paramValues[paramValueCount] = value
+        paramValueCount += 1
     }
 
     /// End the current sub-parameter (`:`), staying within the same parameter group.
@@ -711,8 +708,9 @@ final class VTParser {
     private func pushParamSeparator() {
         appendValue(currentNumber ?? 0)
         currentNumber = nil
-        if groupStarts.count >= maxParams { csiOverflow = true; return }
-        groupStarts.append(paramValues.count)
+        if groupCount >= maxParams { csiOverflow = true; return }
+        groupStarts[groupCount] = paramValueCount
+        groupCount += 1
     }
 
     /// Flush the in-progress number into the final group at dispatch time so a trailing parameter is
@@ -723,11 +721,11 @@ final class VTParser {
     }
 
     private func clearCSI() {
-        paramValues.removeAll(keepingCapacity: true)
-        groupStarts.removeAll(keepingCapacity: true)
-        groupStarts.append(0) // group 0 always begins at the start of the (empty) value store
+        paramValueCount = 0
+        groupCount = 1
+        groupStarts[0] = 0
         currentNumber = nil
-        intermediates.removeAll(keepingCapacity: true)
+        if !intermediates.isEmpty { intermediates.removeAll(keepingCapacity: true) }
         csiPrivate = false
         csiPrivateMarker = nil
         csiOverflow = false
@@ -876,8 +874,8 @@ extension VTParser {
         #endif
         return CheckpointState(
             state: state.rawValue,
-            paramValues: paramValues,
-            groupStarts: groupStarts,
+            paramValues: Array(UnsafeBufferPointer(start: paramValues, count: paramValueCount)),
+            groupStarts: Array(UnsafeBufferPointer(start: groupStarts, count: groupCount)),
             currentNumber: currentNumber,
             intermediates: intermediates,
             csiPrivate: csiPrivate,
@@ -907,8 +905,14 @@ extension VTParser {
         else { throw TerminalCheckpointError.invalidState }
         state = savedState
         stringKind = savedKind
-        paramValues = saved.paramValues
-        groupStarts = saved.groupStarts
+        paramValueCount = saved.paramValues.count
+        groupCount = saved.groupStarts.count
+        saved.paramValues.withUnsafeBufferPointer { source in
+            if let base = source.baseAddress { paramValues.update(from: base, count: source.count) }
+        }
+        saved.groupStarts.withUnsafeBufferPointer { source in
+            if let base = source.baseAddress { groupStarts.update(from: base, count: source.count) }
+        }
         currentNumber = saved.currentNumber
         intermediates = saved.intermediates
         csiPrivate = saved.csiPrivate

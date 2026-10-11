@@ -3,6 +3,22 @@ import XCTest
 
 @MainActor
 final class OnboardingSetupTests: XCTestCase {
+    private var savedHome: String?
+
+    override func setUp() {
+        super.setUp()
+        savedHome = ProcessInfo.processInfo.environment["HARNESS_HOME"]
+        // These tests inject permission callbacks and perform no system installation.
+        // Exercise the normal setup policy even when CI isolates the app's data home.
+        unsetenv("HARNESS_HOME")
+    }
+
+    override func tearDown() {
+        if let savedHome { setenv("HARNESS_HOME", savedHome, 1) }
+        else { unsetenv("HARNESS_HOME") }
+        super.tearDown()
+    }
+
     func testPermissionRequestIsSingleFlightAndDoesNotInstallHooks() {
         let setup = OnboardingSetup()
         var requests = 0
@@ -56,6 +72,7 @@ final class OnboardingSetupTests: XCTestCase {
         setup.stopWaitingForNotifications()
         XCTAssertFalse(setup.isBusy)
         setup.requestNotifications()
+        guard callbacks.count == 2 else { return XCTFail("Expected two permission requests") }
         callbacks[0](.success(.denied))
         XCTAssertTrue(setup.isRequestingNotifications)
         XCTAssertEqual(setup.notifications, .undetermined)

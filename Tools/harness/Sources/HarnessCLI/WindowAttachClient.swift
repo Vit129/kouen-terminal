@@ -313,20 +313,17 @@ private final class WindowSession: @unchecked Sendable {
                 // OSC 52 from a pane → set the client's own clipboard (gated on set-clipboard)
                 // and mirror into the daemon buffer so other clients see it.
                 term.onSetClipboard = { [weak self] text in self?.handleProgramClipboard(text, surface: sid) }
-                // Gap-free seed: subscribe FIRST (buffering live output), replay scrollback, then
-                // flush the buffered frames deduped against the replay boundary — closing the window
-                // where output appended between the old replay snapshot and the separate subscribe
-                // was dropped. Replay and live frames both feed the pane via `ingest` (the serial
-                // render queue), so the replayed history lands before any live byte. Then vote this
-                // pane's PTY size on the subscription fd (a one-shot resize loses its vote on close).
-                if let sub = try? client.attachReplayingSurfaceOutput(
-                    surfaceID: sid, label: configuration.label,
-                    onReplay: { [weak self] text in
-                        if !text.isEmpty, let data = text.data(using: .utf8) { self?.ingest(surface: sid, data: data) }
+                let consumption = WindowOutputConsumption()
+                if let sub = try? client.attachStream(
+                    AttachRequest(surfaceID: sid, label: configuration.label, acknowledgesOutput: true),
+                    onAttached: { _, _ in },
+                    onData: { [weak self] data, _, consumed in
+                        consumption.receive(data.count)
+                        self?.ingest(surface: sid, data: data) { consumed(); consumption.consumed(data.count) }
                     },
-                    onData: { [weak self] data, _ in self?.ingest(surface: sid, data: data) },
                     onEnd: { [weak self] in self?.scheduleStructureCheck() }
                 ) {
+                    consumption.bind(sub)
                     subscriptions[sid] = sub
                     sub.resize(sid, rows: UInt16(rect.rows), cols: UInt16(rect.cols))
                 }
@@ -357,10 +354,11 @@ private final class WindowSession: @unchecked Sendable {
 
     // MARK: Rendering
 
-    private func ingest(surface: String, data: Data) {
+    private func ingest(surface: String, data: Data, onConsumed: @escaping @Sendable () -> Void) {
         renderQueue.async { [weak self] in
             guard let self, let term = self.terminals[surface] else { return }
             term.feed(data)
+            onConsumed()
             // DEC 2026 synchronized output: hold the repaint while this pane is mid-frame, then
             // present atomically when it ends; a timeout guards a program that never closes it.
             if term.modes.synchronizedOutput {
@@ -1621,5 +1619,28 @@ extension WindowAttachClient {
             if let s = ws.sessions.first(where: { $0.id == id }) { return s }
         }
         return nil
+    }
+}
+
+/// The compositor may be busy while history arrives; budget bytes until its terminal feed completes.
+private final class WindowOutputConsumption: @unchecked Sendable {
+    private let lock = NSLock()
+    private weak var subscription: DaemonSubscription?
+    private var inFlight = 0
+    private var paused = false
+    func bind(_ subscription: DaemonSubscription) {
+        lock.lock(); defer { lock.unlock() }
+        self.subscription = subscription
+        if paused { subscription.pauseReading() }
+    }
+    func receive(_ count: Int) {
+        lock.lock(); defer { lock.unlock() }
+        inFlight += count
+        if inFlight >= 4 << 20, !paused { paused = true; subscription?.pauseReading() }
+    }
+    func consumed(_ count: Int) {
+        lock.lock(); defer { lock.unlock() }
+        inFlight -= count
+        if inFlight <= 1 << 20, paused { paused = false; subscription?.resumeReading() }
     }
 }

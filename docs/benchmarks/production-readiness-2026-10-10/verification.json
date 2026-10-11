@@ -1,0 +1,39 @@
+{
+  "macos_release": {
+    "log": "release-build-shortcuts.log",
+    "status": "passed",
+    "log_sha256": "c3837eea3274e5c54d4e893c3c64296d54636a57164c06be921752c243912cc1"
+  },
+  "xcode_debug_unsigned": {
+    "log": "xcode-build-final.log",
+    "status": "passed",
+    "log_sha256": "fed106c1a43b535f348ed2b67267e578369d12db2b39acbcb710b2e1419ffceb"
+  },
+  "linux_arm64_release_dependency_gate": {
+    "log": "linux-build.log",
+    "status": "passed",
+    "log_sha256": "771b99ab891d9ad5374b506a882350d243af2ac663ce2baca74bc49f4facfbab"
+  },
+  "native_smoke": {
+    "status": "passed",
+    "observations": [
+      "history search 009500 returned 1 of 1",
+      "split creation and styled output preserved",
+      "Unicode paste and combining characters rendered",
+      "prefix zoom and unzoom consumed keys after fix",
+      "in-place settings edit activated a temporary palette zoom shortcut",
+      "palette shortcut zoom and unzoom consumed keys after fix",
+      "three-marker output preserved across zoom/unzoom and GUI restart",
+      "single Unicode marker written in 47-column pane preserved through 100-column zoom, unzoom and restart"
+    ],
+    "limits": [
+      "Pre-fix session had one prior output line absent after restart; exact cause unproven, controlled final repeats preserved all markers.",
+      "Native synthetic typeText omitted non-ASCII input; Unicode was verified using native paste."
+    ]
+  },
+  "warnings": [
+    "Unchanged vendored MCP weak-capture compiler warning.",
+    "Swift Linux Foundation static-library mktemp linker warning; no changed Harness-source build warning."
+  ],
+  "no_release_push_actions_or_cloud_dispatch": true
+}

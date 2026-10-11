@@ -1,0 +1,32 @@
+{
+  "source_sha256": "59285da821de96f23043dba9979401881361c9cee4728ca857940af758ecbada",
+  "boundary": "native keyDown to CPU frame submission containing a newer output generation on same surface; not photons",
+  "attempted_keys_per_phase": 180,
+  "native_key_duration_ms": 20,
+  "foreground": "/bin/cat with canonical tty echo; RIS before launch",
+  "display_max_hz": 120,
+  "frame_budget_ms": 8.333333333333334,
+  "grid": [
+    100,
+    30
+  ],
+  "log_start_bytes": 0,
+  "phases": {
+    "idle": {
+      "start": 1791686723.574096,
+      "end": 1791686808.688527
+    },
+    "ten_floods": {
+      "start": 1791686899.1023738,
+      "background_panes": 10,
+      "background_grid": [
+        100,
+        30
+      ],
+      "payload": "plain_ascii.vt",
+      "payload_sha256": "69680914285e69ad93c035539b0a9d370efd607b9f78a4748fd3fd58cb3717ff",
+      "end": 1791686936.2797282
+    }
+  },
+  "setup_note": "An incorrect payload extension was corrected and those setup sessions closed before the timed load sample; no timed samples discarded."
+}

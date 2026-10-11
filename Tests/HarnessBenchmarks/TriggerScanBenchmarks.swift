@@ -16,7 +16,7 @@ final class TriggerScanBenchmarks: XCTestCase {
     }
 
     private func drainFlood(rules: [TriggerRule]) -> UInt64 {
-        let view = HarnessTerminalSurfaceView(offMainParserFramePipeline: true)
+        let view = HarnessTerminalSurfaceView()
         view.applyTriggerRules(rules)
         let line = "build output line with some text that mostly does not match anything 0123\r\n"
         let chunk = Data(String(repeating: line, count: 200).utf8)

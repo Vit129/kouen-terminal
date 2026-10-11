@@ -84,8 +84,9 @@ public struct DaemonStats: Codable, Sendable {
 }
 
 public extension DaemonStats {
+    static let acknowledgedOutput = "acknowledged-output-v1"
     static let sessionHost = "session-host-handover"
-    static let currentSessionHostProtocolLevel = 8
+    static let currentSessionHostProtocolLevel = 10
     static let sessionHostWorker = "session-host-worker-v\(currentSessionHostProtocolLevel)"
     static let workloadInput = "workload-stdin-v1"
     static let clientCapabilities = "client-capabilities-v1"
@@ -106,23 +107,22 @@ public extension DaemonStats {
     static let activityHistory = "activity-history-v1"
     static let guardedRestart = "guarded-restart"
     static var currentCapabilities: [String] {
-        [agentIdentities, mobileCompanion, attachStream, paneAttention, sessionLibrary, outputSearch, filteredOutputSearch, managedWorktrees, fanout, schedules, hookPolicy, aiSummaries, pathSearch, guardedRestart, activityHistory, activityState, paneContent, terminalGeometry, usageDigest, repositoryDigest, paneResources, historyRecovery, activityProfiles, paneResume, automaticResume, commandOutput, powerManagement, notificationPolicy, clientCapabilities]
+        [agentIdentities, mobileCompanion, attachStream, acknowledgedOutput, paneAttention, sessionLibrary, outputSearch, filteredOutputSearch, managedWorktrees, fanout, schedules, hookPolicy, aiSummaries, pathSearch, guardedRestart, activityHistory, activityState, paneContent, terminalGeometry, usageDigest, repositoryDigest, paneResources, historyRecovery, activityProfiles, paneResume, automaticResume, commandOutput, powerManagement, notificationPolicy, clientCapabilities]
     }
     var mayRestartWithoutInterruption: Bool { surfaceCount == 0 && (pipeConsumerCount ?? 0) == 0 && (pendingProcessRetirements ?? 0) == 0 && (pendingDaemonRetirements ?? 0) == 0 }
     var updateAvailable: Bool {
         daemonUpdateAvailable || sessionHostUpdateAvailable
     }
-    var daemonUpdateAvailable: Bool { build != HarnessVersion.build || !Set(Self.currentCapabilities).isSubset(of: Set(capabilities ?? [])) }
+    var daemonUpdateAvailable: Bool { protocolLevel != HarnessVersion.protocolLevel || build != HarnessVersion.build || !Set(Self.currentCapabilities).isSubset(of: Set(capabilities ?? [])) }
     var sessionHostUpdateAvailable: Bool {
         guard sessionHostPID != nil else { return false }
         return sessionHostBuild != HarnessVersion.build || sessionHostProtocolLevel != Self.currentSessionHostProtocolLevel
     }
     var compatibility: DaemonCompatibility {
+        if sessionHostPID != nil, sessionHostProtocolLevel != Self.currentSessionHostProtocolLevel { return .incompatible }
         if let protocolLevel {
-            return protocolLevel == HarnessVersion.protocolLevel ? .compatible : .incompatible
+            return protocolLevel == HarnessVersion.protocolLevel && supports(Self.acknowledgedOutput) ? .compatible : .incompatible
         }
-        // The verified 2.1.0 wire contract. Do not infer future compatibility from build numbers.
-        if build == 132, capabilities?.contains(Self.attachStream) == true { return .compatible }
         return .unknown
     }
     func supports(_ capability: String) -> Bool { capabilities?.contains(capability) == true }

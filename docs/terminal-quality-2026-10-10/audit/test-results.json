@@ -1,0 +1,374 @@
+{
+  "-[HarnessAppTests.TabSpacingTests testHidingMachineIndicatorReturnsItsSpaceToTabs]": {
+    "log": ".benchmark-results/terminal-quality-audit/startup-tests.log",
+    "result": "passed"
+  },
+  "-[HarnessAppTests.TabSpacingTests testMachineIndicatorLeavesRoomForTabsAndControlsAtNarrowWidths]": {
+    "log": ".benchmark-results/terminal-quality-audit/startup-tests.log",
+    "result": "passed"
+  },
+  "-[HarnessAppTests.TabSpacingTests testTabsStayCenteredBetweenWindowTopAndPaneBorderAtEverySpacing]": {
+    "log": ".benchmark-results/terminal-quality-audit/startup-tests.log",
+    "result": "passed"
+  },
+  "-[HarnessAppTests.WindowAppearanceTests testOpacityThresholdMatchesMainWindow]": {
+    "log": ".benchmark-results/terminal-quality-audit/startup-tests.log",
+    "result": "passed"
+  },
+  "-[HarnessAppTests.WindowAppearanceTests testOpaquePanelUpdatesItsBackgroundColor]": {
+    "log": ".benchmark-results/terminal-quality-audit/startup-tests.log",
+    "result": "passed"
+  },
+  "-[HarnessAppTests.WindowAppearanceTests testQuickTerminalCanTransitionBetweenOpaqueAndTranslucent]": {
+    "log": ".benchmark-results/terminal-quality-audit/startup-tests.log",
+    "result": "passed"
+  },
+  "-[HarnessAppTests.WindowAppearanceTests testSidebarHasFinalGeometryBeforeFirstPresentation]": {
+    "log": ".benchmark-results/terminal-quality-audit/startup-tests.log",
+    "result": "passed"
+  },
+  "-[HarnessCoreTests.DaemonClientTests testAdministrativePeerIdentityRejectsDifferentPIDAndBirth]": {
+    "log": ".benchmark-results/terminal-quality-audit/transport-tests.log",
+    "result": "passed"
+  },
+  "-[HarnessCoreTests.DaemonClientTests testConcurrentSendInputDuringCancelIsSafe]": {
+    "log": ".benchmark-results/terminal-quality-audit/transport-tests.log",
+    "result": "passed"
+  },
+  "-[HarnessCoreTests.DaemonClientTests testPausedSubscriptionRetainsOrderedFramesUntilResume]": {
+    "log": ".benchmark-results/terminal-quality-audit/transport-tests.log",
+    "result": "passed"
+  },
+  "-[HarnessCoreTests.DaemonClientTests testRequestTimesOutWhenSocketAcceptsButDoesNotReply]": {
+    "log": ".benchmark-results/terminal-quality-audit/transport-tests.log",
+    "result": "passed"
+  },
+  "-[HarnessCoreTests.DaemonClientTests testSendInputAfterReadLoopCloseBails]": {
+    "log": ".benchmark-results/terminal-quality-audit/transport-tests.log",
+    "result": "passed"
+  },
+  "-[HarnessCoreTests.DaemonClientTests testSendInputReturnsFalseAfterTeardown]": {
+    "log": ".benchmark-results/terminal-quality-audit/transport-tests.log",
+    "result": "passed"
+  },
+  "-[HarnessCoreTests.DaemonClientTests testSendInputReturnsFalseOnClosedPeerWrite]": {
+    "log": ".benchmark-results/terminal-quality-audit/transport-tests.log",
+    "result": "passed"
+  },
+  "-[HarnessCoreTests.DaemonClientTests testSubscriptionCancelDoesNotDeadlockWhileReadLoopBlocked]": {
+    "log": ".benchmark-results/terminal-quality-audit/transport-tests.log",
+    "result": "passed"
+  },
+  "-[HarnessCoreTests.IPCCodecTests testEmptyPayloadFramesRoundTrip]": {
+    "log": ".benchmark-results/terminal-quality-audit/transport-tests.log",
+    "result": "passed"
+  },
+  "-[HarnessCoreTests.IPCCodecTests testExhaustivenessTripwiresCoverEveryCase]": {
+    "log": ".benchmark-results/terminal-quality-audit/transport-tests.log",
+    "result": "passed"
+  },
+  "-[HarnessCoreTests.IPCCodecTests testInputFrameRoundTrip]": {
+    "log": ".benchmark-results/terminal-quality-audit/transport-tests.log",
+    "result": "passed"
+  },
+  "-[HarnessCoreTests.IPCCodecTests testJSONRequestStillDecodesThroughCombinedReader]": {
+    "log": ".benchmark-results/terminal-quality-audit/transport-tests.log",
+    "result": "passed"
+  },
+  "-[HarnessCoreTests.IPCCodecTests testLegacyCaptureFormattedDecodesWithoutScreen]": {
+    "log": ".benchmark-results/terminal-quality-audit/transport-tests.log",
+    "result": "passed"
+  },
+  "-[HarnessCoreTests.IPCCodecTests testLegacyNewSplitRequestsDecodeWithoutShell]": {
+    "log": ".benchmark-results/terminal-quality-audit/transport-tests.log",
+    "result": "passed"
+  },
+  "-[HarnessCoreTests.IPCCodecTests testLegacyNewTabRequestsDecodeWithoutShell]": {
+    "log": ".benchmark-results/terminal-quality-audit/transport-tests.log",
+    "result": "passed"
+  },
+  "-[HarnessCoreTests.IPCCodecTests testMalformedReplyFrameThrowsUndecodableAndConsumesTheFrame]": {
+    "log": ".benchmark-results/terminal-quality-audit/transport-tests.log",
+    "result": "passed"
+  },
+  "-[HarnessCoreTests.IPCCodecTests testMalformedReplyOrDataFrameThrowsUndecodable]": {
+    "log": ".benchmark-results/terminal-quality-audit/transport-tests.log",
+    "result": "passed"
+  },
+  "-[HarnessCoreTests.IPCCodecTests testMalformedRequestFrameThrowsUndecodable]": {
+    "log": ".benchmark-results/terminal-quality-audit/transport-tests.log",
+    "result": "passed"
+  },
+  "-[HarnessCoreTests.IPCCodecTests testMixedInputFramesAndJSONResizeRequestsDecodeSequentially]": {
+    "log": ".benchmark-results/terminal-quality-audit/transport-tests.log",
+    "result": "passed"
+  },
+  "-[HarnessCoreTests.IPCCodecTests testMixedJSONAndBinaryFramesDecodeSequentially]": {
+    "log": ".benchmark-results/terminal-quality-audit/transport-tests.log",
+    "result": "passed"
+  },
+  "-[HarnessCoreTests.IPCCodecTests testOutputDataFrameRoundTrip]": {
+    "log": ".benchmark-results/terminal-quality-audit/transport-tests.log",
+    "result": "passed"
+  },
+  "-[HarnessCoreTests.IPCCodecTests testOutputSequenceOverflowRejectedInEveryReplyDecoder]": {
+    "log": ".benchmark-results/terminal-quality-audit/transport-tests.log",
+    "result": "passed"
+  },
+  "-[HarnessCoreTests.IPCCodecTests testOversizeBinaryFrameThrowsTooLarge]": {
+    "log": ".benchmark-results/terminal-quality-audit/transport-tests.log",
+    "result": "passed"
+  },
+  "-[HarnessCoreTests.IPCCodecTests testOversizeLengthHeaderThrowsSoTheConnectionIsDropped]": {
+    "log": ".benchmark-results/terminal-quality-audit/transport-tests.log",
+    "result": "passed"
+  },
+  "-[HarnessCoreTests.IPCCodecTests testPartialBinaryFrameReturnsNilAndLeavesBufferIntact]": {
+    "log": ".benchmark-results/terminal-quality-audit/transport-tests.log",
+    "result": "passed"
+  },
+  "-[HarnessCoreTests.IPCCodecTests testPartialBufferDecodesToNilAndLeavesBufferIntact]": {
+    "log": ".benchmark-results/terminal-quality-audit/transport-tests.log",
+    "result": "passed"
+  },
+  "-[HarnessCoreTests.IPCCodecTests testReadBufferCompactionPreservesStream]": {
+    "log": ".benchmark-results/terminal-quality-audit/transport-tests.log",
+    "result": "passed"
+  },
+  "-[HarnessCoreTests.IPCCodecTests testReadBufferDecodesIdenticallyToDataPath]": {
+    "log": ".benchmark-results/terminal-quality-audit/transport-tests.log",
+    "result": "passed"
+  },
+  "-[HarnessCoreTests.IPCCodecTests testReadBufferErrorContractMatchesDataPath]": {
+    "log": ".benchmark-results/terminal-quality-audit/transport-tests.log",
+    "result": "passed"
+  },
+  "-[HarnessCoreTests.IPCCodecTests testReadBufferRequestPathMatchesDataPath]": {
+    "log": ".benchmark-results/terminal-quality-audit/transport-tests.log",
+    "result": "passed"
+  },
+  "-[HarnessCoreTests.IPCCodecTests testRequestRoundTripIsStable]": {
+    "log": ".benchmark-results/terminal-quality-audit/transport-tests.log",
+    "result": "passed"
+  },
+  "-[HarnessCoreTests.IPCCodecTests testResponseRoundTripIsStable]": {
+    "log": ".benchmark-results/terminal-quality-audit/transport-tests.log",
+    "result": "passed"
+  },
+  "-[HarnessCoreTests.IPCCodecTests testTwoMessagesInOneBufferDecodeSequentially]": {
+    "log": ".benchmark-results/terminal-quality-audit/transport-tests.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalKitTests.HarnessTerminalSurfaceWorkerTests testAppearanceChangesPreserveTerminalContent]": {
+    "log": ".benchmark-results/terminal-quality-audit/transport-tests.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalKitTests.HarnessTerminalSurfaceWorkerTests testCrispTextRenderingEnablesSurfaceFontThickening]": {
+    "log": ".benchmark-results/terminal-quality-audit/transport-tests.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalKitTests.HarnessTerminalSurfaceWorkerTests testInputModesMirrorTracksModeChangesAcrossMainHop]": {
+    "log": ".benchmark-results/terminal-quality-audit/transport-tests.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalKitTests.HarnessTerminalSurfaceWorkerTests testOffMainBurstCoalescesMainHopsAndConvergesMirrors]": {
+    "log": ".benchmark-results/terminal-quality-audit/transport-tests.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalKitTests.HarnessTerminalSurfaceWorkerTests testOffMainDSRResponseIsDeliveredAfterVisibleOutput]": {
+    "log": ".benchmark-results/terminal-quality-audit/transport-tests.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalKitTests.HarnessTerminalSurfaceWorkerTests testOffMainResizeSerializesWithHeavyOutput]": {
+    "log": ".benchmark-results/terminal-quality-audit/transport-tests.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalKitTests.HarnessTerminalSurfaceWorkerTests testOffMainScrolledUpAnchorAdvancesByTotalAddedHistory]": {
+    "log": ".benchmark-results/terminal-quality-audit/transport-tests.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalKitTests.HarnessTerminalSurfaceWorkerTests testOffMainSynchronizedFlipWithinBurstAppliesFinalState]": {
+    "log": ".benchmark-results/terminal-quality-audit/transport-tests.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalKitTests.HarnessTerminalSurfaceWorkerTests testOffMainSynchronizedOutputHoldsAndReleasesRender]": {
+    "log": ".benchmark-results/terminal-quality-audit/transport-tests.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalKitTests.LiveResizeTests testAsyncRenderPathStillPresentsOutsideDrag]": {
+    "log": ".benchmark-results/terminal-quality-audit/startup-tests.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalKitTests.LiveResizeTests testBalancedPaddingCentersSubCellRemainder]": {
+    "log": ".benchmark-results/terminal-quality-audit/startup-tests.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalKitTests.LiveResizeTests testBoundaryTickDoesNotBlockMainOnBusyParser]": {
+    "log": ".benchmark-results/terminal-quality-audit/startup-tests.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalKitTests.LiveResizeTests testBoundaryTickPaysExactlyOneCachePopulatingRebuildThenFree]": {
+    "log": ".benchmark-results/terminal-quality-audit/startup-tests.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalKitTests.LiveResizeTests testCommitFiresLiveAtBoundaryWithReflowOn]": {
+    "log": ".benchmark-results/terminal-quality-audit/startup-tests.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalKitTests.LiveResizeTests testComputeGridGeometryMatchesLegacyInlineMath]": {
+    "log": ".benchmark-results/terminal-quality-audit/startup-tests.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalKitTests.LiveResizeTests testDebouncedCommitDefersWhileDragHolds]": {
+    "log": ".benchmark-results/terminal-quality-audit/startup-tests.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalKitTests.LiveResizeTests testDebouncedCommitStillFiresWithoutLiveResize]": {
+    "log": ".benchmark-results/terminal-quality-audit/startup-tests.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalKitTests.LiveResizeTests testDetachMidDragClearsStagedResizeTarget]": {
+    "log": ".benchmark-results/terminal-quality-audit/startup-tests.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalKitTests.LiveResizeTests testDetachMidDragUnwindsLiveResizeState]": {
+    "log": ".benchmark-results/terminal-quality-audit/startup-tests.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalKitTests.LiveResizeTests testDetachedDrawableWaitCannotBlockRemountAndPoolRestoresWithoutRendererChurn]": {
+    "log": ".benchmark-results/terminal-quality-audit/startup-tests.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalKitTests.LiveResizeTests testDragEndInvalidatesInFlightPreview]": {
+    "log": ".benchmark-results/terminal-quality-audit/startup-tests.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalKitTests.LiveResizeTests testEncodeStatsSplitIsPopulatedAndBounded]": {
+    "log": ".benchmark-results/terminal-quality-audit/startup-tests.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalKitTests.LiveResizeTests testFlushedCommitDoesNotResurrectStaleSizeAfterDebounce]": {
+    "log": ".benchmark-results/terminal-quality-audit/startup-tests.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalKitTests.LiveResizeTests testFrozenOriginClampSlidesWhenGrowthCrossesCellBoundary]": {
+    "log": ".benchmark-results/terminal-quality-audit/startup-tests.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalKitTests.LiveResizeTests testFrozenOriginClampsWhenShrinkWouldClipLastColumn]": {
+    "log": ".benchmark-results/terminal-quality-audit/startup-tests.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalKitTests.LiveResizeTests testFrozenOriginHeldSteadyAcrossSubCellWidths]": {
+    "log": ".benchmark-results/terminal-quality-audit/startup-tests.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalKitTests.LiveResizeTests testLivePTYVoteCoalescesToDistinctCellCounts]": {
+    "log": ".benchmark-results/terminal-quality-audit/startup-tests.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalKitTests.LiveResizeTests testLiveReflowCommitsGridAndPresentsMidDrag]": {
+    "log": ".benchmark-results/terminal-quality-audit/startup-tests.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalKitTests.LiveResizeTests testLiveReflowDisabledDefersCommitToRelease]": {
+    "log": ".benchmark-results/terminal-quality-audit/startup-tests.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalKitTests.LiveResizeTests testLiveResizeFreezesOriginOnlyAfterFirstLayout]": {
+    "log": ".benchmark-results/terminal-quality-audit/startup-tests.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalKitTests.LiveResizeTests testLiveResizeLifecycleTogglesTransactionPresentMode]": {
+    "log": ".benchmark-results/terminal-quality-audit/startup-tests.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalKitTests.LiveResizeTests testMidDragOutputPresentsLiveWithReflowOn]": {
+    "log": ".benchmark-results/terminal-quality-audit/startup-tests.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalKitTests.LiveResizeTests testOutputPresentsDeferDuringDragAndFlushAfter]": {
+    "log": ".benchmark-results/terminal-quality-audit/startup-tests.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalKitTests.LiveResizeTests testPresentPercentileMath]": {
+    "log": ".benchmark-results/terminal-quality-audit/startup-tests.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalKitTests.LiveResizeTests testPresentResizePreviewGuardsDropStaleLandings]": {
+    "log": ".benchmark-results/terminal-quality-audit/startup-tests.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalKitTests.LiveResizeTests testStackedLiveCommitsApplyOnlyTheLatestTarget]": {
+    "log": ".benchmark-results/terminal-quality-audit/startup-tests.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalKitTests.LiveResizeTests testStalePreviewBuildIsDroppedNotStashed]": {
+    "log": ".benchmark-results/terminal-quality-audit/startup-tests.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalKitTests.LiveResizeTests testSubCellDragRepaintsReuseEveryRow]": {
+    "log": ".benchmark-results/terminal-quality-audit/startup-tests.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalKitTests.LiveResizeTests testTokenSupersededCommitBuildStillAppliesResize]": {
+    "log": ".benchmark-results/terminal-quality-audit/startup-tests.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalKitTests.LiveResizeTests testTransactionRepaintSupersedesAnEarlierEncodeCompletion]": {
+    "log": ".benchmark-results/terminal-quality-audit/startup-tests.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalKitTests.LiveResizeTests testTransientLayoutReturningToOriginalSizeCancelsResize]": {
+    "log": ".benchmark-results/terminal-quality-audit/startup-tests.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalKitTests.LiveResizeTests testUnbalancedOriginIsPaddingInset]": {
+    "log": ".benchmark-results/terminal-quality-audit/startup-tests.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalKitTests.LiveResizeTests testUnmountedGeometryDoesNotVotePlaceholderPTYSize]": {
+    "log": ".benchmark-results/terminal-quality-audit/startup-tests.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalKitTests.LiveResizeTests testViewDidEndLiveResizeFlushesPendingCommitImmediately]": {
+    "log": ".benchmark-results/terminal-quality-audit/startup-tests.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalKitTests.LiveResizeTests testWindowHostedLiveResizeRoutesPresentsThroughTransactionSyncPath]": {
+    "log": ".benchmark-results/terminal-quality-audit/startup-tests.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalKitTests.ReplayReceiveTests testReplayReceiveSuppressesQueries]": {
+    "log": ".benchmark-results/terminal-quality-audit/transport-tests.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalKitTests.SurfaceOutputReceiverTests testAcknowledgementThresholdDoesNotOverflowAtSequenceLimit]": {
+    "log": ".benchmark-results/terminal-quality-audit/transport-tests.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalKitTests.SurfaceOutputReceiverTests testBatchingPreservesReplayBoundariesAndReleasesEveryPacketAfterParsing]": {
+    "log": ".benchmark-results/terminal-quality-audit/transport-tests.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalKitTests.SurfaceOutputReceiverTests testDisconnectBeforeReplayConsumptionDoesNotInventAResumeFence]": {
+    "log": ".benchmark-results/terminal-quality-audit/transport-tests.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalKitTests.SurfaceOutputReceiverTests testEmptyPacketFloodHasBoundedTurnsAndPreservesQueueOrder]": {
+    "log": ".benchmark-results/terminal-quality-audit/transport-tests.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalKitTests.SurfaceOutputReceiverTests testLargePacketYieldsToQueuedWorkWithoutReleasingIngressBudgetEarly]": {
+    "log": ".benchmark-results/terminal-quality-audit/transport-tests.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalKitTests.SurfaceOutputReceiverTests testPartialPacketKeepsReplayBoundariesAndCompletionOrder]": {
+    "log": ".benchmark-results/terminal-quality-audit/transport-tests.log",
+    "result": "passed"
+  },
+  "-[HarnessTerminalKitTests.SurfaceOutputReceiverTests testReconnectWaitsForAdmittedParserWorkAndPublishesItsExactResumeFence]": {
+    "log": ".benchmark-results/terminal-quality-audit/transport-tests.log",
+    "result": "passed"
+  }
+}

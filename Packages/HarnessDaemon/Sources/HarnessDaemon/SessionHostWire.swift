@@ -15,7 +15,15 @@ final class SessionHostChannel: @unchecked Sendable {
     private let queueKey = DispatchSpecificKey<Bool>()
     private var reader: DispatchSourceRead?
     private var writer: DispatchSourceWrite?
-    private var input = Data(), output = Data()
+    private var input = Data()
+    private var readBuffer = [UInt8](repeating: 0, count: 65536)
+    private let outputLock = NSLock()
+    private var pendingOutput: [(Data, (@Sendable () -> Void)?)] = []
+    private var pendingBytes = 0
+    private var flushScheduled = false
+    private var outputClosed = false
+    private var output: [(Data, (@Sendable () -> Void)?)] = []
+    private var outputHead = 0
     private var inputOffset = 0, outputOffset = 0
     private var ended = false
     private var endingAfterWrites = false
@@ -40,28 +48,39 @@ final class SessionHostChannel: @unchecked Sendable {
             reader = source; source.resume()
         }
     }
-    func send(_ data: Data) {
-        if DispatchQueue.getSpecific(key: queueKey) != nil { enqueue(data) }
-        else { queue.sync { enqueue(data) } }
-    }
-    private func enqueue(_ data: Data) {
-        guard !ended else { return }
-        guard data.count <= 32 << 20, output.count - outputOffset <= (32 << 20) - data.count else { finish(); return }
-        if outputOffset > 0, outputOffset >= output.count / 2 { output.removeFirst(outputOffset); outputOffset = 0 }
-        output.append(data)
-        flush()
+    /// Completion runs on the channel queue only after this complete segment is written.
+    func send(_ data: Data, onFlushed: (@Sendable () -> Void)? = nil) {
+        outputLock.lock()
+        guard data.count <= 32 << 20, pendingBytes <= (32 << 20) - data.count else {
+            outputLock.unlock(); closeChannel(); return
+        }
+        guard !outputClosed else { outputLock.unlock(); return }
+        pendingOutput.append((data, onFlushed)); pendingBytes += data.count
+        let schedule = !flushScheduled
+        flushScheduled = true
+        outputLock.unlock()
+        if schedule { queue.async { [weak self] in self?.flush() } }
     }
     private func flush() {
-        while !ended, outputOffset < output.count {
-            let sent = output.withUnsafeBytes { raw in
+        guard !ended else { return }
+        outputLock.lock()
+        output.append(contentsOf: pendingOutput)
+        pendingOutput.removeAll(keepingCapacity: true)
+        outputLock.unlock()
+        while !ended, outputHead < output.count {
+            let segment = output[outputHead]
+            let sent = segment.0.withUnsafeBytes { raw in
                 #if canImport(Darwin)
                 Darwin.send(fd, raw.baseAddress!.advanced(by: outputOffset), raw.count - outputOffset, 0)
                 #else
                 Glibc.send(fd, raw.baseAddress!.advanced(by: outputOffset), raw.count - outputOffset, Int32(MSG_NOSIGNAL))
                 #endif
             }
-            if sent > 0 { outputOffset += sent }
-            else if sent < 0, errno == EINTR { continue }
+            if sent > 0 {
+                outputOffset += sent
+                outputLock.lock(); pendingBytes -= sent; outputLock.unlock()
+                if outputOffset == segment.0.count { outputHead += 1; outputOffset = 0; segment.1?() }
+            } else if sent < 0, errno == EINTR { continue }
             else if sent < 0, errno == EAGAIN || errno == EWOULDBLOCK {
                 if writer == nil {
                     let source = DispatchSource.makeWriteSource(fileDescriptor: fd, queue: queue)
@@ -69,19 +88,24 @@ final class SessionHostChannel: @unchecked Sendable {
                     descriptor.register(source)
                     writer = source; source.resume()
                 }
+                if outputHead > 0 { output.removeFirst(outputHead); outputHead = 0 }
                 return
             } else { finish(); return }
         }
-        output.removeAll(keepingCapacity: true); outputOffset = 0
+        output.removeAll(keepingCapacity: true); outputHead = 0; outputOffset = 0
         writer?.cancel(); writer = nil
-        if endingAfterWrites { finish() }
+        outputLock.lock()
+        let pending = !pendingOutput.isEmpty
+        flushScheduled = pending
+        outputLock.unlock()
+        if pending { queue.async { [weak self] in self?.flush() } }
+        else if endingAfterWrites { finish() }
     }
     private func readReady() {
         guard !ended else { return }
-        var bytes = [UInt8](repeating: 0, count: 65536)
         for _ in 0..<16 {
-            let count = read(fd, &bytes, bytes.count)
-            if count > 0 { input.append(contentsOf: bytes.prefix(count)) }
+            let count = readBuffer.withUnsafeMutableBytes { read(fd, $0.baseAddress, $0.count) }
+            if count > 0 { input.append(contentsOf: readBuffer.prefix(count)) }
             else if count < 0, errno == EINTR { continue }
             else if count < 0, errno == EAGAIN || errno == EWOULDBLOCK { break }
             else { finish(); return }
@@ -101,13 +125,15 @@ final class SessionHostChannel: @unchecked Sendable {
             if input.count - inputOffset > IPCCodec.maxPayloadLength + 5 { finish(); return }
         }
     }
-    func closeAfterWrites() {
+    func closeAfterWrites(timeout: TimeInterval? = 2) {
         queue.async { [self] in
             guard !ended else { return }
             endingAfterWrites = true; reader?.cancel(); reader = nil
-            if output.count == outputOffset { finish(); return }
+            outputLock.lock(); let empty = pendingBytes == 0; outputLock.unlock()
+            if empty { finish(); return }
+            guard let timeout else { flush(); return }
             let deadline = DispatchSource.makeTimerSource(queue: queue)
-            deadline.schedule(deadline: .now() + 2)
+            deadline.schedule(deadline: .now() + timeout)
             // Retain the channel until its bounded drain ends, even when its owner
             // removes the subscription immediately after the final exit record.
             deadline.setEventHandler { [self] in finish() }
@@ -121,6 +147,7 @@ final class SessionHostChannel: @unchecked Sendable {
         reader?.cancel(); writer?.cancel(); reader = nil; writer = nil
         descriptor.retire()
         input.removeAll(); output.removeAll()
+        outputLock.lock(); pendingOutput.removeAll(); pendingBytes = 0; flushScheduled = true; outputClosed = true; outputLock.unlock()
         let callback = onEnd; onEnd = nil; onFrame = nil; callback?()
     }
     deinit { reader?.cancel(); writer?.cancel(); descriptor.retire() }

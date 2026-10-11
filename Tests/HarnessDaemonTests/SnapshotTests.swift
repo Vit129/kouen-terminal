@@ -7,6 +7,34 @@ import XCTest
 /// Snapshot (1.17). The parsers are fed by capture, attach and the screen warmer, not by the
 /// PTY read loop. A parked pane keeps the child and drops the grids.
 final class SnapshotTests: XCTestCase {
+    func testObservationReplayUsesByteWindowsAndReportsOnlyMissingBytes() throws {
+        let pty = try catPty()
+        defer { pty.close() }
+        let bytes = Data(repeating: 65, count: 12000)
+        pty.injectSyntheticOutput(bytes)
+        XCTAssertTrue(waitUntil { pty.ringEnd == UInt64(bytes.count + 1) })
+        XCTAssertTrue(pty.attachHistory(fromSequence: 1).resync, "initial geometry needs a visual resync")
+        var next: UInt64 = 1
+        var actual = Data()
+        while next < pty.ringEnd {
+            let replay = pty.observationReplay(fromSequence: next, byteLimit: 4096)
+            XCTAssertFalse(replay.resync, "geometry cannot create a missing-byte warning")
+            let window = replay.chunks.reduce(into: Data()) { $0.append($1.data) }
+            XCTAssertLessThanOrEqual(window.count, 4096)
+            actual.append(window); next = replay.endSequence
+        }
+        XCTAssertEqual(actual, bytes)
+        XCTAssertTrue(pty.observationReplay(fromSequence: next).chunks.isEmpty)
+        pty.setScrollbackBytes(4096)
+        let retained = Data("retained".utf8)
+        pty.injectSyntheticOutput(retained)
+        XCTAssertTrue(waitUntil { pty.ringEnd == next + UInt64(retained.count) })
+        let lost = pty.observationReplay(fromSequence: 1)
+        XCTAssertTrue(lost.resync, "evicted bytes must still report activity loss")
+        XCTAssertEqual(lost.chunks.first?.sequence, next)
+        XCTAssertEqual(lost.chunks.reduce(into: Data()) { $0.append($1.data) }, retained)
+    }
+
     func testDisablingPersistencePreservesParkedScreenInMemory() throws {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
@@ -326,6 +354,57 @@ final class SnapshotTests: XCTestCase {
         XCTAssertEqual(tiny.bytes, Data("x".utf8))
     }
 
+    func testSealedBlocksAppendWithoutInflatingAndEvictInSequence() {
+        let first = Data(repeating: 65, count: 32768)
+        let second = Data(repeating: 66, count: 16384)
+        var ring = ParkedRing(sequence: 7, bytes: first)
+        let stored = ring.storedByteCount
+        ring.append(second)
+        XCTAssertEqual(ring.bytes, first + second)
+        XCTAssertGreaterThan(ring.storedByteCount, stored)
+        XCTAssertEqual(ring.segments(fromSequence: 32775).map(\.data), [second])
+        ring.keepSuffix(atMost: 16384)
+        XCTAssertEqual(ring.sequence, 32775)
+        XCTAssertEqual(ring.bytes, second)
+        XCTAssertEqual(ring.rawCount, second.count)
+    }
+
+    func testParkedRingRepeatedEvictionCompactsWithoutRetainingOrReorderingBlocks() {
+        let original = Data((0..<3072).map { UInt8($0 % 251) })
+        var ring = ParkedRing(sequence: 17, bytes: Data())
+        for byte in original { ring.append(Data([byte])) }
+        let snapshot = ring
+        for remaining in stride(from: original.count - 1, through: 700, by: -1) {
+            ring.keepSuffix(atMost: remaining)
+        }
+        let expected = Data(original.suffix(700))
+        XCTAssertEqual(ring.sequence, 17 + UInt64(original.count - 700))
+        XCTAssertEqual(ring.rawCount, expected.count)
+        XCTAssertEqual(ring.storedByteCount, expected.count)
+        XCTAssertEqual(ring.stored, expected)
+        XCTAssertEqual(ring.bytes, expected)
+        XCTAssertEqual(snapshot.bytes, original, "eviction must not mutate a retained value copy")
+        let segments = ring.segments(fromSequence: ring.sequence + 690, toSequence: ring.sequence + 695)
+        XCTAssertEqual(segments.map(\.sequence), (690..<695).map { ring.sequence + UInt64($0) })
+        XCTAssertEqual(segments.reduce(into: Data()) { $0.append($1.data) }, expected.subdata(in: 690..<695))
+
+        var equivalent = ParkedRing(sequence: ring.sequence, bytes: Data())
+        for byte in expected { equivalent.append(Data([byte])) }
+        XCTAssertEqual(ring, equivalent, "logical equality must ignore an evicted backing prefix")
+        ring.append(Data([252, 253]))
+        XCTAssertEqual(ring.bytes, expected + Data([252, 253]))
+        let end = ring.sequence + UInt64(ring.rawCount)
+        ring.keepSuffix(atMost: 0)
+        XCTAssertEqual(ring.sequence, end)
+        XCTAssertEqual(ring.rawCount, 0)
+        XCTAssertEqual(ring.storedByteCount, 0)
+        XCTAssertTrue(ring.bytes.isEmpty)
+        XCTAssertTrue(ring.segments().isEmpty)
+        ring.append(Data([254]))
+        XCTAssertEqual(ring.segments().map(\.sequence), [end])
+        XCTAssertEqual(ring.bytes, Data([254]))
+    }
+
     func testUnparkingKeepsHistoryAndClearingAParkedPaneForgetsIt() throws {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent("harness-park-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
@@ -434,7 +513,7 @@ final class SnapshotTests: XCTestCase {
         XCTAssertNotNil(pty.parkedFootprint, "and leaves it parked")
         pty.injectSyntheticOutput(Data("woke\n".utf8))
         XCTAssertTrue(waitUntil { pty.replay(fromSequence: nil).contains("woke") })
-        XCTAssertNil(pty.parkedFootprint, "output unparks the ring")
+        XCTAssertNotNil(pty.parkedFootprint, "output keeps sealed blocks compressed while growing a hot tail")
         XCTAssertTrue(pty.replay(fromSequence: nil).contains("park-me\nwoke") || pty.replay(fromSequence: nil).contains("park-me\r\nwoke"),
                       "the old bytes come back in front of the new ones")
 
@@ -501,9 +580,13 @@ final class SnapshotTests: XCTestCase {
                 }
             }
             let lines = PaneCapture.render(term: fullTerm, format: "vt", trim: false, unwrap: false).components(separatedBy: "\n")
+            let suffix = lines.suffix(10).joined(separator: "\n")
+            // VT captures establish placement mode before their first row. A sliced
+            // history capture loses that prefix; an alternate-screen capture retains it.
+            let standalone = suffix.hasPrefix("\u{1b}[?2027l") ? suffix : "\u{1b}[?2027l" + suffix
             XCTAssertEqual(
                 PaneCapture.render(term: fullTerm, format: "vt", trim: false, unwrap: false, history: false),
-                lines.suffix(10).joined(separator: "\n")
+                standalone
             )
         }
     }
@@ -525,7 +608,7 @@ final class SnapshotTests: XCTestCase {
         XCTAssertFalse(screen.contains("row 0"))
         let full = pty.captureFormatted(format: "vt", trim: false, unwrap: false)
         XCTAssertTrue(full.contains("row 0"))
-        XCTAssertEqual(full.components(separatedBy: "\n").suffix(24).joined(separator: "\n"), screen)
+        XCTAssertEqual("\u{1b}[?2027l" + full.components(separatedBy: "\n").suffix(24).joined(separator: "\n"), screen)
         XCTAssertTrue(pty.gridIsResident)
 
         let polling = Date()

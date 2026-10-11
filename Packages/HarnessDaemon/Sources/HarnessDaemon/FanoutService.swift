@@ -16,13 +16,15 @@ final class FanoutService: @unchecked Sendable {
     private var starting: Set<UUID> = []
     private let monitorQueue = DispatchQueue(label: "com.harness.fanout-outcomes", qos: .utility)
     private var monitor: DispatchSourceTimer?
-    private var monitorOffset = 0
+    private var pendingOutcomeIDs: [UUID] = []
+    private var outcomesChanged = false
+    private var monitorFailure: String?
     private let observeOwned: @Sendable (@Sendable () -> Void) -> Void
     init(store: ActivityStore, hostID: UUID, worktrees: WorktreeService, host: SessionHostClient? = .configured,
          workspace: @escaping @Sendable (UUID?) throws -> UUID, observeOwned: @escaping @Sendable (@Sendable () -> Void) -> Void = { $0() }, launch: @escaping Launch) {
         self.store = store; self.hostID = hostID; self.worktrees = worktrees; self.host = host; self.workspace = workspace; self.launch = launch; self.observeOwned = observeOwned
         let timer = DispatchSource.makeTimerSource(queue: monitorQueue)
-        timer.schedule(deadline: .now() + 1, repeating: 1)
+        timer.schedule(deadline: .now())
         timer.setEventHandler { [weak self] in self?.observeOwned { [weak self] in self?.refreshOutcomes() } }
         monitor = timer; timer.resume()
     }
@@ -30,16 +32,31 @@ final class FanoutService: @unchecked Sendable {
     private func refreshOutcomes() {
         let deadline = ProcessInfo.processInfo.systemUptime + 4
         do {
-            let ids = try store.objectPage(UUID.self, kind: "fanout-active", offset: 0, limit: 129).sorted { $0.uuidString < $1.uuidString }
-            let page = ids.dropFirst(monitorOffset).prefix(4)
-            monitorOffset = monitorOffset + page.count >= ids.count ? 0 : monitorOffset + page.count
-            for id in page {
-                guard ProcessInfo.processInfo.systemUptime < deadline else { break }
-                _ = try inspect(id, cancelled: { ProcessInfo.processInfo.systemUptime >= deadline })
+            queue.sync { monitorFailure = nil }
+            if pendingOutcomeIDs.isEmpty {
+                outcomesChanged = false
+                pendingOutcomeIDs = try store.objectPage(UUID.self, kind: "fanout-active", limit: 129).sorted { $0.uuidString < $1.uuidString }
             }
-        } catch { /* Preserve last observations; explicit Inspect reports recovery errors. */ }
+            while let id = pendingOutcomeIDs.first, ProcessInfo.processInfo.systemUptime < deadline {
+                do { _ = try inspect(id, cancelled: { ProcessInfo.processInfo.systemUptime >= deadline }) }
+                catch FanoutError.missing { }
+                pendingOutcomeIDs.removeFirst()
+            }
+            monitor?.schedule(deadline: pendingOutcomeIDs.isEmpty && !outcomesChanged ? .distantFuture : .now() + 0.1, leeway: .milliseconds(20))
+        } catch {
+            queue.sync { monitorFailure = error.localizedDescription }
+            monitor?.schedule(deadline: .now() + 5, leeway: .milliseconds(100))
+        }
+    }
+    func wakeOutcomes() {
+        monitorQueue.async { [weak self] in
+            guard let self else { return }
+            outcomesChanged = true
+            monitor?.schedule(deadline: .now(), leeway: .milliseconds(10))
+        }
     }
     func handle(_ operation: FanoutOperation, cancelled: @escaping () -> Bool) throws -> Data {
+        defer { wakeOutcomes() }
         let encoder = JSONEncoder(); encoder.outputFormatting = [.sortedKeys]
         switch operation {
         case let .start(id, directory, base, workspaceID, prompt, providers, managed):
@@ -47,7 +64,7 @@ final class FanoutService: @unchecked Sendable {
         case let .list(offset, limit):
             guard offset >= 0, (1...100).contains(limit) else { throw FanoutError.budget }
             let records = try store.objectPage(FanoutGroup.self, kind: "fanout", offset: offset, limit: limit + 1)
-            return try encoder.encode(FanoutPage(groups: Array(records.prefix(limit)), nextOffset: records.count > limit ? offset + limit : nil, historyUnavailable: store.availability))
+            return try encoder.encode(FanoutPage(groups: Array(records.prefix(limit)), nextOffset: records.count > limit ? offset + limit : nil, historyUnavailable: queue.sync { monitorFailure } ?? store.availability))
         case let .inspect(id): return try encoder.encode(inspect(id))
         case let .cancel(id):
             let group = try update(id) { $0.cancellationRequested = true }
@@ -163,11 +180,14 @@ final class FanoutService: @unchecked Sendable {
     }
     private func update(_ id: UUID, _ body: (inout FanoutGroup) throws -> Void) throws -> FanoutGroup {
         try queue.sync {
-            var group = try recorded(id); try body(&group)
+            var group = try recorded(id)
+            let prior = group
+            try body(&group)
             // Opt-out wins against an in-flight launch batch's captured snapshot.
             for participant in group.participants {
                 if try store.object(Bool.self, kind: "capture-policy", id: participant.surfaceID) == true || participant.tests.contains(where: { (try? store.object(Bool.self, kind: "capture-policy", id: $0.surfaceID)) == true }) { group.removeCapturedText(); break }
             }
+            guard group != prior else { return group }
             group.updatedAt = .now
             if group.participants.allSatisfy({ $0.canCleanup && $0.tests.allSatisfy { !$0.mayBeRunning } }) {
                 let actualEnds = group.participants.flatMap { participant in [participant.outcome?.observedAt].compactMap { $0 } + participant.tests.compactMap { $0.outcome?.observedAt } }

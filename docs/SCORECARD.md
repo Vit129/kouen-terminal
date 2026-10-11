@@ -1,5 +1,10 @@
 # Harness performance scorecard
 
+Latest local review: [October 10 production-readiness audit](benchmarks/production-readiness-2026-10-10.md).
+Its fixes supersede the earlier rebuild source. The large one-pane memory ratio
+in that historical rebuild did not reproduce; use the audit's scoped follow-up
+and retain the original receipts as history.
+
 This document records methodology and scoped measurements from owner hardware.
 Named reference terminals identify the applications actually measured; they do not
 describe Harness's implementation or establish affiliation. Older sections are
@@ -442,3 +447,59 @@ Debug preview of the unreleased tree, not a release build. `HarnessVersion.short
 | Ghostty | open → first window (wall clock — coarser probe) | 261 ms |
 
 The installed Ghostty was already running (pid 19398). The script's running-process check did not see it, so it opened ten extra instances and quit those. Pid 19398 was still running after the probe. The Ghostty median is that wall clock only.
+
+
+## Results — 2026-10-10, physical Apple M5 Max
+
+Local release working tree from `3fd9cf174215808af8721eb8a687b75f16514339`;
+final source SHA-256 `59285da821de96f23043dba9979401881361c9cee4728ca857940af758ecbada`.
+M5 Max, 18 cores, 128 GiB, macOS 27.0.1, Xcode 27 / Swift 6.4. Candidate bundle 2.2.0/build 133;
+no version bump, release, push, GitHub Actions or cloud dispatch.
+[Full report](benchmarks/performance-rebuild-2026-10-10.md),
+[raw receipts](benchmarks/performance-rebuild-2026-10-10/README.md),
+[Devin handoff](benchmarks/devin-handoff-2026-10-10.md).
+
+| Same-machine boundary | Before | Final candidate |
+|---|---:|---:|
+| Engine ASCII, CPU component |44.05 MB/s |162.03 MB/s (3.68×) |
+| Engine scrolling, CPU component |47.43 MB/s |184.18 MB/s (3.88×) |
+| Engine SGR, CPU component |55.42 MB/s |161.25 MB/s (2.91×) |
+| GUI ASCII, parsing fence |44.04 MB/s |76.96 MB/s (1.75×) |
+| GUI SGR, parsing fence |48.75 MB/s |77.43 MB/s (1.59×) |
+| GUI Unicode, parsing fence |32.86 MB/s |62.95 MB/s (1.92×) |
+| Recorded agent startup/redraw, 4,750 bytes |5.474 ms |4.963 ms |
+| Warm GUI reconnect, existing-shell DSR |2,302.27 ms |270.64 ms |
+| Warm prompt CPU submission |Not matched previously |296.31 ms median, 315.81 ms max |
+| One focused blinking pane, owned CPU |0.433% |0.350% of one core |
+| Fifty panes / ten idle Codex TUIs, owned CPU |4.397% |1.033% of one core |
+| Thirty styled panes, owned physical footprint |897.17 MiB |578.39 MiB (35.5% less) |
+| Fifty styled panes, owned physical footprint |1,444.07 MiB |780.22 MiB (46.0% less) |
+| One styled pane, owned physical footprint |104.14 MiB |286.94 MiB (regression) |
+
+64 MiB pre-generated hashed payloads; 100×30 grid, matched appearance; one warm-up
+and five samples. Scale states use 30-second settle and one 60-second CPU window.
+Owned totals include app+daemon+host; shells/agents are separate. Uniform colored
+10k-line history already compacted under the old representation. Font/settings
+were captured after the baseline and copied to the candidate. DSR fences parsing,
+not presentation. The tiny agent recording contains no model turn.
+
+Native typing captured 180/180 keys idle and 180/180 with ten background floods:
+p99 2.885→9.373 ms, added 6.488 ms within an 8.333 ms maximum-refresh frame budget.
+These instrumented samples end at CPU submission, not photons. Actual variable
+refresh cadence, wakeups and cursor-blink cadence were not measured.
+
+The ≥150 MB/s engine and ≤2% fifty-pane idle targets pass. Engine SGR 3×,
+GUI 3× and thirty-pane 60% memory reduction miss. Warm prompt proxy median meets
+300 ms; the largest sample exceeds it. One-pane graphics memory regresses and
+remains unresolved. Full-system PID walks are shared; total host work still grows
+with pane count. Public Ghostty/Rex scores do not establish an overall ranking.
+
+The isolated ad-hoc bundle reports historyProtection:keyUnavailable, so performance
+numbers exclude production encrypted persistence cost. Security was not weakened.
+Correctness coverage inventory: 2,387 unique passes, 63 intentional skips; repaired
+classes and 67 final graphics/order checks pass, with no unresolved failures.
+Final local macOS release/Xcode builds and locked arm64 Linux release/dependency
+checks pass. Native smoke covers Codex, styled Unicode/image, search/copy/paste,
+splits/resize/scroll and live-host reconnect; real PTY read-only CLI attach detaches
+cleanly. Actual SSH host, photons and notification audibility/banner evidence are
+unavailable. No repeated broad test suite was run for the frozen candidate.

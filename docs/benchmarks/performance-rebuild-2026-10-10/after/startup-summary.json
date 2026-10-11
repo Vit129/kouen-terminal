@@ -1,0 +1,64 @@
+{
+  "source_sha256": "59285da821de96f23043dba9979401881361c9cee4728ca857940af758ecbada",
+  "dsr_ready_median_ms": 270.640417,
+  "dsr_ready_max_ms": 290.001958,
+  "prompt_frame_observed_median_ms": 296.307041,
+  "prompt_frame_observed_max_ms": 315.807333,
+  "samples": [
+    {
+      "ready_ns": 107211228917416,
+      "columns": 100,
+      "rows": 30,
+      "label": "harness-final-async-drawables",
+      "sample": 1,
+      "app_pid": 87814,
+      "dsr_ready_ms": 271.242791,
+      "boundary": "warm GUI reconnect to pre-armed shell; DSR parsing fence",
+      "shell_prompt_frame_observed_ms": 296.307041
+    },
+    {
+      "ready_ns": 107211570076375,
+      "columns": 100,
+      "rows": 30,
+      "label": "harness-final-async-drawables",
+      "sample": 2,
+      "app_pid": 87821,
+      "dsr_ready_ms": 264.519417,
+      "boundary": "warm GUI reconnect to pre-armed shell; DSR parsing fence",
+      "shell_prompt_frame_observed_ms": 289.14925
+    },
+    {
+      "ready_ns": 107211917434208,
+      "columns": 100,
+      "rows": 30,
+      "label": "harness-final-async-drawables",
+      "sample": 3,
+      "app_pid": 87835,
+      "dsr_ready_ms": 269.634833,
+      "boundary": "warm GUI reconnect to pre-armed shell; DSR parsing fence",
+      "shell_prompt_frame_observed_ms": 297.975875
+    },
+    {
+      "ready_ns": 107212270625958,
+      "columns": 100,
+      "rows": 30,
+      "label": "harness-final-async-drawables",
+      "sample": 4,
+      "app_pid": 87842,
+      "dsr_ready_ms": 270.640417,
+      "boundary": "warm GUI reconnect to pre-armed shell; DSR parsing fence",
+      "shell_prompt_frame_observed_ms": 290.739042
+    },
+    {
+      "ready_ns": 107212635466291,
+      "columns": 100,
+      "rows": 30,
+      "label": "harness-final-async-drawables",
+      "sample": 5,
+      "app_pid": 87849,
+      "dsr_ready_ms": 290.001958,
+      "boundary": "warm GUI reconnect to pre-armed shell; DSR parsing fence",
+      "shell_prompt_frame_observed_ms": 315.807333
+    }
+  ]
+}

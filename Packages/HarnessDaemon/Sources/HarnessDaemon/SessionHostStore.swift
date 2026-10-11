@@ -73,6 +73,60 @@ final class SessionHostStore: @unchecked Sendable {
         closedHistory = ClosedHistoryStore(catalogURL: sessionsDirectory.appendingPathComponent("closed-history.json"), historyDirectory: historyDirectory, protectedSurfaces: protected)
     }
     var subscriptions: [ObjectIdentifier: (String, UUID, SessionHostChannel)] = [:]
+    private let eventLock = NSLock()
+    private var observers: [ObjectIdentifier: (UUID, SessionHostChannel)] = [:]
+    private var metadata: [String: HostedPtyState] = [:]
+    private var observationTimer: DispatchSourceTimer?
+    private var parkingTimer: DispatchSourceTimer?
+    private var nextFullObservation = Date.distantPast
+    private var observationInterval: TimeInterval = 1.5
+
+    func startObservations() {
+        let timer = DispatchSource.makeTimerSource(queue: queue)
+        timer.schedule(deadline: .now() + 1.5, repeating: 1.5, leeway: .milliseconds(100))
+        timer.setEventHandler { [weak self] in self?.observeProcesses() }
+        observationTimer = timer; timer.resume()
+    }
+    private func emit(_ event: HostedPtyEvent) {
+        eventLock.lock(); let channels = observers.values.map { $0.1 }; eventLock.unlock()
+        for channel in channels { reply(.event(event), channel) }
+    }
+    private func observeProcesses() {
+        guard !ptys.isEmpty else { return }
+        let now = Date()
+        let foregroundChanged = ptys.contains { metadata[$0.key]?.foregroundPID != $0.value.foregroundProcessID }
+        guard foregroundChanged || now >= nextFullObservation else { return }
+        let parents = ProcessScan.parentMap()
+        var changes: [String: HostedPtyState] = [:]
+        for (id, pty) in ptys {
+            let state = HostedPtyState(pty, parents: parents)
+            let prior = metadata[id]
+            if prior?.pid != state.pid || prior?.cwd != state.cwd || prior?.foregroundPID != state.foregroundPID
+                || prior?.foregroundExecutable != state.foregroundExecutable || prior?.arguments != state.arguments
+                || prior?.isShell != state.isShell || prior?.processGeneration != state.processGeneration {
+                changes[id] = state
+            }
+            metadata[id] = state; pty.cacheMetadata(state)
+            AgentDetector.registerRootPID(state.pid, forSurfaceKey: id)
+        }
+        let agents = AgentDetector.scan(table: AgentTableCache.shared.value, parents: parents)
+        for id in agents.keys where changes[id] == nil { changes[id] = metadata[id] }
+        if !changes.isEmpty || !agents.isEmpty { emit(.metadata(changes, agents)); observationInterval = 1.5 }
+        else { observationInterval = min(6, observationInterval * 2) }
+        nextFullObservation = now.addingTimeInterval(observationInterval)
+    }
+    private func scheduleParking() {
+        parkingTimer?.cancel(); parkingTimer = nil
+        guard let deadline = ptys.values.compactMap(\.parkingDeadline).min() else { return }
+        let timer = DispatchSource.makeTimerSource(queue: queue)
+        timer.schedule(deadline: .now() + max(0.01, deadline.timeIntervalSinceNow), leeway: .milliseconds(100))
+        timer.setEventHandler { [weak self] in
+            guard let self else { return }
+            for pty in self.ptys.values { pty.parkIfIdle() }
+            self.scheduleParking()
+        }
+        parkingTimer = timer; timer.resume()
+    }
     private struct RetryWindow {
         var highWater: UInt64 = 0
         var results: [UInt64: (sequence: UInt64, id: UUID, result: SessionHostResult)] = [:]
@@ -115,14 +169,17 @@ final class SessionHostStore: @unchecked Sendable {
                     reply(prior.id == request.operationID ? prior.result : .error("Operation sequence identity was reused."), channel); return
                 }
             }
-            let result = execute(request.operation, channel: channel)
+            let result = execute(request.operation, generation: request.generation, channel: channel)
             if request.operation.mutation {
                 var window = results[request.generation] ?? RetryWindow()
                 window.highWater = max(window.highWater, request.operationSequence)
                 window.results[request.operationSequence % 4096] = (request.operationSequence, request.operationID, result)
                 results[request.generation] = window
             }
-            reply(result, channel)
+            if case .applicationCheckpoint = request.operation {
+                let error: String? = if case let .error(message) = result { message } else { nil }
+                reply(.checkpointAccepted(request.operationID, error), channel)
+            } else { reply(result, channel) }
         }
     }
     private func executeQuery(_ operation: HostedPtyOperation, pty: RealPty) -> SessionHostResult {
@@ -134,6 +191,7 @@ final class SessionHostStore: @unchecked Sendable {
         case let .captureRange(_, start, end, escapes): return .text(pty.captureRange(start: start, end: end, escapeSequences: escapes))
         case .processTree: return .text(pty.processTreeJSON())
         case let .replay(_, sequence): let replay = pty.replayWithEndSequence(fromSequence: sequence); return .replay(replay.text, replay.endSequence)
+        case let .observationReplay(_, sequence): return .history(pty.observationReplay(fromSequence: sequence))
         case let .history(_, history, sequence, limit, screen, checkpoint):
             return .history(pty.attachHistory(history: history, fromSequence: sequence, chunkLimit: min(max(limit, 4096), 1 << 20), screenOnResync: screen, includeCheckpoint: checkpoint))
         case .checkpoint:
@@ -148,30 +206,39 @@ final class SessionHostStore: @unchecked Sendable {
         default: return .error("This operation is not a concurrent terminal query.")
         }
     }
-    private func finishSurface(_ id: String, pty: RealPty?, status: Int32?) {
+    private func finishSurface(_ id: String, pty: RealPty, status: Int32?) {
         if let pipe = pipes.removeValue(forKey: id) {
-            if let token = pipe.token { pty?.cancelSubscription(token: token) }
+            if let token = pipe.token { pty.cancelSubscription(token: token) }
             finishingPipes[ObjectIdentifier(pipe)] = pipe; pipe.finish()
         }
-        if let pty { retainRetiring(pty) }
+        retainRetiring(pty)
         ptys.removeValue(forKey: id)
         exited[id] = (status, .now)
         exited = exited.filter { $0.value.at >= Date().addingTimeInterval(-14 * 86400) }
         if exited.count > 500, let oldest = exited.min(by: { $0.value.at < $1.value.at })?.key { exited.removeValue(forKey: oldest) }
         let finished = subscriptions.filter { $0.value.0 == id }
         for (key, (_, token, channel)) in finished {
-            pty?.cancelSubscription(token: token); subscriptions.removeValue(forKey: key)
+            pty.cancelSubscription(token: token); subscriptions.removeValue(forKey: key)
             reply(.exited(status), channel); channel.closeAfterWrites()
         }
+        metadata.removeValue(forKey: id); AgentDetector.unregisterRootPID(forSurfaceKey: id)
+        emit(.exited(id, pty.streamIdentity, status)); scheduleParking()
         onSurfaceExit?(id, status)
     }
     func forget(_ channel: SessionHostChannel) {
         queue.async { [self] in
+            eventLock.lock()
+            observers.removeValue(forKey: ObjectIdentifier(channel))
+            let hasActive = observers.values.contains { $0.0 == activeGeneration }
+            eventLock.unlock()
+            if !hasActive { for pty in ptys.values { pty.endObservation() } }
             if let (id, token, _) = subscriptions.removeValue(forKey: ObjectIdentifier(channel)) { ptys[id]?.cancelSubscription(token: token) }
         }
     }
     func grant(_ generation: UUID) {
         activeGeneration = generation
+        eventLock.lock(); let observed = observers.values.contains { $0.0 == generation }; eventLock.unlock()
+        for pty in ptys.values { if observed { pty.beginObservation() } else { pty.endObservation() } }
         results = results.filter { generations.contains($0.key) }
     }
     func reply(_ result: SessionHostResult, _ channel: SessionHostChannel) {
@@ -216,11 +283,18 @@ final class SessionHostStore: @unchecked Sendable {
             throw SessionHostError.refused("The pipe consumer exited during launch.")
         }
     }
-    private func execute(_ operation: HostedPtyOperation, channel: SessionHostChannel) -> SessionHostResult {
+    private func execute(_ operation: HostedPtyOperation, generation: UUID, channel: SessionHostChannel) -> SessionHostResult {
         switch operation {
         case let .applicationCheckpoint(data):
             guard data.count <= 4 << 20, let value = try? JSONDecoder().decode(DaemonObservationCheckpoint.self, from: data), value.version == DaemonObservationCheckpoint.currentVersion else { return .error("Invalid application checkpoint.") }
             applicationCheckpoint = data; return .ok
+        case .observe:
+            eventLock.lock(); observers[ObjectIdentifier(channel)] = (generation, channel); eventLock.unlock()
+            if generation == activeGeneration { for pty in ptys.values { pty.beginObservation() } }
+            var agents: [String: AgentSnapshot?] = [:]
+            for id in ptys.keys { agents.updateValue(AgentDetector.snapshot(forSurfaceKey: id), forKey: id) }
+            reply(.event(.metadata(ptys.mapValues { HostedPtyState($0) }, agents)), channel)
+            return .ok
         case .inventory: return .inventory(Array(ptys.keys).sorted())
         case .capabilities: return .capabilities(Self.capabilities)
         case let .workloadOutcome(id): return .workloadOutcome(workloads.read(id))
@@ -254,11 +328,43 @@ final class SessionHostStore: @unchecked Sendable {
                     scrollbackURL: launch.scrollbackURL, launchArgumentsOverride: launch.launchArgumentsOverride, initialStandardInput: launch.initialStandardInput, retainedHistory: retainedHistory)
                 closedHistory.adopted(launch.id)
                 ptys[launch.id] = pty; exited.removeValue(forKey: launch.id)
+                AgentDetector.registerRootPID(pty.currentChildPID, forSurfaceKey: launch.id)
+                eventLock.lock(); let hasObserver = observers.values.contains { $0.0 == activeGeneration }; eventLock.unlock()
+                if hasObserver { pty.beginObservation() }
+                pty.onObservation = { [weak self] observation in
+                    guard let self else { return }
+                    self.emit(.output(launch.id, observation))
+                    AgentDetector.recordActivity(forSurfaceKey: launch.id)
+                    let metadataEvent = observation.events.contains { anchored in
+                        switch anchored.event {
+                        case .osc(7, _, _), .osc(133, _, _), .ris: true
+                        default: false
+                        }
+                    }
+                    if metadataEvent {
+                        self.queue.async { [weak self] in
+                            guard let self, let pty = self.ptys[launch.id] else { return }
+                            self.nextFullObservation = .distantPast
+                            // At a shell prompt the root owns both cwd and the foreground job;
+                            // publish immediately without walking the system process table.
+                            if pty.foregroundProcessID == pty.currentChildPID {
+                                let state = HostedPtyState(pty, parents: [:])
+                                let prior = self.metadata[launch.id]
+                                if prior?.cwd != state.cwd || prior?.foregroundPID != state.foregroundPID {
+                                    self.metadata[launch.id] = state; pty.cacheMetadata(state)
+                                    self.emit(.metadata([launch.id: state], [:]))
+                                }
+                            }
+                        }
+                    }
+                }
+                pty.onUnpark = { [weak self] in self?.queue.async { [weak self] in self?.scheduleParking() } }
+                nextFullObservation = .distantPast; scheduleParking()
                 pty.onExit = { [weak self, weak pty] status in
                     guard let self else { return }
                     self.queue.async { [weak self, weak pty] in
-                        guard let self, self.ptys[launch.id] === pty else { return }
-                        self.closedHistory.retain(pty?.retainedHistory, surfaceID: launch.id)
+                        guard let self, let pty, self.ptys[launch.id] === pty else { return }
+                        self.closedHistory.retain(pty.retainedHistory, surfaceID: launch.id)
                         self.finishSurface(launch.id, pty: pty, status: status)
                     }
                 }
@@ -284,16 +390,16 @@ final class SessionHostStore: @unchecked Sendable {
         switch operation {
         case let .adopt(value), let .state(value), let .start(value), let .close(value), let .clear(value),
              let .flush(value), let .deleteHistory(value), let .warm(value), let .processTree(value), let .checkpoint(value): id = value
-        case let .pipe(value, _), let .input(value, _), let .inject(value, _), let .persist(value, _), let .budget(value, _),
-             let .replay(value, _), let .captureScrollback(value, _), let .subscribe(value, _): id = value
-        case let .resize(value, _, _), let .respawn(value, _, _), let .park(value, _, _): id = value
+        case let .acknowledgeEvents(value, _, _), let .pipe(value, _), let .input(value, _), let .inject(value, _), let .persist(value, _), let .budget(value, _),
+             let .replay(value, _), let .observationReplay(value, _), let .captureScrollback(value, _), let .acknowledgeOutput(value, _): id = value
+        case let .resize(value, _, _), let .respawn(value, _, _), let .subscribe(value, _, _): id = value
         case let .insertResume(value, _, _), let .automaticResume(value, _, _): id = value
         case let .commandOutput(value, _, _): id = value
         case let .insertExplanation(value, _, _, _): id = value
         case let .captureGrid(value, _, _, _), let .captureRange(value, _, _, _): id = value
         case let .capture(value, _, _, _, _): id = value
         case let .history(value, _, _, _, _, _): id = value
-        case .applicationCheckpoint, .inventory, .create, .workloadOutcome, .cancelWorkload, .capabilities: return .error("Invalid operation")
+        case .observe, .applicationCheckpoint, .inventory, .create, .workloadOutcome, .cancelWorkload, .capabilities: return .error("Invalid operation")
         }
         guard let pty = ptys[id] else {
             if case .persist(_, false) = operation {
@@ -311,8 +417,11 @@ final class SessionHostStore: @unchecked Sendable {
             return .error("The shell has closed or this surface does not exist.")
         }
         switch operation {
-        case .state, .capture, .captureScrollback, .captureGrid, .captureRange, .processTree, .replay, .history, .checkpoint, .commandOutput:
+        case .state, .capture, .captureScrollback, .captureGrid, .captureRange, .processTree, .replay, .observationReplay, .history, .checkpoint, .commandOutput:
             return .error("Terminal queries must run on their bounded worker queue.")
+        case let .acknowledgeOutput(_, sequence):
+            if let (surface, token, _) = subscriptions[ObjectIdentifier(channel)], surface == id { pty.acknowledgeSubscription(token: token, sequence: sequence) }
+        case let .acknowledgeEvents(_, identity, sequence): if generation == activeGeneration, identity == pty.streamIdentity { pty.acknowledgeObservation(sequence) }
         case .start: pty.start()
         case let .input(_, data):
             guard !pty.usesPreparedStandardInput else { return .error("This workload consumes its prepared stdin only. Open a fresh shell or a resumed interactive agent to send input.") }
@@ -347,16 +456,15 @@ final class SessionHostStore: @unchecked Sendable {
         case .flush: pty.flushScrollback()
         case .deleteHistory: pty.deletePersistedScrollback()
         case let .budget(_, bytes): pty.setScrollbackBytes(bytes)
-        case let .park(_, now, threshold): pty.parkIfIdle(now: now, threshold: threshold)
         case .warm: pty.warmScreen()
-        case let .subscribe(_, watching):
+        case let .subscribe(_, watching, acknowledgesOutput):
             let key = ObjectIdentifier(channel)
             if let (oldID, token, _) = subscriptions.removeValue(forKey: key) { ptys[oldID]?.cancelSubscription(token: token) }
-            let token = pty.subscribe(watching: watching) { [weak self, weak channel] data, sequence in
+            let token = pty.subscribe(watching: watching, acknowledgesOutput: acknowledgesOutput) { [weak self, weak channel] data, sequence in
                 guard let self, let channel else { return }; self.reply(.output(data, sequence), channel)
             }
             subscriptions[key] = (id, token, channel)
-        case .applicationCheckpoint, .inventory, .adopt, .create, .workloadOutcome, .cancelWorkload, .capabilities: break
+        case .observe, .applicationCheckpoint, .inventory, .adopt, .create, .workloadOutcome, .cancelWorkload, .capabilities: break
         }
         return .ok
     }

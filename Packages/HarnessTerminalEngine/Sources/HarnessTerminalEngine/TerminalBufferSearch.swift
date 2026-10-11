@@ -53,6 +53,7 @@ public enum TerminalBufferSearch {
 
     public static func search(query: String, options: TerminalBufferSearchOptions = .default,
                               lineCount: Int, clusters: [UInt32: String] = [:],
+                              within scope: TerminalTextRange? = nil,
                               isWrapped: (Int) -> Bool = { _ in false },
                               cancelled: @escaping () -> Bool = { false },
                               line: (Int) -> [TerminalGridCell]) -> TerminalSearchOutcome {
@@ -84,11 +85,20 @@ public enum TerminalBufferSearch {
         var mapped = TerminalMappedText()
         var resolver = TerminalTextResolver()
         var limited = false
-        for index in 0..<lineCount {
+        let firstLine = max(0, scope?.start.line ?? 0)
+        let lastLine = min(lineCount, scope.map { $0.end.line + ($0.end.column > 0 ? 1 : 0) } ?? lineCount)
+        guard firstLine < lastLine else { return .matches([], limited: false) }
+        for index in firstLine..<lastLine {
             if cancelled() { return .cancelled }
-            mapped.append(line(index), line: index, clusters: clusters, resolver: &resolver)
+            var cells = line(index)
+            if isWrapped(index), index + 1 < lineCount, cells.last == .blank,
+               line(index + 1).first?.width == .wide { cells.removeLast() }
+            let start = index == scope?.start.line ? min(cells.count, max(0, scope?.start.column ?? 0)) : 0
+            let end = index == scope?.end.line ? min(cells.count, max(start, scope?.end.column ?? 0)) : cells.count
+            mapped.append(start == 0 && end == cells.count ? cells : Array(cells[start..<end]),
+                          line: index, clusters: clusters, resolver: &resolver, columnOffset: start)
             if mapped.utf16Count > 262_144 { return .matches(matches, limited: true) }
-            if isWrapped(index), index + 1 < lineCount { continue }
+            if isWrapped(index), index + 1 < lastLine { continue }
             let fullRange = NSRange(location: 0, length: mapped.utf16Count)
             if let regex {
                 regex.enumerateMatches(in: mapped.text, options: [.reportProgress], range: fullRange) { result, _, stop in

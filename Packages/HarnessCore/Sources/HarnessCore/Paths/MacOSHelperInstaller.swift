@@ -6,6 +6,62 @@ import Security
 /// Keep the signed executable, Info.plist and Apple profile together. The public
 /// tool path remains stable through an atomic alias replacement.
 enum MacOSHelperInstaller {
+    private struct ExecutableIdentity: Codable, Equatable {
+        var version: String, size: Int64, cdHash: Data
+    }
+    private struct FileIdentity: Codable, Equatable {
+        var path: String, inode: UInt64, size: Int64
+        var modifiedSeconds: Int64, modifiedNanoseconds: Int64
+        var changedSeconds: Int64, changedNanoseconds: Int64
+    }
+    private struct InstallationStamp: Codable {
+        var executable: ExecutableIdentity
+        var sourceFiles: [FileIdentity], installedFiles: [FileIdentity]
+    }
+    private static func executableIdentity(_ bundle: URL, executable: String) throws -> ExecutableIdentity {
+        let info = try PropertyListSerialization.propertyList(from: Data(contentsOf: bundle.appendingPathComponent("Contents/Info.plist")), format: nil) as? [String: Any]
+        var code: SecStaticCode?, signing: CFDictionary?
+        guard SecStaticCodeCreateWithPath(bundle as CFURL, SecCSFlags(rawValue: 0), &code) == errSecSuccess,
+              let code,
+              SecCodeCopySigningInformation(code, SecCSFlags(rawValue: kSecCSSigningInformation), &signing) == errSecSuccess,
+              let cdHash = (signing as? [String: Any])?[kSecCodeInfoUnique as String] as? Data else { throw CocoaError(.fileReadCorruptFile) }
+        var file = stat()
+        guard lstat(bundle.appendingPathComponent("Contents/MacOS/" + executable).path, &file) == 0,
+              file.st_mode & mode_t(S_IFMT) == mode_t(S_IFREG) else { throw CocoaError(.fileReadCorruptFile) }
+        return ExecutableIdentity(version: info?["CFBundleVersion"] as? String ?? "", size: Int64(file.st_size), cdHash: cdHash)
+    }
+    private static func fileIdentities(_ bundle: URL, requireOwnership: Bool) throws -> [FileIdentity] {
+        guard let files = FileManager.default.enumerator(at: bundle, includingPropertiesForKeys: nil) else { throw CocoaError(.fileReadUnknown) }
+        var identities: [FileIdentity] = []
+        for case let file as URL in files {
+            var info = stat()
+            guard lstat(file.path, &info) == 0 else { throw CocoaError(.fileReadUnknown) }
+            let type = info.st_mode & mode_t(S_IFMT)
+            guard type == mode_t(S_IFREG) || type == mode_t(S_IFDIR) else { throw CocoaError(.fileReadCorruptFile) }
+            if requireOwnership {
+                guard info.st_uid == getuid(), info.st_mode & mode_t(0o022) == 0 else { throw CocoaError(.fileWriteNoPermission) }
+            }
+            identities.append(FileIdentity(path: String(file.path.dropFirst(bundle.path.count)), inode: UInt64(info.st_ino),
+                size: Int64(info.st_size), modifiedSeconds: Int64(info.st_mtimespec.tv_sec), modifiedNanoseconds: Int64(info.st_mtimespec.tv_nsec),
+                changedSeconds: Int64(info.st_ctimespec.tv_sec), changedNanoseconds: Int64(info.st_ctimespec.tv_nsec)))
+        }
+        return identities.sorted { $0.path < $1.path }
+    }
+    private static func stampURL(_ installed: URL) -> URL {
+        installed.deletingLastPathComponent().appendingPathComponent("." + installed.lastPathComponent + ".installation.json")
+    }
+    private static func matchesInstalledStamp(source: URL, destination: URL) throws -> Bool {
+        var alias = stat()
+        guard lstat(destination.path, &alias) == 0, alias.st_mode & mode_t(S_IFMT) == mode_t(S_IFLNK) else { return false }
+        let installed = try ownedBundle(for: destination)
+        guard let bytes = try PrivateFile.read(stampURL(installed)),
+              let stamp = try? JSONDecoder().decode(InstallationStamp.self, from: bytes) else { return false }
+        let name = destination.lastPathComponent
+        guard try executableIdentity(source, executable: name) == stamp.executable,
+              try executableIdentity(installed, executable: name) == stamp.executable,
+              try fileIdentities(installed, requireOwnership: true) == stamp.installedFiles else { return false }
+        return try fileIdentities(source, requireOwnership: false) == stamp.sourceFiles
+    }
     static func withInstallationLock<T>(directory: URL, _ work: () throws -> T) throws -> T {
         guard FileManager.default.fileExists(atPath: directory.path) else { return try work() }
         let root = directory.appendingPathComponent(".tool-bundles", isDirectory: true)
@@ -42,8 +98,7 @@ enum MacOSHelperInstaller {
         var info = stat()
         guard lstat(destination.path, &info) == 0 else { return true }
         if info.st_mode & mode_t(S_IFMT) != mode_t(S_IFLNK) { return true }
-        let installed = try ownedBundle(for: destination)
-        return !FileManager.default.contentsEqual(atPath: bundle.path, andPath: installed.path)
+        return try !matchesInstalledStamp(source: bundle, destination: destination)
     }
     private static func requireOwnedDirectory(_ url: URL) throws {
         var info = stat()
@@ -97,6 +152,7 @@ enum MacOSHelperInstaller {
         try fm.createDirectory(at: root, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
         let lockFD = try lockedDescriptor(root)
         defer { close(lockFD) }
+        if try matchesInstalledStamp(source: bundle, destination: destination) { return true }
         let installed = root.appendingPathComponent(bundle.lastPathComponent, isDirectory: true)
         let relativeTarget = ".tool-bundles/" + bundle.lastPathComponent + "/Contents/MacOS/" + executable.lastPathComponent
         var destinationInfo = stat()
@@ -160,6 +216,10 @@ enum MacOSHelperInstaller {
             throw failure
         }
         try syncDirectory(destination.deletingLastPathComponent())
+        let stamp = try InstallationStamp(executable: executableIdentity(installed, executable: executable.lastPathComponent),
+            sourceFiles: fileIdentities(bundle, requireOwnership: false), installedFiles: fileIdentities(installed, requireOwnership: true))
+        let stampFile = stampURL(installed)
+        try PrivateFile.replace(stampFile, data: JSONEncoder().encode(stamp), expected: PrivateFile.read(stampFile), backup: false)
         return true
     }
 }

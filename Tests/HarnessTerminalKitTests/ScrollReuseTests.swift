@@ -13,10 +13,11 @@ import HarnessTerminalRenderer
 @MainActor
 final class ScrollReuseTests: XCTestCase {
     private func makeHostedView(in window: NSWindow) throws -> HarnessTerminalSurfaceView {
-        let view = HarnessTerminalSurfaceView(offMainParserFramePipeline: true)
+        let view = HarnessTerminalSurfaceView()
         window.contentView = view // viewDidMoveToWindow → buildRenderer + first layout path
         guard view.testingHasRenderer else { throw XCTSkip("renderer unavailable") }
         view.layoutSubtreeIfNeeded()
+        drainRenderPipeline(view)
         return view
     }
 
@@ -40,6 +41,7 @@ final class ScrollReuseTests: XCTestCase {
         for i in 0 ..< 200 { view.receive("history line \(i)\r\n") }
         view.testingWaitForEmulatorIdle()
         view.testingForceRender() // live frame: seeds the row cache + the shift source
+        drainRenderPipeline(view)
         guard lastStats != nil else { throw XCTSkip("no present happened (drawable unavailable)") }
         let rows = view.testingGridSize.rows
         let frameRows = rows + 1 // scrolled frames carry the peek row
@@ -49,6 +51,7 @@ final class ScrollReuseTests: XCTestCase {
         lastStats = nil
         view.testingScrollBy(lines: 3)
         view.testingForceRender()
+        drainRenderPipeline(view)
         guard let entry = lastStats else { throw XCTSkip("scrolled present dropped (drawable unavailable)") }
         XCTAssertEqual(entry.encodedRows, frameRows, "live→scrolled pays one shape-change rebuild")
 
@@ -56,6 +59,7 @@ final class ScrollReuseTests: XCTestCase {
         lastStats = nil
         view.testingScrollBy(lines: 3) // pure scroll: offset 3 → 6, no output in between
         view.testingForceRender()
+        drainRenderPipeline(view)
         guard let scrolled = lastStats else { throw XCTSkip("scrolled present dropped (drawable unavailable)") }
         XCTAssertEqual(scrolled.encodedRows, 3, "only the newly-exposed rows re-encode")
         XCTAssertEqual(scrolled.reusedRows, frameRows - 3, "kept rows rotate through the cache")
@@ -64,6 +68,7 @@ final class ScrollReuseTests: XCTestCase {
         lastStats = nil
         view.testingScrollBy(lines: -3)
         view.testingForceRender()
+        drainRenderPipeline(view)
         guard let back = lastStats else { throw XCTSkip("return present dropped (drawable unavailable)") }
         XCTAssertEqual(back.encodedRows, 3)
         XCTAssertEqual(back.reusedRows, frameRows - 3)
@@ -73,6 +78,7 @@ final class ScrollReuseTests: XCTestCase {
         lastStats = nil
         view.testingScrollBy(lines: -3)
         view.testingForceRender()
+        drainRenderPipeline(view)
         guard let landed = lastStats else { throw XCTSkip("landing present dropped (drawable unavailable)") }
         XCTAssertEqual(landed.encodedRows, rows, "scrolled→live pays the mirror shape-change rebuild")
     }
@@ -90,6 +96,7 @@ final class ScrollReuseTests: XCTestCase {
         for i in 0 ..< 200 { view.receive("history line \(i)\r\n") }
         view.testingWaitForEmulatorIdle()
         view.testingForceRender()
+        drainRenderPipeline(view)
         guard lastStats != nil else { throw XCTSkip("no present happened (drawable unavailable)") }
         let rows = view.testingGridSize.rows
 
@@ -97,6 +104,7 @@ final class ScrollReuseTests: XCTestCase {
         lastStats = nil
         view.testingScrollByContinuous(lines: 0.5)
         view.testingForceRender()
+        drainRenderPipeline(view)
         guard lastStats != nil else { throw XCTSkip("present dropped (drawable unavailable)") }
         XCTAssertEqual(view.testingScrollPosition.offset, 1)
         XCTAssertEqual(view.testingScrollPosition.fraction, 0.5, accuracy: 0.0001)
@@ -105,6 +113,7 @@ final class ScrollReuseTests: XCTestCase {
         // every cached row (uniform-only present).
         lastStats = nil
         view.testingScrollByContinuous(lines: 0.3)
+        drainRenderPipeline(view)
         guard let fractionTick = lastStats else { throw XCTSkip("fraction repaint dropped (drawable unavailable)") }
         XCTAssertEqual(view.testingScrollPosition.offset, 1)
         XCTAssertEqual(view.testingScrollPosition.fraction, 0.2, accuracy: 0.0001)
@@ -115,6 +124,7 @@ final class ScrollReuseTests: XCTestCase {
         // zero-copy — the steady-state trackpad tick is a 4-byte uniform update, nothing more.
         lastStats = nil
         view.testingScrollByContinuous(lines: 0.1)
+        drainRenderPipeline(view)
         guard let second = lastStats else { throw XCTSkip("fraction repaint dropped (drawable unavailable)") }
         XCTAssertEqual(second.encodedRows, 0)
         XCTAssertEqual(second.instanceUploadBytes, 0, "steady-state fraction ticks bind the uploaded cache zero-copy")
@@ -135,6 +145,7 @@ final class ScrollReuseTests: XCTestCase {
         for i in 0 ..< 50 { view.receive("line \(i)\r\n") }
         view.testingWaitForEmulatorIdle()
         view.testingForceRender()
+        drainRenderPipeline(view)
 
         view.testingScrollByContinuous(lines: 2.25) // P = 2.25 → ceil 3, fraction 0.75
         XCTAssertEqual(view.testingScrollPosition.offset, 3)
@@ -165,6 +176,7 @@ final class ScrollReuseTests: XCTestCase {
         for i in 0 ..< 100 { view.receive("line \(i)\r\n") }
         view.testingWaitForEmulatorIdle()
         view.testingForceRender()
+        drainRenderPipeline(view)
         guard lastStats != nil else { throw XCTSkip("no present happened (drawable unavailable)") }
         let rows = view.testingGridSize.rows
 
@@ -176,6 +188,7 @@ final class ScrollReuseTests: XCTestCase {
         lastStats = nil
         view.testingScrollBy(lines: 2)
         view.testingForceRender()
+        drainRenderPipeline(view)
         guard let scrolled = lastStats else { throw XCTSkip("scrolled present dropped (drawable unavailable)") }
         XCTAssertEqual(scrolled.encodedRows, rows + 1, "output since the last frame forces a full re-encode")
         XCTAssertEqual(scrolled.reusedRows, 0)

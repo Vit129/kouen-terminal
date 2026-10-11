@@ -24,6 +24,35 @@ final class FrameBuilderTests: XCTestCase {
         XCTAssertEqual(f.cells.count, 30)
     }
 
+    func testDirectRowsMatchReferenceShadingAndSparseOverlays() throws {
+        let terminal = try XCTUnwrap(HarnessGridTerminal(cols: 28, rows: 5))
+        let builder = FrameBuilder(theme: theme, selectionBackground: theme.foreground,
+            searchBackground: RGBColor(red: 60, green: 90, blue: 120))
+        for step in 0..<24 {
+            terminal.feed("\u{1b}[\(step % 5 + 1);1H\u{1b}[0;\(30 + step % 8);4:\(step % 5 + 1)mA\u{0301} 漢 ไทย 👩‍💻 == \u{1b}[5mblink\u{1b}[0m")
+            let snapshot = try XCTUnwrap(terminal.readGrid())
+            let region = SelectionRegion.block(BlockSelection((row: 1, column: 2), (row: 3, column: 8)))
+            let search = [TerminalSelection((row: 0, column: 3), (row: 2, column: 12))]
+            let direct = builder.buildDirect(snapshot, region: region, searchHighlights: search)
+            let reference = builder.build(snapshot, region: region, searchHighlights: search)
+            XCTAssertTrue(direct.isDirect)
+            XCTAssertEqual(direct, reference)
+            XCTAssertEqual(direct.cellCount, snapshot.cols * snapshot.rows)
+        }
+        let snapshot = try XCTUnwrap(terminal.readGrid())
+        var direct = builder.buildDirect(snapshot, region: nil)
+        let selection = SelectionRegion.linear(TerminalSelection((row: 1, column: 1), (row: 2, column: 10)))
+        builder.applyHighlights(into: &direct, from: snapshot, region: selection,
+            searchHighlights: [], rows: IndexSet(integersIn: 1...2))
+        XCTAssertEqual(direct, builder.build(snapshot, region: selection))
+        var reference = builder.build(snapshot, region: selection)
+        direct.updateCell(row: 2, column: 3) { $0.codepoint = 0x58; $0.underline = .double }
+        reference.cells[2 * snapshot.cols + 3].codepoint = 0x58
+        reference.cells[2 * snapshot.cols + 3].underline = .double
+        XCTAssertTrue(direct.isDirect, "Sparse UI overlays retain the engine rows")
+        XCTAssertEqual(direct, reference)
+    }
+
     /// Scroll-delta reuse must be byte-identical to a full rebuild at every offset: walk a
     /// deterministic pseudo-random offset sequence over content with colors, wide chars,
     /// decorations, and wrapped lines, shifting from the previous frame at each step.

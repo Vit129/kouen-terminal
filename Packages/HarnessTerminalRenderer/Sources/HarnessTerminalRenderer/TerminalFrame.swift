@@ -137,7 +137,27 @@ public struct TerminalFrame: Equatable, Sendable {
     /// Row-major, `columns * rows` long — every grid position. The renderer clears the surface
     /// to the canvas color and fills a per-cell background quad only where `drawBackground` is
     /// set, so default-canvas cells rely on the clear rather than their own quad.
-    public var cells: [RenderCell]
+    fileprivate var cellStorage: FrameCellStorage
+    /// Explicit resolved-cell export for captures, reference builds and inspection.
+    public var cells: [RenderCell] {
+        get {
+            if case let .resolved(cells) = cellStorage { return cells }
+            var cells: [RenderCell] = []; cells.reserveCapacity(cellCount)
+            for row in 0..<rows {
+                var resolver = rowResolver(row)
+                for column in 0..<columns { cells.append(resolver.cell(column)) }
+            }
+            return cells
+        }
+        set { cellStorage = .resolved(newValue) }
+    }
+    public var cellCount: Int {
+        switch cellStorage {
+        case let .resolved(cells): return cells.count
+        case .direct: return columns * rows
+        }
+    }
+    public var isDirect: Bool { if case .direct = cellStorage { return true }; return false }
     public var cursor: CursorRender
     /// Inline images overlaid on the grid (empty when none).
     public var images: [FrameImage]
@@ -155,7 +175,7 @@ public struct TerminalFrame: Equatable, Sendable {
                 hasBlink: Bool = false, clusters: [UInt32: String] = [:]) {
         self.columns = columns
         self.rows = rows
-        self.cells = cells
+        self.cellStorage = .resolved(cells)
         self.cursor = cursor
         self.images = images
         self.promptGutter = promptGutter
@@ -170,7 +190,80 @@ public struct TerminalFrame: Equatable, Sendable {
 
     public func cell(row: Int, column: Int) -> RenderCell? {
         guard row >= 0, row < rows, column >= 0, column < columns else { return nil }
-        return cells[row * columns + column]
+        var resolver = rowResolver(row)
+        return resolver.cell(column)
+    }
+    public mutating func updateCell(row: Int, column: Int, _ update: (inout RenderCell) -> Void) {
+        guard var cell = cell(row: row, column: column) else { return }
+        update(&cell)
+        let index = row * columns + column
+        switch cellStorage {
+        case var .resolved(cells): cells[index] = cell; cellStorage = .resolved(cells)
+        case var .direct(source): source.overrides[index] = cell; cellStorage = .direct(source)
+        }
+    }
+    func rowResolver(_ row: Int) -> FrameRowResolver {
+        FrameRowResolver(storage: cellStorage, row: row, columns: columns)
+    }
+    func withRowResolver<Result>(_ row: Int, _ body: (inout FrameRowResolver) -> Result) -> Result {
+        if case let .direct(source) = cellStorage {
+            return source.snapshot.withRowCells(row: row) { cells in
+                var resolver = FrameRowResolver(storage: cellStorage, row: row, columns: columns, engineCells: cells)
+                return body(&resolver)
+            }
+        }
+        var resolver = rowResolver(row)
+        return body(&resolver)
+    }
+    public static func == (lhs: TerminalFrame, rhs: TerminalFrame) -> Bool {
+        guard lhs.columns == rhs.columns, lhs.rows == rhs.rows, lhs.cellCount == rhs.cellCount,
+              lhs.cursor == rhs.cursor, lhs.images == rhs.images, lhs.promptGutter == rhs.promptGutter,
+              lhs.hasBlink == rhs.hasBlink, lhs.clusters == rhs.clusters else { return false }
+        if case let .resolved(left) = lhs.cellStorage, case let .resolved(right) = rhs.cellStorage { return left == right }
+        for row in 0..<lhs.rows {
+            var left = lhs.rowResolver(row), right = rhs.rowResolver(row)
+            for column in 0..<lhs.columns where left.cell(column) != right.cell(column) { return false }
+        }
+        return true
+    }
+
+}
+
+fileprivate struct DirectFrameContent: Sendable {
+    var snapshot: TerminalGridSnapshot
+    var builder: FrameBuilder
+    var region: SelectionRegion?
+    var search: SearchHighlightIndex
+    var overrides: [Int: RenderCell] = [:]
+}
+fileprivate enum FrameCellStorage: Sendable {
+    case resolved([RenderCell])
+    case direct(DirectFrameContent)
+}
+struct FrameRowResolver {
+    fileprivate let storage: FrameCellStorage
+    let row: Int, columns: Int
+    private var cachedPen: (FrameBuilder.PenKey, FrameBuilder.PenPaint)?
+    private var intervalCursor = 0
+    private var previousColumn = -1
+    private let engineCells: UnsafeBufferPointer<TerminalGridCell>?
+    fileprivate init(storage: FrameCellStorage, row: Int, columns: Int, engineCells: UnsafeBufferPointer<TerminalGridCell>? = nil) {
+        self.storage = storage; self.row = row; self.columns = columns; self.engineCells = engineCells
+    }
+    mutating func cell(_ column: Int) -> RenderCell {
+        switch storage {
+        case let .resolved(cells): return cells[row * columns + column]
+        case let .direct(source):
+            if let override = source.overrides[row * columns + column] { return override }
+            let intervals = source.search.intervals(forRow: row)
+            if column < previousColumn { intervalCursor = 0 }
+            while intervalCursor < intervals.count, intervals[intervalCursor].upperBound < column { intervalCursor += 1 }
+            previousColumn = column
+            let highlighted = intervalCursor < intervals.count && intervals[intervalCursor].lowerBound <= column
+            let cell = engineCells.map { $0[column] } ?? source.snapshot.withRowCells(row: row) { $0[column] }
+            return source.builder.resolveCell(cell, row: row, column: column, region: source.region,
+                isSearchHit: highlighted, cached: &cachedPen)
+        }
     }
 }
 
@@ -241,7 +334,7 @@ private func renderCursorStyle(userStyle: CursorStyle, programShape: TerminalCur
 /// predicate was precisely "column ∈ union of the row's intervals" — so consumers stay
 /// byte-identical by construction. Both `build` and `applyHighlights` share this one type,
 /// keeping the #85 cell-overlay pass in lockstep with full builds.
-struct SearchHighlightIndex {
+struct SearchHighlightIndex: Sendable {
     private let byRow: [Int: [ClosedRange<Int>]]
 
     init(_ highlights: [TerminalSelection], rows: Int, cols: Int) {
@@ -352,11 +445,11 @@ public enum SelectionRegion: Equatable, Sendable {
     }
 }
 
-/// Turns an engine `TerminalGridSnapshot` into a `TerminalFrame` by resolving every
-/// cell's colors through a `CellColorResolver`. This is the single bridge between the
+/// Turns an engine `TerminalGridSnapshot` into a `TerminalFrame` whose row cells are
+/// resolved on demand by the renderer. This is the single bridge between the
 /// headless engine and the GPU renderer — keeping it pure means the renderer never has
 /// to know about palettes, defaults, or attribute rules.
-public struct FrameBuilder {
+public struct FrameBuilder: Sendable {
     public let resolver: CellColorResolver
     /// Cursor block color (typically the theme cursor color).
     public let cursorColor: RGBColor
@@ -457,8 +550,8 @@ public struct FrameBuilder {
         return CellColorResolver.ensureContrast(foreground: fg, background: bg, ratio: resolver.minimumContrast)
     }
 
-    /// Build a frame with an optional linear selection. The original entry point — kept so
-    /// existing callers (mouse selection, search-free render) are byte-identical.
+    /// Resolve cells eagerly for captures and correctness comparisons. Live rendering
+    /// uses `buildDirect` to retain engine rows instead.
     public func build(_ snapshot: TerminalGridSnapshot, selection: TerminalSelection? = nil,
                       imageProvider: ((Int) -> DecodedImage?)? = nil) -> TerminalFrame {
         build(snapshot, region: selection.map(SelectionRegion.linear), searchHighlights: [],
@@ -515,6 +608,25 @@ public struct FrameBuilder {
                           searchIntervals: searchIndex.intervals(forRow: row), into: &cells)
             }
         }
+        var frame = metadataFrame(snapshot, copyModeCursor: copyModeCursor, imageProvider: imageProvider,
+                                  hasBlink: cells.contains { $0.blink })
+        frame.cells = cells
+        return frame
+    }
+
+    public func buildDirect(_ snapshot: TerminalGridSnapshot, region: SelectionRegion?,
+                            searchHighlights: [TerminalSelection] = [],
+                            copyModeCursor: (row: Int, column: Int)? = nil,
+                            imageProvider: ((Int) -> DecodedImage?)? = nil) -> TerminalFrame {
+        let hasBlink = (0..<snapshot.rows).contains { row in snapshot.withRowCells(row: row) { $0.contains { $0.blink } } }
+        var frame = metadataFrame(snapshot, copyModeCursor: copyModeCursor, imageProvider: imageProvider, hasBlink: hasBlink)
+        frame.cellStorage = .direct(DirectFrameContent(snapshot: snapshot, builder: self, region: region,
+            search: SearchHighlightIndex(searchHighlights, rows: snapshot.rows, cols: snapshot.cols)))
+        return frame
+    }
+
+    private func metadataFrame(_ snapshot: TerminalGridSnapshot, copyModeCursor: (row: Int, column: Int)?,
+                               imageProvider: ((Int) -> DecodedImage?)?, hasBlink: Bool) -> TerminalFrame {
         // The copy-mode cursor overrides the program cursor's position and forces it visible
         // (history snapshots hide the program cursor); otherwise the program cursor stands.
         let cursor: CursorRender
@@ -545,9 +657,9 @@ public struct FrameBuilder {
         // ANSI green (success) / red (failure) / bright-black (prompt with no exit yet). Skipped
         // entirely when the user hasn't opted in (the default), so no stripe is drawn.
         let promptGutter = promptGutterEnabled ? resolvePromptGutter(snapshot.marks) : [:]
-        return TerminalFrame(columns: snapshot.cols, rows: snapshot.rows, cells: cells,
+        return TerminalFrame(columns: snapshot.cols, rows: snapshot.rows, cells: [],
                              cursor: cursor, images: images, promptGutter: promptGutter,
-                             hasBlink: cells.contains { $0.blink }, clusters: snapshot.clusters)
+                             hasBlink: hasBlink, clusters: snapshot.clusters)
     }
 
     /// Scroll-delta rebuild: the viewport's content moved by `shift` rows (a pure scrollback
@@ -622,7 +734,13 @@ public struct FrameBuilder {
     ) {
         guard region != nil || !searchHighlights.isEmpty else { return }
         let cols = snapshot.cols
-        guard frame.columns == cols, frame.cells.count >= cols * min(frame.rows, snapshot.rows) else { return }
+        guard frame.columns == cols, frame.cellCount >= cols * min(frame.rows, snapshot.rows) else { return }
+        if case var .direct(source) = frame.cellStorage {
+            source.region = region
+            source.search = SearchHighlightIndex(searchHighlights, rows: snapshot.rows, cols: cols)
+            frame.cellStorage = .direct(source)
+            return
+        }
         // The same per-row bucketing `build` performs — sharing the index keeps this overlay
         // pass byte-identical-by-construction with full builds (the #85 invariant).
         let searchIndex = SearchHighlightIndex(searchHighlights, rows: snapshot.rows, cols: cols)
@@ -638,7 +756,7 @@ public struct FrameBuilder {
 
     /// Color inputs that `CellColorResolver.resolve` actually reads. A run of cells with the
     /// same pen (a line of Thai, a line of one SGR color) resolves once.
-    private struct PenKey: Equatable {
+    fileprivate struct PenKey: Equatable {
         var foreground: TerminalGridColor
         var background: TerminalGridColor
         var underlineColor: TerminalGridColor
@@ -649,7 +767,7 @@ public struct FrameBuilder {
     }
 
     /// Resolved colors for one pen, already converted to `RenderColor` for the unshaded path.
-    private struct PenPaint {
+    fileprivate struct PenPaint {
         var colors: ResolvedCellColors
         var foreground: RenderColor
         var background: RenderColor
@@ -691,77 +809,68 @@ public struct FrameBuilder {
     private func appendRow(_ row: Int, snapshot: TerminalGridSnapshot,
                            region: SelectionRegion?, searchIntervals: [ClosedRange<Int>],
                            into cells: inout [RenderCell]) {
-        // Monotonic cursor over the row's disjoint, ascending search intervals: columns only
-        // grow, so each interval is passed at most once per row — O(1) amortized per cell.
-        // The no-search case is hoisted out of the per-cell work entirely: the cursor
-        // bookkeeping measurably taxes the plain build path (~6ns/cell) if left inline.
         var intervalCursor = 0
-        let hasSearchIntervals = !searchIntervals.isEmpty
-        let rowBase = row * snapshot.cols
-        let grid = snapshot.cells
-        var cachedPen: (PenKey, PenPaint)?
-        for column in 0 ..< snapshot.cols {
-            let cell = grid[rowBase + column]
-            let paint = paint(for: cell, cached: &cachedPen)
-            // Precedence: primary selection (opaque) > search hit > normal.
-            let selected = region?.contains(row: row, column: column) ?? false
-            let isSearchHit: Bool
-            if hasSearchIntervals {
-                while intervalCursor < searchIntervals.count,
-                      searchIntervals[intervalCursor].upperBound < column {
-                    intervalCursor += 1
-                }
-                isSearchHit = !selected && intervalCursor < searchIntervals.count
-                    && searchIntervals[intervalCursor].lowerBound <= column
-            } else {
-                isSearchHit = false
+        var cached: (PenKey, PenPaint)?
+        snapshot.withRowCells(row: row) { grid in
+            for column in 0..<snapshot.cols {
+                while intervalCursor < searchIntervals.count, searchIntervals[intervalCursor].upperBound < column { intervalCursor += 1 }
+                let highlighted = intervalCursor < searchIntervals.count && searchIntervals[intervalCursor].lowerBound <= column
+                cells.append(resolveCell(grid[column], row: row, column: column, region: region,
+                    isSearchHit: highlighted, cached: &cached))
             }
-            let foreground: RenderColor
-            let background: RenderColor
-            // Skip the cell's background fill only when it resolves to the default canvas
-            // color — the renderer already clears the target to that color. Highlights and
-            // any non-default background must be drawn.
-            let drawBackground: Bool
-            if selected, let selBg = selectionBackground {
-                background = renderColor(selBg)
-                // The resolver's minimum-contrast lift was keyed to the CELL's background;
-                // the rendered background here is the selection color, so re-ensure
-                // contrast against what's actually drawn.
-                foreground = selectionForeground.map { renderColor($0) }
-                    ?? renderColor(contrasted(paint.colors.foreground, against: selBg))
-                drawBackground = true
-            } else if isSearchHit, let searchBg = searchBackground {
-                background = renderColor(searchBg)
-                foreground = searchForeground.map { renderColor($0) }
-                    ?? renderColor(contrasted(paint.colors.foreground, against: searchBg))
-                drawBackground = true
-            } else {
-                background = paint.background
-                foreground = paint.foreground
-                drawBackground = paint.drawBackground
-            }
-            // A Kitty image placeholder draws its image slice, not a glyph.
-            let placeholder = cell.codepoint == KittyPlaceholders.character
-            cells.append(RenderCell(
-                row: row,
-                column: column,
-                codepoint: placeholder ? 0x20 : cell.codepoint,
-                combining0: placeholder ? 0 : cell.combining0,
-                combining1: placeholder ? 0 : cell.combining1,
-                foreground: foreground,
-                background: background,
-                underlineColor: paint.underlineColor,
-                bold: cell.bold,
-                italic: cell.italic,
-                underline: cell.underline,
-                strikethrough: cell.strikethrough,
-                overline: cell.overline,
-                blink: cell.blink,
-                width: cell.width,
-                drawBackground: drawBackground,
-                colorGlyphOpacity: cell.invisible ? 0 : (cell.faint ? Float(1 - resolver.faintFraction) : 1)
-            ))
         }
+    }
+    fileprivate func resolveCell(_ cell: TerminalGridCell, row: Int, column: Int,
+                                 region: SelectionRegion?, isSearchHit: Bool,
+                                 cached: inout (PenKey, PenPaint)?) -> RenderCell {
+        let paint = paint(for: cell, cached: &cached)
+        let selected = region?.contains(row: row, column: column) ?? false
+        let isSearchHit = isSearchHit && !selected
+        let foreground: RenderColor
+        let background: RenderColor
+        // Skip the cell's background fill only when it resolves to the default canvas
+        // color — the renderer already clears the target to that color. Highlights and
+        // any non-default background must be drawn.
+        let drawBackground: Bool
+        if selected, let selBg = selectionBackground {
+            background = renderColor(selBg)
+            // The resolver's minimum-contrast lift was keyed to the CELL's background;
+            // the rendered background here is the selection color, so re-ensure
+            // contrast against what's actually drawn.
+            foreground = selectionForeground.map { renderColor($0) }
+                ?? renderColor(contrasted(paint.colors.foreground, against: selBg))
+            drawBackground = true
+        } else if isSearchHit, let searchBg = searchBackground {
+            background = renderColor(searchBg)
+            foreground = searchForeground.map { renderColor($0) }
+                ?? renderColor(contrasted(paint.colors.foreground, against: searchBg))
+            drawBackground = true
+        } else {
+            background = paint.background
+            foreground = paint.foreground
+            drawBackground = paint.drawBackground
+        }
+        // A Kitty image placeholder draws its image slice, not a glyph.
+        let placeholder = cell.codepoint == KittyPlaceholders.character
+        return RenderCell(
+            row: row,
+            column: column,
+            codepoint: placeholder ? 0x20 : cell.codepoint,
+            combining0: placeholder ? 0 : cell.combining0,
+            combining1: placeholder ? 0 : cell.combining1,
+            foreground: foreground,
+            background: background,
+            underlineColor: paint.underlineColor,
+            bold: cell.bold,
+            italic: cell.italic,
+            underline: cell.underline,
+            strikethrough: cell.strikethrough,
+            overline: cell.overline,
+            blink: cell.blink,
+            width: cell.width,
+            drawBackground: drawBackground,
+            colorGlyphOpacity: cell.invisible ? 0 : (cell.faint ? Float(1 - resolver.faintFraction) : 1)
+        )
     }
 
     /// Map OSC 133 semantic marks (viewport row → mark) to gutter stripe colors. A mark with a

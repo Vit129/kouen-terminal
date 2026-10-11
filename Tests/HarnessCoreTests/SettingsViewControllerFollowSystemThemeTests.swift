@@ -101,7 +101,6 @@ final class SettingsViewControllerFollowSystemThemeTests: XCTestCase {
             linearBlending: true,
             applyThemeToTerminalOutput: true,
             ligatures: false,
-            offMainParserFramePipeline: false,
             showPromptGutter: true,
             showStatusLine: false,
             experienceMode: .agent,
@@ -148,7 +147,6 @@ final class SettingsViewControllerFollowSystemThemeTests: XCTestCase {
         XCTAssertTrue(settings.linearBlending)
         XCTAssertTrue(settings.applyThemeToTerminalOutput)
         XCTAssertFalse(settings.ligatures)
-        XCTAssertFalse(settings.offMainParserFramePipeline)
         XCTAssertTrue(settings.showPromptGutter)
         XCTAssertFalse(settings.showStatusLine)
         XCTAssertEqual(settings.experienceMode, .agent)

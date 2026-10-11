@@ -23,37 +23,29 @@ final class SelectionScrollTests: XCTestCase {
         await drainMainQueue()
     }
 
-    private func runSurvivesScrolling(offMain: Bool) async {
-        let view = HarnessTerminalSurfaceView(offMainParserFramePipeline: offMain)
+    func testSelectionSurvivesScrolling() async {
+        let view = HarnessTerminalSurfaceView()
         for i in 0 ..< 60 { view.receive("history line \(i) padded out for selection\r\n") }
         await settle(view)
 
         // A drag's end state on visible content (viewport rows 2…3).
         view.testingSetSelection(anchor: (row: 2, column: 0), head: (row: 3, column: 12))
         let before = view.testingSelectionText()
-        XCTAssertNotNil(before, "selection on visible content must extract (offMain=\(offMain))")
+        XCTAssertNotNil(before, "selection on visible content must extract")
 
         // Scroll far enough that the selected lines leave the viewport entirely.
         view.testingScrollBy(lines: 30)
         XCTAssertEqual(view.testingSelectionText(), before,
-                       "scrolling must not clear or shift the selection (offMain=\(offMain))")
+                       "scrolling must not clear or shift the selection")
 
         // Smooth (fractional) scrolling included, and scrolling back down too.
         view.testingScrollByContinuous(lines: -7.5)
         XCTAssertEqual(view.testingSelectionText(), before,
-                       "continuous scrolling must keep the selection (offMain=\(offMain))")
-    }
-
-    func testSelectionSurvivesScrollingSyncPipeline() async {
-        await runSurvivesScrolling(offMain: false)
-    }
-
-    func testSelectionSurvivesScrollingOffMainPipeline() async {
-        await runSurvivesScrolling(offMain: true)
+                       "continuous scrolling must keep the selection")
     }
 
     func testSelectionStaysOnContentAsNewOutputArrives() async {
-        let view = HarnessTerminalSurfaceView(offMainParserFramePipeline: true)
+        let view = HarnessTerminalSurfaceView()
         for i in 0 ..< 30 { view.receive("steady line \(i)\r\n") }
         await settle(view)
 
@@ -69,7 +61,7 @@ final class SelectionScrollTests: XCTestCase {
     }
 
     func testEvictedSelectionClampsInsteadOfCrashing() async {
-        let view = HarnessTerminalSurfaceView(offMainParserFramePipeline: true)
+        let view = HarnessTerminalSurfaceView()
         for i in 0 ..< 20 { view.receive("early line \(i)\r\n") }
         await settle(view)
         view.testingSetSelection(anchor: (row: 0, column: 0), head: (row: 0, column: 10))
@@ -85,6 +77,37 @@ final class SelectionScrollTests: XCTestCase {
         _ = view.testingSelectionText()
     }
 
+    func testSelectionAndReadingPositionSurviveRepeatedReflow() async {
+        let view = HarnessTerminalSurfaceView()
+        view.testingResizeGrid(cols: 20, rows: 5)
+        view.receive((0..<30).map { "line \($0) abcdefghijklmnop" }.joined(separator: "\r\n") + "\r\n")
+        await settle(view)
+        view.testingScrollBy(lines: 15)
+        view.testingSetSelection(anchor: (row: 1, column: 1), head: (row: 2, column: 3))
+        let text = view.testingSelectionText()
+        XCTAssertNotNil(text)
+        for width in [9, 31, 12, 20] {
+            view.testingResizeGrid(cols: width, rows: 5)
+            await settle(view)
+            XCTAssertEqual(view.testingSelectionText(), text, "width \(width)")
+            XCTAssertGreaterThan(view.testingScrollPosition.offset, 0)
+        }
+    }
+
+    func testWrappedSelectionPreservesInteriorSpacesAndWideDeferral() async {
+        let view = HarnessTerminalSurfaceView()
+        view.testingResizeGrid(cols: 8, rows: 5)
+        view.receive("ab   cd界efghij")
+        await settle(view)
+        view.testingSetSelection(anchor: (row: 0, column: 0), head: (row: 1, column: 7))
+        let text = view.testingSelectionText()
+        XCTAssertEqual(text, "ab   cd界efghij")
+        for width in [4, 20, 7] {
+            view.testingResizeGrid(cols: width, rows: 5)
+            XCTAssertEqual(view.testingSelectionText(), text)
+        }
+    }
+
     /// The rendered highlight moves WITH the content when the viewport scrolls (Metal-gated).
     func testPresentedSelectionShadingRebasesAcrossScroll() async throws {
         guard MTLCreateSystemDefaultDevice() != nil else { throw XCTSkip("No Metal device available") }
@@ -94,7 +117,7 @@ final class SelectionScrollTests: XCTestCase {
         )
         window.isReleasedWhenClosed = false
         defer { window.contentView = nil }
-        let view = HarnessTerminalSurfaceView(offMainParserFramePipeline: true)
+        let view = HarnessTerminalSurfaceView()
         window.contentView = view
         guard view.testingHasRenderer else { throw XCTSkip("renderer unavailable") }
         view.layoutSubtreeIfNeeded()
@@ -104,12 +127,14 @@ final class SelectionScrollTests: XCTestCase {
         for i in 0 ..< 60 { view.receive("scroll shade line \(i) content\r\n") }
         await settle(view)
         view.testingForceRender()
+        await drainRenderPipelineAsync(view)
         guard view.testingLastPresentedFrame != nil else {
             throw XCTSkip("no present happened (drawable unavailable)")
         }
 
         view.testingSetSelection(anchor: (row: 2, column: 0), head: (row: 2, column: 8))
         view.testingForceRender()
+        await drainRenderPipelineAsync(view)
         let atRest = try XCTUnwrap(view.testingLastPresentedFrame)
         XCTAssertEqual(atRest.cell(row: 2, column: 4)?.background, RenderColor(selectionBG))
 
@@ -118,6 +143,7 @@ final class SelectionScrollTests: XCTestCase {
         view.testingScrollBy(lines: 3)
         await settle(view)
         view.testingForceRender()
+        await drainRenderPipelineAsync(view)
         let scrolled = try XCTUnwrap(view.testingLastPresentedFrame)
         XCTAssertEqual(scrolled.cell(row: 5, column: 4)?.background, RenderColor(selectionBG),
                        "highlight must follow the content, not the viewport")

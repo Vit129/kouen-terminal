@@ -95,10 +95,11 @@ final class CellOverlayTests: XCTestCase {
     // MARK: - Presented-frame equivalence (window-hosted; skips without Metal)
 
     private func makeHostedView(in window: NSWindow) throws -> HarnessTerminalSurfaceView {
-        let view = HarnessTerminalSurfaceView(offMainParserFramePipeline: true)
+        let view = HarnessTerminalSurfaceView()
         window.contentView = view
         guard view.testingHasRenderer else { throw XCTSkip("renderer unavailable") }
         view.layoutSubtreeIfNeeded()
+        drainRenderPipeline(view)
         return view
     }
 
@@ -117,6 +118,7 @@ final class CellOverlayTests: XCTestCase {
         for i in 0 ..< 30 { view.receive("\u{1b}[3\(i % 8)moverlay line \(i) content\u{1b}[0m\r\n") }
         view.testingWaitForEmulatorIdle()
         view.testingForceRender()
+        drainRenderPipeline(view)
         guard view.testingLastPresentedFrame != nil else {
             throw XCTSkip("no present happened (drawable unavailable)")
         }
@@ -125,6 +127,7 @@ final class CellOverlayTests: XCTestCase {
         // clean caches must survive (that is the whole point of the overlay pass).
         view.testingSetSelection(anchor: (1, 2), head: (4, 8))
         view.testingForceRender()
+        drainRenderPipeline(view)
         let presented = try XCTUnwrap(view.testingLastPresentedFrame)
         let baked = view.testingMakeFrameBuilder().build(
             view.testingReadGridSnapshot(),
@@ -139,6 +142,7 @@ final class CellOverlayTests: XCTestCase {
         // full-row span, 4 joins) — not the grid.
         view.testingSetSelection(anchor: (1, 2), head: (5, 8))
         view.testingForceRender()
+        drainRenderPipeline(view)
         let damage = try XCTUnwrap(view.testingLastPresentedDamage)
         XCTAssertFalse(damage.full)
         XCTAssertEqual(damage.rows, IndexSet([4, 5]), "a one-row drag re-encodes the crossed rows")
@@ -152,6 +156,7 @@ final class CellOverlayTests: XCTestCase {
         // Clearing the selection restores plain cells and dirties exactly the old rows.
         view.testingSetSelection(anchor: nil, head: nil)
         view.testingForceRender()
+        drainRenderPipeline(view)
         let cleared = try XCTUnwrap(view.testingLastPresentedFrame)
         let plain = view.testingMakeFrameBuilder().build(view.testingReadGridSnapshot())
         XCTAssertEqual(cleared.cells, plain.cells)
@@ -171,6 +176,7 @@ final class CellOverlayTests: XCTestCase {
         for i in 0 ..< 10 { view.receive("line \(i)\r\n") }
         view.testingWaitForEmulatorIdle()
         view.testingForceRender()
+        drainRenderPipeline(view)
         guard let before = view.testingLastPresentedFrame else {
             throw XCTSkip("no present happened (drawable unavailable)")
         }
@@ -179,6 +185,7 @@ final class CellOverlayTests: XCTestCase {
         // Composition shows over the grid, dirties only its row, and never poisons the caches.
         view.setMarkedText("かん", selectedRange: NSRange(), replacementRange: NSRange())
         view.testingForceRender()
+        drainRenderPipeline(view)
         let composing = try XCTUnwrap(view.testingLastPresentedFrame)
         let glyph = composing.cell(row: cursorRow, column: before.cursor.column)
         XCTAssertEqual(glyph?.codepoint, UnicodeScalar("か").value)
@@ -190,6 +197,7 @@ final class CellOverlayTests: XCTestCase {
         // Cancelling the composition restores the plain cells via the clean cache.
         view.unmarkText()
         view.testingForceRender()
+        drainRenderPipeline(view)
         let restored = try XCTUnwrap(view.testingLastPresentedFrame)
         XCTAssertEqual(restored.cells, before.cells)
         let clearDamage = try XCTUnwrap(view.testingLastPresentedDamage)
@@ -214,6 +222,7 @@ final class CellOverlayTests: XCTestCase {
         for i in 0 ..< 10 { view.receive("line \(i)\r\n") }
         view.testingWaitForEmulatorIdle()
         view.testingForceRender()
+        drainRenderPipeline(view)
         guard let before = view.testingLastPresentedFrame else {
             throw XCTSkip("no present happened (drawable unavailable)")
         }
@@ -223,8 +232,10 @@ final class CellOverlayTests: XCTestCase {
         // Shade the cursor row, then compose on top of the shaded cells.
         view.testingSetSelection(anchor: (row, 0), head: (row, 20))
         view.testingForceRender()
+        drainRenderPipeline(view)
         view.setMarkedText("かん", selectedRange: NSRange(), replacementRange: NSRange())
         view.testingForceRender()
+        drainRenderPipeline(view)
 
         let frame = try XCTUnwrap(view.testingLastPresentedFrame)
         let cell = try XCTUnwrap(frame.cell(row: row, column: col))
@@ -249,17 +260,20 @@ final class CellOverlayTests: XCTestCase {
         for i in 0 ..< 10 { view.receive("line \(i)\r\n") }
         view.testingWaitForEmulatorIdle()
         view.testingForceRender()
+        drainRenderPipeline(view)
         guard view.testingLastPresentedFrame != nil else {
             throw XCTSkip("no present happened (drawable unavailable)")
         }
         view.testingSetSelection(anchor: (0, 0), head: (2, 5))
         view.testingForceRender()
+        drainRenderPipeline(view)
 
         // New output lands while the selection is held: the presented frame must equal the
         // baked build of the NEW grid (selection still shaded, fresh content resolved).
         view.receive("appended while selected\r\n")
         view.testingWaitForEmulatorIdle()
         view.testingForceRender()
+        drainRenderPipeline(view)
         let presented = try XCTUnwrap(view.testingLastPresentedFrame)
         let baked = view.testingMakeFrameBuilder().build(
             view.testingReadGridSnapshot(),
@@ -315,6 +329,7 @@ final class CellOverlayTests: XCTestCase {
         view.receive("\r\n")
         view.testingWaitForEmulatorIdle()
         view.testingForceRender()
+        drainRenderPipeline(view)
         guard let before = view.testingLastPresentedFrame else {
             throw XCTSkip("no present happened (drawable unavailable)")
         }
@@ -322,6 +337,7 @@ final class CellOverlayTests: XCTestCase {
         let col = before.cursor.column
         view.setMarkedText("あ", selectedRange: NSRange(), replacementRange: NSRange())
         view.testingForceRender()
+        drainRenderPipeline(view)
         let frame = try XCTUnwrap(view.testingLastPresentedFrame)
         let cell = try XCTUnwrap(frame.cell(row: row, column: col))
         XCTAssertEqual(cell.codepoint, UnicodeScalar("あ").value)

@@ -13,8 +13,8 @@ final class NotificationService: @unchecked Sendable {
     }
     private let queue = DispatchQueue(label: "com.harness.notifications")
     private let inputSlots = DispatchSemaphore(value: 128)
-    private var lastSettingsRead = Date.distantPast
-    private var settingsBytes: Data?
+    private let settingsCache: DaemonSettingsCache
+    private var settingsObservation: UUID?
     private var settingsFailure: String?
     private var commandThreshold: Double
     private let settingsURL: URL
@@ -32,13 +32,18 @@ final class NotificationService: @unchecked Sendable {
     private var timer: DispatchSourceTimer?
     private var accepting = false
     private var failure: String?
+    private var deliveryRetryAt: Date?
     var onDesktop: (@Sendable (DesktopNotificationDelivery) -> Void)?
     init(store: ActivityStore, settings: HarnessSettings, settingsURL: URL = HarnessPaths.settingsURL) {
         commandThreshold = Double(max(0, settings.commandFinishedThresholdSeconds))
         self.settingsURL = settingsURL
+        settingsCache = settingsURL == HarnessPaths.settingsURL ? .shared : DaemonSettingsCache(url: settingsURL)
         self.store = store; self.settings = NotificationPolicySettings(legacy: settings)
     }
-    deinit { timer?.cancel(); network.close() }
+    deinit {
+        timer?.cancel(); network.close()
+        if let settingsObservation { settingsCache.removeObserver(settingsObservation) }
+    }
     func start() {
         do { try activate() } catch { queue.sync { failure = error.localizedDescription } }
     }
@@ -64,8 +69,14 @@ final class NotificationService: @unchecked Sendable {
             lastDesktop = try store.object(Date.self, kind: "notification-throttle", id: "desktop") ?? .distantPast
             diagnostics = Array(diagnostics.suffix(100)); accepting = true; failure = nil
             let timer = DispatchSource.makeTimerSource(queue: queue)
-            timer.schedule(deadline: .now(), repeating: .milliseconds(250))
+            timer.schedule(deadline: .distantFuture)
             timer.setEventHandler { [weak self] in self?.deliverDue() }; timer.resume(); self.timer = timer
+            if settingsObservation == nil {
+                settingsObservation = settingsCache.observe { [weak self] in
+                    self?.queue.async { [weak self] in self?.settingsChanged() }
+                }
+            }
+            deliverDue()
         }
     }
     func suspend() {
@@ -92,7 +103,9 @@ final class NotificationService: @unchecked Sendable {
                 _ = try NotificationPayload.request(notice: notice, sink: sink, credentials: credential)
             }
             _ = try SettingsSectionStorage.save(value, key: "notificationPolicy", url: settingsURL, rootValues: ["systemNotificationsEnabled": value.banners, "notificationSoundEnabled": value.chimes], events: value.events)
+            settingsCache.refresh()
             settings = value
+            defer { deliverDue() }
             // Previously accepted payloads must not outlive a revoked destination or consent.
             for item in Array(pending.values) {
                 if let sink = item.sinkID, !value.sinks.contains(where: { $0.id == sink && $0.enabled }) { try finish(item, outcome: "destination disabled") }
@@ -106,6 +119,7 @@ final class NotificationService: @unchecked Sendable {
             guard accepting, controls.count < 500 || controls[value.scopeIdentifier] != nil else { throw LedgerError.limit }
             try store.saveObjects([LedgerObject(kind: "notification-control", id: value.scopeIdentifier, value: value)])
             controls[value.scopeIdentifier] = value
+            defer { armNextDelivery() }
             if value.muted || (value.snoozedUntil.map { $0 > .now } ?? false) {
                 for item in Array(pending.values) where item.notice.surfaceID == value.surfaceID && (value.runID == nil || value.runID == item.notice.runID) { try finish(item, outcome: "muted or snoozed") }
             }
@@ -113,6 +127,7 @@ final class NotificationService: @unchecked Sendable {
     }
     func purgeCapturedText(surfaceID: String) throws {
         try queue.sync {
+            defer { armNextDelivery() }
             for var item in Array(pending.values) where item.notice.surfaceID == surfaceID {
                 if let attempt = inFlight.removeValue(forKey: item.id) { network.cancel(attempt.taskID) }
                 item.notice.title = "Harness"; item.notice.message = ""; item.notice.repository = nil
@@ -196,6 +211,7 @@ final class NotificationService: @unchecked Sendable {
         if let identity = original.observationIdentity { records.append(try LedgerObject(kind: "notification-observed", id: identity, value: true)) }
         try store.saveObjects(records)
         for item in staged { pending[item.id] = item }
+        armNextDelivery()
     }
     private func save(_ item: PendingDelivery) throws {
         try store.saveObjects([LedgerObject(kind: "notification-pending", id: item.id.uuidString, value: item)])
@@ -203,7 +219,9 @@ final class NotificationService: @unchecked Sendable {
     }
     private func deliverDue() {
         guard accepting else { return }
-        reloadSettingsIfDue()
+        defer { armNextDelivery() }
+        if let deliveryRetryAt, deliveryRetryAt > .now { return }
+        deliveryRetryAt = nil
         for var item in pending.values.sorted(by: { $0.due < $1.due }) {
             do {
                 // Expiry and revoked policy also cancel requests already in flight.
@@ -240,25 +258,59 @@ final class NotificationService: @unchecked Sendable {
                     try finish(item, outcome: "offered to attached desktop"); lastDesktop = .now
                     onDesktop?(DesktopNotificationDelivery(notice: notice, settings: settings))
                 }
-            } catch { failure = error.localizedDescription; do { try finish(item, outcome: "configuration or storage unavailable") } catch { failure = error.localizedDescription } }
+            } catch {
+                failure = error.localizedDescription
+                do { try finish(item, outcome: "configuration or storage unavailable") }
+                catch {
+                    // A failed durable retirement leaves its deadline in the past.
+                    // Back off instead of immediately scheduling the same failed write.
+                    failure = error.localizedDescription
+                    deliveryRetryAt = Date().addingTimeInterval(5)
+                    break
+                }
+            }
         }
     }
-    private func reloadSettingsIfDue() {
-        guard Date().timeIntervalSince(lastSettingsRead) >= 2 else { return }
-        lastSettingsRead = .now
-        do {
-            guard let bytes = try PrivateFile.read(settingsURL), bytes != settingsBytes else { return }
-            let fresh = try HarnessSettings.reload(data: bytes)
+    private func settingsChanged() {
+        guard let result = settingsCache.latestResult else { return }
+        switch result {
+        case let .success(fresh):
             settings = NotificationPolicySettings(legacy: fresh)
             commandThreshold = Double(max(0, fresh.commandFinishedThresholdSeconds))
-            settingsBytes = bytes; settingsFailure = nil
-        } catch { settingsFailure = "Notification settings could not be reloaded; the last working policy remains active." }
+            settingsFailure = nil
+        case .failure:
+            settingsFailure = "Notification settings could not be reloaded; the last working policy remains active."
+        }
+        deliverDue()
+    }
+    private func armNextDelivery() {
+        guard accepting, let timer else { return }
+        let now = Date()
+        var next: Date?
+        for item in pending.values {
+            var deadline = item.expires
+            if inFlight[item.id] == nil {
+                if let sinkID = item.sinkID,
+                   let sink = settings.sinks.first(where: { $0.id == sinkID }),
+                   inFlight.count < 4,
+                   !pending.values.contains(where: { $0.sinkID == sinkID && inFlight[$0.id] != nil }) {
+                    deadline = min(deadline, max(item.due, (lastDelivery[sinkID] ?? .distantPast).addingTimeInterval(sink.minimumInterval)))
+                } else if item.sinkID == nil {
+                    deadline = min(deadline, max(item.due, lastDesktop.addingTimeInterval(2)))
+                }
+            }
+            next = min(next ?? deadline, deadline)
+        }
+        if let retry = deliveryRetryAt, let deadline = next { next = max(deadline, retry) }
+        timer.schedule(deadline: next.map { .now() + max(0, $0.timeIntervalSince(now)) } ?? .distantFuture,
+            leeway: .milliseconds(10))
     }
     private func completed(_ id: UUID, attemptID: UUID, result: Result<HTTPResult, Error>) {
         // Cancellation can finish after a redacted replacement has been submitted.
         // Only the matching attempt may consume that delivery's pending state.
         guard accepting, inFlight[id]?.id == attemptID, var item = pending[id] else { return }
         inFlight.removeValue(forKey: id)
+        defer { deliverDue() }
         do {
             if case let .success(response) = result, (200..<300).contains(response.status) {
                 if item.sinkID.flatMap({ id in settings.sinks.first { $0.id == id } })?.kind == .pushover {

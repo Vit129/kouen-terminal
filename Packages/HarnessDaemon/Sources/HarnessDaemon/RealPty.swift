@@ -94,6 +94,10 @@ public final class RealPty: @unchecked Sendable {
     // This scanner is owned by deliveryQueue, away from PTY reads and input.
     private var resumeScanner = PtyStreamScanner()
     private var resumeScanGeneration: UInt64?
+    private let metadataLock = NSLock()
+    private var observedMetadata: HostedPtyState?
+    var cachedMetadata: HostedPtyState? { metadataLock.lock(); defer { metadataLock.unlock() }; return observedMetadata }
+    func cacheMetadata(_ state: HostedPtyState) { metadataLock.lock(); observedMetadata = state; metadataLock.unlock() }
     /// Reaped status tagged with its child generation. Terminal EOF does not reap
     /// or end a process. Guarded by lifecycleLock, including respawn races.
     private var reapedExit: (generation: UInt64, status: Int32?)?
@@ -139,6 +143,13 @@ public final class RealPty: @unchecked Sendable {
 
     private let readQueue = DispatchQueue(label: "com.robert.harness.realpty.read")
     private var readSource: DispatchSourceRead?
+    private var readSuspended = false
+    private var deliveryBytes = 0
+    private var observedThrough: UInt64?
+    private var consumedThrough: [UUID: UInt64] = [:]
+    private var emittedThrough: UInt64 = 0
+    private static let deliveryHighWater = 4 << 20
+    private static let deliveryLowWater = 1 << 20
     /// Reused across read wakeups — `readQueue` is serial and every generation's read source runs on
     /// it, so this is single-owner and never raced. Allocating + zero-filling a fresh 64 KiB buffer
     /// *per wakeup* was a measured hot-path cost: the macOS PTY hands out only ~1 KiB per read, so a
@@ -146,13 +157,13 @@ public final class RealPty: @unchecked Sendable {
     /// was the largest single per-segment cost. Reusing one buffer raised end-to-end drain from
     /// ≈42 to ≈48 MB/s in the `real_pty_end_to_end_drain` benchmark (the raw read ceiling is ≈75).
     private var readBuffer = [UInt8](repeating: 0, count: 64 * 1024)
-    /// Subscriber fan-out runs here, NOT on `readQueue`: a slow or misbehaving subscriber handler
-    /// must not stall PTY reads (which would back-pressure the shell and every other subscriber of
-    /// this surface). Output is enqueued in read order onto this *serial* queue, so each subscriber
-    /// still sees chunks in order. Bounded in practice — the real subscriber (`DaemonServer`) hands
-    /// each chunk to its own queue with a write-backlog cap and drops a stuck client — so this
-    /// queue can't grow without bound.
+    /// Ordered fan-out stays off PTY reads. A full delivery or mandatory-observer queue
+    /// suspends the read source, letting the kernel throttle producers without dropping bytes.
     private let deliveryQueue = DispatchQueue(label: "com.robert.harness.realpty.deliver")
+    private var pendingObservation: HostedOutputObservation?
+    private var pendingObservationGeneration: UInt64?
+    private var pendingObservationDeadline: UInt64 = 0
+    private var observationFlushScheduled = false
     /// Input to the PTY master, never on the caller's thread: `SurfaceRegistry` sends input
     /// while holding the registry lock on the daemon's IPC queue. Serial, so keystrokes stay in
     /// order; the master is non-blocking, so a flow-controlled (C-s) or full PTY holds a buffer,
@@ -179,6 +190,8 @@ public final class RealPty: @unchecked Sendable {
     private let killGrace: DispatchTimeInterval = .milliseconds(2500)
 
     public var onOutput: ((Data) -> Void)?
+    var onUnpark: (@Sendable () -> Void)?
+    var onObservation: (@Sendable (HostedOutputObservation) -> Void)?
     /// Fired once when the child for the current generation dies. Carries the decoded exit
     /// status when the `waitpid` watcher observed it (exit code, or 128+signal for a signalled
     /// child, shell-convention); nil when only EOF was observed (e.g. the read loop won the
@@ -208,8 +221,7 @@ public final class RealPty: @unchecked Sendable {
     /// Last PTY read. Idle parking uses this, not a wall clock in the read loop.
     private var lastPTYReadAt = Date()
     private var idleGrid = IdleGrid()
-    /// The ring while the surface is parked (idle), compressed. Readers decompress a copy;
-    /// the next PTY output puts it back into `scrollback`.
+    /// Sealed compressed blocks stay cold while new output grows the live tail.
     private var parked: ParkedRing?
     /// Authoritative grid with its history, for capture. Touched only under `snapshotLock`,
     /// never from the PTY read loop.
@@ -230,6 +242,7 @@ public final class RealPty: @unchecked Sendable {
     private let screen = AuthoritativeParser(historyLines: 1)
     /// While parked, the screen at the park when it isn't in the park file. Under `screenLock`.
     private var parkedScreen: ScreenFrame?
+    private var parkedScreenSequence: UInt64?
     private var parkDirectoryOverride: URL?
     private var parkKeyOverride: Data?
     private let persistedScrollbackURL: URL?
@@ -578,10 +591,12 @@ public final class RealPty: @unchecked Sendable {
         ["zsh", "bash", "fish", "sh", "dash", "ksh"].contains(URL(fileURLWithPath: shell).lastPathComponent)
             && !(launchArgumentsOverride ?? []).contains(where: { $0 == "-c" || $0 == "--command" })
     }
-    private func observeResumePrompt(_ data: Data, generation observed: UInt64) {
+    private func observeOutput(_ data: Data, sequence: UInt64, generation observed: UInt64, retainedStart: UInt64, retainedBytes: Int) -> HostedOutputObservation {
         if resumeScanGeneration != observed { resumeScanner = PtyStreamScanner(); resumeScanGeneration = observed }
         var marker: String?, paste: Bool?
-        resumeScanner.visit(data) { anchored in
+        var events: [AnchoredPtyScanEvent] = []
+        resumeScanner.visit(data, sequence: sequence) { anchored in
+            events.append(anchored)
             switch anchored.event {
             case let .bracketedPaste(enabled): paste = enabled
             case let .osc(133, body, _):
@@ -591,13 +606,14 @@ public final class RealPty: @unchecked Sendable {
             default: break
             }
         }
-        guard marker != nil || paste != nil else { return }
+        let observation = HostedOutputObservation(streamIdentity: streamIdentity, sequence: sequence, byteCount: data.count, events: events, scanner: resumeScanner.phase == .ground ? nil : resumeScanner, retainedStart: retainedStart, retainedBytes: retainedBytes)
+        guard marker != nil || paste != nil else { return observation }
         inputPolicyLock.lock(); defer { inputPolicyLock.unlock() }
         lifecycleLock.lock(); let current = generation; lifecycleLock.unlock()
-        guard observed == current else { return }
+        guard observed == current else { return observation }
         if let paste { pasteGeneration = paste ? observed : nil }
         if let marker { promptGeneration = marker == "A" ? observed : nil }
-
+        return observation
     }
     func insertExplanation(_ text: String, agentPID: Int32, agentGeneration: String) throws {
         guard text.utf8.count <= 32 * 1024,
@@ -659,7 +675,7 @@ public final class RealPty: @unchecked Sendable {
         pruneReplaySizesLocked()
         authoritative.releaseGrid()
         screen.releaseGrid()
-        parkedScreen = nil
+        parkedScreen = nil; parkedScreenSequence = nil
         deleteParkFile()
         // Appends are enqueued under this same lock, so none of the erased bytes can be
         // queued after the disk reset and silently restore the old history.
@@ -701,6 +717,7 @@ public final class RealPty: @unchecked Sendable {
         inputWriter.reset()
         generation &+= 1
         let replacementGeneration = generation
+        if readSuspended { readSource?.resume(); readSuspended = false }
         readSource = nil
         master = -1
         childPID = -1
@@ -976,7 +993,7 @@ public final class RealPty: @unchecked Sendable {
                     guard generation == requestedGeneration, !isClosed, outcome.shouldApply() else { return false }
                     scrollbackLock.lock(); defer { scrollbackLock.unlock() }
                     guard harness_pty_set_winsize(descriptor, rows, cols) == 0 else { return false }
-                    if idleGrid.parked { mergeParkedHistoryLocked() }
+                    if idleGrid.parked { restoreHotTailLocked() }
                     let size = ReplaySize(sequence: nextSequence, cols: cols, rows: rows)
                     if replaySizes.last?.sequence == nextSequence { replaySizes.removeLast() }
                     recorded = size
@@ -1046,6 +1063,51 @@ public final class RealPty: @unchecked Sendable {
     /// The foreground process group (`tcgetpgrp`) and its executable name.
     /// The pid is the process whose name is returned, not the spawned shell,
     /// unless the shell itself is in the foreground.
+    var foregroundProcessID: Int32? {
+        lifecycleLock.lock(); defer { lifecycleLock.unlock() }
+        guard childPID > 0 else { return nil }
+        let foreground = master >= 0 ? tcgetpgrp(master) : -1
+        return foreground > 0 ? foreground : childPID
+    }
+    func beginObservation() {
+        let end = ringEnd
+        lifecycleLock.lock(); observedThrough = end; emittedThrough = end
+        resumeReadingIfConsumedLocked()
+        lifecycleLock.unlock()
+    }
+    func endObservation() {
+        lifecycleLock.lock(); observedThrough = nil
+        resumeReadingIfConsumedLocked()
+        lifecycleLock.unlock()
+    }
+    func acknowledgeObservation(_ sequence: UInt64) {
+        lifecycleLock.lock()
+        if let prior = observedThrough { observedThrough = max(prior, min(sequence, emittedThrough)) }
+        resumeReadingIfConsumedLocked()
+        lifecycleLock.unlock()
+    }
+    /// Every acknowledged consumer must release its live bytes before the producer resumes.
+    private var outstandingOutputLocked: UInt64 {
+        let consumed = consumedThrough.values.min().map { min($0, emittedThrough) } ?? emittedThrough
+        let observed = observedThrough.map { min($0, emittedThrough) } ?? emittedThrough
+        return emittedThrough - min(consumed, observed)
+    }
+    private func resumeReadingIfConsumedLocked() {
+        if readSuspended, deliveryBytes <= Self.deliveryLowWater, outstandingOutputLocked <= UInt64(Self.deliveryLowWater) {
+            readSource?.resume(); readSuspended = false
+        }
+    }
+    public func acknowledgeSubscription(token: UUID, sequence: UInt64) {
+        lifecycleLock.lock()
+        if let prior = consumedThrough[token] { consumedThrough[token] = max(prior, min(sequence, emittedThrough)) }
+        resumeReadingIfConsumedLocked()
+        lifecycleLock.unlock()
+    }
+    var parkingDeadline: Date? {
+        scrollbackLock.lock(); defer { scrollbackLock.unlock() }
+        return idleGrid.parked ? nil : lastPTYReadAt.addingTimeInterval(IdleGrid.defaultThreshold)
+    }
+
     public func probeForegroundProcess() -> (pid: pid_t, executable: String)? {
         lifecycleLock.lock()
         let child = childPID
@@ -1137,7 +1199,7 @@ public final class RealPty: @unchecked Sendable {
     /// Bytes currently held in the in-memory scrollback ring (`#{history_bytes}`).
     public var historyBytes: Int {
         scrollbackLock.lock(); defer { scrollbackLock.unlock() }
-        return scrollbackBytes
+        return scrollbackBytes + (parked?.rawCount ?? 0)
     }
 
     /// After SIGTERM, a child that traps/ignores TERM+HUP never exits — its exit event never
@@ -1193,6 +1255,7 @@ public final class RealPty: @unchecked Sendable {
         let needsWatcher = !started
         let source = readSource
         let fd = master
+        if readSuspended { readSource?.resume(); readSuspended = false }
         readSource = nil
         master = -1
         childPID = -1
@@ -1223,7 +1286,7 @@ public final class RealPty: @unchecked Sendable {
     public var scrollbackByteCount: Int {
         scrollbackLock.lock()
         defer { scrollbackLock.unlock() }
-        return scrollbackBytes
+        return scrollbackBytes + (parked?.rawCount ?? 0)
     }
 
     /// `persist-scrollback` runtime toggle: `false` stops on-disk persistence and wipes the
@@ -1472,6 +1535,7 @@ public final class RealPty: @unchecked Sendable {
         scrollbackLock.unlock()
         guard due else { return }
         screenLock.lock()
+        restoreParkedScreenLocked()
         scrollbackLock.lock()
         let idleFor = now.timeIntervalSince(lastPTYReadAt)
         var model = idleGrid
@@ -1483,7 +1547,7 @@ public final class RealPty: @unchecked Sendable {
             screenLock.unlock()
             return
         }
-        let ring = ringLocked()
+        let ring = ringLocked(fromSequence: screen.gridResident ? screen.fedThrough : nil)
         let sizes = replaySizes
         let size = (cols: Int(sizes.last?.cols ?? 80), rows: Int(sizes.last?.rows ?? 24))
         packRingLocked()
@@ -1493,6 +1557,7 @@ public final class RealPty: @unchecked Sendable {
         // bytes in memory, a few KiB.
         screen.catchUp(ring: ring, cols: size.cols, rows: size.rows, sizes: sizes)
         let frame = screen.frame(includeCheckpoint: true)
+        parkedScreenSequence = frame?.sequence
         screen.releaseGrid()
         if !scrollbackPersistenceEnabled { deleteParkFile() }
         parkedScreen = scrollbackPersistenceEnabled && frame.map(writeParkFile) == true ? nil : frame
@@ -1500,41 +1565,24 @@ public final class RealPty: @unchecked Sendable {
         releaseAuthoritativeGrid()
     }
 
-    /// Compress the live ring into `parked`. Caller holds `scrollbackLock`.
+    /// Compress only the hot tail; sealed blocks never inflate on output wakeup.
     private func packRingLocked() {
         let live = scrollback[scrollbackHead...]
-        guard parked == nil, let first = live.first else { return }
+        guard let first = live.first else { return }
         let bytes = live.reduce(into: Data()) { $0.append($1.data) }
-        parked = ParkedRing(sequence: first.sequence, bytes: bytes)
+        if parked == nil { parked = ParkedRing(sequence: first.sequence, bytes: bytes) }
+        else { parked?.append(bytes) }
         scrollback.removeAll(keepingCapacity: false)
         scrollbackHead = 0
-        scrollbackBytes -= bytes.count
+        scrollbackBytes = 0
     }
 
-    /// Put the parked ring back in front of the live one, in 16 KiB entries like a seeded
-    /// ring, so eviction trims the oldest bytes instead of dropping the whole history at once.
-    /// Caller holds `scrollbackLock`.
-    private func mergeParkedHistoryLocked() {
-        if let ring = parked {
-            let bytes = ring.bytes
-            var entries: [ScrollbackEntry] = []
-            var offset = 0
-            while offset < bytes.count {
-                let end = min(offset + 16 * 1024, bytes.count)
-                entries.append(ScrollbackEntry(sequence: ring.sequence &+ UInt64(offset), data: bytes.subdata(in: offset ..< end)))
-                offset = end
-            }
-            scrollback.insert(contentsOf: entries, at: scrollbackHead)
-            scrollbackBytes += bytes.count
-        }
-        parked = nil
-        idleGrid.restore()
-    }
+    private func restoreHotTailLocked() { idleGrid.restore() }
 
     /// Ring bytes held compressed while parked, and their uncompressed size.
     var parkedFootprint: (stored: Int, raw: Int)? {
         scrollbackLock.lock(); defer { scrollbackLock.unlock() }
-        return parked.map { ($0.stored.count, $0.rawCount) }
+        return parked.map { ($0.storedByteCount, $0.rawCount) }
     }
 
     var presentsProcessAsRunning: Bool {
@@ -1562,7 +1610,7 @@ public final class RealPty: @unchecked Sendable {
 
     var ringStart: UInt64 {
         scrollbackLock.lock(); defer { scrollbackLock.unlock() }
-        return ringLocked().first?.sequence ?? nextSequence
+        return parked?.sequence ?? (scrollbackHead < scrollback.count ? scrollback[scrollbackHead].sequence : nextSequence)
     }
 
     /// One past the ring's last byte.
@@ -1596,9 +1644,10 @@ public final class RealPty: @unchecked Sendable {
     func screenFrame() -> ScreenFrame? {
         screenLock.lock()
         defer { screenLock.unlock() }
+        restoreParkedScreenLocked()
         scrollbackLock.lock()
         let parked = idleGrid.parked
-        let ring = parked ? [] : ringLocked()
+        let ring = parked ? [] : ringLocked(fromSequence: screen.gridResident ? screen.fedThrough : nil)
         let sizes = replaySizes
         let size = (cols: Int(sizes.last?.cols ?? 80), rows: Int(sizes.last?.rows ?? 24))
         scrollbackLock.unlock()
@@ -1617,9 +1666,10 @@ public final class RealPty: @unchecked Sendable {
         guard !closed, !watched else { return }
         screenLock.lock()
         defer { screenLock.unlock() }
+        restoreParkedScreenLocked()
         scrollbackLock.lock()
         let parked = idleGrid.parked
-        let ring = parked ? [] : ringLocked()
+        let ring = parked ? [] : ringLocked(fromSequence: screen.gridResident ? screen.fedThrough : nil)
         let sizes = replaySizes
         let size = (cols: Int(sizes.last?.cols ?? 80), rows: Int(sizes.last?.rows ?? 24))
         scrollbackLock.unlock()
@@ -1640,13 +1690,31 @@ public final class RealPty: @unchecked Sendable {
         return screen.frame(includeCheckpoint: includeCheckpoint)
     }
 
+    private func restoreParkedScreenLocked() {
+        scrollbackLock.lock(); let isParked = idleGrid.parked; scrollbackLock.unlock()
+        guard !isParked, !screen.gridResident, let frame = parkedScreenLocked() else { return }
+        screen.restore(frame)
+    }
+
     /// The screen kept at the park: in memory, or sealed in the park file. Caller holds
     /// `screenLock` and has seen the pane parked.
     private func parkedScreenLocked() -> ScreenFrame? {
         if let parkedScreen { return parkedScreen }
         guard let url = parkFileURL(), let sealed = try? Data(contentsOf: url),
-              let plain = try? parkProtection().open(sealed, identity: "checkpoint:" + id, sequence: ringEnd) else { return nil }
+              let plain = try? parkProtection().open(sealed, identity: "checkpoint:" + id, sequence: parkedScreenSequence ?? ringEnd) else { return nil }
         return ScreenFrame.decode(plain)
+    }
+
+    /// Observation recovery tracks raw bytes, independently of geometry and screen resyncs.
+    func observationReplay(fromSequence: UInt64, byteLimit: Int = 4 << 20) -> AttachHistory {
+        scrollbackLock.lock(); defer { scrollbackLock.unlock() }
+        let retainedStart = parked?.sequence ?? (scrollbackHead < scrollback.count ? scrollback[scrollbackHead].sequence : nextSequence)
+        let lost = fromSequence < retainedStart || fromSequence > nextSequence
+        let start = lost ? retainedStart : fromSequence
+        let end = start + min(nextSequence - start, UInt64(max(1, min(byteLimit, 4 << 20))))
+        let ring = ringLocked(fromSequence: start, toSequence: end)
+        let replay = Self.chunks(ring, from: start, limit: 1 << 20)
+        return AttachHistory(chunks: replay, endSequence: end, resync: lost)
     }
 
     /// What an attaching client needs from the ring: the bytes after `fromSequence` when the
@@ -1657,11 +1725,12 @@ public final class RealPty: @unchecked Sendable {
     func attachHistory(history: Bool = true, fromSequence: UInt64?, chunkLimit: Int = 1 << 20, screenOnResync: Bool = false, includeCheckpoint: Bool = false) -> AttachHistory {
         if history, let fromSequence {
             scrollbackLock.lock()
-            let ring = ringLocked()
+            let start = parked?.sequence ?? (scrollbackHead < scrollback.count ? scrollback[scrollbackHead].sequence : nextSequence)
+            let ring = ringLocked(fromSequence: fromSequence)
             let end = nextSequence
             let resized = replaySizes.contains { $0.sequence >= fromSequence }
             scrollbackLock.unlock()
-            if !resized, fromSequence >= ring.first?.sequence ?? end, fromSequence <= end {
+            if !resized, fromSequence >= start, fromSequence <= end {
                 return AttachHistory(chunks: Self.chunks(ring, from: fromSequence, limit: chunkLimit), endSequence: end, resync: false)
             }
         }
@@ -1706,13 +1775,16 @@ public final class RealPty: @unchecked Sendable {
         return chunks
     }
 
-    private func ringLocked() -> [SnapshotByteSpan] {
-        var spans: [SnapshotByteSpan] = []
-        if let ring = parked {
-            spans.append(SnapshotByteSpan(sequence: ring.sequence, data: ring.bytes))
-        }
+    private func ringLocked(fromSequence: UInt64? = nil, toSequence: UInt64? = nil) -> [SnapshotByteSpan] {
+        var spans: [SnapshotByteSpan] = parked?.segments(fromSequence: fromSequence, toSequence: toSequence).map { segment in
+            let bytes = toSequence.map { Data(segment.data.prefix(Int(min(UInt64(segment.data.count), $0 - segment.sequence)))) } ?? segment.data
+            return SnapshotByteSpan(sequence: segment.sequence, data: bytes)
+        } ?? []
         for entry in scrollback[scrollbackHead...] {
-            spans.append(SnapshotByteSpan(sequence: entry.sequence, data: entry.data))
+            if let fromSequence, entry.sequence + UInt64(entry.data.count) <= fromSequence { continue }
+            if let toSequence, entry.sequence >= toSequence { break }
+            let bytes = toSequence.map { Data(entry.data.prefix(Int(min(UInt64(entry.data.count), $0 - entry.sequence)))) } ?? entry.data
+            spans.append(SnapshotByteSpan(sequence: entry.sequence, data: bytes))
         }
         return spans
     }
@@ -1731,7 +1803,7 @@ public final class RealPty: @unchecked Sendable {
         let gen = generation
         lifecycleLock.unlock()
         scrollbackLock.lock()
-        let first = scrollbackHead < scrollback.count ? scrollback[scrollbackHead].sequence : nextSequence
+        let first = parked?.sequence ?? (scrollbackHead < scrollback.count ? scrollback[scrollbackHead].sequence : nextSequence)
         let end = nextSequence
         let size = replaySizes.last
         scrollbackLock.unlock()
@@ -1811,7 +1883,7 @@ public final class RealPty: @unchecked Sendable {
 
     public func replay(fromSequence: UInt64?) -> String {
         scrollbackLock.lock()
-        let segments = replaySegmentsLocked()
+        let segments = replaySegmentsLocked(fromSequence: fromSequence)
         scrollbackLock.unlock()
         let combined = Self.replayData(from: segments, fromSequence: fromSequence)
         // Lossy decode — a UTF-8 sequence split across the replay boundary (or an evicted entry)
@@ -1827,7 +1899,7 @@ public final class RealPty: @unchecked Sendable {
     /// atomically, so `endSequence` always lands on a chunk boundary).
     public func replayWithEndSequence(fromSequence: UInt64?) -> (text: String, endSequence: UInt64) {
         scrollbackLock.lock()
-        let segments = replaySegmentsLocked()
+        let segments = replaySegmentsLocked(fromSequence: fromSequence)
         let endSequence = nextSequence
         scrollbackLock.unlock()
         let combined = Self.replayData(from: segments, fromSequence: fromSequence)
@@ -1835,10 +1907,10 @@ public final class RealPty: @unchecked Sendable {
     }
 
     /// Live ring plus parked history, in sequence order. Caller holds `scrollbackLock`.
-    private func replaySegmentsLocked() -> [ScrollbackReplaySegment] {
+    private func replaySegmentsLocked(fromSequence: UInt64? = nil) -> [ScrollbackReplaySegment] {
         var segments: [ScrollbackReplaySegment] = []
         if let ring = parked {
-            segments.append(ScrollbackReplaySegment(sequence: ring.sequence, data: ring.bytes))
+            segments.append(contentsOf: ring.segments(fromSequence: fromSequence))
         }
         segments.append(contentsOf: scrollback[scrollbackHead...].map {
             ScrollbackReplaySegment(sequence: $0.sequence, data: $0.data)
@@ -1865,8 +1937,12 @@ public final class RealPty: @unchecked Sendable {
 
     /// `watching`: the subscriber paints the pane (a client). While one does, the daemon leaves
     /// the screen grid where it is: the client has its own.
-    public func subscribe(watching: Bool = true, onResize: ((ReplaySize) -> Void)? = nil, _ handler: @escaping (Data, UInt64) -> Void) -> UUID {
+    public func subscribe(watching: Bool = true, acknowledgesOutput: Bool = false, onResize: ((ReplaySize) -> Void)? = nil, _ handler: @escaping (Data, UInt64) -> Void) -> UUID {
         let token = UUID()
+        if acknowledgesOutput {
+            let end = ringEnd
+            lifecycleLock.lock(); consumedThrough[token] = end; lifecycleLock.unlock()
+        }
         subscribersLock.lock()
         subscribers[token] = handler
         if let onResize { geometrySubscribers[token] = onResize }
@@ -1889,6 +1965,10 @@ public final class RealPty: @unchecked Sendable {
         }
         let unwatched = watchers.isEmpty
         subscribersLock.unlock()
+        lifecycleLock.lock()
+        if let token { consumedThrough.removeValue(forKey: token) } else { consumedThrough.removeAll() }
+        resumeReadingIfConsumedLocked()
+        lifecycleLock.unlock()
         if unwatched { ScreenWarmer.shared.request(self) }
     }
 
@@ -1919,18 +1999,20 @@ public final class RealPty: @unchecked Sendable {
         let source = DispatchSource.makeReadSource(fileDescriptor: fd, queue: readQueue)
         source.setEventHandler { [weak self] in
             guard let self else { return }
-            // Reuse the buffer across wakeups instead of allocating for every PTY read.
-            let n = self.readBuffer.withUnsafeMutableBufferPointer { ptr -> Int in
-                sysRead(fd, ptr.baseAddress, ptr.count)
-            }
-            if n < 0, errno == EAGAIN || errno == EWOULDBLOCK || errno == EINTR { return }
-            if n <= 0 {
-                // Closing the terminal output is not proof that its process ended.
-                self.outputEnded(fd: fd, generation: gen)
-                return
-            }
-            let data = Data(self.readBuffer.prefix(n))
-            self.handleOutput(data, generation: gen)
+            let deadline = DispatchTime.now().uptimeNanoseconds + 1_000_000
+            var batch = Data()
+            var ended = false
+            repeat {
+                let count = self.readBuffer.withUnsafeMutableBufferPointer { ptr in
+                    sysRead(fd, ptr.baseAddress, min(ptr.count, 65536 - batch.count))
+                }
+                if count < 0, errno == EINTR { continue }
+                if count < 0, errno == EAGAIN || errno == EWOULDBLOCK { break }
+                if count <= 0 { ended = true; break }
+                batch.append(contentsOf: self.readBuffer.prefix(count))
+            } while batch.count < 65536 && DispatchTime.now().uptimeNanoseconds < deadline
+            if !batch.isEmpty { self.handleOutput(batch, generation: gen) }
+            if ended { self.outputEnded(fd: fd, generation: gen) }
         }
         source.setCancelHandler { [weak self] in
             // The exit watcher can cancel this source before the read handler copies the
@@ -1953,8 +2035,10 @@ public final class RealPty: @unchecked Sendable {
         scrollbackLock.lock()
         let effective = scrollbackFile == nil ? cap : max(cap, ScrollbackFile.minimumRetentionCap)
         guard effective != maxScrollbackBytes else { scrollbackLock.unlock(); return }
-        if idleGrid.parked { mergeParkedHistoryLocked() }
+        if idleGrid.parked { restoreHotTailLocked() }
         maxScrollbackBytes = effective
+        parked?.keepSuffix(atMost: max(0, effective - scrollbackBytes))
+        if parked?.rawCount == 0 { parked = nil }
         while scrollbackBytes > effective, scrollbackHead < scrollback.count {
             scrollbackBytes -= scrollback[scrollbackHead].data.count
             scrollbackHead += 1
@@ -1988,13 +2072,14 @@ public final class RealPty: @unchecked Sendable {
         }
         lastPTYReadAt = Date()
         // Bytes only. The parsers run in capture, attach and `ScreenWarmer`, not here.
-        if idleGrid.parked {
-            mergeParkedHistoryLocked()
-        }
+        let wasParked = idleGrid.parked
+        if wasParked { restoreHotTailLocked() }
         let sequence = nextSequence
         nextSequence &+= UInt64(data.count)
         scrollback.append(ScrollbackEntry(sequence: sequence, data: data))
         scrollbackBytes += data.count
+        parked?.keepSuffix(atMost: max(0, maxScrollbackBytes - scrollbackBytes))
+        if parked?.rawCount == 0 { parked = nil }
         while scrollbackBytes > maxScrollbackBytes, scrollbackHead < scrollback.count {
             scrollbackBytes -= scrollback[scrollbackHead].data.count
             scrollbackHead += 1
@@ -2006,26 +2091,38 @@ public final class RealPty: @unchecked Sendable {
             scrollbackHead = 0
         }
         pruneReplaySizesLocked()
+        let retainedStart = parked?.sequence ?? (scrollbackHead < scrollback.count ? scrollback[scrollbackHead].sequence : nextSequence)
+        let retainedBytes = scrollbackBytes + (parked?.rawCount ?? 0)
         // Persist the same bytes off the read hot path (debounced inside `ScrollbackFile`), so the
         // history survives a daemon restart. No-op when the surface isn't persisted.
         scrollbackFile?.append(data, size: replaySizes.last)
         scrollbackLock.unlock()
 
+        if wasParked { onUnpark?() }
         onOutput?(data)
         let outputGeneration = generation ?? processGeneration
 
-        // Fan out on the delivery queue (off the read loop). `data`/`sequence` are values; capture
-        // self weakly so a teardown mid-flight just no-ops. The snapshot is taken at delivery time
-        // so a just-cancelled subscriber drops out. Every subscriber handler is non-blocking — the
-        // `DaemonServer` client hands each chunk to its own write-backlog-capped queue, and the
-        // `pipe-pane` tee hands off to its own bounded writer queue — so a backed-up consumer can
-        // neither stall PTY reads nor let this fan-out queue grow without bound. A single serial
-        // fan-out queue is also what guarantees in-order delivery — do not special-case "one
-        // subscriber" to deliver inline on the read loop: a chunk delivered inline could overtake a
-        // prior chunk still queued here when the subscriber count changes, reordering output.
+        lifecycleLock.lock()
+        deliveryBytes += data.count
+        emittedThrough = sequence + UInt64(data.count)
+        let outstanding = outstandingOutputLocked
+        if deliveryBytes >= Self.deliveryHighWater || outstanding >= UInt64(Self.deliveryHighWater), let source = readSource, !readSuspended {
+            source.suspend(); readSuspended = true
+        }
+        lifecycleLock.unlock()
+
+        // One ordered scanner/fan-out queue preserves stream order across watcher changes.
         deliveryQueue.async { [weak self] in
             guard let self else { return }
-            self.observeResumePrompt(data, generation: outputGeneration)
+            defer {
+                self.lifecycleLock.lock()
+                self.deliveryBytes -= data.count
+                self.resumeReadingIfConsumedLocked()
+                self.lifecycleLock.unlock()
+            }
+            let observation = self.observeOutput(data, sequence: sequence, generation: outputGeneration,
+                retainedStart: retainedStart, retainedBytes: retainedBytes)
+            self.enqueueOutputObservation(observation, generation: outputGeneration)
             self.subscribersLock.lock()
             let handlers = Array(self.subscribers.values)
             let watched = !self.watchers.isEmpty
@@ -2034,6 +2131,40 @@ public final class RealPty: @unchecked Sendable {
             // Nobody watching: keep the screen current for the next attach (coalesced, off here).
             if !watched { ScreenWarmer.shared.request(self) }
         }
+    }
+
+    /// Queue-turn coalescing adds no timer or echo delay, and preserves the original ACK byte fences.
+    private func enqueueOutputObservation(_ observation: HostedOutputObservation, generation: UInt64) {
+        let now = DispatchTime.now().uptimeNanoseconds
+        if let pending = pendingObservation,
+           pendingObservationGeneration != generation || pending.endSequence != observation.sequence
+            || pending.byteCount + observation.byteCount > 65536 || now >= pendingObservationDeadline {
+            flushOutputObservation()
+        }
+        if var pending = pendingObservation {
+            pending.byteCount += observation.byteCount
+            pending.events.append(contentsOf: observation.events)
+            pending.scanner = observation.scanner
+            pending.retainedStart = observation.retainedStart; pending.retainedBytes = observation.retainedBytes
+            pendingObservation = pending
+        } else {
+            pendingObservation = observation; pendingObservationGeneration = generation
+            pendingObservationDeadline = now + 1_000_000
+        }
+        if !observation.events.isEmpty || pendingObservation!.byteCount >= 65536 {
+            flushOutputObservation(); return
+        }
+        guard !observationFlushScheduled else { return }
+        observationFlushScheduled = true
+        deliveryQueue.async { [weak self] in
+            guard let self else { return }
+            self.observationFlushScheduled = false; self.flushOutputObservation()
+        }
+    }
+    private func flushOutputObservation() {
+        guard let observation = pendingObservation else { return }
+        pendingObservation = nil; pendingObservationGeneration = nil
+        onObservation?(observation)
     }
 
     private func watchForExit(pid: pid_t, generation gen: UInt64) {
@@ -2162,6 +2293,7 @@ public final class RealPty: @unchecked Sendable {
         lifecycleLock.lock()
         guard generation == gen, master == fd, !isClosed else { lifecycleLock.unlock(); return }
         let source = readSource
+        if readSuspended { readSource?.resume(); readSuspended = false }
         readSource = nil; master = -1
         lifecycleLock.unlock()
         // The reaper remains armed and childPID remains owned. Queries and empty
@@ -2182,6 +2314,7 @@ public final class RealPty: @unchecked Sendable {
         generation &+= 1
         let source = readSource
         let fd = master
+        if readSuspended { readSource?.resume(); readSuspended = false }
         readSource = nil
         master = -1
         childPID = -1
@@ -2209,6 +2342,7 @@ public final class RealPty: @unchecked Sendable {
         pendingExitDelivery = nil
         lifecycleLock.unlock()
         deliveryQueue.async { [self] in
+            flushOutputObservation()
             lifecycleLock.lock(); let current = isClosed && generation == gen &+ 1; lifecycleLock.unlock()
             if current { onExit?(notice.status) }
         }

@@ -1,24 +1,13 @@
 import Foundation
+import HarnessCore
 #if canImport(os)
 import os
 #endif
 
-/// Opt-in `os_signpost` instrumentation of the per-frame pipeline — parse → build → present — for
-/// profiling input-to-photon latency on the `os_signpost` track in Instruments (Time Profiler /
-/// Points of Interest). **Off by default**: when `HARNESS_FRAME_SIGNPOSTS != 1` every call is a
-/// single branch, so the brackets are safe to leave on the hot path (mirrors `StartupMetrics`).
-///
-/// The `present` interval is the one to watch: it wraps the renderer's `present`, which does
-/// `nextDrawable()` + `inFlightSemaphore.wait()` on the main thread — i.e. it *includes the
-/// drawable/GPU back-pressure (vsync) stall*. `0b`'s benchmark already showed the CPU-side
-/// parse+build is ~16µs, so if typing feels laggy the `present` interval is where the time is, and
-/// that is what the vsync/drawable-pacing work targets.
-///
-/// Subsystem `com.robert.harness`, category `frame`. Enable with `PREVIEW_SIGNPOSTS=1 make preview`
-/// (which launches `open … --args -HARNESS_FRAME_SIGNPOSTS 1`), by setting
-/// `HARNESS_FRAME_SIGNPOSTS=1` in the app's launch environment (direct binary launch /
-/// `xctrace record --template 'os_signpost' --launch …`), then read with
-/// `log stream --predicate 'subsystem == "com.robert.harness"'`.
+/// Opt-in parse/build/encode and frame-submission timing, safe across per-surface render queues.
+/// Submission and echo samples are CPU-side proxies; they do not measure GPU completion or
+/// visible photons. `HARNESS_FRAME_SIGNPOSTS=1` enables signposts and durable metric summaries.
+/// Disabled call sites branch once and perform no locking or I/O.
 final class FrameSignposter: @unchecked Sendable {
     static let shared = FrameSignposter()
 
@@ -28,15 +17,10 @@ final class FrameSignposter: @unchecked Sendable {
     private let signposter: OSSignposter
     private let logger: Logger
     #endif
-    /// Recent `present` interval durations (ns) with their breakdown components, main-thread only
-    /// (`recordPresent` is called from the surface's `presentFrame`). Flushed to the log as
-    /// p50/p95/max every `presentLogEvery` frames. NOTE: the singleton blends samples from ALL
-    /// presenting surfaces (splits/tabs) into one bucket — the percentiles are only attributable
-    /// to a specific pipeline with a single visible surface (benchmarks read per-view
-    /// `TerminalRenderStats` directly and are unaffected). The breakdown attributes a slow present:
-    /// `drawableWait` = `nextDrawable()` (pool exhaustion / vsync pacing), `semaphoreWait` = the
-    /// renderer's in-flight gate (GPU behind), `schedule` = `waitUntilScheduled()` (the bounded
-    /// transaction-synchronized wait of the glitchless-resize path; 0 for async presents).
+    private let lock = NSLock()
+    private let fileLoggingEnabled: Bool
+    private let logQueue = DispatchQueue(label: "com.harness.frame-metrics", qos: .utility)
+    /// Aggregate CPU submission timings across surfaces; source counts accompany each summary.
     private var presentSamples: [UInt64] = []
     private var drawableWaitSamples: [UInt64] = []
     private var semaphoreWaitSamples: [UInt64] = []
@@ -46,22 +30,21 @@ final class FrameSignposter: @unchecked Sendable {
     /// (`bindableInstanceBuffers`). Attributes a slow encode to the value boundary that paid it.
     private var instanceBuildSamples: [UInt64] = []
     private var uploadSamples: [UInt64] = []
-    /// Presents skipped since the last flush — work was pending but nothing reached the glass that
+    /// Presents skipped since the last flush — work was pending but no frame was submitted that
     /// turn; the scheduler retried on a later tick. Counted per cause so a flush line can tell
     /// drawable-pool exhaustion (vsync/window-server pressure) from a renderer encode failure.
     private var droppedNilDrawable = 0
     private var droppedEncodeFailure = 0
     private let presentLogEvery = 120
-    /// End-to-end echo latency: keyDown → the next present's completion (the CPU-side proxy for
-    /// photon; scanout is at most one refresh later). One sample per keystroke — the pending
-    /// timestamp is consumed by the first present after it; a present arriving more than
-    /// `echoAttributionWindowNanos` later is unrelated (no echo came back — e.g. a blink tick or
-    /// a dead key) and drops the pending sample instead of mis-attributing it. Main-thread only,
-    /// like the present samples, and blended across surfaces the same way — attribute with a
-    /// single visible surface. This is the number the SCORECARD's "input-to-photon" row was
-    /// missing: `present` measures the pipeline's tail, this measures from the keystroke.
-    private var pendingKeystrokeNanos: UInt64?
+    private struct Keystroke {
+        var nanos: UInt64
+        var outputGeneration: UInt64
+    }
+    /// One latest input per surface. Only its first newer-output submission can consume it.
+    private var pendingKeystrokes: [ObjectIdentifier?: Keystroke] = [:]
     private var echoSamples: [UInt64] = []
+    private var echoSourceCounts: [String: Int] = [:]
+    private var presentSourceCounts: [String: Int] = [:]
     private let echoAttributionWindowNanos: UInt64 = 500_000_000
     private let echoLogEvery = 60
 
@@ -81,53 +64,48 @@ final class FrameSignposter: @unchecked Sendable {
         self.enabled = enabled
             ?? (ProcessInfo.processInfo.environment["HARNESS_FRAME_SIGNPOSTS"] == "1"
                 || UserDefaults.standard.bool(forKey: "HARNESS_FRAME_SIGNPOSTS"))
+        fileLoggingEnabled = enabled == nil && self.enabled
         #if canImport(os)
         signposter = OSSignposter(subsystem: "com.robert.harness", category: "frame")
         logger = Logger(subsystem: "com.robert.harness", category: "frame")
         #endif
     }
 
-    /// Record a `present` duration (ns) plus its breakdown and, every `presentLogEvery` frames,
-    /// log p50/p95/max per component to the unified log — so the drawable/vsync stall is readable
-    /// with `log stream --predicate 'subsystem == "com.robert.harness"'` (no Instruments needed).
-    /// Main-thread only; a no-op when disabled (so the hot path stays a single branch).
-    /// A keystroke headed for the PTY just left the input encoder. Arms the echo-latency sample
-    /// the next present consumes. Main-thread only; a single branch when disabled.
-    func noteKeystroke(at nanos: UInt64 = DispatchTime.now().uptimeNanoseconds) {
+    /// Arm an input sample with the surface's output generation before sending the keystroke.
+    /// Nil source is reserved for simple fixtures; production callers supply source and generation.
+    func noteKeystroke(source: ObjectIdentifier? = nil, outputGeneration: UInt64 = 0,
+                       at nanos: UInt64 = DispatchTime.now().uptimeNanoseconds) {
         guard enabled else { return }
-        pendingKeystrokeNanos = nanos
+        lock.lock(); defer { lock.unlock() }
+        pendingKeystrokes[source] = Keystroke(nanos: nanos, outputGeneration: outputGeneration)
     }
 
-    /// Test seam: the echo samples accumulated since the last flush (µs percentiles math is
-    /// covered separately; this pins arm/consume/window semantics).
-    var testingEchoSampleCount: Int { echoSamples.count }
-    var testingHasPendingKeystroke: Bool { pendingKeystrokeNanos != nil }
+    var testingEchoSampleCount: Int { lock.lock(); defer { lock.unlock() }; return echoSamples.count }
+    var testingHasPendingKeystroke: Bool { lock.lock(); defer { lock.unlock() }; return !pendingKeystrokes.isEmpty }
 
+    /// Record a successful CPU frame submission. Repaints with unchanged output cannot claim input.
     func recordPresent(
         nanos: UInt64, drawableWait: UInt64 = 0, semaphoreWait: UInt64 = 0, schedule: UInt64 = 0,
         instanceBuild: UInt64 = 0, upload: UInt64 = 0,
+        source: ObjectIdentifier? = nil, outputGeneration: UInt64? = nil,
         at now: UInt64 = DispatchTime.now().uptimeNanoseconds
     ) {
         guard enabled else { return }
-        // Echo sample: this present is the first since the armed keystroke — charge it.
-        if let pending = pendingKeystrokeNanos {
-            pendingKeystrokeNanos = nil
-            let elapsed = now &- pending
-            if elapsed <= echoAttributionWindowNanos {
-                echoSamples.append(elapsed)
-                if echoSamples.count >= echoLogEvery {
-                    let echo = Self.percentilesMicros(echoSamples)
-                    let count = echoSamples.count
-                    echoSamples.removeAll(keepingCapacity: true)
-                    #if canImport(os)
-                    logger.log("""
-                    echo µs p50=\(echo.p50) p95=\(echo.p95) p99=\(echo.p99) max=\(echo.max) \
-                    over \(count) keystrokes
-                    """)
-                    #endif
-                }
-            }
+        lock.lock(); defer { lock.unlock() }
+        pendingKeystrokes = pendingKeystrokes.filter {
+            now < $0.value.nanos || now - $0.value.nanos <= echoAttributionWindowNanos
         }
+        if let pending = pendingKeystrokes[source], now >= pending.nanos,
+           (source == nil && outputGeneration == nil)
+            || (outputGeneration.map { $0 > pending.outputGeneration } ?? false) {
+            pendingKeystrokes.removeValue(forKey: source)
+            let elapsed = now - pending.nanos
+            echoSamples.append(elapsed)
+            echoSourceCounts[Self.sourceLabel(source), default: 0] += 1
+            persistSummary(kind: "echo-sample", samples: [elapsed], sources: [Self.sourceLabel(source): 1])
+            if echoSamples.count >= echoLogEvery { flushEchoSamples() }
+        }
+        presentSourceCounts[Self.sourceLabel(source), default: 0] += 1
         presentSamples.append(nanos)
         drawableWaitSamples.append(drawableWait)
         semaphoreWaitSamples.append(semaphoreWait)
@@ -144,6 +122,13 @@ final class FrameSignposter: @unchecked Sendable {
         let up = Self.percentilesMicros(uploadSamples)
         let droppedDrawable = droppedNilDrawable
         let droppedEncode = droppedEncodeFailure
+        persistSummary(kind: "frame-submission", samples: presentSamples, sources: presentSourceCounts,
+                       additional: ["drawableWaitNanos": drawableWaitSamples,
+                                    "semaphoreWaitNanos": semaphoreWaitSamples, "scheduleNanos": scheduleSamples,
+                                    "instanceBuildNanos": instanceBuildSamples, "uploadNanos": uploadSamples,
+                                    "droppedNilDrawable": droppedDrawable, "droppedEncodeFailure": droppedEncode])
+        presentSourceCounts.removeAll(keepingCapacity: true)
+        if !echoSamples.isEmpty { flushEchoSamples() }
         presentSamples.removeAll(keepingCapacity: true)
         drawableWaitSamples.removeAll(keepingCapacity: true)
         semaphoreWaitSamples.removeAll(keepingCapacity: true)
@@ -167,12 +152,60 @@ final class FrameSignposter: @unchecked Sendable {
     }
 
     /// Count a skipped present by cause; included in the periodic `recordPresent` flush line.
-    /// Main-thread only; no-op when disabled.
+    /// Thread-safe; no-op when disabled.
     func recordFrameDrop(_ cause: FrameDropCause) {
         guard enabled else { return }
+        lock.lock(); defer { lock.unlock() }
         switch cause {
         case .nilDrawable: droppedNilDrawable += 1
         case .encodeFailure: droppedEncodeFailure += 1
+        }
+    }
+
+    private static func sourceLabel(_ source: ObjectIdentifier?) -> String {
+        source.map { String(describing: $0) } ?? "unattributed"
+    }
+
+    private func flushEchoSamples() {
+        let echo = Self.percentilesMicros(echoSamples)
+        let count = echoSamples.count
+        persistSummary(kind: "echo-submission-proxy", samples: echoSamples, sources: echoSourceCounts)
+        echoSamples.removeAll(keepingCapacity: true)
+        echoSourceCounts.removeAll(keepingCapacity: true)
+        #if canImport(os)
+        logger.log("echo submission proxy µs p50=\(echo.p50) p95=\(echo.p95) p99=\(echo.p99) max=\(echo.max) over \(count) keystrokes")
+        #endif
+    }
+
+    /// Serialize small batches while locked, then perform diagnostic file I/O off render queues.
+    private func persistSummary(kind: String, samples: [UInt64], sources: [String: Int], additional: [String: Any] = [:]) {
+        guard fileLoggingEnabled else { return }
+        let percentile = Self.percentilesMicros(samples)
+        var record = additional
+        record["kind"] = kind
+        record["timestamp"] = Date().timeIntervalSince1970
+        record["count"] = samples.count
+        record["samplesNanos"] = samples
+        record["sourceCounts"] = sources
+        record["percentilesMicros"] = ["p50": percentile.p50, "p95": percentile.p95,
+                                       "p99": percentile.p99, "max": percentile.max]
+        guard var line = try? JSONSerialization.data(withJSONObject: record, options: [.sortedKeys]) else { return }
+        line.append(0x0a)
+        let data = line
+        let url = HarnessPaths.logsDirectory.appendingPathComponent("frame-metrics.jsonl")
+        logQueue.async {
+            do {
+                try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+                if !FileManager.default.fileExists(atPath: url.path) {
+                    _ = FileManager.default.createFile(atPath: url.path, contents: nil, attributes: [.posixPermissions: 0o600])
+                }
+                let handle = try FileHandle(forWritingTo: url)
+                defer { try? handle.close() }
+                try handle.seekToEnd()
+                try handle.write(contentsOf: data)
+            } catch {
+                // Diagnostic persistence must not affect input or frame submission.
+            }
         }
     }
 
@@ -190,8 +223,8 @@ final class FrameSignposter: @unchecked Sendable {
 
     #if canImport(os)
     /// Run `body` inside a named signpost interval (no-op overhead when disabled). Reentrancy- and
-    /// concurrency-safe: each call carries its own interval state, so overlapping frames (off-main
-    /// build while main presents) don't confuse the trace.
+    /// concurrency-safe: each call carries its own interval state, so concurrent surface workers
+    /// do not confuse the trace.
     @inline(__always)
     func interval<T>(_ name: StaticString, _ body: () -> T) -> T {
         guard enabled else { return body() }

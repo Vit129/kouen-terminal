@@ -1,0 +1,22 @@
+{
+  "source_sha256": "59285da821de96f23043dba9979401881361c9cee4728ca857940af758ecbada",
+  "candidate_gui_pid": 95004,
+  "evidence": "native macOS accessibility plus screenshots observed in task; screenshots not exported as files",
+  "checks": {
+    "codex_tui": "Actual Codex 0.162.1 startup and slash command menu displayed; ten idle TUIs at fifty panes; no model task submitted",
+    "text_styles": "Visible Unicode combining/CJK/emoji, RGB/bold/italic/underline fixture and OSC8 text",
+    "inline_image": "Kitty 16x16 raw RGBA green image visible before and after GUI reopen",
+    "find": "Marker 1 of 1 and golden highlight visible, also found after marker scrolled into history",
+    "copy_paste": "Native Cmd-A/C copy followed by paste into owned cat; 30-line multiline paste guard displayed and confirmed; marker and Unicode appeared in paste",
+    "split_resize": "Native split: both panes47x30; zoom96x46; restore47x30. Transaction resize also covered by35 existing tests",
+    "scroll": "Native two-page wheel scroll; scrollbar0.5509259259 and viewport rows0108..0153; right pane stayed at prompt",
+    "gui_reopen": "Same two surface UUIDs and fish PIDs87767/94652 retained across GUI quit/reopen; image and find retained",
+    "cli_attach": "Real PTY read-only attach/history received marker, final scroll row and Unicode; Ctrl-A d exit0"
+  },
+  "limitations": [
+    "GUI reopen checks live session-host retention, not encrypted on-disk full runtime restart",
+    "BEL fixture emitted and semantic event correctness covered; actual audibility/OS notification banner not asserted",
+    "No real remote SSH host available; Linux/shared protocol builds and attach correctness cover available paths",
+    "Unsupported AX text selection used native Cmd-A fallback; owned fixture text remains on clipboard"
+  ]
+}

@@ -45,10 +45,22 @@ public enum IPCCodec {
         // malformed/skewed reply. Throw rather than returning nil: the frame is already consumed,
         // so nil would read as "need more bytes" and hang the caller until it times out.
         do {
-            return try JSONDecoder().decode(IPCReply.self, from: payload)
+            return try decodeValidatedReply(payload)
         } catch {
             throw FrameError.undecodable
         }
+    }
+
+    private static func validateOutputSpan(sequence: UInt64, count: Int) throws {
+        guard UInt64(count) <= UInt64.max - sequence else { throw FrameError.undecodable }
+    }
+
+    private static func decodeValidatedReply(_ payload: Data) throws -> IPCReply {
+        let reply = try JSONDecoder().decode(IPCReply.self, from: payload)
+        if case let .data(data, sequence) = reply.response {
+            try validateOutputSpan(sequence: sequence, count: data.count)
+        }
+        return reply
     }
 
     /// Pull one length-prefixed payload off the front of `buffer`. Returns nil when a full
@@ -133,6 +145,7 @@ public enum IPCCodec {
             guard body.count >= 8 else { throw FrameError.undecodable }
             let sequence = readUInt64BE(body, 0)
             let payload = body.subdata(in: (body.startIndex + 8) ..< body.endIndex)
+            try validateOutputSpan(sequence: sequence, count: payload.count)
             return .output(payload, sequence: sequence)
         }
         guard let payload = try extractPayload(from: &buffer) else { return nil }
@@ -140,7 +153,7 @@ public enum IPCCodec {
         // loop treats it as fatal and tears down) rather than returning nil and silently dropping
         // a reply the caller is still waiting on.
         do {
-            let reply = try JSONDecoder().decode(IPCReply.self, from: payload)
+            let reply = try decodeValidatedReply(payload)
             return .reply(reply.response)
         } catch {
             throw FrameError.undecodable
@@ -217,11 +230,12 @@ public enum IPCCodec {
             for k in 0 ..< 8 { sequence = (sequence << 8) | UInt64(buffer.byte(at: bodyOffset + k)) }
             let payload = buffer.payloadData(at: bodyOffset + 8, count: bodyCount - 8)
             buffer.consume(5 + bodyCount)
+            try validateOutputSpan(sequence: sequence, count: payload.count)
             return .output(payload, sequence: sequence)
         }
         guard let payload = try extractPayload(from: &buffer) else { return nil }
         do {
-            let reply = try JSONDecoder().decode(IPCReply.self, from: payload)
+            let reply = try decodeValidatedReply(payload)
             return .reply(reply.response)
         } catch {
             throw FrameError.undecodable

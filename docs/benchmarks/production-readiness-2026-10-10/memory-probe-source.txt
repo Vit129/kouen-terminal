@@ -1,0 +1,31 @@
+from pathlib import Path
+import os,sys,subprocess,json,time,shlex,re
+root=Path(__file__).resolve().parents[2];label=sys.argv[1];out=Path(__file__).resolve().parent/label
+app=out/'Harness.app';env={k:v for k,v in os.environ.items() if not k.startswith('HARNESS')};env['HARNESS_HOME']='/tmp/harness-performance-review-'+label
+cli=app/'Contents/MacOS/harness-cli'
+def call(*args):return subprocess.check_output([str(cli),*args],env=env,text=True)
+stats=json.loads(call('daemon-stats','--json'));(out/'stats.json').write_text(json.dumps(stats,indent=2))
+sessions=json.loads(call('ls','--json'));(out/'sessions.json').write_text(json.dumps(sessions,indent=2));assert len(sessions['sessions'])==1
+surface=sessions['sessions'][0]['tabs'][0]['panes'][0]['surface']
+pids={'app':int((out/'app.pid').read_text()),'daemon':stats['daemonPID'],'host':stats['sessionHostPID']}
+assert 'production-readiness-2026-10-10/'+label+'/Harness.app' in subprocess.check_output(['ps','-p',str(pids['app']),'-o','comm='],text=True)
+def run(command,name):
+ ready=out/(name+'-ready.json');ready.unlink(missing_ok=True)
+ fence=shlex.join([sys.executable,str(root/'Scripts/benchmarks/harness_scale_runner.py'),'--pane-ready',str(ready)])
+ call('send','--surface',surface,'--text',command+'; '+fence+'\n')
+ deadline=time.monotonic()+180
+ while not ready.exists():
+  if time.monotonic()>deadline:raise RuntimeError('No parse fence: '+name)
+  time.sleep(.1)
+ grid=json.loads(ready.read_text());assert grid=={'columns':100,'rows':30},grid
+ time.sleep(30)
+ records={}
+ for role,pid in pids.items():
+  result=subprocess.run(['footprint','--format','bytes',str(pid)],text=True,capture_output=True,check=True)
+  (out/(name+'-'+role+'-footprint.txt')).write_text(result.stdout+result.stderr)
+  found=re.search(r'phys_footprint:\s+(\d+)',result.stdout);records[role]={'pid':pid,'physical_bytes':int(found[1])}
+ (out/(name+'.json')).write_text(json.dumps(records,indent=2));print(label,name,records,flush=True)
+clear=shlex.join(['/usr/bin/printf',r'\033[3J\033[2J\033[H'])
+run(clear,'fresh')
+run(shlex.join([sys.executable,str(root/'Scripts/benchmarks/consumer_ack_runner.py'),label,str(out/'throughput.jsonl'),'--payloads',str(root/'.benchmark-results/performance-rebuild/payloads'),'--samples','5']),'throughput')
+run(clear+'; '+shlex.join(['/bin/cat',str(root/'.benchmark-results/performance-rebuild/baseline/scale/styled-10000.vt')]),'styled')

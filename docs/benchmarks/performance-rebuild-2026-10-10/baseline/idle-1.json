@@ -1,0 +1,24 @@
+{
+  "state": "one visible idle pane, blink enabled; onboarding completed; physical M5 Max",
+  "duration_seconds": 60.035789416,
+  "processes": [
+    {
+      "role": "app",
+      "pid": 31335,
+      "one_core_cpu_percent": 0.2165375041530635,
+      "rss_bytes": 248627200
+    },
+    {
+      "role": "daemon",
+      "pid": 31118,
+      "one_core_cpu_percent": 0.26650769741916464,
+      "rss_bytes": 29081600
+    },
+    {
+      "role": "host",
+      "pid": 31117,
+      "one_core_cpu_percent": 0.18322404197567457,
+      "rss_bytes": 34160640
+    }
+  ]
+}

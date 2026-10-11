@@ -1,0 +1,207 @@
+{
+  "source_sha256": "59285da821de96f23043dba9979401881361c9cee4728ca857940af758ecbada",
+  "all_numeric_targets_passed": false,
+  "engine_ascii_mbps": 162.03248004880444,
+  "engine_sgr_speedup": 2.9096093491715678,
+  "gui_consumer": {
+    "ansi_sgr": {
+      "samples": 5,
+      "median_consumer_mbps": 77.42565030430387,
+      "median_consumer_ms": 866.752875
+    },
+    "plain_ascii": {
+      "samples": 5,
+      "median_consumer_mbps": 76.96389523679412,
+      "median_consumer_ms": 871.952125
+    },
+    "unicode_mixed": {
+      "samples": 5,
+      "median_consumer_mbps": 62.950902676770234,
+      "median_consumer_ms": 1066.051417
+    }
+  },
+  "recorded_agent": {
+    "samples": 5,
+    "bytes": 4750,
+    "sha256": "02c3c18b64b4f2ab3e95b198026fd250b1f07ee49c51b781f78a9c6fa4d26b26",
+    "median_consumer_ms": 4.963167,
+    "boundary": "recorded startup/command redraw, no model turn; original surface hidden during fifty-pane state"
+  },
+  "scale": {
+    "1": {
+      "owned_phys_footprint_mib": 286.9401550292969,
+      "owned_one_core_cpu_percent": 0.34975281341160513,
+      "shell_agent_phys_footprint_mib": 5.469184875488281,
+      "shell_agent_one_core_cpu_percent": 0.0,
+      "owned_processes": [
+        {
+          "pid": 87762,
+          "role": "host",
+          "command": "/Users/rcourson/Desktop/Harness Terminal/.benchmark-results/performance-rebuild/after/Harness.app/Contents/Helpers/HarnessSessionHost.app/Contents/MacOS/HarnessSessionHost",
+          "rss_bytes": 28442624,
+          "one_core_cpu_percent": 0.08327447938372086,
+          "phys_footprint_bytes": 14795568
+        },
+        {
+          "pid": 87765,
+          "role": "daemon",
+          "command": "/Users/rcourson/Desktop/Harness Terminal/.benchmark-results/performance-rebuild/after/Harness.app/Contents/Helpers/HarnessDaemon.app/Contents/MacOS/HarnessDaemon",
+          "rss_bytes": 28884992,
+          "one_core_cpu_percent": 0.033309791753484794,
+          "phys_footprint_bytes": 8225560
+        },
+        {
+          "pid": 87886,
+          "role": "app",
+          "command": "/Users/rcourson/Desktop/Harness Terminal/.benchmark-results/performance-rebuild/after/Harness.app/Contents/MacOS/Harness",
+          "rss_bytes": 153272320,
+          "one_core_cpu_percent": 0.23316854227439945,
+          "phys_footprint_bytes": 277857432
+        }
+      ]
+    },
+    "10": {
+      "owned_phys_footprint_mib": 379.15892791748047,
+      "owned_one_core_cpu_percent": 0.5163157010688628,
+      "shell_agent_phys_footprint_mib": 54.17638397216797,
+      "shell_agent_one_core_cpu_percent": 0.0,
+      "owned_processes": [
+        {
+          "pid": 87762,
+          "role": "host",
+          "command": "/Users/rcourson/Desktop/Harness Terminal/.benchmark-results/performance-rebuild/after/Harness.app/Contents/Helpers/HarnessSessionHost.app/Contents/MacOS/HarnessSessionHost",
+          "rss_bytes": 42565632,
+          "one_core_cpu_percent": 0.24983017793654522,
+          "phys_footprint_bytes": 26952496
+        },
+        {
+          "pid": 87765,
+          "role": "daemon",
+          "command": "/Users/rcourson/Desktop/Harness Terminal/.benchmark-results/performance-rebuild/after/Harness.app/Contents/Helpers/HarnessDaemon.app/Contents/MacOS/HarnessDaemon",
+          "rss_bytes": 29605888,
+          "one_core_cpu_percent": 0.04996603558731141,
+          "phys_footprint_bytes": 8946456
+        },
+        {
+          "pid": 87886,
+          "role": "app",
+          "command": "/Users/rcourson/Desktop/Harness Terminal/.benchmark-results/performance-rebuild/after/Harness.app/Contents/MacOS/Harness",
+          "rss_bytes": 199311360,
+          "one_core_cpu_percent": 0.21651948754500625,
+          "phys_footprint_bytes": 361678000
+        }
+      ]
+    },
+    "30": {
+      "owned_phys_footprint_mib": 578.393440246582,
+      "owned_one_core_cpu_percent": 0.7495485874863044,
+      "shell_agent_phys_footprint_mib": 162.8107452392578,
+      "shell_agent_one_core_cpu_percent": 0.0,
+      "owned_processes": [
+        {
+          "pid": 87762,
+          "role": "host",
+          "command": "/Users/rcourson/Desktop/Harness Terminal/.benchmark-results/performance-rebuild/after/Harness.app/Contents/Helpers/HarnessSessionHost.app/Contents/MacOS/HarnessSessionHost",
+          "rss_bytes": 76070912,
+          "one_core_cpu_percent": 0.4830424230467288,
+          "phys_footprint_bytes": 60031816
+        },
+        {
+          "pid": 87765,
+          "role": "daemon",
+          "command": "/Users/rcourson/Desktop/Harness Terminal/.benchmark-results/performance-rebuild/after/Harness.app/Contents/Helpers/HarnessDaemon.app/Contents/MacOS/HarnessDaemon",
+          "rss_bytes": 31555584,
+          "one_core_cpu_percent": 0.04996990583242226,
+          "phys_footprint_bytes": 10224432
+        },
+        {
+          "pid": 87886,
+          "role": "app",
+          "command": "/Users/rcourson/Desktop/Harness Terminal/.benchmark-results/performance-rebuild/after/Harness.app/Contents/MacOS/Harness",
+          "rss_bytes": 293322752,
+          "one_core_cpu_percent": 0.21653625860715325,
+          "phys_footprint_bytes": 536233232
+        }
+      ]
+    },
+    "50": {
+      "owned_phys_footprint_mib": 780.2217025756836,
+      "owned_one_core_cpu_percent": 1.0325668933473,
+      "shell_agent_phys_footprint_mib": 4255.572807312012,
+      "shell_agent_one_core_cpu_percent": 1.3489986832440515,
+      "owned_processes": [
+        {
+          "pid": 87762,
+          "role": "host",
+          "command": "/Users/rcourson/Desktop/Harness Terminal/.benchmark-results/performance-rebuild/after/Harness.app/Contents/Helpers/HarnessSessionHost.app/Contents/MacOS/HarnessSessionHost",
+          "rss_bytes": 112197632,
+          "one_core_cpu_percent": 0.7161351034505451,
+          "phys_footprint_bytes": 90588024
+        },
+        {
+          "pid": 87765,
+          "role": "daemon",
+          "command": "/Users/rcourson/Desktop/Harness Terminal/.benchmark-results/performance-rebuild/after/Harness.app/Contents/Helpers/HarnessDaemon.app/Contents/MacOS/HarnessDaemon",
+          "rss_bytes": 34209792,
+          "one_core_cpu_percent": 0.08327152365704137,
+          "phys_footprint_bytes": 11617072
+        },
+        {
+          "pid": 87886,
+          "role": "app",
+          "command": "/Users/rcourson/Desktop/Harness Terminal/.benchmark-results/performance-rebuild/after/Harness.app/Contents/MacOS/Harness",
+          "rss_bytes": 396263424,
+          "one_core_cpu_percent": 0.23316026623971345,
+          "phys_footprint_bytes": 715916656
+        }
+      ]
+    }
+  },
+  "warm_startup": {
+    "source_sha256": "59285da821de96f23043dba9979401881361c9cee4728ca857940af758ecbada",
+    "dsr_ready_median_ms": 270.640417,
+    "dsr_ready_max_ms": 290.001958,
+    "prompt_frame_observed_median_ms": 296.307041,
+    "prompt_frame_observed_max_ms": 315.807333
+  },
+  "typing": {
+    "idle": {
+      "captured_keys": 180,
+      "attempted_keys": 180,
+      "p50_ms": 0.339208,
+      "p95_ms": 0.388667,
+      "p99_ms": 2.884833,
+      "max_ms": 5.875125,
+      "source_ids": [
+        "ObjectIdentifier(0x00000079de1a8000)"
+      ]
+    },
+    "ten_floods": {
+      "captured_keys": 180,
+      "attempted_keys": 180,
+      "p50_ms": 0.34225,
+      "p95_ms": 0.435041,
+      "p99_ms": 9.373,
+      "max_ms": 9.39075,
+      "source_ids": [
+        "ObjectIdentifier(0x00000079de1a8000)"
+      ]
+    },
+    "percentile_method": "nearest rank",
+    "frame_budget_ms": 8.333333333333334,
+    "p99_added_ms": 6.488166999999999,
+    "within_one_frame": true,
+    "boundary": "native keyDown to CPU frame submission containing a newer output generation on same surface; not photons",
+    "source_sha256": "59285da821de96f23043dba9979401881361c9cee4728ca857940af758ecbada"
+  },
+  "target_outcomes": {
+    "engine_ascii_scroll_150_mbps": "pass; optional250 stretch missed",
+    "engine_sgr_3x": "miss2.9096x",
+    "gui_3x": "miss on all three payloads",
+    "fifty_pane_owned_idle_2_percent": "pass1.03257%one core; shared PID walk, total work still grows with panes",
+    "one_visible_idle_no_regression": "focused CPU pass; fewer wakeups and blink cadence unmeasured",
+    "thirty_pane_memory_60_percent_reduction": "miss35.5317%; one-pane memory regresses2.75x",
+    "warm_prompt_300_ms": "median CPU-submission proxy pass296.307ms; max315.807ms; pixels unmeasured",
+    "typing_p99_added_one_frame": "CPU-submission proxy pass6.48817ms<=8.33333ms"
+  }
+}

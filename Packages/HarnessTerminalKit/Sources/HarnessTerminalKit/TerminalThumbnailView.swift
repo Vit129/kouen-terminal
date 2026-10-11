@@ -144,6 +144,7 @@ public final class TerminalThumbnailView: NSView {
             // still screen's images need a small texture budget.
             renderer = TerminalMetalRenderer(
                 device: device, fontFamily: style.font.family, fontSize: style.font.size,
+                fallbackFamilies: style.font.fallbackFamilies, features: style.font.features,
                 scale: scale, atlasSize: 512, imageCacheBytes: Self.imageCacheBytes,
                 fontThicken: style.font.thicken, fontThickenStrength: style.font.thickenStrength,
                 colorSpace: CGColorSpace(name: style.colorSpaceName as CFString)!

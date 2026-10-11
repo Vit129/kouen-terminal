@@ -56,11 +56,9 @@ final class OneGridSessionTests: XCTestCase {
             return XCTFail("hook bind failed")
         }
 
-        let writer = try client.attachReplayingSurfaceOutput(
-            surfaceID: surfaceID,
-            label: "writer",
-            onReplay: { _ in },
-            onData: { _, _ in }
+        let writer = try client.attachStream(
+            AttachRequest(surfaceID: surfaceID, label: "writer", acknowledgesOutput: true),
+            onAttached: { _, _ in }, onData: { _, _, consumed in consumed() }
         )
         XCTAssertTrue(writer.sendInput(Data("printf '\(marker)\\n'\n".utf8), surfaceID: surfaceID))
         let saw = waitUntil(timeout: 8) {
@@ -80,13 +78,18 @@ final class OneGridSessionTests: XCTestCase {
         XCTAssertTrue(replay.contains(marker))
 
         let secret = "HARNESS_READONLY_\(UUID().uuidString.prefix(8))"
-        let reader = try DaemonClient().attachReplayingSurfaceOutput(
-            surfaceID: surfaceID,
-            label: "reader",
-            readOnly: true,
-            onReplay: { text in XCTAssertTrue(text.contains(marker)) },
-            onData: { _, _ in }
+        let sawReplay = expectation(description: "read-only history includes the retained marker")
+        let markerSeen = AtomicBox<Bool>()
+        let reader = try DaemonClient().attachStream(
+            AttachRequest(surfaceID: surfaceID, label: "reader", readOnly: true, acknowledgesOutput: true),
+            onAttached: { _, _ in }, onData: { data, _, consumed in
+                if String(decoding: data, as: UTF8.self).contains(marker), markerSeen.value != true {
+                    markerSeen.set(true); sawReplay.fulfill()
+                }
+                consumed()
+            }
         )
+        wait(for: [sawReplay], timeout: 5)
         XCTAssertTrue(reader.sendInput(Data("printf '\(secret)\\n'\n".utf8), surfaceID: surfaceID))
         usleep(400_000)
         guard case let .text(afterWrite) = try DaemonClient().request(.replayScrollback(surfaceID: surfaceID, fromSequence: nil)) else {

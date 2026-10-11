@@ -26,6 +26,7 @@ public protocol TerminalHostDelegate: AnyObject {
     /// A `notify`-action output trigger matched `lineText` in this pane (already cooled down
     /// per rule by the surface).
     func terminalHostDidMatchTrigger(_ rule: TriggerRule, lineText: String, surfaceID: SurfaceID)
+    func terminalHostDidSubmitFirstShellPrompt(surfaceID: SurfaceID)
     func terminalHostDidClose(surfaceID: SurfaceID)
     /// A Lua action bound to a key in this pane finished: show its failure, run what it queued.
     func terminalHostScriptActionFinished(_ result: ScriptActionResult, surfaceID: SurfaceID)
@@ -36,6 +37,7 @@ public protocol TerminalHostDelegate: AnyObject {
 }
 
 extension TerminalHostDelegate {
+    public func terminalHostDidSubmitFirstShellPrompt(surfaceID: SurfaceID) {}
     /// Default no-op — only the GUI surfaces user variables (as pane-scoped `@` options).
     public func terminalHostDidSetUserVariable(_ name: String, value: String, surfaceID: SurfaceID) {}
     /// Default no-op — only the GUI mirrors user variables, so only it has copies to clear.
@@ -99,6 +101,9 @@ public final class TerminalHostView: NSView {
     private var attachPoint: DaemonClient.AttachPoint?
     /// Bumped for every attach, so callbacks from a superseded one change nothing.
     private var attachGeneration = 0
+    private var attachProgress: AttachProgress?
+    private var attachEpoch: String?
+    private var attachDrainInFlight = false
     /// Where the history a resync is restoring ends (`beginHistoryRestore`). Bytes below it go
     /// to the restore, including the rest of it after a reconnect resumes mid-history.
     private var restoreEnd: UInt64?
@@ -275,10 +280,11 @@ public final class TerminalHostView: NSView {
             themeName: themeName,
             fontFamily: settings?.fontFamily ?? "Menlo",
             fontSize: CGFloat(settings?.fontSize ?? 14),
+            fontFallbackFamilies: settings?.fontFallbackFamilies ?? [],
+            fontFeatures: settings?.fontFeatures ?? [:],
             vivid: settings?.vividColors ?? false,
             colorRendering: settings?.colorRendering,
             colorGamut: settings?.colorGamut ?? .auto,
-            offMainParserFramePipeline: settings?.offMainParserFramePipeline ?? true,
             liveResizeReflow: settings?.liveResizeReflow ?? true
         )
         self.nativeView = nativeView
@@ -291,6 +297,10 @@ public final class TerminalHostView: NSView {
             }
         }
         configureNative(nativeView, io: io, inputGate: inputGate)
+        nativeView.onFirstShellPromptSubmitted = { [weak self] in
+            guard let self else { return }
+            self.hostDelegate?.terminalHostDidSubmitFirstShellPrompt(surfaceID: self.surfaceID)
+        }
         if remote {
             // The shell is on another Mac: a pasted image or file goes there first, and its
             // Kitty graphics can't name files on this one.
@@ -397,6 +407,10 @@ public final class TerminalHostView: NSView {
             // notification — the same delegate path a programmatic tab switch already uses.
             self.hostDelegate?.terminalHostDidChangeFocus(true, surfaceID: self.surfaceID)
         }
+        native.onRequestCommandFind = { [weak self] in
+            self?.showFind()
+            self?.findBar?.scopeToCommandOutput()
+        }
         native.onCopy = { [weak self] text in
             self?.storeCopyBuffer(text)
         }
@@ -462,7 +476,7 @@ public final class TerminalHostView: NSView {
             self.hasSeenInitialGridSize = true
             switch settings.resizeOverlay {
             case .never: return
-            case .afterFirst where isInitial: return // opening a window isn't a resize
+            case .afterFirst where isInitial || self.window?.isVisible != true: return
             default: break
             }
             guard !self.nativeView.isInCopyMode else { return }
@@ -579,6 +593,8 @@ public final class TerminalHostView: NSView {
         nativeView.configureAppearance(
             fontFamily: settings.fontFamily,
             fontSize: CGFloat(settings.fontSize),
+            fontFallbackFamilies: settings.fontFallbackFamilies,
+            fontFeatures: settings.fontFeatures,
             vivid: settings.vividColors,
             colorRendering: settings.colorRendering,
             colorGamut: settings.colorGamut,
@@ -614,7 +630,6 @@ public final class TerminalHostView: NSView {
             ),
             boldIsBright: settings.boldIsBright,
             promptGutter: settings.showPromptGutter,
-            offMainParserFramePipeline: settings.offMainParserFramePipeline,
             liveResizeReflow: settings.liveResizeReflow
         )
         // Behavior (not appearance) settings — set directly rather than bloating the appearance call.
@@ -1012,7 +1027,7 @@ public final class TerminalHostView: NSView {
         // re-grab the surface the user explicitly released. Setting the flag tears the reconnect
         // down: its probe drops its subscription and no further retries are scheduled.
         guard !intentionallyDetached else { return }
-        attachGeneration += 1
+        attachProgress?.stopAccepting()
         reconnectCancellation.cancel()
         reconnectInFlight = false
         intentionallyDetached = true // suppress auto-reconnect: this detach is deliberate
@@ -1112,49 +1127,52 @@ public final class TerminalHostView: NSView {
         scheduleDaemonReconnect(immediately: true)
     }
 
-    /// The attach callbacks, shared by the first connect, a re-grab, and a reconnect. They run
-    /// on the subscription's read thread and hop to main IN ORDER: the read loop is serial and
-    /// `DispatchQueue.main.async` is strict FIFO, so the emulator sees the daemon's byte order.
-    /// (An unstructured `Task { @MainActor in }` is not order-preserving and scrambled
-    /// cursor-positioned redraws under bursty output.) A resync paints the daemon's screen at
-    /// once and rebuilds the history behind it; the bytes a resume missed are fed as a replay
-    /// so old bells and queries don't fire again (#168).
+    /// Attach initialization and history run through one main-thread barrier. Once the
+    /// history boundary is submitted, live batches go directly to the parser worker.
     private func makeAttachHandlers() -> (
         onStart: @Sendable (DaemonClient.AttachStart) -> Void,
         onData: @Sendable (Data, UInt64) -> Void
     ) {
+        attachProgress?.cancel()
         attachGeneration += 1
         let generation = attachGeneration
-        let progress = AttachProgress()
-        let onStart: @Sendable (DaemonClient.AttachStart) -> Void = { [weak self] start in
-            progress.historyEnd = start.historyEnd
-            DispatchQueue.main.async {
-                MainActor.assumeIsolated {
-                    guard let self, generation == self.attachGeneration, !self.intentionallyDetached else { return }
-                    self.attachPoint = start.point
-                    if start.resync {
-                        self.restoreEnd = start.historyEnd
-                        self.nativeView.beginHistoryRestore(screen: start.screen, replaySizes: start.replaySizes ?? [])
-                    }
+        let receiver = nativeView.makeOutputReceiver()
+        let progress = AttachProgress(receiver: receiver, surfaceID: surfaceID.uuidString) { [weak self] sequence in
+            guard let self, generation == self.attachGeneration else { return }
+            if let epoch = self.attachEpoch { self.attachPoint = DaemonClient.AttachPoint(epoch: epoch, sequence: sequence) }
+        }
+        attachProgress = progress
+        let drain: @MainActor @Sendable () -> Void = { [weak self] in
+            guard let self, generation == self.attachGeneration else { progress.cancel(); return }
+            progress.drain { data, sequence, consumed in
+                let end = sequence + UInt64(data.count)
+                if let restoreEnd = self.restoreEnd, sequence < restoreEnd {
+                    self.nativeView.receiveHistory(data, sequence: sequence, onConsumed: consumed)
+                    if end >= restoreEnd { self.finishHistoryRestore() }
+                } else {
+                    self.finishHistoryRestore()
+                    receiver.enqueue(data, replay: sequence < progress.historyEnd, onConsumed: consumed)
                 }
             }
         }
-        let onData: @Sendable (Data, UInt64) -> Void = { [weak self] data, sequence in
-            let replay = sequence < progress.historyEnd
+        let onStart: @Sendable (DaemonClient.AttachStart) -> Void = { [weak self] start in
+            progress.setHistoryEnd(start.historyEnd)
             DispatchQueue.main.async {
                 MainActor.assumeIsolated {
-                    guard let self, generation == self.attachGeneration else { return }
-                    let end = sequence &+ UInt64(data.count)
-                    if let restoreEnd = self.restoreEnd, sequence < restoreEnd {
-                        self.nativeView.receiveHistory(data, sequence: sequence)
-                        if end >= restoreEnd { self.finishHistoryRestore() }
-                    } else {
-                        self.finishHistoryRestore()
-                        self.nativeView.receive(data, replay: replay)
+                    guard let self, generation == self.attachGeneration, !self.intentionallyDetached else { progress.cancel(); return }
+                    self.attachEpoch = start.point?.epoch
+                    if start.resync {
+                        self.attachPoint = nil
+                        self.restoreEnd = start.historyEnd
+                        self.nativeView.beginHistoryRestore(screen: start.screen, replaySizes: start.replaySizes ?? [])
                     }
-                    self.attachPoint?.sequence = end
+                    progress.start()
+                    drain()
                 }
             }
+        }
+        let onData: @Sendable (Data, UInt64) -> Void = { data, sequence in
+            progress.enqueue(data, sequence: sequence, drain: drain)
         }
         return (onStart, onData)
     }
@@ -1222,7 +1240,17 @@ public final class TerminalHostView: NSView {
     /// reattach (resuming when the daemon is the same one). Bounded backoff covers the restart window; after that, fall
     /// back to the manual "click to re-grab" affordance. No-op once intentionally detached.
     private func scheduleDaemonReconnect(immediately: Bool = false) {
-        guard !intentionallyDetached, outputSubscription == nil, !reconnectInFlight else { return }
+        guard !intentionallyDetached, outputSubscription == nil, !reconnectInFlight, !attachDrainInFlight else { return }
+        if let progress = attachProgress {
+            attachDrainInFlight = true
+            progress.finish { [weak self] in
+                guard let self else { return }
+                self.attachProgress = nil
+                self.attachDrainInFlight = false
+                self.scheduleDaemonReconnect(immediately: immediately)
+            }
+            return
+        }
         guard !DaemonReconnectPolicy.isExhausted(attempts: reconnectAttempts) else {
             hideReconnectingOverlay() // the chip gives way to the full re-grab affordance
             showDetachedOverlay() // ~50s of retries elapsed; let the user re-grab manually
@@ -1239,8 +1267,7 @@ public final class TerminalHostView: NSView {
         reconnectCancellation.cancel()
         let cancellation = TerminalSearchCancellation()
         reconnectCancellation = cancellation
-        // Capture main-actor state so the whole probe + (re)attach handshake — ping, ensureSurface,
-        // and attach — runs OFF main. A still-restarting daemon answers slowly
+        // Capture main-actor state so the complete attach handshake runs off main. A still-restarting daemon answers slowly
         // (or its socket blocks), so doing these synchronous round trips on main froze the UI for the
         // duration of every retry. Only the view touches (RIS reset, replay receive, subscription
         // assignment, `io.attach`) hop back to main.
@@ -1255,10 +1282,11 @@ public final class TerminalHostView: NSView {
         let onOwnership = makeOwnershipHandler()
         let onEnd = makeOutputEndHandler()
         let resume = attachPoint
+        let progress = attachProgress
         let onAttached: @Sendable (DaemonSubscription?) -> Void = { [weak self] subscription in
             DispatchQueue.main.async {
                 MainActor.assumeIsolated {
-                    guard let self, generation == self.attachGeneration, !self.intentionallyDetached, self.outputSubscription == nil else {
+                    guard let self, generation == self.attachGeneration, !self.intentionallyDetached, !self.attachDrainInFlight, self.outputSubscription == nil else {
                         subscription?.cancel() // raced an intentional detach / another attach — drop it
                         return
                     }
@@ -1279,21 +1307,13 @@ public final class TerminalHostView: NSView {
         }
         reconnectQueue.asyncAfter(deadline: .now() + delay) {
             guard !cancellation.isCancelled else { onAttached(nil); return }
-            // Ping first: a still-restarting daemon answers nothing, so bail to a retry rather than
-            // block. Then re-ensure the surface (idempotent — the respawned daemon already recreated
-            // it from layout.json); subscribing while the surface is still missing would be rejected
-            // and bounce straight back here.
-            guard case .pong? = try? client.request(.ping, timeout: 0.5) else { onAttached(nil); return }
-            guard !cancellation.isCancelled else { onAttached(nil); return }
-            guard case .ok? = try? client.request(.ensureSurface(
-                surfaceID: sid, cwd: cwd, shell: shell, rows: 24, cols: 80, scrollbackBytes: scrollbackBytes, requireInLayout: requireInLayout
-            )) else { onAttached(nil); return }
-            // Same daemon: resume from the last byte painted. A restarted daemon (new epoch) or an
-            // evicted gap resyncs: reset, then the full history.
             let subscription = try? client.attach(
-                surfaceID: sid, label: "Harness.app", resume: resume, onStart: onStart, onData: onData,
+                surfaceID: sid, label: "Harness.app", resume: resume,
+                launch: AttachLaunch(cwd: cwd, shell: shell, rows: 24, cols: 80, scrollbackBytes: scrollbackBytes, requireInLayout: requireInLayout),
+                acknowledgesOutput: true, onStart: onStart, onData: onData,
                 onOwnership: onOwnership, onEnd: onEnd
             )
+            progress?.bind(subscription)
             onAttached(subscription)
         }
     }
@@ -1587,8 +1607,111 @@ enum DaemonReconnectPolicy {
     static func isExhausted(attempts: Int) -> Bool { attempts >= maxAttempts }
 }
 
-/// The history boundary of one attach, written by `onStart` and read by `onData`, both on the
-/// subscription's serial read thread.
-private final class AttachProgress: @unchecked Sendable {
-    var historyEnd: UInt64 = 0
+/// Serializes the attach barrier with direct worker submission and budgets bytes until
+/// consumption, including history restoration. Socket reads pause at 4 MiB and resume at 1 MiB.
+final class AttachProgress: @unchecked Sendable {
+    private let lock = NSLock()
+    private let receiver: SurfaceOutputReceiver
+    private let surfaceID: String
+    private var acknowledgedThrough: UInt64 = 0
+    private let onProgress: @MainActor @Sendable (UInt64) -> Void
+    private weak var subscription: DaemonSubscription?
+    private var pending: [(Data, UInt64)] = []
+    private var started = false, direct = false, active = true, accepting = true, drainScheduled = false
+    private var finishHandler: (@MainActor @Sendable () -> Void)?
+    private var inFlight = 0
+    private var readsPaused = false
+    private var endSequence: UInt64 = 0
+    private var progressScheduled = false
+    private var boundary: UInt64 = 0
+    var historyEnd: UInt64 { lock.lock(); defer { lock.unlock() }; return boundary }
+    init(receiver: SurfaceOutputReceiver, surfaceID: String, onProgress: @escaping @MainActor @Sendable (UInt64) -> Void) {
+        self.receiver = receiver; self.surfaceID = surfaceID; self.onProgress = onProgress
+    }
+    func setHistoryEnd(_ sequence: UInt64) { lock.lock(); boundary = sequence; lock.unlock() }
+    func bind(_ subscription: DaemonSubscription?) {
+        lock.lock(); self.subscription = subscription
+        if inFlight >= 4 << 20 { readsPaused = true }
+        if readsPaused { subscription?.pauseReading() }
+        if endSequence > 0 { subscription?.acknowledgeOutput(surfaceID: surfaceID, sequence: endSequence) }
+        lock.unlock()
+    }
+    func stopAccepting() { lock.lock(); accepting = false; lock.unlock() }
+    func cancel() {
+        lock.lock()
+        active = false; accepting = false
+        inFlight -= pending.reduce(0) { $0 + $1.0.count }
+        pending.removeAll()
+        lock.unlock()
+    }
+    @MainActor
+    func finish(_ completion: @escaping @MainActor @Sendable () -> Void) {
+        lock.lock(); accepting = false; finishHandler = completion; lock.unlock()
+        publishProgress()
+    }
+    func start() { lock.lock(); started = true; lock.unlock() }
+    func enqueue(_ data: Data, sequence: UInt64, drain: @escaping @MainActor @Sendable () -> Void) {
+        lock.lock()
+        guard active, accepting else { lock.unlock(); return }
+        inFlight += data.count
+        if inFlight >= 4 << 20, !readsPaused { readsPaused = true; subscription?.pauseReading() }
+        if direct {
+            receiver.enqueue(data, replay: sequence < boundary) { [weak self] in self?.consumed(data.count, through: sequence + UInt64(data.count)) }
+            lock.unlock()
+            return
+        }
+        pending.append((data, sequence))
+        let schedule = started && !drainScheduled
+        if schedule { drainScheduled = true }
+        lock.unlock()
+        if schedule { DispatchQueue.main.async(execute: drain) }
+    }
+    @MainActor
+    func drain(_ deliver: (Data, UInt64, @escaping @Sendable () -> Void) -> Void) {
+        var reachedBoundary = false
+        while true {
+            lock.lock()
+            guard active, !pending.isEmpty else {
+                if active && reachedBoundary { direct = true }
+                drainScheduled = false
+                lock.unlock(); return
+            }
+            let batches = pending; pending.removeAll(keepingCapacity: true)
+            let end = boundary
+            lock.unlock()
+            for (data, sequence) in batches {
+                deliver(data, sequence) { [weak self] in self?.consumed(data.count, through: sequence + UInt64(data.count)) }
+                if sequence + UInt64(data.count) >= end { reachedBoundary = true }
+            }
+        }
+    }
+    private func consumed(_ count: Int, through sequence: UInt64) {
+        lock.lock()
+        inFlight -= count; endSequence = max(endSequence, sequence)
+        if active, endSequence >= boundary, endSequence - acknowledgedThrough >= (512 << 10) || inFlight == 0 {
+            acknowledgedThrough = endSequence
+            subscription?.acknowledgeOutput(surfaceID: surfaceID, sequence: endSequence)
+        }
+        if inFlight <= 1 << 20, readsPaused { readsPaused = false; subscription?.resumeReading() }
+        lock.unlock()
+        publishProgress()
+    }
+    private func publishProgress() {
+        lock.lock()
+        let schedule = !progressScheduled
+        if schedule { progressScheduled = true }
+        lock.unlock()
+        guard schedule else { return }
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            self.lock.lock()
+            let end = self.endSequence, active = self.active
+            let finished = self.inFlight == 0 ? self.finishHandler : nil
+            if finished != nil { self.finishHandler = nil }
+            self.progressScheduled = false
+            self.lock.unlock()
+            if active, end > 0 { self.onProgress(end) }
+            finished?()
+        }
+    }
 }

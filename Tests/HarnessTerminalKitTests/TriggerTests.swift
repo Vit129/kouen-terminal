@@ -42,7 +42,7 @@ final class TriggerTests: XCTestCase {
     }
 
     func testScanTextKeepsColumnAlignmentForWideAndBlankCells() {
-        let view = HarnessTerminalSurfaceView(offMainParserFramePipeline: false)
+        let view = HarnessTerminalSurfaceView()
         view.receive("ab日本ERROR")
         let snapshot = view.testingReadGridSnapshot()
         let cells = (0 ..< snapshot.cols).compactMap { snapshot.cell(row: 0, col: $0) }
@@ -57,7 +57,7 @@ final class TriggerTests: XCTestCase {
     // MARK: - Highlight action
 
     func testHighlightRecordsCompletedLinesOnly() async {
-        let view = HarnessTerminalSurfaceView(offMainParserFramePipeline: true)
+        let view = HarnessTerminalSurfaceView()
         view.applyTriggerRules([TriggerRule(pattern: "ERROR", action: .highlight)])
         view.receive("fine line\r\nERROR: bad thing\r\n")
         await settle(view)
@@ -75,18 +75,10 @@ final class TriggerTests: XCTestCase {
         XCTAssertEqual(view.testingTriggerHighlightMatches().count, 2)
     }
 
-    func testSyncPipelineScansToo() async {
-        let view = HarnessTerminalSurfaceView(offMainParserFramePipeline: false)
-        view.applyTriggerRules([TriggerRule(pattern: "WARN", action: .highlight)])
-        view.receive("WARN here\r\n")
-        await settle(view)
-        XCTAssertEqual(view.testingTriggerHighlightMatches().count, 1)
-    }
-
     // MARK: - Notify action
 
     func testNotifyFiresOncePerCooldown() async {
-        let view = HarnessTerminalSurfaceView(offMainParserFramePipeline: true)
+        let view = HarnessTerminalSurfaceView()
         view.applyTriggerRules([TriggerRule(pattern: "PANIC", action: .notify)])
         var fired: [String] = []
         view.onTriggerMatched = { _, line in fired.append(line) }
@@ -99,7 +91,7 @@ final class TriggerTests: XCTestCase {
     }
 
     func testNoRulesMeansNoScanState() async {
-        let view = HarnessTerminalSurfaceView(offMainParserFramePipeline: true)
+        let view = HarnessTerminalSurfaceView()
         view.receive("ERROR but nobody is watching\r\n")
         await settle(view)
         XCTAssertTrue(view.testingTriggerHighlightMatches().isEmpty)
@@ -110,7 +102,7 @@ final class TriggerTests: XCTestCase {
         // (#168's lesson — same contract the engine enforces for query replies). The replay
         // still advances the scan high-water so the restored content isn't backfilled later,
         // and live output after the replay scans normally.
-        let view = HarnessTerminalSurfaceView(offMainParserFramePipeline: true)
+        let view = HarnessTerminalSurfaceView()
         view.applyTriggerRules([TriggerRule(pattern: "ERROR", action: .highlight)])
         view.receive("ERROR from a previous session\r\n", replay: true)
         await settle(view)
@@ -123,7 +115,7 @@ final class TriggerTests: XCTestCase {
     }
 
     func testAlternateScreenIsNeverScanned() async {
-        let view = HarnessTerminalSurfaceView(offMainParserFramePipeline: true)
+        let view = HarnessTerminalSurfaceView()
         view.applyTriggerRules([TriggerRule(pattern: "ERROR", action: .highlight)])
         view.receive("\u{1b}[?1049h") // enter alt screen
         view.receive("ERROR drawn by a TUI\r\n")
@@ -133,7 +125,7 @@ final class TriggerTests: XCTestCase {
     }
 
     func testFloodSkipsBacklogInsteadOfScanningEverything() async {
-        let view = HarnessTerminalSurfaceView(offMainParserFramePipeline: true)
+        let view = HarnessTerminalSurfaceView()
         view.applyTriggerRules([TriggerRule(pattern: "needle", action: .highlight)])
         // One needle deep in a single huge batch, beyond the newest-256-lines budget…
         var flood = "needle early\r\n"

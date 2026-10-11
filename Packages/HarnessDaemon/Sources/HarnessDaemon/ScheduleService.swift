@@ -13,7 +13,8 @@ final class ScheduleService: @unchecked Sendable {
     private let limits: @Sendable (Date) throws -> UsageSummary
     private var timer: DispatchSourceTimer?, unavailable: String?, observationOffset = 0
     private var active = false
-    private var lastTick: Date?
+    private var observationStartedAt: Date?
+    private var eventBacklog = false
     private var maintenanceAt = Date.distantPast
     init(store: ActivityStore, host: SessionHostClient? = .configured,
          observeOwned: @escaping @Sendable (@Sendable () -> Void) -> Void = { $0() },
@@ -24,14 +25,15 @@ final class ScheduleService: @unchecked Sendable {
     func activate() {
         queue.sync {
             guard !active else { return }; active = true
-            let timer = DispatchSource.makeTimerSource(queue: queue); timer.schedule(deadline: .now() + 1, repeating: 1)
+            let timer = DispatchSource.makeTimerSource(queue: queue); timer.schedule(deadline: .now())
             timer.setEventHandler { [weak self] in self?.observeOwned { [weak self] in self?.tickOnQueue(now: .now) } }
             self.timer = timer; timer.resume()
         }
     }
-    func suspend() { queue.sync { active = false; timer?.cancel(); timer = nil } }
+    func suspend() { queue.sync { active = false; timer?.cancel(); timer = nil; observationStartedAt = nil; observationOffset = 0; eventBacklog = false } }
     func handle(_ operation: ScheduleOperation) throws -> Data { try queue.sync { try handleOnQueue(operation) } }
     private func handleOnQueue(_ operation: ScheduleOperation) throws -> Data {
+            defer { armNextObservation() }
             let encoder = JSONEncoder(); encoder.outputFormatting = [.sortedKeys]
             switch operation {
             case let .list(offset, limit):
@@ -81,15 +83,21 @@ final class ScheduleService: @unchecked Sendable {
     /// Focused fixtures drive this exact owner-queue reducer with a deterministic clock.
     func tick(now: Date) { queue.sync { tickOnQueue(now: now) } }
     private func tickOnQueue(now: Date) {
+        defer { armNextObservation() }
         do {
             try requireDurable()
-            let records = try store.objectPage(ScheduleRecord.self, kind: "schedule", limit: 129)
+            let records = try store.objectPage(ScheduleRecord.self, kind: "schedule", limit: 129, orderByIdentity: true)
             guard records.count <= 128 else { throw ScheduleError.budget }
+            if observationStartedAt == nil { observationStartedAt = now }
+            if observationOffset >= records.count { observationOffset = 0 }
+            if observationOffset == 0 { eventBacklog = false }
             let deadline = ProcessInfo.processInfo.systemUptime + 4
             let page = Array(records.dropFirst(observationOffset).prefix(16))
-            observationOffset = observationOffset + page.count >= records.count ? 0 : observationOffset + page.count
-            for record in page {
+            var observedCount = 0
+            var limitSummary: UsageSummary?
+            for var record in page {
                 guard ProcessInfo.processInfo.systemUptime < deadline else { break }
+                observedCount += 1
                 if let lastID = record.lastOccurrenceID, var last = try occurrence(lastID, schedule: record.id), last.blocksOverlap,
                    let host, case let .workloadOutcome(outcome) = try host.request(.workloadOutcome(lastID), timeout: 0.5) {
                     if let outcome {
@@ -98,25 +106,23 @@ final class ScheduleService: @unchecked Sendable {
                     } else { last.state = .unknown; last.reason = "The accepted workload receipt is unavailable. No retry or overlapping launch is permitted." }
                     try save(last)
                 }
-            }
-            var limitSummary: UsageSummary?
-            for var record in records where record.definition.enabled {
-                guard ProcessInfo.processInfo.systemUptime < deadline else { break }
+                guard record.definition.enabled else { continue }
                 switch record.definition.trigger {
                 case .once, .cron:
                     guard let at = record.nextAt, at <= now else { continue }
-                    let missed = lastTick == nil || at < now.addingTimeInterval(-30)
+                    let missed = at <= observationStartedAt! || at < now.addingTimeInterval(-30)
                     record.nextAt = try { if case .cron = record.definition.trigger { return try next(record.definition, after: now) }; return nil }()
                     try claim(&record, key: "time:" + String(at.timeIntervalSince1970), due: at, missed: missed, now: now)
                 case let .agentEvent(kind, surface, provider, profile):
                     let events = try store.scheduledEvents(after: record.eventCursor)
+                    if events.count == 200 { eventBacklog = true }
                     for entry in events {
-                        guard ProcessInfo.processInfo.systemUptime < deadline else { break }
+                        guard ProcessInfo.processInfo.systemUptime < deadline else { eventBacklog = true; break }
                         record.eventCursor = entry.sequence
                         let event = entry.event
                         guard event.kind == kind, let run = try store.run(event.runID), surface.map({ $0 == run.surfaceID }) ?? true,
                               provider.map({ $0 == run.provider }) ?? true, profile.map({ $0 == run.profile }) ?? true else { continue }
-                        try claim(&record, key: "event:" + event.id.uuidString, due: event.at, missed: lastTick == nil || event.at < now.addingTimeInterval(-30), now: now)
+                        try claim(&record, key: "event:" + event.id.uuidString, due: event.at, missed: event.at <= observationStartedAt! || event.at < now.addingTimeInterval(-30), now: now)
                     }
                     if !events.isEmpty { try store.saveObjects([LedgerObject(kind: "schedule", id: record.id.uuidString, value: record)]) }
                 case let .limitReset(profileID, window, accepted):
@@ -126,12 +132,48 @@ final class ScheduleService: @unchecked Sendable {
                           observation.observedAt > now.addingTimeInterval(-7200), let predicted = observation.predictedReset, predicted <= now else { continue }
                     let key = "predicted:" + String(predicted.timeIntervalSince1970)
                     guard record.lastResetKey != key else { continue }; record.lastResetKey = key
-                    try claim(&record, key: key, due: predicted, missed: lastTick == nil || predicted < now.addingTimeInterval(-30), now: now, predicted: true)
+                    try claim(&record, key: key, due: predicted, missed: predicted <= observationStartedAt! || predicted < now.addingTimeInterval(-30), now: now, predicted: true)
                 }
             }
+            observationOffset = observationOffset + observedCount >= records.count ? 0 : observationOffset + observedCount
             if now.timeIntervalSince(maintenanceAt) > 3600 { try prune(now: now); maintenanceAt = now }
-            lastTick = now; unavailable = nil
+            unavailable = nil
         } catch { unavailable = error.localizedDescription }
+    }
+    func wakeObservations() {
+        queue.async { [weak self] in
+            guard let self, active else { return }
+            timer?.schedule(deadline: .now(), leeway: .milliseconds(10))
+        }
+    }
+    private func armNextObservation() {
+        guard active, let timer else { return }
+        guard host != nil, store.availability == nil else { timer.schedule(deadline: .distantFuture); return }
+        guard unavailable == nil else { timer.schedule(deadline: .now() + 5); return }
+        do {
+            let now = Date()
+            let records = try store.objectPage(ScheduleRecord.self, kind: "schedule", limit: 129)
+            var deadlines: [Date] = observationOffset == 0 && !eventBacklog ? [] : [now.addingTimeInterval(0.1)]
+            if try !records.isEmpty || store.objectCount(kind: "schedule-occurrence") > 0 {
+                deadlines.append(max(now, maintenanceAt.addingTimeInterval(3600)))
+            }
+            var summary: UsageSummary?
+            for record in records {
+                guard record.definition.enabled else { continue }
+                if let nextAt = record.nextAt { deadlines.append(nextAt) }
+                if case let .limitReset(profileID, window, accepted) = record.definition.trigger, accepted {
+                    if summary == nil { summary = try limits(now) }
+                    if let observed = summary?.profiles.first(where: { $0.id == profileID })?.limits.first(where: { $0.window == window }),
+                       observed.observedAt > now.addingTimeInterval(-7200), let reset = observed.predictedReset,
+                       record.lastResetKey != "predicted:" + String(reset.timeIntervalSince1970) { deadlines.append(reset) }
+                }
+            }
+            timer.schedule(deadline: deadlines.min().map { .now() + max(0, $0.timeIntervalSince(now)) } ?? .distantFuture,
+                leeway: .milliseconds(20))
+        } catch {
+            unavailable = error.localizedDescription
+            timer.schedule(deadline: .now() + 5, leeway: .milliseconds(100))
+        }
     }
     private func claim(_ record: inout ScheduleRecord, key: String, due: Date, missed: Bool, now: Date, predicted: Bool = false) throws {
         if try store.objectCount(kind: "schedule-occurrence") >= 1000 { try prune(now: now) }

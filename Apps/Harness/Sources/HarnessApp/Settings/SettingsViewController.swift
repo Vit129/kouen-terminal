@@ -72,6 +72,8 @@ final class SettingsViewController: NSViewController, NSFontChanging {
     private let prefixControlSegment = HarnessSegmented(frame: .zero)
     private let statusLineControlSegment = HarnessSegmented(frame: .zero)
     private let fontSizeField = HarnessTextField()
+    private let fontFallbackField = HarnessTextField()
+    private let fontFeaturesField = HarnessTextField()
     private let fontFamilyField = NSTextField() // backing store for the chosen font (not shown)
     private let fontReadout = NSTextField(labelWithString: "")
     private let textRenderingSegment = HarnessSegmented(frame: .zero)
@@ -117,7 +119,6 @@ final class SettingsViewController: NSViewController, NSFontChanging {
     private let notificationPermissionButton = NSButton(title: "Open System Settings…", target: nil, action: nil)
     private var notificationStatusRow: SettingsFormRow?
     // Advanced
-    private let offMainPipelineToggle = HarnessToggle(frame: .zero)
     private let liveResizeReflowToggle = HarnessToggle(frame: .zero)
 
     private let pageContainer = NSView()
@@ -219,6 +220,8 @@ final class SettingsViewController: NSViewController, NSFontChanging {
             (paddingXField, String(format: "%.0f", settings.windowPaddingX)),
             (paddingYField, String(format: "%.0f", settings.windowPaddingY)),
             (fontSizeField, String(format: "%.0f", settings.fontSize)),
+            (fontFallbackField, settings.fontFallbackFamilies.joined(separator: ", ")),
+            (fontFeaturesField, settings.fontFeatures.sorted { $0.key < $1.key }.map { "\($0.key)=\($0.value)" }.joined(separator: ", ")),
             (shellField, settings.defaultShell),
             (cwdField, settings.defaultCWD),
             (scrollbackField, String(settings.scrollbackLines)),
@@ -338,7 +341,7 @@ final class SettingsViewController: NSViewController, NSFontChanging {
 
         // Toggles that write straight through `applySettingsLive`.
         for toggle in [machineIndicatorToggle, cursorBlinkToggle, copyOnSelectToggle, vividColorsToggle, themeTerminalOutputToggle,
-                       ligaturesToggle, promptGutterToggle, transparentTitlebarToggle, offMainPipelineToggle,
+                       ligaturesToggle, promptGutterToggle, transparentTitlebarToggle,
                        liveResizeReflowToggle, paddingBalanceToggle, mouseHideToggle, pasteProtectionToggle,
                        remoteControlToggle, boldIsBrightToggle, themeFitToggle, paneHeadersToggle,
                        inheritCWDToggle, quickTerminalToggle, notificationSoundToggle] + Array(eventToggles.values) {
@@ -859,11 +862,17 @@ final class SettingsViewController: NSViewController, NSFontChanging {
         fontReadout.lineBreakMode = .byTruncatingTail
         fontReadout.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
         fontSizeField.widthAnchor.constraint(equalToConstant: Form.numberFieldWidth).isActive = true
+        fontFallbackField.widthAnchor.constraint(equalToConstant: Form.wideControlWidth).isActive = true
+        fontFeaturesField.widthAnchor.constraint(equalToConstant: Form.wideControlWidth).isActive = true
+        fontFallbackField.placeholderString = "System defaults"
+        fontFeaturesField.placeholderString = "Font defaults"
         let fontGroup = settingsGroup("Font", [
             settingsRow("Font", hstack([fontReadout, chooseFontButton], spacing: 10)),
             settingsRow("Size", hstack([fontSizeField, unitLabel("pt")], spacing: 6), hint: "8–32 pt. ⌘+ and ⌘− change it too."),
             settingsRow("Text rendering", textRenderingSegment, hint: "Crisp draws glyphs lighter, Soft heavier."),
             settingsRow("Ligatures", ligaturesToggle, hint: "Joins => != -> in fonts that have them."),
+            settingsRow("Fallback fonts", fontFallbackField, hint: "Comma-separated font families, in preferred order."),
+            settingsRow("Font features", fontFeaturesField, hint: "OpenType settings, such as calt=0, ss01=1. Blank uses font defaults."),
         ])
 
         let cursorGroup = settingsGroup("Cursor", [
@@ -1244,15 +1253,12 @@ final class SettingsViewController: NSViewController, NSFontChanging {
         // the daemon-backed controls they don't get refreshed by `loadAdvancedValues`. Re-read their
         // state from settings here so a rebuilt page reflects changes made since the last build.
         let perfSettings = SessionCoordinator.shared.settings
-        offMainPipelineToggle.state = perfSettings.offMainParserFramePipeline ? .on : .off
         liveResizeReflowToggle.state = perfSettings.liveResizeReflow ? .on : .off
 
         let performanceGroup = settingsGroup("Performance", [
-            settingsRow("Off-main render pipeline", offMainPipelineToggle,
-                        hint: "Parse output and build frames off the main thread."),
             settingsRow("Real-time resize", liveResizeReflowToggle,
                         hint: "Reflow the running program while you drag the window edge."),
-        ], footer: "Both are on by default; turn one off only to rule it out.")
+        ], footer: "Disable this to defer reflow until the resize ends.")
 
         let statusGroup = settingsGroup("Status line", [
             settingsRow("Position", advSegment("status-position", ["bottom", "top"])),
@@ -2343,6 +2349,10 @@ final class SettingsViewController: NSViewController, NSFontChanging {
         paddingYField.stringValue = String(Int(settings.windowPaddingY.rounded()))
         fontFamilyField.stringValue = settings.fontFamily
         fontSizeField.stringValue = String(Int(settings.fontSize.rounded()))
+        fontFallbackField.stringValue = settings.fontFallbackFamilies.joined(separator: ", ")
+        fontFeaturesField.stringValue = settings.fontFeatures.sorted { $0.key < $1.key }.map { "\($0.key)=\($0.value)" }.joined(separator: ", ")
+        fontFeaturesField.textColor = .labelColor
+        fontFeaturesField.toolTip = nil
         updateFontReadout()
         shellField.stringValue = settings.defaultShell
         cwdField.stringValue = settings.defaultCWD
@@ -2363,7 +2373,6 @@ final class SettingsViewController: NSViewController, NSFontChanging {
         themeTerminalOutputToggle.state = on(settings.applyThemeToTerminalOutput)
         ligaturesToggle.state = on(settings.ligatures)
         promptGutterToggle.state = on(settings.showPromptGutter)
-        offMainPipelineToggle.state = on(settings.offMainParserFramePipeline)
         liveResizeReflowToggle.state = on(settings.liveResizeReflow)
         resizeOverlaySegment.selectItem(withTitle: resizeOverlayTitle(settings.resizeOverlay))
         resizeOverlayPositionSegment.selectItem(withTitle: resizeOverlayPositionTitle(settings.resizeOverlayPosition))
@@ -2506,6 +2515,16 @@ final class SettingsViewController: NSViewController, NSFontChanging {
         }
         write(\.fontSize, HarnessSettings.clampedFontSize(Float(fontSizeField.stringValue) ?? 14))
         write(\.fontFamily, fontFamilyField.stringValue)
+        write(\.fontFallbackFamilies, fontFallbackField.stringValue.split(separator: ",")
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty })
+        if let features = HarnessSettings.parseFontFeatures(fontFeaturesField.stringValue) {
+            write(\.fontFeatures, features)
+            fontFeaturesField.textColor = .labelColor
+            fontFeaturesField.toolTip = nil
+        } else {
+            fontFeaturesField.textColor = .systemRed
+            fontFeaturesField.toolTip = "Use four-character tags and nonnegative numbers, for example calt=0, ss01=1."
+        }
         write(\.defaultShell, shellField.stringValue)
         write(\.defaultCWD, cwdField.stringValue)
         write(\.windowInheritCWD, inheritCWDToggle.state == .on)
@@ -2522,7 +2541,6 @@ final class SettingsViewController: NSViewController, NSFontChanging {
         write(\.applyThemeToTerminalOutput, themeTerminalOutputToggle.state == .on)
         write(\.ligatures, ligaturesToggle.state == .on)
         write(\.showPromptGutter, promptGutterToggle.state == .on)
-        write(\.offMainParserFramePipeline, offMainPipelineToggle.state == .on)
         write(\.liveResizeReflow, liveResizeReflowToggle.state == .on)
         write(\.resizeOverlay, resizeOverlayValue(resizeOverlaySegment.titleOfSelectedItem))
         write(\.resizeOverlayPosition, resizeOverlayPositionValue(resizeOverlayPositionSegment.titleOfSelectedItem))

@@ -68,17 +68,9 @@ extension SurfaceRegistry {
                 try activity.registerLaunch(id: workloadID, surfaceID: surfaceID, paneID: leaf.id.uuidString, pid: pid, generation: generation,
                     provider: provider, specification: specification, startedAt: receipt?.acceptedAt ?? .now, outcome: receipt)
             }
-            do {
-                session.monitorSubscription = try session.subscribeSafely(watching: false) { [weak self, weak session] data, sequence in
-                    self?.observeSurfaceOutput(surfaceKey: surfaceID, data: data, sequence: sequence, session: session)
-                }
-            } catch {
-                // A fast process can finish before observation attaches. Its
-                // actual outcome remains queryable from the stable host receipt.
-                if case let .workloadOutcome(value) = try? host.request(.workloadOutcome(workloadID)), value?.state == .exited {
-                    removeSurfaceIfCurrent(surfaceID: surfaceID, session: session, exitStatus: value?.exitCode)
-                } else { session.onStreamInterrupted?() }
-            }
+            if case let .workloadOutcome(value) = try? host.request(.workloadOutcome(workloadID)), value?.state == .exited {
+                removeSurfaceIfCurrent(surfaceID: surfaceID, session: session, exitStatus: value?.exitCode)
+            } else { scheduleObserverRecovery(surfaceKey: surfaceID, session: session) }
         } else { _ = try host.request(.cancelWorkload(workloadID)) }
         if case let .workloadOutcome(outcome) = try host.request(.workloadOutcome(workloadID)) { return outcome }
         throw SessionHostError.refused("The workload was accepted, but its outcome could not be queried. Inspect the participant; no launch is repeated.")

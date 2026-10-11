@@ -128,7 +128,7 @@ harness-cli resume-agent --run RUN_UUID --surface SURFACE_UUID --auto-restore on
 harness-cli resume-agent --surface SURFACE_UUID --auto-restore off
 ```
 
-The private worker protocol is version 5. A host/candidate mismatch refuses adoption
+The private worker protocol is version 10. A host/candidate mismatch refuses adoption
 without interrupting its shells. Closed unavailable-key history remains bounded
 memory; if encrypted activity cannot be restored after an OS restart, the recorded
 execution is unavailable and automatic resume reports that fact.

@@ -120,7 +120,6 @@ public enum SettingsPalette {
         toggle("applyThemeToTerminalOutput", "Theme terminal output", \.applyThemeToTerminalOutput)
         toggle("ligatures", "Ligatures", \.ligatures)
         toggle("showPromptGutter", "Prompt gutter", \.showPromptGutter)
-        toggle("offMainParserFramePipeline", "Off-main parser", \.offMainParserFramePipeline)
         toggle("liveResizeReflow", "Live resize reflow", \.liveResizeReflow)
         cycle("resizeOverlay", "Resize overlay", ResizeOverlayMode.allCases, \.resizeOverlay)
         cycle("resizeOverlayPosition", "Resize overlay position", ResizeOverlayPosition.allCases, \.resizeOverlayPosition)

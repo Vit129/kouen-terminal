@@ -1,0 +1,27 @@
+{
+  "consumer": {
+    "ansi_sgr": {
+      "samples": 5,
+      "median_consumer_mbps": 77.42565030430387,
+      "median_consumer_ms": 866.752875
+    },
+    "plain_ascii": {
+      "samples": 5,
+      "median_consumer_mbps": 76.96389523679412,
+      "median_consumer_ms": 871.952125
+    },
+    "unicode_mixed": {
+      "samples": 5,
+      "median_consumer_mbps": 62.950902676770234,
+      "median_consumer_ms": 1066.051417
+    }
+  },
+  "source_sha256": "59285da821de96f23043dba9979401881361c9cee4728ca857940af758ecbada",
+  "agent": {
+    "samples": 5,
+    "bytes": 4750,
+    "sha256": "02c3c18b64b4f2ab3e95b198026fd250b1f07ee49c51b781f78a9c6fa4d26b26",
+    "median_consumer_ms": 4.963167,
+    "boundary": "recorded startup/command redraw, no model turn; original surface hidden during fifty-pane state"
+  }
+}

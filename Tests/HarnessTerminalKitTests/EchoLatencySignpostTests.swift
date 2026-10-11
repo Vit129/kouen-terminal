@@ -2,11 +2,39 @@ import Foundation
 import XCTest
 @testable import HarnessTerminalKit
 
-/// The echo-latency sampler: keyDown arms one pending sample; the FIRST present after it
-/// consumes it (within the attribution window), later presents don't double-count, and a
-/// present long after the keystroke (no echo came back) drops the sample instead of
-/// mis-attributing a blink tick as typing latency.
+/// Input attribution requires a newer output frame from the same surface. The sample
+/// measures CPU submission latency, before GPU completion and visible scanout.
 final class EchoLatencySignpostTests: XCTestCase {
+    func testInterleavedSurfacesAndStaleFramesCannotConsumeAnotherSourcesInput() {
+        let signposter = FrameSignposter(enabled: true)
+        let first = NSObject(), second = NSObject()
+        let firstID = ObjectIdentifier(first), secondID = ObjectIdentifier(second)
+        signposter.noteKeystroke(source: firstID, outputGeneration: 10, at: 1_000)
+        signposter.recordPresent(nanos: 100, source: secondID, outputGeneration: 21, at: 2_000)
+        signposter.recordPresent(nanos: 100, source: firstID, outputGeneration: 10, at: 3_000)
+        XCTAssertEqual(signposter.testingEchoSampleCount, 0)
+        XCTAssertTrue(signposter.testingHasPendingKeystroke)
+
+        signposter.noteKeystroke(source: secondID, outputGeneration: 20, at: 3_500)
+        signposter.recordPresent(nanos: 100, source: firstID, outputGeneration: 11, at: 4_000)
+        XCTAssertEqual(signposter.testingEchoSampleCount, 1)
+        XCTAssertTrue(signposter.testingHasPendingKeystroke)
+        signposter.recordPresent(nanos: 100, source: secondID, outputGeneration: 20, at: 4_500)
+        XCTAssertEqual(signposter.testingEchoSampleCount, 1)
+        signposter.recordPresent(nanos: 100, source: secondID, outputGeneration: 21, at: 5_000)
+        XCTAssertEqual(signposter.testingEchoSampleCount, 2)
+        XCTAssertFalse(signposter.testingHasPendingKeystroke)
+
+        // An encode can capture its timestamp before a newer main-thread input acquires
+        // the state lock. That older frame must leave the future input armed.
+        signposter.noteKeystroke(source: firstID, outputGeneration: 22, at: 10_000)
+        signposter.recordPresent(nanos: 100, source: firstID, outputGeneration: 23, at: 9_000)
+        XCTAssertEqual(signposter.testingEchoSampleCount, 2)
+        XCTAssertTrue(signposter.testingHasPendingKeystroke)
+        signposter.recordPresent(nanos: 100, source: firstID, outputGeneration: 23, at: 11_000)
+        XCTAssertEqual(signposter.testingEchoSampleCount, 3)
+        XCTAssertFalse(signposter.testingHasPendingKeystroke)
+    }
     func testKeystrokeIsConsumedByTheFirstPresent() {
         let signposter = FrameSignposter(enabled: true)
         signposter.noteKeystroke(at: 1_000)

@@ -1,0 +1,155 @@
+{
+  "sessions": 10,
+  "agent_processes_requested": 0,
+  "settle_seconds": 30,
+  "sample_seconds": 60.039208708000004,
+  "styled_lines": 10000,
+  "processes": [
+    {
+      "pid": 31117,
+      "role": "host",
+      "command": "/Users/rcourson/Desktop/Harness Terminal/.benchmark-results/performance-rebuild/baseline/Harness.app/Contents/Helpers/HarnessSessionHost.app/Contents/MacOS/HarnessSessionHost",
+      "rss_bytes": 55754752,
+      "one_core_cpu_percent": 0.916068035931191,
+      "phys_footprint_bytes": 20022040
+    },
+    {
+      "pid": 31118,
+      "role": "daemon",
+      "command": "/Users/rcourson/Desktop/Harness Terminal/.benchmark-results/performance-rebuild/baseline/Harness.app/Contents/Helpers/HarnessDaemon.app/Contents/MacOS/HarnessDaemon",
+      "rss_bytes": 29868032,
+      "one_core_cpu_percent": 0.3664272143724776,
+      "phys_footprint_bytes": 8389424
+    },
+    {
+      "pid": 31119,
+      "role": "shell-or-agent",
+      "command": "/opt/homebrew/bin/fish",
+      "rss_bytes": 9224192,
+      "one_core_cpu_percent": 0.0,
+      "phys_footprint_bytes": 5620168
+    },
+    {
+      "pid": 31335,
+      "role": "app",
+      "command": "/Users/rcourson/Desktop/Harness Terminal/.benchmark-results/performance-rebuild/baseline/Harness.app/Contents/MacOS/Harness",
+      "rss_bytes": 311181312,
+      "one_core_cpu_percent": 0.09993469482886022,
+      "phys_footprint_bytes": 334677288
+    },
+    {
+      "pid": 41578,
+      "role": "shell-or-agent",
+      "command": "/opt/homebrew/bin/fish",
+      "rss_bytes": 9207808,
+      "one_core_cpu_percent": 0.0,
+      "phys_footprint_bytes": 5636576
+    },
+    {
+      "pid": 41580,
+      "role": "shell-or-agent",
+      "command": "/opt/homebrew/bin/fish",
+      "rss_bytes": 9256960,
+      "one_core_cpu_percent": 0.0,
+      "phys_footprint_bytes": 5702136
+    },
+    {
+      "pid": 41582,
+      "role": "shell-or-agent",
+      "command": "/opt/homebrew/bin/fish",
+      "rss_bytes": 9273344,
+      "one_core_cpu_percent": 0.0,
+      "phys_footprint_bytes": 5685704
+    },
+    {
+      "pid": 41584,
+      "role": "shell-or-agent",
+      "command": "/opt/homebrew/bin/fish",
+      "rss_bytes": 9289728,
+      "one_core_cpu_percent": 0.0,
+      "phys_footprint_bytes": 5702088
+    },
+    {
+      "pid": 41586,
+      "role": "shell-or-agent",
+      "command": "/opt/homebrew/bin/fish",
+      "rss_bytes": 9207808,
+      "one_core_cpu_percent": 0.0,
+      "phys_footprint_bytes": 5620168
+    },
+    {
+      "pid": 41588,
+      "role": "shell-or-agent",
+      "command": "/opt/homebrew/bin/fish",
+      "rss_bytes": 9175040,
+      "one_core_cpu_percent": 0.0,
+      "phys_footprint_bytes": 5587400
+    },
+    {
+      "pid": 41590,
+      "role": "shell-or-agent",
+      "command": "/opt/homebrew/bin/fish",
+      "rss_bytes": 9158656,
+      "one_core_cpu_percent": 0.0,
+      "phys_footprint_bytes": 5587424
+    },
+    {
+      "pid": 41592,
+      "role": "shell-or-agent",
+      "command": "/opt/homebrew/bin/fish",
+      "rss_bytes": 9158656,
+      "one_core_cpu_percent": 0.0,
+      "phys_footprint_bytes": 5587424
+    },
+    {
+      "pid": 41594,
+      "role": "shell-or-agent",
+      "command": "/opt/homebrew/bin/fish",
+      "rss_bytes": 9175040,
+      "one_core_cpu_percent": 0.0,
+      "phys_footprint_bytes": 5587400
+    }
+  ],
+  "panes": [
+    {
+      "session": "4346E5A3-A1C4-48FA-819C-8AF38762D8BE",
+      "surface": "988F1B5D-A6A5-4B86-9216-5CAD4676A69F"
+    },
+    {
+      "session": "472CFCF9-25AD-4678-B895-3E2E9555B823",
+      "surface": "2FF74107-2FDB-48B1-AD9A-04487001738D"
+    },
+    {
+      "session": "8A44E1E5-90DC-455C-AD59-F244E45D39BF",
+      "surface": "D8FCE888-3FE2-4848-870C-268B069179E9"
+    },
+    {
+      "session": "45867179-2801-4B6D-95C4-4AAB92D2702C",
+      "surface": "F282886F-FC38-4680-BA35-1106F0EB0D0B"
+    },
+    {
+      "session": "FF6299A4-300B-4E60-B364-4CBAEF35A883",
+      "surface": "2854979A-4B66-4CC0-BE25-76DED3F38C17"
+    },
+    {
+      "session": "9E441D7A-61C0-428D-8478-1AD3ADBE2454",
+      "surface": "56D0C279-AE10-4C43-978E-A84DB8A72773"
+    },
+    {
+      "session": "3F34AC80-D81D-4A43-A504-72B0B1555E5A",
+      "surface": "87A755DC-F88C-456E-AB2D-FFB91A5A51B1"
+    },
+    {
+      "session": "225EC8D6-63E8-4BD2-8BE7-3F97A1C9300B",
+      "surface": "E9D78D39-50A5-46FB-B08D-D538DF0BCA60"
+    },
+    {
+      "session": "5EC4159F-32B7-435B-B939-A2CAFE4707F3",
+      "surface": "CE9E09AD-1C53-4809-AACE-67AD50BEA9F7"
+    },
+    {
+      "session": "0F260239-D926-4ADD-9DB4-A40E3E2FA60D",
+      "surface": "977E8663-1D29-4AD0-B424-6B72DCBDAE94"
+    }
+  ]
+}

@@ -8,6 +8,39 @@ final class SemanticPromptTests: XCTestCase {
     private let esc = "\u{1b}"
     private func osc133(_ body: String) -> String { "\u{1b}]133;\(body)\u{07}" }
 
+    func testPromptEndStateTracksReplayAndReset() throws {
+        let term = TerminalEmulator(cols: 20, rows: 4)
+        let initial = try term.checkpoint()
+        term.feed(osc133("A") + "$ " + osc133("C"))
+        XCTAssertFalse(term.hasSeenShellPromptEnd)
+        XCTAssertFalse(term.isShellPromptReady)
+        term.feed(osc133("B"))
+        XCTAssertTrue(term.hasSeenShellPromptEnd)
+        XCTAssertTrue(term.isShellPromptReady)
+        for marker in ["C", "A", "D;0"] {
+            term.feed(osc133(marker))
+            XCTAssertFalse(term.isShellPromptReady)
+            XCTAssertTrue(term.hasSeenShellPromptEnd)
+            term.feed(osc133("B"))
+            XCTAssertTrue(term.isShellPromptReady)
+        }
+        try term.restore(initial)
+        XCTAssertFalse(term.hasSeenShellPromptEnd)
+        XCTAssertFalse(term.isShellPromptReady)
+        term.feed(osc133("B"))
+        let replacement = term.makeReplacement(cols: 20, rows: 4)
+        XCTAssertFalse(replacement.hasSeenShellPromptEnd)
+        XCTAssertFalse(replacement.isShellPromptReady)
+        replacement.isReplaying = true
+        replacement.feed(osc133("A") + "$ " + osc133("B"))
+        replacement.takeOver(from: term)
+        XCTAssertTrue(replacement.hasSeenShellPromptEnd)
+        XCTAssertTrue(replacement.isShellPromptReady)
+        replacement.feed(esc + "c")
+        XCTAssertFalse(replacement.hasSeenShellPromptEnd)
+        XCTAssertFalse(replacement.isShellPromptReady)
+    }
+
     func testPromptStartMarksCursorRow() {
         let term = TerminalEmulator(cols: 20, rows: 4)
         term.feed(osc133("A") + "user@host$ ")

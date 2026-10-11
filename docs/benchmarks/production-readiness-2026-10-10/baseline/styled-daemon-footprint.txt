@@ -1,0 +1,38 @@
+======================================================================
+HarnessDaemon [99867]: 64-bit    Footprint: 7766808 B (16384 bytes per page)
+======================================================================
+
+      Dirty         Clean   Reclaimable    Regions    Category
+        ---           ---           ---        ---    ---
+  3194880 B           0 B      524288 B         10    Malloc Small
+   753664 B           0 B           0 B          9    Malloc Metadata
+   748743 B           0 B           0 B        480    __DATA
+   704512 B           0 B           0 B          2    Dispatch Continuations
+   673794 B           0 B           0 B        417    __DATA_DIRTY
+   557848 B           0 B           0 B          1    page table
+   207191 B           0 B           0 B       1405    unused dyld shared cache area
+   196608 B           0 B      294912 B         17    Stack
+   196608 B           0 B           0 B          1    Malloc Tiny
+   147456 B           0 B           0 B         10    Untagged
+   131072 B      327680 B           0 B        472    __DATA_CONST
+    65536 B           0 B           0 B          1    SQLite Page Cache
+    49080 B           0 B           0 B          4    __TPRO_CONST
+    48000 B           0 B           0 B          1    __OBJC_RW
+    42664 B           0 B           0 B        271    __AUTH
+    16384 B           0 B           0 B          1    Deferred Reclaim
+    16384 B           0 B           0 B          1    OS Alloc Once
+    16384 B           0 B           0 B          1    Activity Tracing
+        0 B     5324800 B           0 B        544    __TEXT
+        0 B     5259264 B           0 B          2    __LINKEDIT
+        0 B     1212416 B           0 B          4    mapped file
+        0 B           0 B           0 B          1    __CTF
+        0 B           0 B           0 B        471    __AUTH_CONST
+        0 B           0 B           0 B          1    __FONT_DATA
+        0 B           0 B           0 B          1    __OBJC_RO
+        ---           ---           ---        ---    ---
+  7766808 B    12124160 B      819200 B       4130    TOTAL
+
+Auxiliary data:
+    phys_footprint: 7766808 B
+    phys_footprint_peak: 7832344 B
+

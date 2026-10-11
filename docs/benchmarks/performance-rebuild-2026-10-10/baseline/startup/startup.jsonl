@@ -1,0 +1,6 @@
+{"ready_ns": 101112549562916, "columns": 100, "rows": 30, "label": "baseline", "sample": 0, "app_pid": 47636, "dsr_ready_ms": 2305.227791, "boundary": "warm GUI reconnect to pre-armed shell; DSR parsing fence"}
+{"ready_ns": 101114933588375, "columns": 100, "rows": 30, "label": "baseline", "sample": 1, "app_pid": 47673, "dsr_ready_ms": 2316.423792, "boundary": "warm GUI reconnect to pre-armed shell; DSR parsing fence"}
+{"ready_ns": 101116278006958, "columns": 100, "rows": 30, "label": "baseline", "sample": 2, "app_pid": 47689, "dsr_ready_ms": 1282.256917, "boundary": "warm GUI reconnect to pre-armed shell; DSR parsing fence"}
+{"ready_ns": 101118636602083, "columns": 100, "rows": 30, "label": "baseline", "sample": 3, "app_pid": 47697, "dsr_ready_ms": 2302.267958, "boundary": "warm GUI reconnect to pre-armed shell; DSR parsing fence"}
+{"ready_ns": 101118974341041, "columns": 100, "rows": 30, "label": "baseline", "sample": 4, "app_pid": 47712, "dsr_ready_ms": 267.80075, "boundary": "warm GUI reconnect to pre-armed shell; DSR parsing fence"}
+{"ready_ns": 101121347933500, "columns": 100, "rows": 30, "label": "baseline", "sample": 5, "app_pid": 47719, "dsr_ready_ms": 2305.757792, "boundary": "warm GUI reconnect to pre-armed shell; DSR parsing fence"}

@@ -1,0 +1,50 @@
+======================================================================
+Harness [87886]: 64-bit    Footprint: 277857432 B (16384 bytes per page)
+======================================================================
+
+      Dirty         Clean   Reclaimable    Regions    Category
+        ---           ---           ---        ---    ---
+187301888 B           0 B           0 B         33    Owned physical footprint (unmapped) (graphics)
+ 50708480 B           0 B           0 B         24    Malloc Small
+ 17170432 B           0 B           0 B          9    IOSurface
+  4915200 B           0 B           0 B         29    IOAccelerator (graphics)
+  4194304 B           0 B           0 B          8    Owned physical footprint (unmapped)
+  2198649 B           0 B           0 B        943    __DATA_DIRTY
+  2056746 B           0 B           0 B       1063    __DATA
+  1966080 B           0 B           0 B         13    Malloc Metadata
+  1277952 B           0 B           0 B          9    CoreUI Image Data
+   820376 B           0 B           0 B          1    page table
+   770048 B           0 B           0 B         52    CoreAnimation
+   688128 B           0 B           0 B         30    Untagged
+   674091 B           0 B           0 B       2858    unused dyld shared cache area
+   625914 B           0 B           0 B        703    __AUTH
+   442368 B    23543808 B           0 B         43    mapped file
+   393216 B           0 B      344064 B          2    Dispatch Continuations
+   311296 B           0 B           0 B          8    CG Image
+   294912 B           0 B           0 B          1    Malloc Tiny
+   262144 B      458752 B           0 B       1064    __DATA_CONST
+   212992 B           0 B      180224 B         18    Stack
+   131072 B           0 B           0 B          1    Accelerate Framework
+   114616 B           0 B           0 B          4    __TPRO_CONST
+    65536 B           0 B           0 B          2    IOAccelerator
+    65536 B           0 B           0 B          7    IOKit
+    64384 B           0 B           0 B          1    __OBJC_RW
+    32768 B           0 B           0 B          1    Activity Tracing
+    32768 B           0 B           0 B          2    CoreGraphics
+    16384 B           0 B           0 B          1    Deferred Reclaim
+    16384 B           0 B           0 B          1    OS Alloc Once
+    16384 B           0 B           0 B          1    Foundation
+    16384 B           0 B           0 B          1    ColorSync
+        0 B     7094272 B           0 B       1152    __TEXT
+        0 B      163840 B           0 B          5    __LINKEDIT
+        0 B           0 B           0 B          1    __OBJC_RO
+        0 B           0 B           0 B          1    __FONT_DATA
+        0 B           0 B           0 B          1    __CTF
+        0 B           0 B           0 B       1055    __AUTH_CONST
+        ---           ---           ---        ---    ---
+277857432 B    31260672 B      524288 B       9150    TOTAL
+
+Auxiliary data:
+    phys_footprint: 277857432 B
+    phys_footprint_peak: 278873240 B
+

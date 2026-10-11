@@ -8,6 +8,32 @@ has a matching `vX.Y.Z` tag and a signed, notarized DMG on
 
 ## [Unreleased]
 
+## [2.3.0] - 2026-10-11
+
+Harness 2.3 improves terminal throughput, retained history, command interaction, Unicode handling, and startup layout.
+
+### Added
+
+- Stable text anchors keep selections, reading positions, and search results attached to their text through resizing and history movement.
+- Precise command regions support copying commands or output, selecting output, searching within a command's output, and navigating failed commands. Automatic bash, zsh, and fish integration emits prompt, input, output, and completion boundaries.
+- Checksum-pinned Unicode 18 grapheme segmentation, mode 2027 support, and shared engine text layout for composed input and terminal overlays.
+- Ordered fallback font families and OpenType feature controls in Terminal settings, including matching Overview thumbnails.
+
+### Changed
+
+- Terminal parsing, row damage, packed history, render snapshots, and GPU encoding reduce repeated work. Cursor blink no longer rebuilds unchanged rows; hidden panes stop requesting frames.
+- PTY transport batches reads, bounds write and replay queues, and acknowledges output after consumption. The GUI receiver yields between bounded batches so queued rendering and input can proceed.
+- Agent and settings observation uses shared caches and event-driven updates with bounded fallback work.
+- Internal session-host protocol is now 10 and terminal checkpoints use schema 2. Updating the running host requires an explicit coordinated restart; installing a new build does not authorize terminating existing programs.
+
+### Fixed
+
+- Windows apply their saved sidebar state and final geometry before presentation, eliminating the initial half-width sidebar jump. Restored secondary windows receive their saved frame before being shown.
+- Startup no longer invents a temporary terminal or attempts to attach it before the daemon's real snapshot arrives.
+- Sidebar collapse, tab creation, and hidden connection notices avoid conflicting layout constraints during installation and resizing.
+- Malformed output sequence spans are rejected before arithmetic can overflow. Valid sequence limits remain supported.
+- Render completion ordering, replay consumption fences, history restoration, and selection invalidation retain their current operation identity through resize, reconnect, and remount.
+
 ## [2.2.0] - 2026-10-10
 
 Harness 2.2 brings durable session ownership, agent workflows, and a unified native interface.

@@ -18,11 +18,6 @@ struct HistoryRingBuffer<Element> {
     private var head: Int
     /// Number of retained elements.
     private(set) var count: Int
-    /// Most recently appended element, kept as the release-build fallback for an
-    /// out-of-contract read on an EMPTY buffer (see the subscript getter). One element's
-    /// memory (a single history row); deliberately NOT cleared by `removeAll`, so a stale
-    /// read straight after a scrollback clear is also non-fatal.
-    private var releaseFallback: Element?
 
     init() {
         storage = []
@@ -32,20 +27,15 @@ struct HistoryRingBuffer<Element> {
 
     /// Build from a sequence, oldest first. Used by reflow, which recomputes the whole history.
     init<S: Sequence>(_ elements: S) where S.Element == Element {
-        var slots = ContiguousArray<Element?>()
-        slots.reserveCapacity(elements.underestimatedCount)
-        for element in elements { slots.append(element) }
-        storage = slots
-        head = 0
-        count = slots.count
-        releaseFallback = slots.last ?? nil
+        self.init()
+        for element in elements { append(element) }
     }
 
     var isEmpty: Bool { count == 0 }
     var storageBytes: Int { storage.capacity * MemoryLayout<Element?>.stride }
 
     mutating func compactIfUnderused() {
-        if count == 0 { removeAll(); releaseFallback = nil }
+        if count == 0 { removeAll() }
         else if count < storage.count / 4 { growStorage(to: Swift.max(1, count * 2)) }
     }
 
@@ -56,37 +46,24 @@ struct HistoryRingBuffer<Element> {
         }
         storage[backingIndex(count)] = element
         count += 1
-        releaseFallback = element
     }
 
     /// Random access by logical index (0 = oldest). The setter lets callers mutate an element in
     /// place (e.g. `buffer[i].field = x`), which a plain array's element subscript also allows.
     subscript(index: Int) -> Element {
         get {
-            // An out-of-range index is a logic bug: trap loudly in development (`assert`, stripped
-            // in release) but DON'T crash a shipping build over scrollback indexing. Clamp into
-            // range and return the nearest retained element; the buffer keeps every slot in
-            // [head, head+count) non-nil, so the clamped read never force-unwraps nil. The empty
-            // case (genuinely unreachable: every call site guards `index < count`) falls back to
-            // the most recently appended element rather than trapping — the one remaining trap is
-            // a read from a buffer that NEVER held an element, which no stale index can produce.
-            assert(index >= 0 && index < count, "HistoryRingBuffer index out of range")
-            guard count > 0 else {
-                guard let fallback = releaseFallback else {
-                    preconditionFailure("HistoryRingBuffer subscript on never-filled buffer")
-                }
-                return fallback
-            }
-            let clamped = Swift.max(0, Swift.min(index, count - 1))
-            return storage[backingIndex(clamped)]!
+            precondition(index >= 0 && index < count, "HistoryRingBuffer index out of range")
+            return storage[backingIndex(index)]!
         }
         set {
-            // Same contract as the getter: assert in debug, but in release ignore an out-of-range
-            // write rather than trapping — a stale index should never crash the engine thread.
-            assert(index >= 0 && index < count, "HistoryRingBuffer index out of range")
-            guard index >= 0, index < count else { return }
+            precondition(index >= 0 && index < count, "HistoryRingBuffer index out of range")
             storage[backingIndex(index)] = newValue
         }
+    }
+
+    func withElement<Result>(at index: Int, _ body: (borrowing Element) -> Result) -> Result {
+        precondition(index >= 0 && index < count, "HistoryRingBuffer index out of range")
+        return storage.withUnsafeBufferPointer { body($0[backingIndex(index)]!) }
     }
 
     /// Drop the oldest `n` entries (clamped to `count`). Advances `head` rather than shifting the
@@ -95,7 +72,7 @@ struct HistoryRingBuffer<Element> {
         let drop = Swift.min(Swift.max(0, n), count)
         guard drop > 0 else { return }
         for i in 0 ..< drop { storage[backingIndex(i)] = nil }
-        head = (head + drop) % storage.count
+        head = (head + drop) & (storage.count - 1)
         count -= drop
     }
 
@@ -114,21 +91,21 @@ struct HistoryRingBuffer<Element> {
         storage = []
         head = 0
         count = 0
-        releaseFallback = nil
     }
 
     /// Map a logical index (0 = oldest) to its slot in `storage`. Only called when `count > 0` (or
     /// from `append` after ensuring capacity), so `storage.count > 0` holds.
     private func backingIndex(_ logical: Int) -> Int {
-        (head + logical) % storage.count
+        (head + logical) & (storage.count - 1)
     }
 
     /// Re-lay the retained elements out from index 0 into a larger backing store, then pad with nil.
     private mutating func growStorage(to newCapacity: Int) {
+        let capacity = 1 << (Int.bitWidth - (Swift.max(1, newCapacity) - 1).leadingZeroBitCount)
         var next = ContiguousArray<Element?>()
-        next.reserveCapacity(newCapacity)
+        next.reserveCapacity(capacity)
         for i in 0 ..< count { next.append(storage[backingIndex(i)]) }
-        while next.count < newCapacity { next.append(nil) }
+        while next.count < capacity { next.append(nil) }
         storage = next
         head = 0
     }
