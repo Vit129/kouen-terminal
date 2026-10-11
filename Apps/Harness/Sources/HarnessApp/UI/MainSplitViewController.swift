@@ -386,6 +386,13 @@ private final class SplitChromeDelegate: NSObject, NSSplitViewDelegate {
     /// at 200pt and can't shrink the sidebar to an unusable sliver.
     var allowFullCollapse = false
 
+    // Preserve the sidebar's chosen width as AppKit lays out or resizes the window.
+    // Only the terminal absorbs width changes; proportional adjustment otherwise
+    // changes the divider again during first presentation on macOS 26.
+    func splitView(_ splitView: NSSplitView, shouldAdjustSizeOfSubview view: NSView) -> Bool {
+        view !== splitView.subviews.first
+    }
+
     func splitView(_ splitView: NSSplitView, constrainMinCoordinate proposedMinimum: CGFloat, ofSubviewAt index: Int) -> CGFloat {
         guard index == 0 else { return proposedMinimum }
         return allowFullCollapse ? 0 : Self.minimumWidth

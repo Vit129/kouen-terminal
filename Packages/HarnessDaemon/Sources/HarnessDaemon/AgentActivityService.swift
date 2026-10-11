@@ -397,14 +397,18 @@ final class AgentActivityService: @unchecked Sendable {
         processCursor = batch.last?.id
         if start + batch.count >= executions.count { processCursor = nil }
     }
-    private func reconcileProcess(_ prior: AgentRun, at: Date) throws {
+    private func reconcileProcess(_ prior: AgentRun, at: Date, observedExit: Bool = false) throws {
         guard let pid = prior.pid, active[prior.id] != nil else { return }
-        if let current = ProcessScan.generation(pid) {
-            guard current != prior.processGeneration else { return }
-        } else {
-            // Inspection denial is unknown; only ESRCH proves disappearance.
-            guard kill(pid, 0) != 0 && errno == ESRCH else { return }
+        if !observedExit {
+            if let current = ProcessScan.generation(pid) {
+                guard current != prior.processGeneration else { return }
+            } else {
+                // Inspection denial is unknown; only ESRCH proves disappearance.
+                guard kill(pid, 0) != 0 && errno == ESRCH else { return }
+            }
         }
+        // A kernel exit notification proves termination even while the parent
+        // has not reaped the zombie and its PID/generation can still be inspected.
         var run = prior
         try record(RunEvent(runID: run.id, kind: .processExited, source: .exit, at: max(at, run.observedAt)), reducing: &run)
         active.removeValue(forKey: run.id)
@@ -426,7 +430,7 @@ final class AgentActivityService: @unchecked Sendable {
         let source = DispatchSource.makeProcessSource(identifier: pid, eventMask: .exit, queue: queue)
         source.setEventHandler { [weak self] in
             guard let self, accepting, let current = active[run.id] else { return }
-            do { try reconcileProcess(current, at: .now) }
+            do { try reconcileProcess(current, at: .now, observedExit: true) }
             catch { failure = error.localizedDescription; processRetryAt = Date().addingTimeInterval(5) }
             armProcessMonitor()
         }

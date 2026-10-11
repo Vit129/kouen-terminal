@@ -38,6 +38,10 @@ final class WindowAppearanceTests: XCTestCase {
             let tabBar = try XCTUnwrap(content.subviews.first { $0 is TerminalTabBarView })
             XCTAssertEqual(tabBar.isHidden, visible)
             XCTAssertEqual(SessionCoordinator.shared.settings.sidebarVisible, visible)
+            window.setContentSize(NSSize(width: 1120, height: 660))
+            root.view.layoutSubtreeIfNeeded()
+            XCTAssertEqual(content.frame.minX, visible ? HarnessDesign.sidebarWidth : 0, accuracy: 1)
+            XCTAssertEqual(content.frame.maxX, split.bounds.maxX, accuracy: 1)
         }
     }
 

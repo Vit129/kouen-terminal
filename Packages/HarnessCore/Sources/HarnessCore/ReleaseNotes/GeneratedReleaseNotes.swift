@@ -6,7 +6,7 @@
 extension ReleaseNotes {
     public static let current = ReleaseNotes(
         version: "2.3.0",
-        changelogDigest: "99df26fa22059c95",
+        changelogDigest: "cb91a3d92b7548ef",
         sections: [
             Section(title: "Added", items: [
                 "Stable text anchors keep selections, reading positions, and search results attached to their text through resizing and history movement",
@@ -22,6 +22,7 @@ extension ReleaseNotes {
             ]),
             Section(title: "Fixed", items: [
                 "Windows apply their saved sidebar state and final geometry before presentation, eliminating the initial half-width sidebar jump",
+                "Agent activity records kernel process exits even before the parent reaps the process, retaining the final hook status",
                 "Startup no longer invents a temporary terminal or attempts to attach it before the daemon's real snapshot arrives",
                 "Sidebar collapse, tab creation, and hidden connection notices avoid conflicting layout constraints during installation and resizing",
                 "Malformed output sequence spans are rejected before arithmetic can overflow",

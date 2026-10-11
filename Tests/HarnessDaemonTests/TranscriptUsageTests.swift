@@ -216,7 +216,11 @@ final class TranscriptUsageTests: XCTestCase {
         defer { try? FileManager.default.removeItem(at: root) }
         let store = ActivityStore(url: root.appendingPathComponent("activity.sqlite"), protection: try protection())
         let now = Date()
-        var run = AgentRun(hostID: UUID(), surfaceID: UUID().uuidString, processGeneration: "fixture", pid: 1, provider: .codex, at: now)
+        // Keep the fixture alive under the real process monitor on both platforms.
+        // A made-up generation for PID 1 is correctly retired as a reused PID.
+        let pid = ProcessInfo.processInfo.processIdentifier
+        let generation = try XCTUnwrap(ProcessScan.generation(pid))
+        var run = AgentRun(hostID: UUID(), surfaceID: UUID().uuidString, processGeneration: generation, pid: pid, provider: .codex, at: now)
         try store.save(run)
         for index in 0..<301 {
             _ = try store.record(RunEvent(runID: run.id, kind: .toolCompleted, source: .hook, at: now, toolID: "tool-\(index)", message: "captured fixture text"), reducing: &run)
@@ -227,10 +231,10 @@ final class TranscriptUsageTests: XCTestCase {
         try service.setPersistence(surfaceID: run.surfaceID, enabled: false)
         XCTAssertEqual(try store.events(runID: run.id).count, 0)
         let observation = try ProviderHookAdapter.parse(Data("{\"hook_event_name\":\"Stop\",\"session_id\":\"private conversation\",\"turn_id\":\"t\"}".utf8), contract: .codex202610)
-        _ = try service.report(HookReport(surfaceID: run.surfaceID, senderPID: 1, profile: "default", observation: observation), paneID: nil, generation: "fixture", pid: 1, sequence: 8)
+        _ = try service.report(HookReport(surfaceID: run.surfaceID, senderPID: pid, profile: "default", observation: observation), paneID: nil, generation: generation, pid: pid, sequence: 8)
         XCTAssertNil(try store.run(run.id)?.conversationID)
         XCTAssertEqual(try store.events(runID: run.id).count, 0)
-        let repeated = try service.report(HookReport(surfaceID: run.surfaceID, senderPID: 1, profile: "default", observation: observation), paneID: nil, generation: "fixture", pid: 1, sequence: 9)
+        let repeated = try service.report(HookReport(surfaceID: run.surfaceID, senderPID: pid, profile: "default", observation: observation), paneID: nil, generation: generation, pid: pid, sequence: 9)
         XCTAssertEqual(repeated.id, run.id, "Private hooks retain execution identity after captured profile text has been removed")
         XCTAssertEqual(try store.list(surfaceID: run.surfaceID).runs.count, 1)
     }

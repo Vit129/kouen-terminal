@@ -507,7 +507,7 @@ final class PerformanceBenchmarks: XCTestCase {
             let coldNanos = timedNanos { full = pty.captureFormatted(format: "vt", trim: false, unwrap: false) }
             let held = heapInUse() - before
             let warmNanos = timedNanos { full = pty.captureFormatted(format: "vt", trim: false, unwrap: false) }
-            XCTAssertEqual(full.components(separatedBy: "\n").suffix(48).joined(separator: "\n"), screen)
+            XCTAssertEqual("\u{1b}[?2027l" + full.components(separatedBy: "\n").suffix(48).joined(separator: "\n"), screen)
             printBenchmark("thumbnail_capture_screen_\(label)", nanos: screenNanos, fields: [("bytes", "\(screen.utf8.count)")])
             printBenchmark("thumbnail_capture_full_cold_\(label)", nanos: coldNanos, fields: [("bytes", "\(full.utf8.count)"), ("grid_heap_bytes", "\(held)")])
             printBenchmark("thumbnail_capture_full_held_\(label)", nanos: warmNanos)

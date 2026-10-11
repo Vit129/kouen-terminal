@@ -10,11 +10,14 @@ The [Local macOS CI workflow](../.github/workflows/local-macos.yml) runs the sam
 
 ## VM template
 
-The preparation uses the upstream image `ghcr.io/cirruslabs/macos-tahoe-xcode:27` from [Cirrus Labs](https://github.com/cirruslabs/macos-image-templates/releases/tag/27), named `harness-ci-base`. The image has the Tart guest agent for `tart exec`. Local Xcode 27 checks supplement the shipping CI/release toolchain, which remains Xcode 26.6. A VM run is not evidence of physical GPU performance; guest Metal support and skipped cases must be reported as observed.
+The preparation uses the upstream image `ghcr.io/cirruslabs/macos-tahoe-xcode:27` from [Cirrus Labs](https://github.com/cirruslabs/macos-image-templates/releases/tag/27), named `harness-ci-base`. The image has the Tart guest agent for `tart exec`. The downloaded template boots macOS 26.6.2 with Xcode 27.0; `tart exec` and Remote Login were verified. Local Xcode 27 checks supplement the shipping CI/release toolchain, which remains Xcode 26.6. A VM run is not evidence of physical GPU performance; guest Metal support and skipped cases must be reported as observed.
 
 Tartelet clones the base for each runner and discards the job VM after use. Start with one VM, 8 CPUs and 16 GB RAM. Keep source-only shared directories read-only; avoid sharing the host home or Keychain. The base image should contain build tools, not release credentials or a persistent GitHub access token.
 
 ## Repository registration
+
+The private App `Harness Local macOS CI` (App ID `5270413`) is installed only on `robzilla1738/harness-terminal`. Tartelet's key is imported into the host Keychain, the base image and guest SSH login are configured, and `Harness Local macOS 1` has been verified online with `harness-macos`. A cancelled validation job was discarded and replaced by a new runner registration, confirming the ephemeral lifecycle. Job results remain separately visible in Actions.
+
 
 Configure Tartelet's GitHub scope as **Repository**, owner `robzilla1738`, repository `harness-terminal`. It needs a private GitHub App installed only for this repository, its App ID, and its private key. Prepare it at [GitHub App registration](https://github.com/settings/apps/new):
 
