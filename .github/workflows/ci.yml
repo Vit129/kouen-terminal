@@ -94,6 +94,16 @@ jobs:
           path: .build/*/debug/codecov/*.json
           if-no-files-found: warn
 
+      - name: Upload test crash reports
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: test-crashes-macos
+          path: |
+            ~/Library/Logs/DiagnosticReports/xctest*.ips
+            ~/Library/Logs/DiagnosticReports/Harness*.ips
+          if-no-files-found: warn
+
   linux-build-test:
     name: Build & test (Linux, headless daemon)
     runs-on: ubuntu-24.04
