@@ -344,6 +344,7 @@ public final class MobileBridgeServer: @unchecked Sendable {
       <link rel="manifest" href="/manifest.json">
       <link rel="icon" href="/icon.svg" type="image/svg+xml">
       <style>
+      [hidden]{display:none !important}
       :root{
         --bg:#eef1ee; --surface:#ffffff; --ink:#18201c; --muted:#5d6a63; --line:#d8dfda;
         --accent:#2f6b4f; --accent-ink:#ffffff; --accent-soft:#e2efe8;
