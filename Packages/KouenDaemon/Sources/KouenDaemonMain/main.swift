@@ -206,10 +206,12 @@ do {
             bridge.stop()
         }
     }
-    // Still opt-in at boot: only auto-start if the setting was already on when the daemon
-    // launched (env var set by the LaunchAgent plist install). A live toggle afterward goes
-    // through `mobileBridgeSetEnabledHandler` above instead.
-    if ProcessInfo.processInfo.environment["KOUEN_MOBILE_BRIDGE_PORT"] != nil {
+    // Still opt-in at boot: auto-start when the persisted setting is on, or the LaunchAgent
+    // env var is set. Reading the setting here matters because launchd restarts (install,
+    // kill-server, crash) never pass the env var, which left the Companion off until the
+    // Settings toggle was flipped. A live toggle goes through `mobileBridgeSetEnabledHandler`.
+    if KouenSettings.load().mobileBridgeEnabled
+        || ProcessInfo.processInfo.environment["KOUEN_MOBILE_BRIDGE_PORT"] != nil {
         bridge.start(wsPort: bridgeWSPort, pageURLPort: bridgePageURLPort, store: server.pairedDevices, log: daemonLog)
     }
     #endif

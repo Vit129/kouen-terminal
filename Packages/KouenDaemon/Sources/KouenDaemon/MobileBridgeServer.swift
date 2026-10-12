@@ -564,7 +564,7 @@ public final class MobileBridgeServer: @unchecked Sendable {
     function stripANSI(str) {
       return (str || '')
         .replace(/\x1b\][^\x07\x1b]*(\x07|\x1b\\)/g, '')
-        .replace(/\x1b\[[0-9;?]*[a-zA-Z]/g, '')
+        .replace(/\x1b\[[0-?]*[ -\/]*[@-~]/g, '')
         .replace(/\x1b[@-Z\\-_]/g, '')
         .replace(/\r\n/g, '\n')
         .replace(/\r/g, '');
@@ -698,11 +698,42 @@ public final class MobileBridgeServer: @unchecked Sendable {
       );
     }
 
+    // Artifact link formats per agent. Claude, Copilot and Antigravity are taken from real
+    // session logs; Codex is its cloud-task URL; anything else artifact-like is a generic "Link".
+    // Antigravity artifacts are local files it rewrites in place (brain/<conversation>/<name>),
+    // so the file on disk is always the newest version; the daemon reads it for the phone.
+    const ARTIFACT_KINDS = [
+      ["Claude", /^https:\/\/claude\.ai\/(?:code\/)?artifacts?\//i],
+      ["Copilot", /^https:\/\/github\.com\/copilot\/tasks\//i],
+      ["Codex", /^https:\/\/chatgpt\.com\/codex\/tasks\//i],
+      ["Antigravity", /^file:\/\/\/.*\/antigravity-cli\/brain\/[0-9a-f-]+\/[^/.][^/]*\.(?:md|html?)$/i],
+      ["Link", /^https?:.*(?:artifact|preview|page)/i],
+    ];
+
+    // One entry per link, each at its newest version: links that differ only by a version
+    // marker (?v=N, /v/N, /versions/N) or query/hash collapse to the last one printed.
+    // Order is by agent kind, then first appearance, so chips don't reshuffle as versions stream in.
+    function latestArtifactLinks(text) {
+      const latest = new Map();
+      for (const m of (text || "").matchAll(/(?:https?|file):\/\/[^\s<>"'`)\]]+/gi)) {
+        const url = m[0].replace(/[.,;:]+$/, "");
+        const kind = ARTIFACT_KINDS.find(([, re]) => re.test(url));
+        if (!kind) continue;
+        const key = url.replace(/[?#].*$/, "").replace(/\/(?:v|versions?)\/[^/]+\/?$/i, "").replace(/\/$/, "");
+        latest.set(key, [kind[0], url]); // re-set keeps the key's first-seen position, updates the URL
+      }
+      const links = [...latest.values()];
+      return ARTIFACT_KINDS.flatMap(([k]) => {
+        const ofKind = links.filter(l => l[0] === k);
+        return ofKind.map((l, i) => [ofKind.length > 1 ? `${k} ${i + 1}` : k, l[1]]);
+      });
+    }
+
     function openPreview() {
       if (!cur) return;
       const port = (cur.ports && cur.ports[0]) || (cur.rawOutput && cur.rawOutput.includes('localhost:') ? (cur.rawOutput.match(/localhost:(\d+)/) || [])[1] : null);
       const htmlFile = cur.files ? cur.files.find(f => f[0].toLowerCase().endsWith('.html')) : null;
-      const artMatch = cur.rawOutput ? cur.rawOutput.match(/https?:\/\/[^\s<>"']*(?:artifact|preview|page)[^\s<>"']*/i) : null;
+      const arts = latestArtifactLinks(cur.rawOutput);
 
       const src = {};
       if (port) {
@@ -711,9 +742,7 @@ public final class MobileBridgeServer: @unchecked Sendable {
       if (htmlFile) {
         src.html = ["HTML file", htmlFile[0]];
       }
-      if (artMatch) {
-        src.art = ["Artifact", artMatch[0]];
-      }
+      arts.forEach((a, i) => { src["art" + i] = a; });
 
       if (!src[pv]) pv = Object.keys(src)[0];
       if (!pv) {
@@ -721,6 +750,7 @@ public final class MobileBridgeServer: @unchecked Sendable {
         return;
       }
       const url = src[pv][1];
+      const localFile = url.startsWith("file://");
 
       let bodyHTML = "";
       let captionText = "";
@@ -736,7 +766,7 @@ public final class MobileBridgeServer: @unchecked Sendable {
           </div>
         `;
         captionText = "Mirrored live from Mac via Kouen browser mirror.";
-      } else if (pv === "html") {
+      } else if (pv === "html" || localFile) {
         bodyHTML = `
           <div id="pv-html-content" style="background:#fff;border-radius:8px;min-height:200px;border:1px solid var(--line);padding:12px">
             <div style="color:var(--muted);font-size:13px;text-align:center;padding:24px 0">Loading workspace file…</div>
@@ -772,8 +802,9 @@ public final class MobileBridgeServer: @unchecked Sendable {
         if (rBtn) rBtn.onclick = () => { if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ browserReload: true })); };
         const sBtn = $("pv-snap");
         if (sBtn) sBtn.onclick = () => { if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ browserScreenshot: true })); };
-      } else if (pv === "html") {
-        const fullPath = cur.cwd ? (cur.cwd.replace(/\/$/, '') + '/' + url) : url;
+      } else if (pv === "html" || localFile) {
+        const fullPath = localFile ? decodeURIComponent(url.slice("file://".length))
+          : cur.cwd ? (cur.cwd.replace(/\/$/, '') + '/' + url) : url;
         if (ws && ws.readyState === WebSocket.OPEN) {
           ws.send(JSON.stringify({ readFile: { path: fullPath } }));
         }
@@ -2297,7 +2328,31 @@ public final class MobileBridgeServer: @unchecked Sendable {
         sendJSON(BrowserOkAck(ok: "browserClosed"), on: connection)
     }
 
-    private func handleReadFile(path: String, connection: NWConnection) {
+    /// Where a paired phone may read/list files: the active session's cwd, plus Antigravity's
+    /// brain dir (agy writes its artifacts there, outside any repo). Anything else — `~/.ssh`,
+    /// another project — is rejected; before this the phone could read any path on the Mac.
+    static func authorizedReadPath(
+        _ path: String,
+        surfaceID: String?,
+        surfaceLookup: (String) -> String? = { surfaceCwd(surfaceID: $0) },
+        extraRoots: [String] = [NSHomeDirectory() + "/.gemini/antigravity-cli/brain"]
+    ) -> String? {
+        if case .success(let resolved) = resolveAuthorizedCwd(requestedPath: path, surfaceID: surfaceID, surfaceLookup: surfaceLookup) {
+            return resolved
+        }
+        let req = URL(fileURLWithPath: path).standardizedFileURL.resolvingSymlinksInPath().path
+        for root in extraRoots {
+            let r = URL(fileURLWithPath: root).standardizedFileURL.resolvingSymlinksInPath().path
+            if req.hasPrefix(r + "/") { return req }
+        }
+        return nil
+    }
+
+    private func handleReadFile(path: String, connection: NWConnection, state: ConnectionState) {
+        guard let path = Self.authorizedReadPath(path, surfaceID: state.surfaceID) else {
+            sendText(#"{"error":"foreign or unauthorized path rejected"}"#, on: connection)
+            return
+        }
         guard let info = Self.readFileInfo(path: path) else {
             sendText(#"{"error":"cannot read file"}"#, on: connection)
             return
@@ -2305,7 +2360,11 @@ public final class MobileBridgeServer: @unchecked Sendable {
         sendJSON(FileReadResponse(file: info), on: connection)
     }
 
-    private func handleListDirectory(path: String, connection: NWConnection) {
+    private func handleListDirectory(path: String, connection: NWConnection, state: ConnectionState) {
+        guard let path = Self.authorizedReadPath(path, surfaceID: state.surfaceID) else {
+            sendText(#"{"error":"foreign or unauthorized path rejected"}"#, on: connection)
+            return
+        }
         guard let entries = Self.listDirectoryEntries(path: path) else {
             sendText(#"{"error":"cannot list directory"}"#, on: connection)
             return
@@ -2748,11 +2807,11 @@ public final class MobileBridgeServer: @unchecked Sendable {
             subscription.resize(surfaceID, rows: UInt16(clamping: resize.rows), cols: UInt16(clamping: resize.cols))
         } else if let readFile = message.readFile {
             state.controlQueue.async { [weak self] in
-                self?.handleReadFile(path: readFile.path, connection: connection)
+                self?.handleReadFile(path: readFile.path, connection: connection, state: state)
             }
         } else if let listDirectory = message.listDirectory {
             state.controlQueue.async { [weak self] in
-                self?.handleListDirectory(path: listDirectory.path, connection: connection)
+                self?.handleListDirectory(path: listDirectory.path, connection: connection, state: state)
             }
         } else if let attachFile = message.attachFile {
             state.controlQueue.async { [weak self] in
