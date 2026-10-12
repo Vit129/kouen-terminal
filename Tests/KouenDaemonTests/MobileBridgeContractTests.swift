@@ -6,6 +6,12 @@ import XCTest
 final class MobileBridgeContractTests: XCTestCase {
     /// `.panel-bg`/`.toast` set `display:flex`, which beats the UA `[hidden]` rule — without this
     /// override the empty sheet and toast show on every load.
+    /// Claude Code emits CSI with private `<`/`>`/`=` params (kitty keyboard, modifyOtherKeys);
+    /// the old `[0-9;?]` class let `[<u`, `[>5u`, `[>4;2m` leak into the transcript.
+    func testStripANSIMatchesFullCSIGrammar() {
+        XCTAssertTrue(MobileBridgeServer.embeddedPageHTML.contains(#"/\x1b\[[0-?]*[ -\/]*[@-~]/g"#))
+    }
+
     func testPageCSSKeepsHiddenElementsHidden() {
         XCTAssertTrue(MobileBridgeServer.embeddedPageHTML.contains("[hidden]{display:none !important}"))
     }

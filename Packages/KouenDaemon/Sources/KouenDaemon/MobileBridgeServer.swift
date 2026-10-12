@@ -564,7 +564,7 @@ public final class MobileBridgeServer: @unchecked Sendable {
     function stripANSI(str) {
       return (str || '')
         .replace(/\x1b\][^\x07\x1b]*(\x07|\x1b\\)/g, '')
-        .replace(/\x1b\[[0-9;?]*[a-zA-Z]/g, '')
+        .replace(/\x1b\[[0-?]*[ -\/]*[@-~]/g, '')
         .replace(/\x1b[@-Z\\-_]/g, '')
         .replace(/\r\n/g, '\n')
         .replace(/\r/g, '');
