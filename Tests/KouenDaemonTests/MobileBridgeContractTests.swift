@@ -4,6 +4,12 @@ import XCTest
 @testable import KouenDaemonCore
 
 final class MobileBridgeContractTests: XCTestCase {
+    /// `.panel-bg`/`.toast` set `display:flex`, which beats the UA `[hidden]` rule — without this
+    /// override the empty sheet and toast show on every load.
+    func testPageCSSKeepsHiddenElementsHidden() {
+        XCTAssertTrue(MobileBridgeServer.embeddedPageHTML.contains("[hidden]{display:none !important}"))
+    }
+
     func testDraftPRAckJSONShapeMatchesClientExpectations() throws {
         let ack = MobileBridgeServer.DraftPRAck(url: "https://github.com/Vit129/kouen-terminal/pull/88", number: 88)
         let data = try JSONEncoder().encode(ack)
