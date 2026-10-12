@@ -90,6 +90,14 @@ final class ShellIntegrationTests: XCTestCase {
         }
     }
 
+    func testCopilotWrapperOpensCompanion() {
+        for shell in ShellIntegration.Shell.allCases {
+            let s = ShellIntegration.script(for: shell)
+            let copilot = s[s.range(of: "GitHub Copilot session mode")!.lowerBound..<s.range(of: "Hermes session mode")!.lowerBound]
+            XCTAssertTrue(copilot.contains("__kouen_next rc"), "\(shell) copilot wrapper must open the companion")
+        }
+    }
+
     func testScriptsWrapKouenCLI() {
         for shell in ShellIntegration.Shell.allCases {
             let s = ShellIntegration.script(for: shell)
