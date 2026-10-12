@@ -5,6 +5,14 @@ All notable changes to Kouen are documented here. The format is based on
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Each released version
 has a matching `vX.Y.Z` tag and a signed, notarized DMG on
 [GitHub Releases](https://github.com/Vit129/kouen-terminal/releases).
+## [4.21.5] - 2026-10-12
+
+### Added
+- Parse Claude transcript lines into typed items and tail them by offset ([`6cf8620`](https://github.com/Vit129/kouen-terminal/commit/6cf8620a7d906a0cd42a793e6754ba424299c350))
+- Push the attached agent's transcript to the Companion ([`d7df0d6`](https://github.com/Vit129/kouen-terminal/commit/d7df0d69d0e9741a2af885292d00f9348fd04410))
+- Render the Companion session as user/agent bubbles and tool rows ([`c058903`](https://github.com/Vit129/kouen-terminal/commit/c058903c88ffab3649ec2d9980116eac29360c9a))
+
+
 ## [4.21.4] - 2026-10-12
 
 ### Added
