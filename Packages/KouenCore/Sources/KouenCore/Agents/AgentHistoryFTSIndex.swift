@@ -92,7 +92,7 @@ public final class AgentHistoryFTSIndex: @unchecked Sendable {
     #if canImport(SQLite3)
     private func logStepFailure(_ stepResult: Int32, context: String) {
         let errMsg = db.flatMap { sqlite3_errmsg($0) }.map { String(cString: $0) } ?? "unknown error"
-        Self.logger.error("[AgentHistoryFTSIndex] \(context) failed with code \(stepResult): \(errMsg)")
+        Self.logger.error("\(context, privacy: .public) failed with code \(stepResult): \(errMsg, privacy: .public)")
     }
 
     /// Runs a statement, logging (not ignoring) any failure. Returns false on failure.

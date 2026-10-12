@@ -805,6 +805,10 @@ public final class MobileBridgeServer: @unchecked Sendable {
         }
         return;
       }
+      if (atts.some(a => typeof a === 'object' && a.loading)) {
+        toast("Still uploading", "wait for the attachment");
+        return;
+      }
       const readyPaths = atts.map(a => typeof a === 'object' ? (a.path || a.name) : a).filter(Boolean);
       const toSend = text.trim() + (readyPaths.length ? (text.trim() ? " " : "") + readyPaths.join(" ") : "");
       if (ws && ws.readyState === WebSocket.OPEN) {
@@ -1383,29 +1387,31 @@ public final class MobileBridgeServer: @unchecked Sendable {
     }
 
     public static func isTailscaleServeConfigured(port: Int) -> Bool {
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/local/bin/tailscale")
-        process.arguments = ["serve", "status", "--json"]
-        let pipe = Pipe()
-        process.standardOutput = pipe
-        process.standardError = Pipe()
-        do {
-            try process.run()
-            process.waitUntilExit()
-            let data = pipe.fileHandleForReading.readDataToEndOfFile()
-            guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any], !json.isEmpty else {
-                return false
+        let res = runProcess(
+            executableURL: URL(fileURLWithPath: "/usr/local/bin/tailscale"),
+            arguments: ["serve", "status", "--json"],
+            timeoutSeconds: 5
+        )
+        return res.status == 0 && serveStatusProxiesPort(res.stdout, port: port)
+    }
+
+    /// Pure: true only when `tailscale serve status --json` has a web handler proxying to the
+    /// bridge's own port. Any other serve config (a different app's port) must not flip the
+    /// QR to an https:// URL that lands on someone else's server.
+    static func serveStatusProxiesPort(_ statusJSON: String, port: Int) -> Bool {
+        guard let data = statusJSON.data(using: .utf8),
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let web = json["Web"] as? [String: Any] else { return false }
+        let targets = ["127.0.0.1:\(port)", "localhost:\(port)"]
+        for case let site as [String: Any] in web.values {
+            for case let handler as [String: Any] in (site["Handlers"] as? [String: Any] ?? [:]).values {
+                guard let proxy = handler["Proxy"] as? String else { continue }
+                if proxy == "\(port)" || targets.contains(where: { proxy.hasSuffix($0) || proxy.contains($0 + "/") }) {
+                    return true
+                }
             }
-            if let web = json["Web"] as? [String: Any], !web.isEmpty {
-                return true
-            }
-            if let tcp = json["TCP"] as? [String: Any], !tcp.isEmpty {
-                return true
-            }
-            return true
-        } catch {
-            return false
         }
+        return false
     }
 
     /// Generates a fresh pairing token, prints its QR, and waits it out before generating
@@ -2394,6 +2400,12 @@ public final class MobileBridgeServer: @unchecked Sendable {
             process.terminate()
         }
         process.waitUntilExit()
+        // The handlers can still be holding the final chunk (gh prints the PR URL last), so
+        // detach them and read whatever is left before snapshotting.
+        outPipe.fileHandleForReading.readabilityHandler = nil
+        errPipe.fileHandleForReading.readabilityHandler = nil
+        outBuffer.append(outPipe.fileHandleForReading.readDataToEndOfFile())
+        errBuffer.append(errPipe.fileHandleForReading.readDataToEndOfFile())
 
         let outStr = String(data: outBuffer.snapshot(), encoding: .utf8) ?? ""
         let errStr = String(data: errBuffer.snapshot(), encoding: .utf8) ?? ""
@@ -2501,6 +2513,7 @@ public final class MobileBridgeServer: @unchecked Sendable {
         var currentAdditions = 0
         var currentDeletions = 0
         var currentHunkLines: [String] = []
+        var inHunk = false
 
         func flushCurrent() {
             if let file = currentFile {
@@ -2521,22 +2534,24 @@ public final class MobileBridgeServer: @unchecked Sendable {
         for line in lines {
             if line.hasPrefix("diff --git ") {
                 flushCurrent()
+                inHunk = false
                 let parts = line.components(separatedBy: " ")
                 if parts.count >= 4 {
                     let bPart = parts[3]
                     currentFile = bPart.hasPrefix("b/") ? String(bPart.dropFirst(2)) : bPart
                 }
-            } else if line.hasPrefix("+++ b/") {
+            } else if !inHunk && line.hasPrefix("+++ b/") {
                 currentFile = String(line.dropFirst(6))
-            } else if line.hasPrefix("--- a/") && currentFile == nil {
+            } else if !inHunk && line.hasPrefix("--- a/") && currentFile == nil {
                 currentFile = String(line.dropFirst(6))
             } else if line.hasPrefix("@@") {
+                inHunk = true
                 currentHunkLines.append(line)
-            } else if currentFile != nil {
-                if line.hasPrefix("+") && !line.hasPrefix("+++") {
+            } else if currentFile != nil && inHunk {
+                if line.hasPrefix("+") {
                     currentAdditions += 1
                     currentHunkLines.append(line)
-                } else if line.hasPrefix("-") && !line.hasPrefix("---") {
+                } else if line.hasPrefix("-") {
                     currentDeletions += 1
                     currentHunkLines.append(line)
                 } else if line.hasPrefix(" ") {
