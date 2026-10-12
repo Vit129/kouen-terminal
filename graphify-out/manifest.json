@@ -1165,8 +1165,8 @@
     "semantic_hash": ""
   },
   "Packages/KouenDaemon/Sources/KouenDaemon/MobileBridgeServer.swift": {
-    "mtime": 1791602457.6807256,
-    "ast_hash": "988dbe79a1a81ecc6645c25d0d788eb3",
+    "mtime": 1791771727.8815696,
+    "ast_hash": "e4572ab936992e16310706703d567d99",
     "semantic_hash": ""
   },
   "Packages/KouenDaemon/Sources/KouenDaemon/PairedDeviceStore.swift": {
@@ -4220,8 +4220,8 @@
     "semantic_hash": ""
   },
   "Packages/KouenCore/Sources/KouenCore/Agents/AgentHistoryScanner.swift": {
-    "mtime": 1791771166.1313953,
-    "ast_hash": "37717777a8500c9a948a3d537b4b68ef",
+    "mtime": 1791771440.4337554,
+    "ast_hash": "af6c3751f331fb964a3d15e0c8316b8e",
     "semantic_hash": ""
   },
   "Packages/KouenCore/Sources/KouenCore/Context/ContextResolutionEngine.swift": {
@@ -4470,8 +4470,8 @@
     "semantic_hash": ""
   },
   "Packages/KouenCore/Sources/KouenCore/Agents/AgentHistoryFTSIndex.swift": {
-    "mtime": 1791605105.044879,
-    "ast_hash": "99c0fd049494350f6e906cfa6ed9aa61",
+    "mtime": 1791771440.4332147,
+    "ast_hash": "69f4dd1dc555de11f13f3696b146d88c",
     "semantic_hash": ""
   },
   "Packages/KouenCore/Sources/KouenCore/Agents/AgentHistorySearch.swift": {
@@ -4555,8 +4555,8 @@
     "semantic_hash": ""
   },
   "Tests/KouenDaemonTests/MobileBridgeContractTests.swift": {
-    "mtime": 1791602457.6813672,
-    "ast_hash": "09cdabf1a738e92719407e498652ae26",
+    "mtime": 1791771738.1022606,
+    "ast_hash": "9f8c50d83a882fb69012e17b88c85917",
     "semantic_hash": ""
   },
   "Tools/kouen/Sources/KouenCLI/KouenCLI+RC.swift": {
