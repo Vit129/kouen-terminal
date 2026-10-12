@@ -1,0 +1,110 @@
+import Foundation
+
+/// One bubble/row in a live agent transcript, as the Companion renders it. Agent-neutral so the
+/// later Codex/Antigravity/Copilot parsers (P57 slice 5) can emit the same shape.
+public struct TranscriptItem: Codable, Sendable, Equatable {
+    public enum Role: String, Codable, Sendable { case user, assistant, tool }
+
+    /// `<line uuid>#<part index>` — stable across re-reads, so the client can dedupe.
+    public let id: String
+    public let role: Role
+    public let text: String
+    public let toolName: String?
+    public let toolTarget: String?
+
+    public init(id: String, role: Role, text: String, toolName: String? = nil, toolTarget: String? = nil) {
+        self.id = id
+        self.role = role
+        self.text = text
+        self.toolName = toolName
+        self.toolTarget = toolTarget
+    }
+}
+
+/// Parses one line of a Claude Code session transcript (`~/.claude/projects/<repo>/<id>.jsonl`).
+public enum ClaudeTranscriptLine {
+    /// The user-visible items in one JSONL line. Drops what isn't conversation: `tool_result`
+    /// plumbing, `thinking`, `isMeta` lines, and slash-command / system-reminder wrappers.
+    public static func items(from line: Data) -> [TranscriptItem] {
+        guard let json = try? JSONSerialization.jsonObject(with: line) as? [String: Any],
+              json["isMeta"] as? Bool != true,
+              let msg = json["message"] as? [String: Any] else { return [] }
+        let lineID = (json["uuid"] as? String) ?? UUID().uuidString
+        let isUser = (msg["role"] as? String)?.lowercased() == "user"
+
+        if let content = msg["content"] as? String {
+            return textItem(content, isUser: isUser, id: "\(lineID)#0").map { [$0] } ?? []
+        }
+        guard let parts = msg["content"] as? [[String: Any]] else { return [] }
+        var result: [TranscriptItem] = []
+        for (index, part) in parts.enumerated() {
+            let id = "\(lineID)#\(index)"
+            switch part["type"] as? String {
+            case "text":
+                if let item = textItem(part["text"] as? String ?? "", isUser: isUser, id: id) { result.append(item) }
+            case "tool_use":
+                let name = part["name"] as? String ?? "Tool"
+                result.append(TranscriptItem(id: id, role: .tool, text: "", toolName: name,
+                                             toolTarget: toolTarget(part["input"] as? [String: Any])))
+            default:
+                continue
+            }
+        }
+        return result
+    }
+
+    /// The concatenated `text` of a message — `content` as a plain string, or its `text` parts.
+    /// Shared with `AgentHistoryScanner.parseClaudeTranscript` (History/search indexing).
+    public static func messageText(_ msg: [String: Any]) -> String {
+        if let content = msg["content"] as? String { return content }
+        guard let parts = msg["content"] as? [[String: Any]] else { return "" }
+        return parts.compactMap { $0["text"] as? String }.joined()
+    }
+
+    private static func textItem(_ raw: String, isUser: Bool, id: String) -> TranscriptItem? {
+        let text = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty else { return nil }
+        // Claude injects these as `user` lines; they are harness plumbing, not something the person typed.
+        if isUser, text.hasPrefix("<command-") || text.hasPrefix("<local-command-") || text.hasPrefix("<system-reminder>") {
+            return nil
+        }
+        return TranscriptItem(id: id, role: isUser ? .user : .assistant, text: text)
+    }
+
+    private static func toolTarget(_ input: [String: Any]?) -> String? {
+        guard let input else { return nil }
+        for key in ["file_path", "path", "filePath", "notebook_path"] {
+            if let path = input[key] as? String, !path.isEmpty { return (path as NSString).lastPathComponent }
+        }
+        for key in ["command", "pattern", "url", "description"] {
+            if let value = input[key] as? String, !value.isEmpty { return String(value.prefix(120)) }
+        }
+        return nil
+    }
+}
+
+/// Maps a running `claude` process to its transcript. Claude writes `~/.claude/sessions/<pid>.json`
+/// (`{pid, sessionId, cwd, …}`) for each live session and rewrites it on `/clear` / `/resume`, so
+/// callers re-resolve on every poll instead of caching the answer.
+public enum ClaudeSessionLocator {
+    public static func transcriptURL(
+        pid: Int32,
+        sessionsDir: URL = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".claude/sessions"),
+        projectsDir: URL = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".claude/projects")
+    ) -> URL? {
+        guard pid > 0,
+              let data = try? Data(contentsOf: sessionsDir.appendingPathComponent("\(pid).json")),
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let sessionID = json["sessionId"] as? String, !sessionID.isEmpty,
+              !sessionID.contains("/") else { return nil }
+        let name = "\(sessionID).jsonl"
+        // Claude's project dir is the cwd with every non-alphanumeric char turned into "-"; try it
+        // directly first (this runs once a second per watching phone), walk the tree only as a fallback.
+        if let cwd = json["cwd"] as? String {
+            let dir = String(cwd.map { $0.isLetter || $0.isNumber ? $0 : "-" })
+            let direct = projectsDir.appendingPathComponent(dir).appendingPathComponent(name)
+            if FileManager.default.fileExists(atPath: direct.path) { return direct }
+        }
+        return AgentHistoryScanner.findFile(named: name, under: projectsDir)
+    }
+}
