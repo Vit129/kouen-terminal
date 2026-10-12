@@ -966,23 +966,35 @@ public actor AgentHistoryScanner {
         if raw.hasPrefix("0001-") || raw.hasPrefix("0000-") {
             return Date.distantPast
         }
+        let normalized = raw.replacingOccurrences(of: " ", with: "T")
         let iso = ISO8601DateFormatter()
         iso.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        if let d = iso.date(from: raw) {
+        if let d = iso.date(from: normalized) ?? iso.date(from: raw) {
             if d.timeIntervalSince1970 < 946684800 { return Date.distantPast }
             return d
         }
         let isoBasic = ISO8601DateFormatter()
-        if let d = isoBasic.date(from: raw) {
+        if let d = isoBasic.date(from: normalized) ?? isoBasic.date(from: raw) {
             if d.timeIntervalSince1970 < 946684800 { return Date.distantPast }
             return d
         }
         let df = DateFormatter()
         df.locale = Locale(identifier: "en_US_POSIX")
         df.timeZone = TimeZone(secondsFromGMT: 0)
-        for format in ["yyyy-MM-dd HH:mm:ssZZZZZ", "yyyy-MM-dd HH:mm:ss", "yyyy-MM-dd'T'HH:mm:ssXXXXX", "yyyy-MM-dd'T'HH:mm:ss"] {
+        for format in [
+            "yyyy-MM-dd HH:mm:ss.SSSSSSXXXXX",
+            "yyyy-MM-dd HH:mm:ss.SSSSSSZZZZZ",
+            "yyyy-MM-dd'T'HH:mm:ss.SSSSSSXXXXX",
+            "yyyy-MM-dd'T'HH:mm:ss.SSSSSSZZZZZ",
+            "yyyy-MM-dd HH:mm:ss.SSSXXXXX",
+            "yyyy-MM-dd'T'HH:mm:ss.SSSXXXXX",
+            "yyyy-MM-dd HH:mm:ssZZZZZ",
+            "yyyy-MM-dd HH:mm:ss",
+            "yyyy-MM-dd'T'HH:mm:ssXXXXX",
+            "yyyy-MM-dd'T'HH:mm:ss"
+        ] {
             df.dateFormat = format
-            if let d = df.date(from: raw) {
+            if let d = df.date(from: raw) ?? df.date(from: normalized) {
                 if d.timeIntervalSince1970 < 946684800 { return Date.distantPast }
                 return d
             }
