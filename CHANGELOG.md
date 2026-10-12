@@ -5,6 +5,20 @@ All notable changes to Kouen are documented here. The format is based on
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Each released version
 has a matching `vX.Y.Z` tag and a signed, notarized DMG on
 [GitHub Releases](https://github.com/Vit129/kouen-terminal/releases).
+## [4.21.4] - 2026-10-12
+
+### Added
+- Group Preview links by agent, each at its newest version ([`9f49576`](https://github.com/Vit129/kouen-terminal/commit/9f49576b124b3e5e7a6a0c6a583d725700ce364f))
+- Show Antigravity brain artifacts in Preview ([`7b7e4f0`](https://github.com/Vit129/kouen-terminal/commit/7b7e4f0144cdc078e16913966daa533cac7d16c6))
+
+### Fixed
+- Report the idle→working edge so tabs stop showing idle mid-task ([`3ea2889`](https://github.com/Vit129/kouen-terminal/commit/3ea28894c507f077b88311bdaed54e8da106b86a))
+- Start the Companion at daemon boot when the setting is on ([`f05b102`](https://github.com/Vit129/kouen-terminal/commit/f05b10238318c779a72b16d8bf63e7920295b49d))
+- Strip private-parameter CSI so kitty-keyboard codes don't leak ([`39c191f`](https://github.com/Vit129/kouen-terminal/commit/39c191f438ada0a22c0196e9298314078dd63bd2))
+- Preview lists every artifact link at its newest version ([`c76075e`](https://github.com/Vit129/kouen-terminal/commit/c76075ea637753dbfe32e3d1e71432f7dd21c21b))
+- Limit Companion file reads to the session cwd and agy's brain dir ([`b824503`](https://github.com/Vit129/kouen-terminal/commit/b82450384fcc4c1681a4cef49b7fc5f0feb2c3d8))
+
+
 ## [4.21.3] - 2026-10-12
 
 ### Fixed
