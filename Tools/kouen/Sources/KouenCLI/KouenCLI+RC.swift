@@ -27,16 +27,16 @@ extension KouenCLI {
         // network, so enabling it stays an explicit Settings → Remote choice.
         let client: DaemonClient
         do { client = try makeClient(args) } catch {
-            fputs("kouen-cli rc: daemon not reachable: \(error)\n", stderr)
+            FileHandle.standardError.write(Data("kouen-cli rc: daemon not reachable: \(error)\n".utf8))
             return 1
         }
         guard let response = try? client.request(.mobilePairingInfo, timeout: 1),
               case let .mobilePairingInfo(url, _, enabled) = response else {
-            fputs("kouen-cli rc: daemon did not return pairing info\n", stderr)
+            FileHandle.standardError.write(Data("kouen-cli rc: daemon did not return pairing info\n".utf8))
             return 1
         }
         guard enabled, let targetURL = url else {
-            fputs("kouen-cli rc: the Kouen Companion is off. Turn it on in Settings → Remote.\n", stderr)
+            FileHandle.standardError.write(Data("kouen-cli rc: the Kouen Companion is off. Turn it on in Settings → Remote.\n".utf8))
             return 1
         }
 
