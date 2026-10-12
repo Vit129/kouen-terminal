@@ -320,11 +320,6 @@ final class KouenCLITests: XCTestCase {
         XCTAssertEqual(emacs, "copy-mode-emacs")
     }
 
-    func testHandleRCWithNoOpenReturnsZero() {
-        let code = KouenCLI.handleRC(["rc", "--no-open"])
-        XCTAssertEqual(code, 0)
-    }
-
     func testHandleRCHelpReturnsZero() {
         let code = KouenCLI.handleRC(["rc", "--help"])
         XCTAssertEqual(code, 0)

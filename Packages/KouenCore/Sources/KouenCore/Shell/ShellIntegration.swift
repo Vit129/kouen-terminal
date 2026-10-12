@@ -164,7 +164,7 @@ public enum ShellIntegration {
         done
         if (( rc )); then
           /usr/bin/open -a "Google Chrome" "https://claude.ai/code" >/dev/null 2>&1 &
-          /usr/bin/open -a "Google Chrome" "http://localhost:7777" >/dev/null 2>&1 &
+          (__kouen_next rc >/dev/null 2>&1 &)
           if (( ${+commands[happy]} )) && [[ -f "$HOME/.happy/access.key" ]]; then HAPPY_CLAUDE_PATH="${HAPPY_CLAUDE_PATH:-${commands[claude]}}" happy claude "$@"; else __kouen_claude_next "$@"; fi
           return
         fi
@@ -173,7 +173,7 @@ public enum ShellIntegration {
         elif [[ "$KOUEN_CLAUDE_SESSION_MODE" == cloud || "$KOUEN_CLAUDE_SESSION_MODE" == remote-control ]]; then
           if [[ "$KOUEN_CLAUDE_SESSION_MODE" == remote-control ]]; then
             /usr/bin/open -a "Google Chrome" "https://claude.ai/code" >/dev/null 2>&1 &
-            /usr/bin/open -a "Google Chrome" "http://localhost:7777" >/dev/null 2>&1 &
+            (__kouen_next rc >/dev/null 2>&1 &)
           fi
           if (( ${+commands[happy]} )) && [[ -f "$HOME/.happy/access.key" ]]; then
             HAPPY_CLAUDE_PATH="${HAPPY_CLAUDE_PATH:-${commands[claude]}}" happy claude --remote-control --remote-control-session-name-prefix kouen "$@"
@@ -208,7 +208,7 @@ public enum ShellIntegration {
         done
         if [[ "$KOUEN_CODEX_SESSION_MODE" == "remote-control" || $rc -eq 1 ]]; then
           /usr/bin/open -a "Google Chrome" "https://chatgpt.com" >/dev/null 2>&1 &
-          /usr/bin/open -a "Google Chrome" "http://localhost:7777" >/dev/null 2>&1 &
+          (__kouen_next rc >/dev/null 2>&1 &)
         fi
         if (( ${+commands[happy]} )) && [[ -f "$HOME/.happy/access.key" ]]; then happy codex "$@"; else __kouen_codex_next "$@"; fi
       }
@@ -235,7 +235,7 @@ public enum ShellIntegration {
         done
         if [[ "$KOUEN_AGY_SESSION_MODE" == "remote-control" || $rc -eq 1 ]]; then
           /usr/bin/open -a "Google Chrome" "https://antigravity.google.com" >/dev/null 2>&1 &
-          /usr/bin/open -a "Google Chrome" "http://localhost:7777" >/dev/null 2>&1 &
+          (__kouen_next rc >/dev/null 2>&1 &)
         fi
         if (( ${+commands[happy]} )) && [[ "$KOUEN_AGY_SESSION_MODE" == "happy" ]]; then happy agy "$@"; return; fi
         if (( rc )); then __kouen_agy_next "$@"; else __kouen_agy_next --remote-control "$@"; fi
@@ -284,8 +284,7 @@ public enum ShellIntegration {
         __kouen_hermes_next --remote "$@"
       }
     fi
-    # Kouen CLI wrapper: `kouen` command that supports `rc`/`--rc` to auto-open Chrome
-    # and delegates any other commands to `kouen-cli`.
+    # Kouen CLI wrapper: `kouen` delegates to `kouen-cli` (`kouen rc` opens the Companion).
     if [[ -n "$KOUEN" && -z "$__kouen_cli_wrapped" ]]; then
       __kouen_cli_wrapped=1
       if (( ${+functions[kouen]} )); then
@@ -304,22 +303,7 @@ public enum ShellIntegration {
           fi
         }
       fi
-      kouen() {
-        local a rc=0
-        if [[ "$1" == "rc" || "$1" == "companion" ]]; then
-          rc=1
-        fi
-        for a in "$@"; do
-          case "$a" in
-            --rc|--remote-control) rc=1 ;;
-          esac
-        done
-        if (( rc )); then
-          export KOUEN_RC_OPENED=1
-          /usr/bin/open -a "Google Chrome" "http://localhost:7777" >/dev/null 2>&1 &
-        fi
-        __kouen_next "$@"
-      }
+      kouen() { __kouen_next "$@"; }
     fi
     """
 
@@ -372,7 +356,7 @@ public enum ShellIntegration {
         done
         if (( rc )); then
           /usr/bin/open -a "Google Chrome" "https://claude.ai/code" >/dev/null 2>&1 &
-          /usr/bin/open -a "Google Chrome" "http://localhost:7777" >/dev/null 2>&1 &
+          (__kouen_next rc >/dev/null 2>&1 &)
           if command -v happy >/dev/null 2>&1 && [ -f "$HOME/.happy/access.key" ]; then HAPPY_CLAUDE_PATH="${HAPPY_CLAUDE_PATH:-$(type -P claude)}" happy claude "$@"; else __kouen_claude_next "$@"; fi
           return
         fi
@@ -381,7 +365,7 @@ public enum ShellIntegration {
         elif [[ "$KOUEN_CLAUDE_SESSION_MODE" == cloud || "$KOUEN_CLAUDE_SESSION_MODE" == remote-control ]]; then
           if [[ "$KOUEN_CLAUDE_SESSION_MODE" == remote-control ]]; then
             /usr/bin/open -a "Google Chrome" "https://claude.ai/code" >/dev/null 2>&1 &
-            /usr/bin/open -a "Google Chrome" "http://localhost:7777" >/dev/null 2>&1 &
+            (__kouen_next rc >/dev/null 2>&1 &)
           fi
           if command -v happy >/dev/null 2>&1 && [ -f "$HOME/.happy/access.key" ]; then
             HAPPY_CLAUDE_PATH="${HAPPY_CLAUDE_PATH:-$(type -P claude)}" happy claude --remote-control --remote-control-session-name-prefix kouen "$@"
@@ -416,7 +400,7 @@ public enum ShellIntegration {
         done
         if [[ "$KOUEN_CODEX_SESSION_MODE" == "remote-control" || $rc -eq 1 ]]; then
           /usr/bin/open -a "Google Chrome" "https://chatgpt.com" >/dev/null 2>&1 &
-          /usr/bin/open -a "Google Chrome" "http://localhost:7777" >/dev/null 2>&1 &
+          (__kouen_next rc >/dev/null 2>&1 &)
         fi
         if command -v happy >/dev/null 2>&1 && [ -f "$HOME/.happy/access.key" ]; then happy codex "$@"; else __kouen_codex_next "$@"; fi
       }
@@ -443,7 +427,7 @@ public enum ShellIntegration {
         done
         if [[ "$KOUEN_AGY_SESSION_MODE" == "remote-control" || $rc -eq 1 ]]; then
           /usr/bin/open -a "Google Chrome" "https://antigravity.google.com" >/dev/null 2>&1 &
-          /usr/bin/open -a "Google Chrome" "http://localhost:7777" >/dev/null 2>&1 &
+          (__kouen_next rc >/dev/null 2>&1 &)
         fi
         if command -v happy >/dev/null 2>&1 && [[ "$KOUEN_AGY_SESSION_MODE" == "happy" ]]; then happy agy "$@"; return; fi
         if (( rc )); then __kouen_agy_next "$@"; else __kouen_agy_next --remote-control "$@"; fi
@@ -492,8 +476,7 @@ public enum ShellIntegration {
         __kouen_hermes_next --remote "$@"
       }
     fi
-    # Kouen CLI wrapper: `kouen` command that supports `rc`/`--rc` to auto-open Chrome
-    # and delegates any other commands to `kouen-cli`.
+    # Kouen CLI wrapper: `kouen` delegates to `kouen-cli` (`kouen rc` opens the Companion).
     if [ -n "$KOUEN" ] && [ -z "$__kouen_cli_wrapped" ]; then
       __kouen_cli_wrapped=1
       if declare -F kouen >/dev/null 2>&1; then
@@ -512,22 +495,7 @@ public enum ShellIntegration {
           fi
         }
       fi
-      kouen() {
-        local a rc=0
-        if [ "$1" = "rc" ] || [ "$1" = "companion" ]; then
-          rc=1
-        fi
-        for a in "$@"; do
-          case "$a" in
-            --rc|--remote-control) rc=1 ;;
-          esac
-        done
-        if [ $rc -eq 1 ]; then
-          export KOUEN_RC_OPENED=1
-          /usr/bin/open -a "Google Chrome" "http://localhost:7777" >/dev/null 2>&1 &
-        fi
-        __kouen_next "$@"
-      }
+      kouen() { __kouen_next "$@"; }
     fi
     """
 
@@ -584,7 +552,7 @@ public enum ShellIntegration {
             end
             if test $rc -eq 1
                 /usr/bin/open -a "Google Chrome" "https://claude.ai/code" >/dev/null 2>&1 &
-                /usr/bin/open -a "Google Chrome" "http://localhost:7777" >/dev/null 2>&1 &
+                __kouen_next rc >/dev/null 2>&1
                 if type -q happy; and test -f "$HOME/.happy/access.key"
                     set -l claude_path $HAPPY_CLAUDE_PATH
                     test -n "$claude_path"; or set claude_path (type -p claude)
@@ -597,7 +565,7 @@ public enum ShellIntegration {
             else if test "$KOUEN_CLAUDE_SESSION_MODE" = cloud; or test "$KOUEN_CLAUDE_SESSION_MODE" = remote-control
                 if test "$KOUEN_CLAUDE_SESSION_MODE" = remote-control
                     /usr/bin/open -a "Google Chrome" "https://claude.ai/code" >/dev/null 2>&1 &
-                    /usr/bin/open -a "Google Chrome" "http://localhost:7777" >/dev/null 2>&1 &
+                    __kouen_next rc >/dev/null 2>&1
                 end
                 if type -q happy; and test -f "$HOME/.happy/access.key"
                     set -l claude_path $HAPPY_CLAUDE_PATH
@@ -641,7 +609,7 @@ public enum ShellIntegration {
             end
             if test "$KOUEN_CODEX_SESSION_MODE" = remote-control; or test $rc -eq 1
                 /usr/bin/open -a "Google Chrome" "https://chatgpt.com" >/dev/null 2>&1 &
-                /usr/bin/open -a "Google Chrome" "http://localhost:7777" >/dev/null 2>&1 &
+                __kouen_next rc >/dev/null 2>&1
             end
             if type -q happy; and test -f "$HOME/.happy/access.key"
                 happy codex $argv
@@ -677,7 +645,7 @@ public enum ShellIntegration {
             end
             if test "$KOUEN_AGY_SESSION_MODE" = remote-control; or test $rc -eq 1
                 /usr/bin/open -a "Google Chrome" "https://antigravity.google.com" >/dev/null 2>&1 &
-                /usr/bin/open -a "Google Chrome" "http://localhost:7777" >/dev/null 2>&1 &
+                __kouen_next rc >/dev/null 2>&1
             end
             if test "$KOUEN_AGY_SESSION_MODE" = happy; and type -q happy
                 happy agy $argv; return
@@ -743,8 +711,7 @@ public enum ShellIntegration {
             __kouen_hermes_next --remote $argv
         end
     end
-    # Kouen CLI wrapper: `kouen` command that supports `rc`/`--rc` to auto-open Chrome
-    # and delegates any other commands to `kouen-cli`.
+    # Kouen CLI wrapper: `kouen` delegates to `kouen-cli` (`kouen rc` opens the Companion).
     if set -q KOUEN; and not set -q __kouen_cli_wrapped
         set -g __kouen_cli_wrapped 1
         if functions -q kouen
@@ -764,20 +731,6 @@ public enum ShellIntegration {
             end
         end
         function kouen
-            set -l rc 0
-            if test "$argv[1]" = "rc"; or test "$argv[1]" = "companion"
-                set rc 1
-            end
-            for a in $argv
-                switch $a
-                    case --remote-control --rc
-                        set rc 1
-                end
-            end
-            if test $rc -eq 1
-                set -x KOUEN_RC_OPENED 1
-                /usr/bin/open -a "Google Chrome" "http://localhost:7777" >/dev/null 2>&1 &
-            end
             __kouen_next $argv
         end
     end
