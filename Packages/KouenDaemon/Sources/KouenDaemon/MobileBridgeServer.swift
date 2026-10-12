@@ -2328,7 +2328,31 @@ public final class MobileBridgeServer: @unchecked Sendable {
         sendJSON(BrowserOkAck(ok: "browserClosed"), on: connection)
     }
 
-    private func handleReadFile(path: String, connection: NWConnection) {
+    /// Where a paired phone may read/list files: the active session's cwd, plus Antigravity's
+    /// brain dir (agy writes its artifacts there, outside any repo). Anything else — `~/.ssh`,
+    /// another project — is rejected; before this the phone could read any path on the Mac.
+    static func authorizedReadPath(
+        _ path: String,
+        surfaceID: String?,
+        surfaceLookup: (String) -> String? = { surfaceCwd(surfaceID: $0) },
+        extraRoots: [String] = [NSHomeDirectory() + "/.gemini/antigravity-cli/brain"]
+    ) -> String? {
+        if case .success(let resolved) = resolveAuthorizedCwd(requestedPath: path, surfaceID: surfaceID, surfaceLookup: surfaceLookup) {
+            return resolved
+        }
+        let req = URL(fileURLWithPath: path).standardizedFileURL.resolvingSymlinksInPath().path
+        for root in extraRoots {
+            let r = URL(fileURLWithPath: root).standardizedFileURL.resolvingSymlinksInPath().path
+            if req.hasPrefix(r + "/") { return req }
+        }
+        return nil
+    }
+
+    private func handleReadFile(path: String, connection: NWConnection, state: ConnectionState) {
+        guard let path = Self.authorizedReadPath(path, surfaceID: state.surfaceID) else {
+            sendText(#"{"error":"foreign or unauthorized path rejected"}"#, on: connection)
+            return
+        }
         guard let info = Self.readFileInfo(path: path) else {
             sendText(#"{"error":"cannot read file"}"#, on: connection)
             return
@@ -2336,7 +2360,11 @@ public final class MobileBridgeServer: @unchecked Sendable {
         sendJSON(FileReadResponse(file: info), on: connection)
     }
 
-    private func handleListDirectory(path: String, connection: NWConnection) {
+    private func handleListDirectory(path: String, connection: NWConnection, state: ConnectionState) {
+        guard let path = Self.authorizedReadPath(path, surfaceID: state.surfaceID) else {
+            sendText(#"{"error":"foreign or unauthorized path rejected"}"#, on: connection)
+            return
+        }
         guard let entries = Self.listDirectoryEntries(path: path) else {
             sendText(#"{"error":"cannot list directory"}"#, on: connection)
             return
@@ -2779,11 +2807,11 @@ public final class MobileBridgeServer: @unchecked Sendable {
             subscription.resize(surfaceID, rows: UInt16(clamping: resize.rows), cols: UInt16(clamping: resize.cols))
         } else if let readFile = message.readFile {
             state.controlQueue.async { [weak self] in
-                self?.handleReadFile(path: readFile.path, connection: connection)
+                self?.handleReadFile(path: readFile.path, connection: connection, state: state)
             }
         } else if let listDirectory = message.listDirectory {
             state.controlQueue.async { [weak self] in
-                self?.handleListDirectory(path: listDirectory.path, connection: connection)
+                self?.handleListDirectory(path: listDirectory.path, connection: connection, state: state)
             }
         } else if let attachFile = message.attachFile {
             state.controlQueue.async { [weak self] in

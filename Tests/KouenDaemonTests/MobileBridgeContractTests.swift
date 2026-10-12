@@ -239,5 +239,22 @@ final class MobileBridgeContractTests: XCTestCase {
         let inside = MobileBridgeServer.resolveAuthorizedCwd(requestedPath: cwd.path, surfaceID: "s", surfaceLookup: { _ in cwd.path })
         XCTAssertNotNil(try? inside.get())
     }
+
+    func testReadFileIsLimitedToSessionCwdAndAgyBrain() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        let cwd = root.appendingPathComponent("repo"), brain = root.appendingPathComponent("brain")
+        try FileManager.default.createDirectory(at: cwd, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: brain, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        func check(_ p: String) -> String? {
+            MobileBridgeServer.authorizedReadPath(p, surfaceID: "s", surfaceLookup: { _ in cwd.path }, extraRoots: [brain.path])
+        }
+
+        XCTAssertNotNil(check(cwd.appendingPathComponent("index.html").path))
+        XCTAssertNotNil(check(brain.appendingPathComponent("conv/showcase.md").path))
+        XCTAssertNil(check(NSHomeDirectory() + "/.ssh/id_ed25519"))
+        XCTAssertNil(check(brain.path + "/../repo-sibling/x"))
+        XCTAssertNil(check("/etc/passwd"))
+    }
 }
 #endif
