@@ -37,7 +37,6 @@ has a matching `vX.Y.Z` tag and a signed, notarized DMG on
 - Guard os.Logger so the Linux headless build compiles again ([`7706a53`](https://github.com/Vit129/kouen-terminal/commit/7706a531a8aed7628672d96fbc39d3020d74d553))
 - Write kouen rc errors via FileHandle so Linux strict concurrency compiles ([`585d45a`](https://github.com/Vit129/kouen-terminal/commit/585d45aab8dcb0525b7d4a7b39fef0c3d2249133))
 
-
 ## [4.21.1] - 2026-10-09
 
 ### Added
