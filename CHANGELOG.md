@@ -12,7 +12,6 @@ has a matching `vX.Y.Z` tag and a signed, notarized DMG on
 - Push the attached agent's transcript to the Companion ([`d7df0d6`](https://github.com/Vit129/kouen-terminal/commit/d7df0d69d0e9741a2af885292d00f9348fd04410))
 - Render the Companion session as user/agent bubbles and tool rows ([`c058903`](https://github.com/Vit129/kouen-terminal/commit/c058903c88ffab3649ec2d9980116eac29360c9a))
 
-
 ## [4.21.4] - 2026-10-12
 
 ### Added
