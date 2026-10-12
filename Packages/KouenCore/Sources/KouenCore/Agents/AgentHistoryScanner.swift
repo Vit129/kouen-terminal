@@ -411,7 +411,7 @@ public actor AgentHistoryScanner {
                 end -= 1
             }
             if start < end {
-                lines.append(Data(slice[start..<end]))
+                lines.append(slice[start..<end])  // a slice of the mapped file, no copy
             }
         }
         guard !lines.isEmpty else { return nil }
