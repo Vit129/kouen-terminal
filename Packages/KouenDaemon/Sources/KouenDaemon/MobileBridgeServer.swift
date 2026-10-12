@@ -698,11 +698,24 @@ public final class MobileBridgeServer: @unchecked Sendable {
       );
     }
 
+    // One entry per artifact, each at its newest version: links that differ only by a version
+    // marker (?v=N, /v/N, /versions/N) or query/hash collapse to the last one printed.
+    // Order is first appearance so tabs don't reshuffle as new versions stream in.
+    function latestArtifactLinks(text) {
+      const latest = new Map();
+      for (const m of (text || "").matchAll(/https?:\/\/[^\s<>"'`)\]]*(?:artifact|preview|page)[^\s<>"'`)\]]*/gi)) {
+        const url = m[0].replace(/[.,;:]+$/, "");
+        const key = url.replace(/[?#].*$/, "").replace(/\/(?:v|versions?)\/[^/]+\/?$/i, "").replace(/\/$/, "");
+        latest.set(key, url); // re-set keeps the key's first-seen position, updates the URL
+      }
+      return [...latest.values()];
+    }
+
     function openPreview() {
       if (!cur) return;
       const port = (cur.ports && cur.ports[0]) || (cur.rawOutput && cur.rawOutput.includes('localhost:') ? (cur.rawOutput.match(/localhost:(\d+)/) || [])[1] : null);
       const htmlFile = cur.files ? cur.files.find(f => f[0].toLowerCase().endsWith('.html')) : null;
-      const artMatch = cur.rawOutput ? cur.rawOutput.match(/https?:\/\/[^\s<>"']*(?:artifact|preview|page)[^\s<>"']*/i) : null;
+      const arts = latestArtifactLinks(cur.rawOutput);
 
       const src = {};
       if (port) {
@@ -711,9 +724,9 @@ public final class MobileBridgeServer: @unchecked Sendable {
       if (htmlFile) {
         src.html = ["HTML file", htmlFile[0]];
       }
-      if (artMatch) {
-        src.art = ["Artifact", artMatch[0]];
-      }
+      arts.forEach((u, i) => {
+        src["art" + i] = [arts.length > 1 ? `Artifact ${i + 1}` : "Artifact", u];
+      });
 
       if (!src[pv]) pv = Object.keys(src)[0];
       if (!pv) {
