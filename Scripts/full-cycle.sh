@@ -43,6 +43,18 @@ case "${1:-}" in
     ;;
 esac
 
+# A worktree release ends with `git pull` in the main checkout; check it is clean up front,
+# before Step 3 merges to main, so a dirty checkout can't leave main merged but untagged.
+if [[ "$(git rev-parse --git-dir)" == *"worktrees"* ]]; then
+  main_repo="$(cd "$(dirname "$(git rev-parse --git-common-dir)")" && pwd)"
+  if [[ -n "$(git -C "$main_repo" status --porcelain)" ]]; then
+    echo "❌ Cannot release: main repo at $main_repo has uncommitted changes:" >&2
+    git -C "$main_repo" status -s >&2
+    echo "Commit or stash them there, then re-run." >&2
+    exit 1
+  fi
+fi
+
 # Step 1: Pre-build verification — catch compile errors BEFORE bumping version.
 echo ""
 echo "▶ Step 1: Verifying build..."
@@ -77,12 +89,6 @@ if [[ "$git_dir" == *"worktrees"* ]]; then
   common_dir="$(git rev-parse --git-common-dir)"
   main_repo="$(cd "$(dirname "$common_dir")" && pwd)"
   echo "Code merged to main."
-  if [[ -n "$(git -C "$main_repo" status --porcelain)" ]]; then
-    echo "❌ Cannot sync main repo at $main_repo — working tree has uncommitted changes:" >&2
-    git -C "$main_repo" status -s >&2
-    echo "Commit or stash changes in the main repo before releasing." >&2
-    exit 1
-  fi
   cd "$main_repo"
   git pull --ff-only origin main
 elif [[ "$prior_branch" != "main" ]]; then

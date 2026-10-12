@@ -176,5 +176,56 @@ final class MobileBridgeContractTests: XCTestCase {
         XCTAssertTrue(html.contains("scheduleGitDiff"))
         XCTAssertTrue(html.contains("65536"))
     }
+
+    func testRunProcessKeepsTheLastLineOfOutput() {
+        // gh prints the PR URL last; losing the final chunk drops it.
+        let res = MobileBridgeServer.runProcess(
+            executableURL: URL(fileURLWithPath: "/bin/sh"),
+            arguments: ["-c", "head -c 200000 /dev/zero | tr '\\0' x; echo; echo https://github.com/o/r/pull/7"],
+            timeoutSeconds: 10
+        )
+        XCTAssertEqual(res.status, 0)
+        XCTAssertTrue(res.stdout.hasSuffix("https://github.com/o/r/pull/7\n"))
+    }
+
+    func testServeStatusMustProxyTheBridgePort() {
+        let ours = #"{"Web":{"mac.ts.net:443":{"Handlers":{"/":{"Proxy":"http://127.0.0.1:8080"}}}}}"#
+        let other = #"{"Web":{"mac.ts.net:443":{"Handlers":{"/":{"Proxy":"http://127.0.0.1:3000"}}}}}"#
+        XCTAssertTrue(MobileBridgeServer.serveStatusProxiesPort(ours, port: 8080))
+        XCTAssertFalse(MobileBridgeServer.serveStatusProxiesPort(other, port: 8080))
+        XCTAssertFalse(MobileBridgeServer.serveStatusProxiesPort(#"{"TCP":{"443":{}}}"#, port: 8080))
+        XCTAssertFalse(MobileBridgeServer.serveStatusProxiesPort("{}", port: 8080))
+    }
+
+    func testDiffContentLinesThatLookLikeHeadersAreCounted() {
+        let diff = """
+        diff --git a/notes.sql b/notes.sql
+        --- a/notes.sql
+        +++ b/notes.sql
+        @@ -1,2 +1,2 @@
+        --- a/old comment
+        +++ b/new comment
+         keep
+        """
+        let files = MobileBridgeServer.parseGitDiffOutput(diff)
+        XCTAssertEqual(files.map(\.path), ["notes.sql"])
+        XCTAssertEqual(files.first?.additions, 1)
+        XCTAssertEqual(files.first?.deletions, 1)
+    }
+
+    func testSymlinkInsideSessionCwdCannotEscapeIt() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        let cwd = root.appendingPathComponent("repo"), outside = root.appendingPathComponent("secret")
+        try FileManager.default.createDirectory(at: cwd, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: outside, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        try FileManager.default.createSymbolicLink(at: cwd.appendingPathComponent("link"), withDestinationURL: outside)
+
+        let escaped = MobileBridgeServer.resolveAuthorizedCwd(
+            requestedPath: cwd.appendingPathComponent("link").path, surfaceID: "s", surfaceLookup: { _ in cwd.path })
+        XCTAssertEqual(escaped, .failure(.foreignPathRejected))
+        let inside = MobileBridgeServer.resolveAuthorizedCwd(requestedPath: cwd.path, surfaceID: "s", surfaceLookup: { _ in cwd.path })
+        XCTAssertNotNil(try? inside.get())
+    }
 }
 #endif

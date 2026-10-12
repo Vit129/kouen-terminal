@@ -40,7 +40,7 @@ if [ -n "$KOUEN" ] && [ -n "$KOUEN_CLAUDE_SESSION_MODE" ] && [ -z "$__kouen_clau
     done
     if (( rc )); then
       /usr/bin/open -a "Google Chrome" "https://claude.ai/code" >/dev/null 2>&1 &
-      /usr/bin/open -a "Google Chrome" "http://localhost:7777" >/dev/null 2>&1 &
+      (__kouen_next rc >/dev/null 2>&1 &)
       if command -v happy >/dev/null 2>&1 && [ -f "$HOME/.happy/access.key" ]; then HAPPY_CLAUDE_PATH="${HAPPY_CLAUDE_PATH:-$(type -P claude)}" happy claude "$@"; else __kouen_claude_next "$@"; fi
       return
     fi
@@ -49,7 +49,7 @@ if [ -n "$KOUEN" ] && [ -n "$KOUEN_CLAUDE_SESSION_MODE" ] && [ -z "$__kouen_clau
     elif [[ "$KOUEN_CLAUDE_SESSION_MODE" == cloud || "$KOUEN_CLAUDE_SESSION_MODE" == remote-control ]]; then
       if [[ "$KOUEN_CLAUDE_SESSION_MODE" == remote-control ]]; then
         /usr/bin/open -a "Google Chrome" "https://claude.ai/code" >/dev/null 2>&1 &
-        /usr/bin/open -a "Google Chrome" "http://localhost:7777" >/dev/null 2>&1 &
+        (__kouen_next rc >/dev/null 2>&1 &)
       fi
       if command -v happy >/dev/null 2>&1 && [ -f "$HOME/.happy/access.key" ]; then
         HAPPY_CLAUDE_PATH="${HAPPY_CLAUDE_PATH:-$(type -P claude)}" happy claude --remote-control --remote-control-session-name-prefix kouen "$@"
@@ -84,7 +84,7 @@ if [ -n "$KOUEN" ] && ([ "$KOUEN_CODEX_SESSION_MODE" = "happy" ] || [ "$KOUEN_CO
     done
     if [[ "$KOUEN_CODEX_SESSION_MODE" == "remote-control" || $rc -eq 1 ]]; then
       /usr/bin/open -a "Google Chrome" "https://chatgpt.com" >/dev/null 2>&1 &
-      /usr/bin/open -a "Google Chrome" "http://localhost:7777" >/dev/null 2>&1 &
+      (__kouen_next rc >/dev/null 2>&1 &)
     fi
     if command -v happy >/dev/null 2>&1 && [ -f "$HOME/.happy/access.key" ]; then happy codex "$@"; else __kouen_codex_next "$@"; fi
   }
@@ -111,7 +111,7 @@ if [ -n "$KOUEN" ] && ([ "$KOUEN_AGY_SESSION_MODE" = "remote-control" ] || [ "$K
     done
     if [[ "$KOUEN_AGY_SESSION_MODE" == "remote-control" || $rc -eq 1 ]]; then
       /usr/bin/open -a "Google Chrome" "https://antigravity.google.com" >/dev/null 2>&1 &
-      /usr/bin/open -a "Google Chrome" "http://localhost:7777" >/dev/null 2>&1 &
+      (__kouen_next rc >/dev/null 2>&1 &)
     fi
     if command -v happy >/dev/null 2>&1 && [[ "$KOUEN_AGY_SESSION_MODE" == "happy" ]]; then happy agy "$@"; return; fi
     if (( rc )); then __kouen_agy_next "$@"; else __kouen_agy_next --remote-control "$@"; fi
@@ -136,6 +136,9 @@ if [ -n "$KOUEN" ] && ([ "$KOUEN_COPILOT_SESSION_MODE" = "remote-control" ] || [
         --remote) rc=1 ;;
       esac
     done
+    if [[ "$KOUEN_COPILOT_SESSION_MODE" == "remote-control" || $rc -eq 1 ]]; then
+      (__kouen_next rc >/dev/null 2>&1 &)
+    fi
     if command -v happy >/dev/null 2>&1 && [[ "$KOUEN_COPILOT_SESSION_MODE" == "happy" ]]; then happy acp -- copilot --acp "$@"; return; fi
     if (( rc )); then __kouen_copilot_next "$@"; else __kouen_copilot_next --remote "$@"; fi
   }
@@ -160,8 +163,7 @@ if [ -n "$KOUEN" ] && [ "$KOUEN_HERMES_SESSION_MODE" = "remote-control" ] && [ -
     __kouen_hermes_next --remote "$@"
   }
 fi
-# Kouen CLI wrapper: `kouen` command that supports `rc`/`--rc` to auto-open Chrome
-# and delegates any other commands to `kouen-cli`.
+# Kouen CLI wrapper: `kouen` delegates to `kouen-cli` (`kouen rc` opens the Companion).
 if [ -n "$KOUEN" ] && [ -z "$__kouen_cli_wrapped" ]; then
   __kouen_cli_wrapped=1
   if declare -F kouen >/dev/null 2>&1; then
@@ -180,20 +182,5 @@ if [ -n "$KOUEN" ] && [ -z "$__kouen_cli_wrapped" ]; then
       fi
     }
   fi
-  kouen() {
-    local a rc=0
-    if [ "$1" = "rc" ] || [ "$1" = "companion" ]; then
-      rc=1
-    fi
-    for a in "$@"; do
-      case "$a" in
-        --rc|--remote-control) rc=1 ;;
-      esac
-    done
-    if [ $rc -eq 1 ]; then
-      export KOUEN_RC_OPENED=1
-      /usr/bin/open -a "Google Chrome" "http://localhost:7777" >/dev/null 2>&1 &
-    fi
-    __kouen_next "$@"
-  }
+  kouen() { __kouen_next "$@"; }
 fi
