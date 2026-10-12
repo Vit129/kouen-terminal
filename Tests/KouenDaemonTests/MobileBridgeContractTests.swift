@@ -212,5 +212,20 @@ final class MobileBridgeContractTests: XCTestCase {
         XCTAssertEqual(files.first?.additions, 1)
         XCTAssertEqual(files.first?.deletions, 1)
     }
+
+    func testSymlinkInsideSessionCwdCannotEscapeIt() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        let cwd = root.appendingPathComponent("repo"), outside = root.appendingPathComponent("secret")
+        try FileManager.default.createDirectory(at: cwd, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: outside, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        try FileManager.default.createSymbolicLink(at: cwd.appendingPathComponent("link"), withDestinationURL: outside)
+
+        let escaped = MobileBridgeServer.resolveAuthorizedCwd(
+            requestedPath: cwd.appendingPathComponent("link").path, surfaceID: "s", surfaceLookup: { _ in cwd.path })
+        XCTAssertEqual(escaped, .failure(.foreignPathRejected))
+        let inside = MobileBridgeServer.resolveAuthorizedCwd(requestedPath: cwd.path, surfaceID: "s", surfaceLookup: { _ in cwd.path })
+        XCTAssertNotNil(try? inside.get())
+    }
 }
 #endif

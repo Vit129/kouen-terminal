@@ -706,8 +706,6 @@ public final class MobileBridgeServer: @unchecked Sendable {
       const src = {};
       if (port) {
         src.local = ["Dev server", `http://localhost:${port}/`];
-      } else {
-        src.local = ["Dev server", "http://localhost:5173/"];
       }
       if (htmlFile) {
         src.html = ["HTML file", htmlFile[0]];
@@ -716,8 +714,12 @@ public final class MobileBridgeServer: @unchecked Sendable {
         src.art = ["Artifact", artMatch[0]];
       }
 
-      if (!src[pv]) pv = Object.keys(src)[0] || 'local';
-      const url = src[pv] ? src[pv][1] : src.local[1];
+      if (!src[pv]) pv = Object.keys(src)[0];
+      if (!pv) {
+        panel("Preview", `<p class="caption">No dev server, HTML file or artifact link seen in this session yet.</p>`);
+        return;
+      }
+      const url = src[pv][1];
 
       let bodyHTML = "";
       let captionText = "";
@@ -1320,10 +1322,17 @@ public final class MobileBridgeServer: @unchecked Sendable {
         return lines.joined(separator: "\n")
     }
 
+    /// Intel Homebrew, Apple Silicon Homebrew, then the CLI bundled in the App Store / standalone app.
+    static let tailscalePath: String = [
+        "/usr/local/bin/tailscale",
+        "/opt/homebrew/bin/tailscale",
+        "/Applications/Tailscale.app/Contents/MacOS/Tailscale",
+    ].first { FileManager.default.isExecutableFile(atPath: $0) } ?? "/usr/local/bin/tailscale"
+
     /// Best-effort Tailscale IPv4 for the QR's URL; nil if Tailscale isn't installed/up.
     private func detectTailscaleHost() -> String? {
         let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/local/bin/tailscale")
+        process.executableURL = URL(fileURLWithPath: Self.tailscalePath)
         process.arguments = ["ip", "-4"]
         let pipe = Pipe()
         process.standardOutput = pipe
@@ -1352,7 +1361,7 @@ public final class MobileBridgeServer: @unchecked Sendable {
     /// more permissively. This is unverified until tested against a real failing device.
     private func detectTailscaleMagicDNSName() -> String? {
         let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/local/bin/tailscale")
+        process.executableURL = URL(fileURLWithPath: Self.tailscalePath)
         process.arguments = ["status", "--json"]
         let pipe = Pipe()
         process.standardOutput = pipe
@@ -1388,7 +1397,7 @@ public final class MobileBridgeServer: @unchecked Sendable {
 
     public static func isTailscaleServeConfigured(port: Int) -> Bool {
         let res = runProcess(
-            executableURL: URL(fileURLWithPath: "/usr/local/bin/tailscale"),
+            executableURL: URL(fileURLWithPath: Self.tailscalePath),
             arguments: ["serve", "status", "--json"],
             timeoutSeconds: 5
         )
@@ -2619,8 +2628,8 @@ public final class MobileBridgeServer: @unchecked Sendable {
             return .failure(.missingSessionOrCwd)
         }
         if let requested = requestedPath?.trimmingCharacters(in: .whitespacesAndNewlines), !requested.isEmpty {
-            let reqURL = URL(fileURLWithPath: requested).standardizedFileURL.path
-            let cwdURL = URL(fileURLWithPath: cwd).standardizedFileURL.path
+            let reqURL = URL(fileURLWithPath: requested).standardizedFileURL.resolvingSymlinksInPath().path
+            let cwdURL = URL(fileURLWithPath: cwd).standardizedFileURL.resolvingSymlinksInPath().path
             if reqURL != cwdURL && !reqURL.hasPrefix(cwdURL + "/") {
                 return .failure(.foreignPathRejected)
             }
