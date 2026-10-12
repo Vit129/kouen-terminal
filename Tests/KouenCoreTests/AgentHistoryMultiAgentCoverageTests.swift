@@ -168,8 +168,8 @@ final class AgentHistoryMultiAgentCoverageTests: XCTestCase {
         let records = AgentHistoryScanner.readAntigravitySummaries(dbPath: dbPath, brainDir: tempDir.appendingPathComponent("brain"))
         // subagent "sub-1" must not be present
         XCTAssertFalse(records.contains(where: { $0.id == "sub-1" }))
-        // Total top-level records should be 5
-        XCTAssertEqual(records.count, 5)
+        // Total top-level records should be 6 (7 rows minus the subagent)
+        XCTAssertEqual(records.count, 6)
         #endif
     }
 
