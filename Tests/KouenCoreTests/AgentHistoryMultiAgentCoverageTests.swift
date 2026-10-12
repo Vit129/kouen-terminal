@@ -67,6 +67,8 @@ final class AgentHistoryMultiAgentCoverageTests: XCTestCase {
             ("sub-1", "Subagent", "Subagent task", 2, "2026-10-09T08:00:00Z", "[\"file:///Users/test/ProjectA\"]", "default-cli-project", "cli-1", "antigravity-cli", "2026-10-09T08:00:00Z"),
             // 5. Ancient / corrupted timestamp
             ("ancient-1", "Old session", "Ancient preview", 0, "0001-01-01 00:00:00+00:00", "[\"file:///Users/test/ProjectD\"]", "default-cli-project", "", "antigravity-cli", "0001-01-01 00:00:00+00:00"),
+            // 7. Real conversation_summaries.db format: space separator + microseconds
+            ("micro-1", "Micro Session", "Micro preview", 2, "2026-10-11 03:15:43.415871+00:00", "[\"file:///Users/test/ProjectE\"]", "default-cli-project", "", "antigravity-cli", "2026-10-11 03:15:34.682729+00:00"),
             // 6. Percent-encoded workspace URI
             ("encoded-1", "Encoded Path Session", "Encoded preview", 4, "2026-10-09T12:00:00Z", "[\"file:///Users/test/My%20Test%20Folder\"]", "default-cli-project", "", "antigravity-cli", "2026-10-09T12:00:00Z")
         ]
@@ -166,8 +168,8 @@ final class AgentHistoryMultiAgentCoverageTests: XCTestCase {
         let records = AgentHistoryScanner.readAntigravitySummaries(dbPath: dbPath, brainDir: tempDir.appendingPathComponent("brain"))
         // subagent "sub-1" must not be present
         XCTAssertFalse(records.contains(where: { $0.id == "sub-1" }))
-        // Total top-level records should be 5
-        XCTAssertEqual(records.count, 5)
+        // Total top-level records should be 6 (7 rows minus the subagent)
+        XCTAssertEqual(records.count, 6)
         #endif
     }
 
@@ -238,6 +240,19 @@ final class AgentHistoryMultiAgentCoverageTests: XCTestCase {
             return
         }
         XCTAssertEqual(ancient.updatedAt, Date.distantPast)
+        #endif
+    }
+
+    func testAntigravityParsesMicrosecondTimestamp() async throws {
+        #if canImport(SQLite3)
+        let tempDir = makeTempDir()
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+        let dbPath = tempDir.appendingPathComponent("conversation_summaries.db").path
+        createMockAntigravityDB(at: dbPath)
+
+        let records = AgentHistoryScanner.readAntigravitySummaries(dbPath: dbPath, brainDir: tempDir.appendingPathComponent("brain"))
+        let micro = try XCTUnwrap(records.first(where: { $0.id == "micro-1" }))
+        XCTAssertEqual(micro.updatedAt.timeIntervalSince1970, 1791688543.415, accuracy: 0.01)
         #endif
     }
 
