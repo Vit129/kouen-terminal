@@ -12,6 +12,24 @@ final class MobileBridgeContractTests: XCTestCase {
         XCTAssertTrue(MobileBridgeServer.embeddedPageHTML.contains(#"/\x1b\[[0-?]*[ -\/]*[@-~]/g"#))
     }
 
+    /// TS-5711: the client reads `transcript.reset`, `transcript.items[].{id,role,text,toolName,toolTarget}`.
+    func testTS5711_transcriptPushShapeMatchesClient() throws {
+        let push = MobileBridgeServer.TranscriptPush(transcript: .init(reset: true, items: [
+            TranscriptItem(id: "a#0", role: .assistant, text: "hi"),
+            TranscriptItem(id: "a#1", role: .tool, text: "", toolName: "Edit", toolTarget: "x.swift"),
+        ]))
+        let json = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(push)) as? [String: Any])
+        let body = try XCTUnwrap(json["transcript"] as? [String: Any])
+        XCTAssertEqual(body["reset"] as? Bool, true)
+        let items = try XCTUnwrap(body["items"] as? [[String: Any]])
+        XCTAssertEqual(items[0]["role"] as? String, "assistant")
+        XCTAssertEqual(items[0]["text"] as? String, "hi")
+        XCTAssertEqual(items[1]["role"] as? String, "tool")
+        XCTAssertEqual(items[1]["toolName"] as? String, "Edit")
+        XCTAssertEqual(items[1]["toolTarget"] as? String, "x.swift")
+        XCTAssertEqual(items[1]["id"] as? String, "a#1")
+    }
+
     func testPageCSSKeepsHiddenElementsHidden() {
         XCTAssertTrue(MobileBridgeServer.embeddedPageHTML.contains("[hidden]{display:none !important}"))
     }

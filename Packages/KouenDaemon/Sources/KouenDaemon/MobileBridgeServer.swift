@@ -266,6 +266,13 @@ public final class MobileBridgeServer: @unchecked Sendable {
             set { lock.lock(); _snapshotSubscription = newValue; lock.unlock() }
         }
         private var _snapshotSubscription: DaemonSubscription?
+        /// P57: per-attach 1s poll that tails the attached agent's own transcript file. Replaced
+        /// on every attach, cancelled on detach and disconnect — same lifetime as `subscription`.
+        var transcriptTimer: DispatchSourceTimer? {
+            get { lock.lock(); defer { lock.unlock() }; return _transcriptTimer }
+            set { lock.lock(); let old = _transcriptTimer; _transcriptTimer = newValue; lock.unlock(); old?.cancel() }
+        }
+        private var _transcriptTimer: DispatchSourceTimer?
         /// Set once, at authorization — the id `PairedDeviceStore` tracks this
         /// connection under, so a `mobile-revoke-client` can cancel it specifically.
         var deviceID: String? {
@@ -411,6 +418,7 @@ public final class MobileBridgeServer: @unchecked Sendable {
       /* Output */
       .out{padding:12px 16px;display:flex;flex-direction:column;gap:10px;font-size:14px}
       .msg{min-width:0}
+      .msg.bot{align-self:flex-start;background:var(--surface);border:1px solid var(--line);padding:8px 12px;border-radius:14px 14px 14px 4px;max-width:92%;white-space:pre-wrap;overflow-wrap:anywhere}
       .msg.user{align-self:flex-end;background:var(--accent);color:var(--accent-ink);padding:8px 12px;border-radius:14px 14px 4px 14px;max-width:85%}
       .tool{font-family:var(--f-mono);font-size:12px;color:var(--muted);background:var(--code-bg);border:1px solid var(--line);border-radius:8px;padding:6px 10px;overflow-x:auto;white-space:pre}
       .ask{border:1px solid var(--warn);background:var(--warn-soft);border-radius:12px;padding:10px 12px;display:flex;flex-direction:column;gap:8px}
@@ -565,6 +573,7 @@ public final class MobileBridgeServer: @unchecked Sendable {
       return (str || '')
         .replace(/\x1b\][^\x07\x1b]*(\x07|\x1b\\)/g, '')
         .replace(/\x1b\[[0-?]*[ -\/]*[@-~]/g, '')
+        .replace(/\x1b[()*+\-.\/][ -~]/g, '')
         .replace(/\x1b[@-Z\\-_]/g, '')
         .replace(/\r\n/g, '\n')
         .replace(/\r/g, '');
@@ -633,6 +642,7 @@ public final class MobileBridgeServer: @unchecked Sendable {
 
       p.innerHTML = '<div class="out">' + items.map(([k, t]) => {
         if (k === "user") return `<div class="msg user">${esc(t)}</div>`;
+        if (k === "agent") return `<div class="msg bot">${esc(t)}</div>`;
         if (k === "tool") return `<div class="tool${t.startsWith("Edit") ? " edit-link" : ""}">${esc(t)}</div>`;
         if (k === "diff") {
           const a = cur.files.reduce((x, f) => x + f[1], 0), d = cur.files.reduce((x, f) => x + f[2], 0);
@@ -943,6 +953,32 @@ public final class MobileBridgeServer: @unchecked Sendable {
       }
     };
 
+    // P57: the daemon tails the agent's own session file and sends typed items. Once any arrive,
+    // this session renders from them (real user/agent bubbles + one-line tool rows) and the raw
+    // PTY stream stops feeding the transcript — it still feeds rawOutput for Preview/port detection.
+    const CARD_KINDS = ["diff", "preview", "pr", "prdone"];
+    function applyTranscript(t) {
+      if (!cur) return;
+      if (t.reset || !cur.transcript) {
+        cur.transcript = true;
+        cur.seen = new Set();
+        cur.out = cur.out.filter(x => CARD_KINDS.includes(x[0]));
+      }
+      for (const it of t.items || []) {
+        if (cur.seen.has(it.id)) continue;
+        cur.seen.add(it.id);
+        if (it.role === "user") cur.out.push(["user", it.text]);
+        else if (it.role === "assistant") cur.out.push(["agent", it.text]);
+        else {
+          const line = (it.toolName || "Tool") + (it.toolTarget ? " " + it.toolTarget : "");
+          cur.out.push(["tool", line]);
+          if (it.toolName === "Edit" || it.toolName === "Write" || it.toolName === "MultiEdit") scheduleGitDiff();
+        }
+      }
+      if (cur.out.length > 400) cur.out = cur.out.slice(-400);
+      renderPane();
+    }
+
     function handleWSJSON(msg) {
       if (msg.deviceCredentials) {
         localStorage.setItem(credKey, JSON.stringify(msg.deviceCredentials));
@@ -986,6 +1022,7 @@ public final class MobileBridgeServer: @unchecked Sendable {
           }
         }
       }
+      if (msg.transcript) applyTranscript(msg.transcript);
       if (msg.ok === "attached") {
         if (cur) ws.send(JSON.stringify({ gitDiff: { path: cur.cwd } }));
       }
@@ -1079,6 +1116,7 @@ public final class MobileBridgeServer: @unchecked Sendable {
           cur.out.push(["preview", pUrl]);
         }
       }
+      if (cur.transcript) return;
       const lines = clean.split('\n').filter(l => l.trim().length > 0);
       for (const line of lines) {
         const trimmed = line.trim();
@@ -1594,6 +1632,14 @@ public final class MobileBridgeServer: @unchecked Sendable {
         var sessions: [Entry]
     }
     private struct AttachedAck: Encodable { var ok = "attached"; var surfaceID: String }
+    /// P57: `{"transcript":{"reset":true,"items":[…]}}`. `reset` = replace what the client shows
+    /// (first send after attach, or the agent switched sessions via /clear or /resume); otherwise
+    /// append. Absent entirely for a surface with no transcript — the client keeps its raw view.
+    struct TranscriptPush: Encodable {
+        struct Body: Encodable { var reset: Bool; var items: [TranscriptItem] }
+        var transcript: Body
+    }
+    static let transcriptBacklogLimit = 200
     private struct DetachedAck: Encodable { var ok = "detached" }
     private struct SpawnedAck: Encodable { var ok = "spawned"; var surfaceID: String }
 
@@ -1918,6 +1964,7 @@ public final class MobileBridgeServer: @unchecked Sendable {
         let previous = state.subscription
         state.subscription = nil
         state.surfaceID = nil
+        state.transcriptTimer = nil
         previous?.cancel()
 
         let client = DaemonClient()
@@ -1946,6 +1993,7 @@ public final class MobileBridgeServer: @unchecked Sendable {
             state.surfaceID = surfaceID
             state.subscription = subscription
             sendJSON(AttachedAck(surfaceID: surfaceID), on: connection)
+            startTranscriptTail(surfaceID: surfaceID, connection: connection, state: state)
             // Feature A: a phone tap/spawn reached here (the native GUI never calls this bridge),
             // so jump the Mac's own window to the same session and bring it to the foreground. The
             // selects move the daemon-authoritative selection (GUI follows via snapshot sync); the
@@ -1958,11 +2006,40 @@ public final class MobileBridgeServer: @unchecked Sendable {
         }
     }
 
+    /// P57: streams the attached agent's own transcript (Claude today) as typed items, so the
+    /// phone shows real user/assistant/tool bubbles instead of ANSI-stripped TUI redraws.
+    /// Re-resolves pid → transcript every tick: `/clear` and `/resume` swap the session file.
+    private func startTranscriptTail(surfaceID: String, connection: NWConnection, state: ConnectionState) {
+        var url: URL?
+        var offset = 0
+        let timer = DispatchSource.makeTimerSource(queue: state.controlQueue)
+        timer.schedule(deadline: .now(), repeating: 1.0, leeway: .milliseconds(250))
+        timer.setEventHandler { [weak self, weak connection, weak state] in
+            guard let self, let connection, let state, state.surfaceID == surfaceID,
+                  let snap = AgentDetector.snapshot(forSurfaceKey: surfaceID), snap.kind == .claudeCode,
+                  let current = ClaudeSessionLocator.transcriptURL(pid: snap.pid) else { return }
+            var reset = false
+            if current != url { url = current; offset = 0; reset = true }
+            guard let read = AgentHistoryScanner.readJSONLLines(from: current, fromOffset: offset) else {
+                offset = 0 // truncated or replaced: start over next tick
+                return
+            }
+            offset = read.endOffset
+            var items = read.lines.flatMap(ClaudeTranscriptLine.items(from:))
+            if reset { items = Array(items.suffix(Self.transcriptBacklogLimit)) }
+            guard reset || !items.isEmpty else { return }
+            self.sendJSON(TranscriptPush(transcript: .init(reset: reset, items: items)), on: connection)
+        }
+        state.transcriptTimer = timer
+        timer.resume()
+    }
+
     private func handleDetach(connection: NWConnection, state: ConnectionState) {
         // Same nil-before-cancel ordering as `handleAttach` — see its comment.
         let previous = state.subscription
         state.subscription = nil
         state.surfaceID = nil
+        state.transcriptTimer = nil
         previous?.cancel()
         sendJSON(DetachedAck(), on: connection)
     }
@@ -2879,6 +2956,7 @@ public final class MobileBridgeServer: @unchecked Sendable {
             if error != nil {
                 state.subscription?.cancel()
                 state.snapshotSubscription?.cancel()
+                state.transcriptTimer = nil
                 return
             }
             if let data { state.frameBuffer.append(data) }
@@ -3080,6 +3158,7 @@ public final class MobileBridgeServer: @unchecked Sendable {
                     }
                     state.subscription?.cancel()
                     state.subscription = nil
+                    state.transcriptTimer = nil
                     // Connection is going away for good (unlike a per-attach detach), so the
                     // whole-connection session-list subscription dies with it too.
                     state.snapshotSubscription?.cancel()
