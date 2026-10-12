@@ -5,6 +5,39 @@ All notable changes to Kouen are documented here. The format is based on
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Each released version
 has a matching `vX.Y.Z` tag and a signed, notarized DMG on
 [GitHub Releases](https://github.com/Vit129/kouen-terminal/releases).
+## [4.21.2] - 2026-10-12
+
+### Added
+- P51 Kouen Companion PWA (plain text chat, diff/preview cards, draft PR, no terminal emulator) ([`66ecde7`](https://github.com/Vit129/kouen-terminal/commit/66ecde7437c5822d4aeec25327a2391a59bb2a3f))
+- Replace mockup preview with real browser mirror ([`6c2096a`](https://github.com/Vit129/kouen-terminal/commit/6c2096a1beeddb180bd241cc411828b168d6ebc4))
+- Setup tailscale serve HTTPS pairing and clean up assets and fonts ([`9a859e6`](https://github.com/Vit129/kouen-terminal/commit/9a859e6212e55bf9879b35536618330da4072db6))
+- P51 Kouen Companion PWA (waiting for claude review and testing) ([`ac6d1c3`](https://github.com/Vit129/kouen-terminal/commit/ac6d1c31a5cac59e8ada25766fc19116f8d7198b))
+- Add kouen rc command to launch companion in Chrome (waiting for claude review and testing) ([`ecda596`](https://github.com/Vit129/kouen-terminal/commit/ecda596fdb61835e4f8460ad8af4973c3a020373))
+- Auto-open kouen rc when launching claude, agy, or codex (waiting for claude review and testing) ([`72f663a`](https://github.com/Vit129/kouen-terminal/commit/72f663ac567cab231d1a8c5fdf1ea46b541f2c64))
+- Open the Kouen Companion when copilot starts in remote mode ([`64ceb73`](https://github.com/Vit129/kouen-terminal/commit/64ceb738a67329508c8f12f17e018227939f977f))
+
+### Changed
+- Split history model, extract graphify cache, and deduplicate jsonl reader ([`a6d87d0`](https://github.com/Vit129/kouen-terminal/commit/a6d87d0640d68b0bf8c1a6623c2e87dbc7da70fb))
+- P52 history model separation and JSONL reader deduplication (waiting for claude review and testing) ([`7891523`](https://github.com/Vit129/kouen-terminal/commit/789152393ab915654677e44bc76390dd99c1fe45))
+
+### Documentation
+- Update agent-memory location to central agent-memory-private ([`69116c1`](https://github.com/Vit129/kouen-terminal/commit/69116c16d4f48ae8e907420d6b15cef9fd043223))
+
+### Fixed
+- Align client ack key handling with draftPRCreated and fileAttached responses ([`fe24d77`](https://github.com/Vit129/kouen-terminal/commit/fe24d77a8b84c70f3041e0febd011000d43dc7e5))
+- Prevent XSS in PR cards and enforce session-scoped cwd ([`8054a4c`](https://github.com/Vit129/kouen-terminal/commit/8054a4c3eb91e18ff0f8b9f311b3fca9222571f5))
+- Prevent subprocess deadlocks and enforce timeouts on gh and git ([`85b5b99`](https://github.com/Vit129/kouen-terminal/commit/85b5b99147cb3d286926e5a22481433ca72af3b0))
+- Send attached file path to agent and submit with carriage return ([`28fa1e0`](https://github.com/Vit129/kouen-terminal/commit/28fa1e09ba5b0ec9cab5f235b786cf2e7cbf64d5))
+- Make draft PR creation one-tap without confirmation sheet ([`e917cfd`](https://github.com/Vit129/kouen-terminal/commit/e917cfd7ee89ba748283f6bb76ae4a291deac8a3))
+- Isolate release bump staging and guard dirty main in full-cycle (waiting for claude review and testing) ([`c68c7a7`](https://github.com/Vit129/kouen-terminal/commit/c68c7a7f2e444d43347c3407e0d4a29900f87aa9))
+- Parse space-separated microsecond timestamps for Antigravity ([`dc4012a`](https://github.com/Vit129/kouen-terminal/commit/dc4012aeeaf2fd741b5c4a6001ce03e1c5749dc9))
+- Stop kouen rc from enabling the mobile bridge and hardcoding port 7777 ([`f413d48`](https://github.com/Vit129/kouen-terminal/commit/f413d48cd11c5143c948df211b193ef0c8352724))
+- Review fixes for the P56 companion and history follow-ups ([`ee243be`](https://github.com/Vit129/kouen-terminal/commit/ee243be325cf4cd109ca92c91ceae384b25d6fb7))
+- Find tailscale on Apple Silicon, block symlink cwd escape, drop guessed preview port ([`a00a6c4`](https://github.com/Vit129/kouen-terminal/commit/a00a6c462fc030811dccc6a8fd0a38249312d2fd))
+- Guard os.Logger so the Linux headless build compiles again ([`7706a53`](https://github.com/Vit129/kouen-terminal/commit/7706a531a8aed7628672d96fbc39d3020d74d553))
+- Write kouen rc errors via FileHandle so Linux strict concurrency compiles ([`585d45a`](https://github.com/Vit129/kouen-terminal/commit/585d45aab8dcb0525b7d4a7b39fef0c3d2249133))
+
+
 ## [4.21.1] - 2026-10-09
 
 ### Added
