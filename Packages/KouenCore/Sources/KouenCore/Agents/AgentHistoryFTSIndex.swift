@@ -1,6 +1,8 @@
 import Foundation
 import KouenIPC
+#if canImport(os)
 import os
+#endif
 #if canImport(SQLite3)
 import SQLite3
 #endif
@@ -62,7 +64,9 @@ public struct CachedSessionEntry: Sendable {
 /// Manages indexing session metadata, transcripts, edited files, and tool names.
 public final class AgentHistoryFTSIndex: @unchecked Sendable {
     public static let shared = AgentHistoryFTSIndex()
+    #if canImport(os)
     private static let logger = Logger(subsystem: "com.vit129.kouen", category: "history")
+    #endif
 
     public static let schemaVersion: Int32 = 2
 
@@ -92,7 +96,11 @@ public final class AgentHistoryFTSIndex: @unchecked Sendable {
     #if canImport(SQLite3)
     private func logStepFailure(_ stepResult: Int32, context: String) {
         let errMsg = db.flatMap { sqlite3_errmsg($0) }.map { String(cString: $0) } ?? "unknown error"
+        #if canImport(os)
         Self.logger.error("\(context, privacy: .public) failed with code \(stepResult): \(errMsg, privacy: .public)")
+        #else
+        print("[AgentHistoryFTSIndex] \(context) failed with code \(stepResult): \(errMsg)")
+        #endif
     }
 
     /// Runs a statement, logging (not ignoring) any failure. Returns false on failure.
