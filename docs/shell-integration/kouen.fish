@@ -50,7 +50,7 @@ if set -q KOUEN; and set -q KOUEN_CLAUDE_SESSION_MODE; and not set -q __kouen_cl
         end
         if test $rc -eq 1
             /usr/bin/open -a "Google Chrome" "https://claude.ai/code" >/dev/null 2>&1 &
-            /usr/bin/open -a "Google Chrome" "http://localhost:7777" >/dev/null 2>&1 &
+            __kouen_next rc >/dev/null 2>&1
             if type -q happy; and test -f "$HOME/.happy/access.key"
                 set -l claude_path $HAPPY_CLAUDE_PATH
                 test -n "$claude_path"; or set claude_path (type -p claude)
@@ -63,7 +63,7 @@ if set -q KOUEN; and set -q KOUEN_CLAUDE_SESSION_MODE; and not set -q __kouen_cl
         else if test "$KOUEN_CLAUDE_SESSION_MODE" = cloud; or test "$KOUEN_CLAUDE_SESSION_MODE" = remote-control
             if test "$KOUEN_CLAUDE_SESSION_MODE" = remote-control
                 /usr/bin/open -a "Google Chrome" "https://claude.ai/code" >/dev/null 2>&1 &
-                /usr/bin/open -a "Google Chrome" "http://localhost:7777" >/dev/null 2>&1 &
+                __kouen_next rc >/dev/null 2>&1
             end
             if type -q happy; and test -f "$HOME/.happy/access.key"
                 set -l claude_path $HAPPY_CLAUDE_PATH
@@ -107,7 +107,7 @@ if set -q KOUEN; and begin test "$KOUEN_CODEX_SESSION_MODE" = happy; or test "$K
         end
         if test "$KOUEN_CODEX_SESSION_MODE" = remote-control; or test $rc -eq 1
             /usr/bin/open -a "Google Chrome" "https://chatgpt.com" >/dev/null 2>&1 &
-            /usr/bin/open -a "Google Chrome" "http://localhost:7777" >/dev/null 2>&1 &
+            __kouen_next rc >/dev/null 2>&1
         end
         if type -q happy; and test -f "$HOME/.happy/access.key"
             happy codex $argv
@@ -143,7 +143,7 @@ if set -q KOUEN; and begin test "$KOUEN_AGY_SESSION_MODE" = remote-control; or t
         end
         if test "$KOUEN_AGY_SESSION_MODE" = remote-control; or test $rc -eq 1
             /usr/bin/open -a "Google Chrome" "https://antigravity.google.com" >/dev/null 2>&1 &
-            /usr/bin/open -a "Google Chrome" "http://localhost:7777" >/dev/null 2>&1 &
+            __kouen_next rc >/dev/null 2>&1
         end
         if test "$KOUEN_AGY_SESSION_MODE" = happy; and type -q happy
             happy agy $argv; return
@@ -209,8 +209,7 @@ if set -q KOUEN; and test "$KOUEN_HERMES_SESSION_MODE" = remote-control; and not
         __kouen_hermes_next --remote $argv
     end
 end
-# Kouen CLI wrapper: `kouen` command that supports `rc`/`--rc` to auto-open Chrome
-# and delegates any other commands to `kouen-cli`.
+# Kouen CLI wrapper: `kouen` delegates to `kouen-cli` (`kouen rc` opens the Companion).
 if set -q KOUEN; and not set -q __kouen_cli_wrapped
     set -g __kouen_cli_wrapped 1
     if functions -q kouen
@@ -230,20 +229,6 @@ if set -q KOUEN; and not set -q __kouen_cli_wrapped
         end
     end
     function kouen
-        set -l rc 0
-        if test "$argv[1]" = "rc"; or test "$argv[1]" = "companion"
-            set rc 1
-        end
-        for a in $argv
-            switch $a
-                case --remote-control --rc
-                    set rc 1
-            end
-        end
-        if test $rc -eq 1
-            set -x KOUEN_RC_OPENED 1
-            /usr/bin/open -a "Google Chrome" "http://localhost:7777" >/dev/null 2>&1 &
-        end
         __kouen_next $argv
     end
 end

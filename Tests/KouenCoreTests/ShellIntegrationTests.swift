@@ -85,7 +85,8 @@ final class ShellIntegrationTests: XCTestCase {
             XCTAssertTrue(s.contains("https://claude.ai/code"), "\(shell) wrapper must contain claude remote URL")
             XCTAssertTrue(s.contains("https://antigravity.google.com"), "\(shell) wrapper must contain antigravity remote URL")
             XCTAssertTrue(s.contains("https://chatgpt.com"), "\(shell) wrapper must contain codex remote URL")
-            XCTAssertTrue(s.contains("http://localhost:7777"), "\(shell) wrapper must contain kouen companion remote URL")
+            XCTAssertTrue(s.contains("__kouen_next rc"), "\(shell) wrapper must open the companion via kouen-cli rc")
+            XCTAssertFalse(s.contains("localhost:7777"), "\(shell) wrapper must not hardcode the companion port")
         }
     }
 

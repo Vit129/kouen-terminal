@@ -23,22 +23,21 @@ extension KouenCLI {
             return 0
         }
 
-        var targetURL = "http://localhost:7777"
-
-        if let client = try? makeClient(args) {
-            if let response = try? client.request(.mobilePairingInfo, timeout: 1),
-               case let .mobilePairingInfo(url, _, enabled) = response {
-                if !enabled {
-                    _ = try? client.request(.setMobileBridgeEnabled(true), timeout: 1)
-                    if let updatedResponse = try? client.request(.mobilePairingInfo, timeout: 1),
-                       case let .mobilePairingInfo(updatedUrl, _, _) = updatedResponse,
-                       let u = updatedUrl {
-                        targetURL = u
-                    }
-                } else if let u = url {
-                    targetURL = u
-                }
-            }
+        // Never turn the bridge on from here: it exposes a token-gated WebSocket to the
+        // network, so enabling it stays an explicit Settings → Remote choice.
+        let client: DaemonClient
+        do { client = try makeClient(args) } catch {
+            fputs("kouen-cli rc: daemon not reachable: \(error)\n", stderr)
+            return 1
+        }
+        guard let response = try? client.request(.mobilePairingInfo, timeout: 1),
+              case let .mobilePairingInfo(url, _, enabled) = response else {
+            fputs("kouen-cli rc: daemon did not return pairing info\n", stderr)
+            return 1
+        }
+        guard enabled, let targetURL = url else {
+            fputs("kouen-cli rc: the Kouen Companion is off. Turn it on in Settings → Remote.\n", stderr)
+            return 1
         }
 
         if args.contains("--json") {
@@ -57,10 +56,7 @@ extension KouenCLI {
         }
 
         print("Opening Kouen Companion in Google Chrome: \(targetURL)")
-
-        let shouldOpen = !args.contains("--no-open")
-        let alreadyOpened = ProcessInfo.processInfo.environment["KOUEN_RC_OPENED"] == "1"
-        if shouldOpen && (!alreadyOpened || targetURL != "http://localhost:7777") {
+        if !args.contains("--no-open") {
             #if os(macOS)
             let openProcess = Process()
             openProcess.executableURL = URL(fileURLWithPath: "/usr/bin/open")
