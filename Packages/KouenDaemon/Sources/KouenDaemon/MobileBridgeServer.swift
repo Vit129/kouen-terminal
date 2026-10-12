@@ -418,6 +418,7 @@ public final class MobileBridgeServer: @unchecked Sendable {
       /* Output */
       .out{padding:12px 16px;display:flex;flex-direction:column;gap:10px;font-size:14px}
       .msg{min-width:0}
+      .msg.bot{align-self:flex-start;background:var(--surface);border:1px solid var(--line);padding:8px 12px;border-radius:14px 14px 14px 4px;max-width:92%;white-space:pre-wrap;overflow-wrap:anywhere}
       .msg.user{align-self:flex-end;background:var(--accent);color:var(--accent-ink);padding:8px 12px;border-radius:14px 14px 4px 14px;max-width:85%}
       .tool{font-family:var(--f-mono);font-size:12px;color:var(--muted);background:var(--code-bg);border:1px solid var(--line);border-radius:8px;padding:6px 10px;overflow-x:auto;white-space:pre}
       .ask{border:1px solid var(--warn);background:var(--warn-soft);border-radius:12px;padding:10px 12px;display:flex;flex-direction:column;gap:8px}
@@ -572,6 +573,7 @@ public final class MobileBridgeServer: @unchecked Sendable {
       return (str || '')
         .replace(/\x1b\][^\x07\x1b]*(\x07|\x1b\\)/g, '')
         .replace(/\x1b\[[0-?]*[ -\/]*[@-~]/g, '')
+        .replace(/\x1b[()*+\-.\/][ -~]/g, '')
         .replace(/\x1b[@-Z\\-_]/g, '')
         .replace(/\r\n/g, '\n')
         .replace(/\r/g, '');
@@ -640,6 +642,7 @@ public final class MobileBridgeServer: @unchecked Sendable {
 
       p.innerHTML = '<div class="out">' + items.map(([k, t]) => {
         if (k === "user") return `<div class="msg user">${esc(t)}</div>`;
+        if (k === "agent") return `<div class="msg bot">${esc(t)}</div>`;
         if (k === "tool") return `<div class="tool${t.startsWith("Edit") ? " edit-link" : ""}">${esc(t)}</div>`;
         if (k === "diff") {
           const a = cur.files.reduce((x, f) => x + f[1], 0), d = cur.files.reduce((x, f) => x + f[2], 0);
@@ -950,6 +953,32 @@ public final class MobileBridgeServer: @unchecked Sendable {
       }
     };
 
+    // P57: the daemon tails the agent's own session file and sends typed items. Once any arrive,
+    // this session renders from them (real user/agent bubbles + one-line tool rows) and the raw
+    // PTY stream stops feeding the transcript — it still feeds rawOutput for Preview/port detection.
+    const CARD_KINDS = ["diff", "preview", "pr", "prdone"];
+    function applyTranscript(t) {
+      if (!cur) return;
+      if (t.reset || !cur.transcript) {
+        cur.transcript = true;
+        cur.seen = new Set();
+        cur.out = cur.out.filter(x => CARD_KINDS.includes(x[0]));
+      }
+      for (const it of t.items || []) {
+        if (cur.seen.has(it.id)) continue;
+        cur.seen.add(it.id);
+        if (it.role === "user") cur.out.push(["user", it.text]);
+        else if (it.role === "assistant") cur.out.push(["agent", it.text]);
+        else {
+          const line = (it.toolName || "Tool") + (it.toolTarget ? " " + it.toolTarget : "");
+          cur.out.push(["tool", line]);
+          if (it.toolName === "Edit" || it.toolName === "Write" || it.toolName === "MultiEdit") scheduleGitDiff();
+        }
+      }
+      if (cur.out.length > 400) cur.out = cur.out.slice(-400);
+      renderPane();
+    }
+
     function handleWSJSON(msg) {
       if (msg.deviceCredentials) {
         localStorage.setItem(credKey, JSON.stringify(msg.deviceCredentials));
@@ -993,6 +1022,7 @@ public final class MobileBridgeServer: @unchecked Sendable {
           }
         }
       }
+      if (msg.transcript) applyTranscript(msg.transcript);
       if (msg.ok === "attached") {
         if (cur) ws.send(JSON.stringify({ gitDiff: { path: cur.cwd } }));
       }
@@ -1086,6 +1116,7 @@ public final class MobileBridgeServer: @unchecked Sendable {
           cur.out.push(["preview", pUrl]);
         }
       }
+      if (cur.transcript) return;
       const lines = clean.split('\n').filter(l => l.trim().length > 0);
       for (const line of lines) {
         const trimmed = line.trim();
