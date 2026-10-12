@@ -468,6 +468,7 @@ final class AgentHistoryScannerTests: XCTestCase {
 
     // A schema bump drops session_records; if session_index_meta survived, needsReindex()
     // would skip unchanged transcripts and those sessions would vanish from History.
+    #if canImport(SQLite3)
     func testFTSSchemaBumpForcesReindexOfUnchangedSessions() {
         let tempDB = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("test_fts_migrate_\(UUID().uuidString).sqlite")
         defer { try? FileManager.default.removeItem(at: tempDB) }
@@ -491,4 +492,5 @@ final class AgentHistoryScannerTests: XCTestCase {
         let reopened = AgentHistoryFTSIndex(dbPath: tempDB.path)
         XCTAssertTrue(reopened.needsReindex(sessionID: "old", mtime: mtime, fileSize: 10))
     }
+    #endif
 }
