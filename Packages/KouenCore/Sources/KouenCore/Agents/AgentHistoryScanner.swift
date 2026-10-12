@@ -398,6 +398,28 @@ public actor AgentHistoryScanner {
     /// avoiding full-file String allocation and redundant UTF-8 re-encoding.
     static func readJSONLLines(from fileURL: URL) -> (lines: [Data], fileSize: Int)? {
         guard let data = try? Data(contentsOf: fileURL, options: .mappedIfSafe), !data.isEmpty else { return nil }
+        let lines = trimmedLines(data)
+        guard !lines.isEmpty else { return nil }
+        return (lines, data.count)
+    }
+
+    /// Live-tail variant: the complete lines appended since `fromOffset`, plus the offset to pass
+    /// next time. A trailing line with no newline yet is held back (the writer is mid-append), so
+    /// `endOffset` stops after the last newline. nil = unreadable, or the file shrank below
+    /// `fromOffset` (truncated/replaced) — the caller restarts from 0.
+    public static func readJSONLLines(from fileURL: URL, fromOffset: Int) -> (lines: [Data], endOffset: Int)? {
+        guard let handle = try? FileHandle(forReadingFrom: fileURL) else { return nil }
+        defer { try? handle.close() }
+        guard let size = try? handle.seekToEnd(), Int(size) >= fromOffset else { return nil }
+        guard Int(size) > fromOffset else { return ([], fromOffset) }
+        try? handle.seek(toOffset: UInt64(fromOffset))
+        guard let chunk = try? handle.readToEnd(),
+              let lastNewline = chunk.lastIndex(of: UInt8(ascii: "\n")) else { return ([], fromOffset) }
+        let complete = chunk[chunk.startIndex...lastNewline]
+        return (trimmedLines(Data(complete)), fromOffset + complete.count)
+    }
+
+    private static func trimmedLines(_ data: Data) -> [Data] {
         let rawSlices = data.split(separator: UInt8(ascii: "\n"))
         var lines: [Data] = []
         lines.reserveCapacity(rawSlices.count)
@@ -414,8 +436,7 @@ public actor AgentHistoryScanner {
                 lines.append(slice[start..<end])  // a slice of the mapped file, no copy
             }
         }
-        guard !lines.isEmpty else { return nil }
-        return (lines, data.count)
+        return lines
     }
 
     private var cachedRecords: [AgentSessionRecord] = []
@@ -656,17 +677,7 @@ public actor AgentHistoryScanner {
                 }
                 let role = (msg["role"] as? String)?.lowercased() ?? ""
                 if role == "user" && firstPrompt == nil {
-                    var textContent = ""
-                    if let contentStr = msg["content"] as? String {
-                        textContent = contentStr
-                    } else if let contentArr = msg["content"] as? [[String: Any]] {
-                        for item in contentArr {
-                            if let text = item["text"] as? String {
-                                textContent += text
-                            }
-                        }
-                    }
-                    let trimmed = textContent.trimmingCharacters(in: .whitespacesAndNewlines)
+                    let trimmed = ClaudeTranscriptLine.messageText(msg).trimmingCharacters(in: .whitespacesAndNewlines)
                     if !trimmed.isEmpty {
                         firstPrompt = trimmed
                     }
@@ -683,18 +694,7 @@ public actor AgentHistoryScanner {
             }
 
             let role = (msg["role"] as? String)?.lowercased() ?? ""
-            var textContent = ""
-            if let contentStr = msg["content"] as? String {
-                textContent = contentStr
-            } else if let contentArr = msg["content"] as? [[String: Any]] {
-                for item in contentArr {
-                    if let text = item["text"] as? String {
-                        textContent += text
-                    }
-                }
-            }
-
-            let trimmed = textContent.trimmingCharacters(in: .whitespacesAndNewlines)
+            let trimmed = ClaudeTranscriptLine.messageText(msg).trimmingCharacters(in: .whitespacesAndNewlines)
             if !trimmed.isEmpty {
                 let turnRole = (role == "user") ? "YOU" : "AGENT"
                 if turns.count >= Self.maxLatestTurns { turns.removeFirst() }
