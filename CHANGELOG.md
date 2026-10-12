@@ -18,7 +18,6 @@ has a matching `vX.Y.Z` tag and a signed, notarized DMG on
 - Preview lists every artifact link at its newest version ([`c76075e`](https://github.com/Vit129/kouen-terminal/commit/c76075ea637753dbfe32e3d1e71432f7dd21c21b))
 - Limit Companion file reads to the session cwd and agy's brain dir ([`b824503`](https://github.com/Vit129/kouen-terminal/commit/b82450384fcc4c1681a4cef49b7fc5f0feb2c3d8))
 
-
 ## [4.21.3] - 2026-10-12
 
 ### Fixed
