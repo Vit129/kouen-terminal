@@ -698,15 +698,16 @@ public final class MobileBridgeServer: @unchecked Sendable {
       );
     }
 
-    // Artifact link formats per agent. Claude and Copilot are taken from real session logs;
-    // Codex is its cloud-task URL; Antigravity prints no artifact URL of its own yet, so its
-    // links (and anything else artifact-like) fall to the generic "Link" row.
+    // Artifact link formats per agent. Claude, Copilot and Antigravity are taken from real
+    // session logs; Codex is its cloud-task URL; anything else artifact-like is a generic "Link".
+    // Antigravity artifacts are local files it rewrites in place (brain/<conversation>/<name>),
+    // so the file on disk is always the newest version; the daemon reads it for the phone.
     const ARTIFACT_KINDS = [
       ["Claude", /^https:\/\/claude\.ai\/(?:code\/)?artifacts?\//i],
       ["Copilot", /^https:\/\/github\.com\/copilot\/tasks\//i],
       ["Codex", /^https:\/\/chatgpt\.com\/codex\/tasks\//i],
-      ["Antigravity", /^https:\/\/(?:[a-z0-9-]+\.)*antigravity\.google\//i],
-      ["Link", /(?:artifact|preview|page)/i],
+      ["Antigravity", /^file:\/\/\/.*\/antigravity-cli\/brain\/[0-9a-f-]+\/[^/.][^/]*\.(?:md|html?)$/i],
+      ["Link", /^https?:.*(?:artifact|preview|page)/i],
     ];
 
     // One entry per link, each at its newest version: links that differ only by a version
@@ -714,7 +715,7 @@ public final class MobileBridgeServer: @unchecked Sendable {
     // Order is by agent kind, then first appearance, so chips don't reshuffle as versions stream in.
     function latestArtifactLinks(text) {
       const latest = new Map();
-      for (const m of (text || "").matchAll(/https?:\/\/[^\s<>"'`)\]]+/gi)) {
+      for (const m of (text || "").matchAll(/(?:https?|file):\/\/[^\s<>"'`)\]]+/gi)) {
         const url = m[0].replace(/[.,;:]+$/, "");
         const kind = ARTIFACT_KINDS.find(([, re]) => re.test(url));
         if (!kind) continue;
@@ -749,6 +750,7 @@ public final class MobileBridgeServer: @unchecked Sendable {
         return;
       }
       const url = src[pv][1];
+      const localFile = url.startsWith("file://");
 
       let bodyHTML = "";
       let captionText = "";
@@ -764,7 +766,7 @@ public final class MobileBridgeServer: @unchecked Sendable {
           </div>
         `;
         captionText = "Mirrored live from Mac via Kouen browser mirror.";
-      } else if (pv === "html") {
+      } else if (pv === "html" || localFile) {
         bodyHTML = `
           <div id="pv-html-content" style="background:#fff;border-radius:8px;min-height:200px;border:1px solid var(--line);padding:12px">
             <div style="color:var(--muted);font-size:13px;text-align:center;padding:24px 0">Loading workspace file…</div>
@@ -800,8 +802,9 @@ public final class MobileBridgeServer: @unchecked Sendable {
         if (rBtn) rBtn.onclick = () => { if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ browserReload: true })); };
         const sBtn = $("pv-snap");
         if (sBtn) sBtn.onclick = () => { if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ browserScreenshot: true })); };
-      } else if (pv === "html") {
-        const fullPath = cur.cwd ? (cur.cwd.replace(/\/$/, '') + '/' + url) : url;
+      } else if (pv === "html" || localFile) {
+        const fullPath = localFile ? decodeURIComponent(url.slice("file://".length))
+          : cur.cwd ? (cur.cwd.replace(/\/$/, '') + '/' + url) : url;
         if (ws && ws.readyState === WebSocket.OPEN) {
           ws.send(JSON.stringify({ readFile: { path: fullPath } }));
         }
