@@ -12,6 +12,11 @@ import Foundation
 public enum AgentDetector {
     /// Process-table snapshot updated on each scan.
     nonisolated(unsafe) private static var lastSurfaceSnapshots: [String: AgentSnapshot] = [:]
+    /// The primary `scan` last reported as a change. Separate from `lastSurfaceSnapshots`
+    /// because `recordActivity`/`setActivity` flip that one to `.working` in place, so diffing
+    /// against it swallowed the idle→working edge and the tab never left `.idle`.
+    /// Guarded by `snapshotsLock`.
+    nonisolated(unsafe) private static var lastReportedPrimary: [String: AgentSnapshot] = [:]
     private static let snapshotsLock = NSLock()
 
     /// PID of the shell that owns each surface (set by the daemon when it
@@ -55,6 +60,7 @@ public enum AgentDetector {
 
         snapshotsLock.lock()
         lastSurfaceSnapshots.removeValue(forKey: key)
+        lastReportedPrimary.removeValue(forKey: key)
         snapshotsLock.unlock()
 
         hintsLock.lock()
@@ -254,11 +260,12 @@ public enum AgentDetector {
             subagentsLock.unlock()
 
             let resolved = AgentDetection(primary: resolvedPrimary, subagents: resolvedSubagents)
-            let priorDetection = AgentDetection(primary: prior, subagents: priorSubagents)
+            let priorDetection = AgentDetection(primary: lastReportedPrimary[key], subagents: priorSubagents)
             if resolved != priorDetection {
                 changes[key] = resolved
             }
             lastSurfaceSnapshots[key] = resolvedPrimary
+            lastReportedPrimary[key] = resolvedPrimary
             snapshotsLock.unlock()
         }
         return changes

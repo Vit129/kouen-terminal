@@ -6,6 +6,12 @@ import XCTest
 final class MobileBridgeContractTests: XCTestCase {
     /// `.panel-bg`/`.toast` set `display:flex`, which beats the UA `[hidden]` rule — without this
     /// override the empty sheet and toast show on every load.
+    /// Claude Code emits CSI with private `<`/`>`/`=` params (kitty keyboard, modifyOtherKeys);
+    /// the old `[0-9;?]` class let `[<u`, `[>5u`, `[>4;2m` leak into the transcript.
+    func testStripANSIMatchesFullCSIGrammar() {
+        XCTAssertTrue(MobileBridgeServer.embeddedPageHTML.contains(#"/\x1b\[[0-?]*[ -\/]*[@-~]/g"#))
+    }
+
     func testPageCSSKeepsHiddenElementsHidden() {
         XCTAssertTrue(MobileBridgeServer.embeddedPageHTML.contains("[hidden]{display:none !important}"))
     }
@@ -232,6 +238,23 @@ final class MobileBridgeContractTests: XCTestCase {
         XCTAssertEqual(escaped, .failure(.foreignPathRejected))
         let inside = MobileBridgeServer.resolveAuthorizedCwd(requestedPath: cwd.path, surfaceID: "s", surfaceLookup: { _ in cwd.path })
         XCTAssertNotNil(try? inside.get())
+    }
+
+    func testReadFileIsLimitedToSessionCwdAndAgyBrain() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        let cwd = root.appendingPathComponent("repo"), brain = root.appendingPathComponent("brain")
+        try FileManager.default.createDirectory(at: cwd, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: brain, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        func check(_ p: String) -> String? {
+            MobileBridgeServer.authorizedReadPath(p, surfaceID: "s", surfaceLookup: { _ in cwd.path }, extraRoots: [brain.path])
+        }
+
+        XCTAssertNotNil(check(cwd.appendingPathComponent("index.html").path))
+        XCTAssertNotNil(check(brain.appendingPathComponent("conv/showcase.md").path))
+        XCTAssertNil(check(NSHomeDirectory() + "/.ssh/id_ed25519"))
+        XCTAssertNil(check(brain.path + "/../repo-sibling/x"))
+        XCTAssertNil(check("/etc/passwd"))
     }
 }
 #endif

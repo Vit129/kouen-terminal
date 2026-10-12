@@ -32,7 +32,10 @@ final class AgentDetectorTests: XCTestCase {
         XCTAssertTrue(AgentDetector.scan(table: table, workingWindow: window).isEmpty)
 
         AgentDetector.recordActivity(forSurfaceKey: surfaceKey)
-        _ = AgentDetector.scan(table: table, workingWindow: window)
+        // The idle→working edge must come back as a change — that's the only path into the
+        // registry (`applyAgentChanges`), so a swallowed edge left the tab `.idle` for good.
+        let workingChanges = AgentDetector.scan(table: table, workingWindow: window)
+        XCTAssertEqual(workingChanges[surfaceKey]?.primary?.activity, .working)
         XCTAssertEqual(AgentDetector.snapshot(forSurfaceKey: surfaceKey)?.activity, .working)
         XCTAssertTrue(AgentDetector.scan(table: table, workingWindow: window).isEmpty)
 
