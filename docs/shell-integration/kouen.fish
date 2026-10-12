@@ -177,6 +177,9 @@ if set -q KOUEN; and begin test "$KOUEN_COPILOT_SESSION_MODE" = remote-control; 
                     set rc 1
             end
         end
+        if test "$KOUEN_COPILOT_SESSION_MODE" = remote-control; or test $rc -eq 1
+            __kouen_next rc >/dev/null 2>&1
+        end
         if test "$KOUEN_COPILOT_SESSION_MODE" = happy; and type -q happy
             happy acp -- copilot --acp $argv; return
         end

@@ -136,6 +136,9 @@ if [ -n "$KOUEN" ] && ([ "$KOUEN_COPILOT_SESSION_MODE" = "remote-control" ] || [
         --remote) rc=1 ;;
       esac
     done
+    if [[ "$KOUEN_COPILOT_SESSION_MODE" == "remote-control" || $rc -eq 1 ]]; then
+      (__kouen_next rc >/dev/null 2>&1 &)
+    fi
     if command -v happy >/dev/null 2>&1 && [[ "$KOUEN_COPILOT_SESSION_MODE" == "happy" ]]; then happy acp -- copilot --acp "$@"; return; fi
     if (( rc )); then __kouen_copilot_next "$@"; else __kouen_copilot_next --remote "$@"; fi
   }
