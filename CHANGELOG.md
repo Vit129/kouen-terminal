@@ -5,6 +5,12 @@ All notable changes to Kouen are documented here. The format is based on
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Each released version
 has a matching `vX.Y.Z` tag and a signed, notarized DMG on
 [GitHub Releases](https://github.com/Vit129/kouen-terminal/releases).
+## [4.21.3] - 2026-10-12
+
+### Fixed
+- Keep hidden panel and toast hidden so the companion isn't blank ([`07eeafe`](https://github.com/Vit129/kouen-terminal/commit/07eeafec4cc6d41773d48dfd3395a5f13b596913))
+
+
 ## [4.21.2] - 2026-10-12
 
 ### Added
