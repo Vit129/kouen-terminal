@@ -698,17 +698,34 @@ public final class MobileBridgeServer: @unchecked Sendable {
       );
     }
 
-    // One entry per artifact, each at its newest version: links that differ only by a version
+    // Artifact link formats per agent. Claude and Copilot are taken from real session logs;
+    // Codex is its cloud-task URL; Antigravity prints no artifact URL of its own yet, so its
+    // links (and anything else artifact-like) fall to the generic "Link" row.
+    const ARTIFACT_KINDS = [
+      ["Claude", /^https:\/\/claude\.ai\/(?:code\/)?artifacts?\//i],
+      ["Copilot", /^https:\/\/github\.com\/copilot\/tasks\//i],
+      ["Codex", /^https:\/\/chatgpt\.com\/codex\/tasks\//i],
+      ["Antigravity", /^https:\/\/(?:[a-z0-9-]+\.)*antigravity\.google\//i],
+      ["Link", /(?:artifact|preview|page)/i],
+    ];
+
+    // One entry per link, each at its newest version: links that differ only by a version
     // marker (?v=N, /v/N, /versions/N) or query/hash collapse to the last one printed.
-    // Order is first appearance so tabs don't reshuffle as new versions stream in.
+    // Order is by agent kind, then first appearance, so chips don't reshuffle as versions stream in.
     function latestArtifactLinks(text) {
       const latest = new Map();
-      for (const m of (text || "").matchAll(/https?:\/\/[^\s<>"'`)\]]*(?:artifact|preview|page)[^\s<>"'`)\]]*/gi)) {
+      for (const m of (text || "").matchAll(/https?:\/\/[^\s<>"'`)\]]+/gi)) {
         const url = m[0].replace(/[.,;:]+$/, "");
+        const kind = ARTIFACT_KINDS.find(([, re]) => re.test(url));
+        if (!kind) continue;
         const key = url.replace(/[?#].*$/, "").replace(/\/(?:v|versions?)\/[^/]+\/?$/i, "").replace(/\/$/, "");
-        latest.set(key, url); // re-set keeps the key's first-seen position, updates the URL
+        latest.set(key, [kind[0], url]); // re-set keeps the key's first-seen position, updates the URL
       }
-      return [...latest.values()];
+      const links = [...latest.values()];
+      return ARTIFACT_KINDS.flatMap(([k]) => {
+        const ofKind = links.filter(l => l[0] === k);
+        return ofKind.map((l, i) => [ofKind.length > 1 ? `${k} ${i + 1}` : k, l[1]]);
+      });
     }
 
     function openPreview() {
@@ -724,9 +741,7 @@ public final class MobileBridgeServer: @unchecked Sendable {
       if (htmlFile) {
         src.html = ["HTML file", htmlFile[0]];
       }
-      arts.forEach((u, i) => {
-        src["art" + i] = [arts.length > 1 ? `Artifact ${i + 1}` : "Artifact", u];
-      });
+      arts.forEach((a, i) => { src["art" + i] = a; });
 
       if (!src[pv]) pv = Object.keys(src)[0];
       if (!pv) {
