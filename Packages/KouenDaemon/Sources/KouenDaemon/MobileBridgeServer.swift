@@ -266,6 +266,13 @@ public final class MobileBridgeServer: @unchecked Sendable {
             set { lock.lock(); _snapshotSubscription = newValue; lock.unlock() }
         }
         private var _snapshotSubscription: DaemonSubscription?
+        /// P57: per-attach 1s poll that tails the attached agent's own transcript file. Replaced
+        /// on every attach, cancelled on detach and disconnect — same lifetime as `subscription`.
+        var transcriptTimer: DispatchSourceTimer? {
+            get { lock.lock(); defer { lock.unlock() }; return _transcriptTimer }
+            set { lock.lock(); let old = _transcriptTimer; _transcriptTimer = newValue; lock.unlock(); old?.cancel() }
+        }
+        private var _transcriptTimer: DispatchSourceTimer?
         /// Set once, at authorization — the id `PairedDeviceStore` tracks this
         /// connection under, so a `mobile-revoke-client` can cancel it specifically.
         var deviceID: String? {
@@ -1594,6 +1601,14 @@ public final class MobileBridgeServer: @unchecked Sendable {
         var sessions: [Entry]
     }
     private struct AttachedAck: Encodable { var ok = "attached"; var surfaceID: String }
+    /// P57: `{"transcript":{"reset":true,"items":[…]}}`. `reset` = replace what the client shows
+    /// (first send after attach, or the agent switched sessions via /clear or /resume); otherwise
+    /// append. Absent entirely for a surface with no transcript — the client keeps its raw view.
+    struct TranscriptPush: Encodable {
+        struct Body: Encodable { var reset: Bool; var items: [TranscriptItem] }
+        var transcript: Body
+    }
+    static let transcriptBacklogLimit = 200
     private struct DetachedAck: Encodable { var ok = "detached" }
     private struct SpawnedAck: Encodable { var ok = "spawned"; var surfaceID: String }
 
@@ -1918,6 +1933,7 @@ public final class MobileBridgeServer: @unchecked Sendable {
         let previous = state.subscription
         state.subscription = nil
         state.surfaceID = nil
+        state.transcriptTimer = nil
         previous?.cancel()
 
         let client = DaemonClient()
@@ -1946,6 +1962,7 @@ public final class MobileBridgeServer: @unchecked Sendable {
             state.surfaceID = surfaceID
             state.subscription = subscription
             sendJSON(AttachedAck(surfaceID: surfaceID), on: connection)
+            startTranscriptTail(surfaceID: surfaceID, connection: connection, state: state)
             // Feature A: a phone tap/spawn reached here (the native GUI never calls this bridge),
             // so jump the Mac's own window to the same session and bring it to the foreground. The
             // selects move the daemon-authoritative selection (GUI follows via snapshot sync); the
@@ -1958,11 +1975,40 @@ public final class MobileBridgeServer: @unchecked Sendable {
         }
     }
 
+    /// P57: streams the attached agent's own transcript (Claude today) as typed items, so the
+    /// phone shows real user/assistant/tool bubbles instead of ANSI-stripped TUI redraws.
+    /// Re-resolves pid → transcript every tick: `/clear` and `/resume` swap the session file.
+    private func startTranscriptTail(surfaceID: String, connection: NWConnection, state: ConnectionState) {
+        var url: URL?
+        var offset = 0
+        let timer = DispatchSource.makeTimerSource(queue: state.controlQueue)
+        timer.schedule(deadline: .now(), repeating: 1.0, leeway: .milliseconds(250))
+        timer.setEventHandler { [weak self, weak connection, weak state] in
+            guard let self, let connection, let state, state.surfaceID == surfaceID,
+                  let snap = AgentDetector.snapshot(forSurfaceKey: surfaceID), snap.kind == .claudeCode,
+                  let current = ClaudeSessionLocator.transcriptURL(pid: snap.pid) else { return }
+            var reset = false
+            if current != url { url = current; offset = 0; reset = true }
+            guard let read = AgentHistoryScanner.readJSONLLines(from: current, fromOffset: offset) else {
+                offset = 0 // truncated or replaced: start over next tick
+                return
+            }
+            offset = read.endOffset
+            var items = read.lines.flatMap(ClaudeTranscriptLine.items(from:))
+            if reset { items = Array(items.suffix(Self.transcriptBacklogLimit)) }
+            guard reset || !items.isEmpty else { return }
+            self.sendJSON(TranscriptPush(transcript: .init(reset: reset, items: items)), on: connection)
+        }
+        state.transcriptTimer = timer
+        timer.resume()
+    }
+
     private func handleDetach(connection: NWConnection, state: ConnectionState) {
         // Same nil-before-cancel ordering as `handleAttach` — see its comment.
         let previous = state.subscription
         state.subscription = nil
         state.surfaceID = nil
+        state.transcriptTimer = nil
         previous?.cancel()
         sendJSON(DetachedAck(), on: connection)
     }
@@ -2879,6 +2925,7 @@ public final class MobileBridgeServer: @unchecked Sendable {
             if error != nil {
                 state.subscription?.cancel()
                 state.snapshotSubscription?.cancel()
+                state.transcriptTimer = nil
                 return
             }
             if let data { state.frameBuffer.append(data) }
@@ -3080,6 +3127,7 @@ public final class MobileBridgeServer: @unchecked Sendable {
                     }
                     state.subscription?.cancel()
                     state.subscription = nil
+                    state.transcriptTimer = nil
                     // Connection is going away for good (unlike a per-attach detach), so the
                     // whole-connection session-list subscription dies with it too.
                     state.snapshotSubscription?.cancel()
