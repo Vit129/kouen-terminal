@@ -17,6 +17,7 @@ has a matching `vX.Y.Z` tag and a signed, notarized DMG on
 - Closing a split stops its terminal IO even while its last frame is animating out. Late resize requests on a closing output stream no longer produce “Surface not found.” errors.
 - Scrolling and reflow correctly upload relocated cached rows to the GPU, keeping terminal text and graphics aligned while retaining row reuse.
 - macOS service restarts recognize exited processes before their parents reap them, preventing false shutdown timeouts.
+- Disclosure sections open on the first click and report their expanded state to accessibility tools. Closing tool dialogs restores terminal focus, and Overview can open for a visible background window.
 
 ### Changed
 

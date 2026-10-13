@@ -154,18 +154,30 @@ final class HarnessToolPage: NSView {
 private final class ToolDocumentView: NSView { override var isFlipped: Bool { true } }
 
 @MainActor
+private final class ToolDisclosureButton: NSButton {
+    override func accessibilityPerformPress() -> Bool {
+        guard isEnabled, let action else { return false }
+        return sendAction(action, to: target)
+    }
+}
+
+@MainActor
 final class ToolSectionView: NSStackView {
     private var disclosure: NSButton?
     private var disclosureTitle = ""
+    private var detailsExpanded = false
     init(_ title: String, views: [NSView], collapsible: Bool = false) {
         super.init(frame: .zero)
         orientation = .vertical; alignment = .leading; spacing = HarnessDesign.Spacing.lg
         edgeInsets = NSEdgeInsets(top: 16, left: 16, bottom: 16, right: 16)
         if collapsible {
             disclosureTitle = title
-            let button = NSButton(title: title, target: self, action: #selector(toggleDetails))
+            let button = ToolDisclosureButton(title: title, target: self, action: #selector(toggleDetails))
             button.isBordered = false; button.image = NSImage(systemSymbolName: "chevron.right", accessibilityDescription: nil)
             button.imagePosition = .imageLeading; button.setAccessibilityLabel("Show " + title)
+            button.setAccessibilityRole(.disclosureTriangle)
+            button.setAccessibilityExpanded(false)
+            button.setAccessibilityValue(NSNumber(value: false))
             disclosure = button; addArrangedSubview(button)
         } else {
             let heading = NSTextField(labelWithString: title); heading.font = HarnessDesign.Typography.settingsHeading
@@ -178,11 +190,15 @@ final class ToolSectionView: NSStackView {
     required init?(coder: NSCoder) { nil }
     @objc private func toggleDetails() {
         guard let disclosure else { return }
-        let expanded = disclosure.state != .on
-        disclosure.state = expanded ? .on : .off
-        disclosure.image = NSImage(systemSymbolName: expanded ? "chevron.down" : "chevron.right", accessibilityDescription: nil)
-        disclosure.setAccessibilityLabel((expanded ? "Hide " : "Show ") + disclosureTitle)
-        for view in arrangedSubviews where view !== disclosure { view.isHidden = !expanded }
+        // A momentary button is already pressed during its action. That transient
+        // AppKit state does not describe whether this section's details are open.
+        detailsExpanded.toggle()
+        disclosure.image = NSImage(systemSymbolName: detailsExpanded ? "chevron.down" : "chevron.right", accessibilityDescription: nil)
+        disclosure.setAccessibilityLabel((detailsExpanded ? "Hide " : "Show ") + disclosureTitle)
+        disclosure.setAccessibilityExpanded(detailsExpanded)
+        disclosure.setAccessibilityValue(NSNumber(value: detailsExpanded))
+        for view in arrangedSubviews where view !== disclosure { view.isHidden = !detailsExpanded }
+        NSAccessibility.post(element: disclosure, notification: .valueChanged)
     }
     func applyChrome() { layer?.backgroundColor = HarnessChrome.current.surfaceElevated.cgColor; layer?.borderColor = HarnessChrome.current.border.cgColor }
 }
@@ -191,6 +207,7 @@ final class ToolSectionView: NSStackView {
 @MainActor
 private final class HarnessToolDialog: NSObject, NSWindowDelegate {
     private let panel: NSPanel
+    private var returnWindow: NSWindow?
     private var cancelResponse = NSApplication.ModalResponse.abort
 
     init(alert: NSAlert) {
@@ -211,6 +228,10 @@ private final class HarnessToolDialog: NSObject, NSWindowDelegate {
         panel = NSPanel(contentRect: NSRect(x: 0, y: 0, width: width, height: height),
                         styleMask: [.titled, .closable, .resizable], backing: .buffered, defer: false)
         super.init()
+        let originatingWindow = NSApp.keyWindow ?? NSApp.mainWindow
+        returnWindow = originatingWindow.flatMap { $0 is NSPanel ? nil : $0 }
+            ?? WindowContexts.lastKey?.window
+            ?? WindowContexts.all.compactMap(\.window).first(where: \.isVisible)
         panel.title = alert.messageText
         panel.isReleasedWhenClosed = false; panel.delegate = self
         panel.titlebarAppearsTransparent = true
@@ -269,6 +290,15 @@ private final class HarnessToolDialog: NSObject, NSWindowDelegate {
         panel.center(); panel.makeKeyAndOrderFront(nil)
         let response = NSApp.runModal(for: panel)
         panel.orderOut(nil)
+        // A dismissed Overview may have been the originating key window. Return
+        // to a visible terminal when that presentation no longer exists, so menu
+        // validation and keyboard commands have an active session again.
+        let previous = returnWindow.flatMap { $0.isVisible && !($0 is NSPanel) ? $0 : nil }
+        let destination = previous ?? NSApp.orderedWindows.first {
+            $0.isVisible && $0.contentViewController is MainSplitViewController
+        }
+        destination?.makeKeyAndOrderFront(nil)
+        if destination?.contentViewController is MainSplitViewController { destination?.makeMain() }
         return response
     }
     @objc private func choose(_ sender: NSButton) { NSApp.stopModal(withCode: .init(rawValue: sender.tag)) }

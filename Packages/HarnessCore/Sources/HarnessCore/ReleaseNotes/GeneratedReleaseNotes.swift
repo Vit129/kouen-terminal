@@ -6,7 +6,7 @@
 extension ReleaseNotes {
     public static let current = ReleaseNotes(
         version: "2.3.2",
-        changelogDigest: "693ae622423c53ae",
+        changelogDigest: "0ade4296d64bf4f4",
         sections: [
             Section(title: "Fixed", items: [
                 "App updates stage the current daemon and session-host helpers before connecting",
@@ -14,6 +14,7 @@ extension ReleaseNotes {
                 "Closing a split stops its terminal IO even while its last frame is animating out",
                 "Scrolling and reflow correctly upload relocated cached rows to the GPU, keeping terminal text and graphics aligned while retaining row reuse",
                 "macOS service restarts recognize exited processes before their parents reap them, preventing false shutdown timeouts",
+                "Disclosure sections open on the first click and report their expanded state to accessibility tools",
             ]),
             Section(title: "Changed", items: [
                 "Release validation exercises session survival, pane lifecycle, and the installed DMG",

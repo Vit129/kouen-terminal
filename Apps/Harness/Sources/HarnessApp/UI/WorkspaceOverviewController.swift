@@ -24,7 +24,12 @@ enum WorkspaceOverviewController {
     }
 
     private static func show(relativeTo parent: NSWindow? = nil) {
-        guard let parent = parent ?? NSApp.keyWindow ?? NSApp.mainWindow else { return }
+        // A menu or accessibility action can target a background application
+        // without a key/main window. Its visible terminal still supplies the
+        // correct frame and session for Overview.
+        guard let parent = parent ?? NSApp.keyWindow ?? NSApp.mainWindow ?? NSApp.orderedWindows.first(where: {
+            $0.isVisible && !($0 is NSPanel) && $0.contentViewController is MainSplitViewController
+        }) else { return }
         let window = KeyablePanel(
             contentRect: parent.frame,
             styleMask: [.borderless, .nonactivatingPanel],
