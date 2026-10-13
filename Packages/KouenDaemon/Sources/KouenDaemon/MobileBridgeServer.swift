@@ -619,7 +619,10 @@ public final class MobileBridgeServer: @unchecked Sendable {
     let needsAttach = null, failedRetries = 0; // needsAttach: null = socket not open yet
     const params = new URLSearchParams(location.search);
     const wsPort = params.get('wsport') || location.port;
-    const credKey = 'kouenDeviceCreds:' + location.hostname;
+    // Keyed by host:port: the installed Kouen (8080) and a preview (8081) share a hostname but are
+    // different daemons with different paired-device stores.
+    const credKey = 'kouenDeviceCreds:' + location.host;
+    let sentCreds = false;
     function storedCreds() { try { return JSON.parse(localStorage.getItem(credKey)); } catch { return null; } }
     // Which session was open plus each session's picked model/effort and transcript feed, so a
     // reload or an iOS background kill comes back to the same screen instead of the list.
@@ -1386,6 +1389,7 @@ public final class MobileBridgeServer: @unchecked Sendable {
       ws.onopen = () => {
         needsAttach = true;
         const creds = storedCreds();
+        sentCreds = !!creds;
         if (creds) {
           ws.send(JSON.stringify({ deviceAuth: creds }));
         } else if (params.get('token')) {
@@ -1407,6 +1411,14 @@ public final class MobileBridgeServer: @unchecked Sendable {
         const wasOpen = needsAttach !== null;
         failedRetries = wasOpen ? 0 : failedRetries + 1;
         needsAttach = null;
+        // Stored credentials this daemon doesn't know (revoked, or another daemon's): drop them and
+        // retry, so the QR token / pairing screen gets a turn instead of being rejected forever.
+        if (ev.code === 1008 && sentCreds) {
+          try { localStorage.removeItem(credKey); } catch {}
+          sentCreds = false;
+          setTimeout(connectWS, 300);
+          return;
+        }
         if (!sawServerError && (ev.code === 1008 || (failedRetries === 3 && document.visibilityState === 'visible'))) {
           showError(ev.code === 1008
             ? 'Pairing rejected — rescan the QR code.'
