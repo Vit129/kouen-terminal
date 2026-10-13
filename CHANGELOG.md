@@ -21,7 +21,7 @@ has a matching `vX.Y.Z` tag and a signed, notarized DMG on
 
 ### Changed
 
-- Release validation exercises session survival, pane lifecycle, and the installed DMG. Public downloads are verified before the updater feed is published, and published release versions remain immutable.
+- Release validation exercises session survival, pane lifecycle, and the installed DMG. Publication requires successful CI for the exact source commit. Public downloads are verified before the updater feed is published, and published release versions remain immutable.
 - Sparkle verifies signed update feeds and authenticates update archives before extraction, using the existing update-signing key.
 
 ## [2.3.1] - 2026-10-11

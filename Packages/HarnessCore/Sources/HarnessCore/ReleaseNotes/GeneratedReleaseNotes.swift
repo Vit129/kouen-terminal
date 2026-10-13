@@ -6,7 +6,7 @@
 extension ReleaseNotes {
     public static let current = ReleaseNotes(
         version: "2.3.2",
-        changelogDigest: "0ade4296d64bf4f4",
+        changelogDigest: "426d24093b3c825d",
         sections: [
             Section(title: "Fixed", items: [
                 "App updates stage the current daemon and session-host helpers before connecting",

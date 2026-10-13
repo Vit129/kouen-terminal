@@ -20,9 +20,11 @@ coding tools remain available.
 
 See the [changelog](../CHANGELOG.md), [release validation](RELEASE-2.3.2.md), and
 [terminal quality](TERMINAL-QUALITY.md). Version declarations and generated update
-notes move together. Run CI on the shipping commit, then the release workflow with
+notes move together. Push the shipping commit to start CI, then run the release workflow with
 `tag=v2.3.2` and `deploy_appcast=true`. The app and DMG must pass signing,
-notarization and smoke testing before publication. The workflow verifies the
+notarization and smoke testing before publication. The release build can run
+alongside CI, but draft creation requires successful main-branch CI for the exact
+source commit. The workflow verifies the
 public download before updating either live appcast domain.
 
 ## One-time GitHub setup
@@ -66,10 +68,10 @@ regeneration with the existing release key. See [Sparkle's signing settings](htt
 
 ## Running a release from GitHub
 
-1. Merge the code and version bump that should ship, and check that CI is green
-   on that commit (see [CI](#ci) below).
+1. Merge the code and version bump that should ship to `main`, starting CI
+   on that commit (see [CI](#ci) below). The release waits for it to pass.
 2. Open **Actions -> Release Harness -> Run workflow**.
-3. Select the release branch, normally `main`.
+3. Select `main`.
 4. Enter `tag` (required): `vX.Y.Z` matching `CFBundleShortVersionString`, for
    example `v2.3.2`.
 5. Optionally enter `release_name`; it defaults to `Harness <version> (<build>)`.
@@ -106,16 +108,18 @@ the environment.
 1. Reject a published version or an existing tag pointing to a different commit.
 2. Build the app, verify package contents, sign and notarize the app, and create
    the DMG containing its already stapled ticket.
-3. Create or resume a draft release. Sign, notarize and staple the final DMG,
+3. Require successful main-branch CI for the exact source commit. A missing or
+   failed CI run stops the release before creating a draft or publishing assets.
+4. Create or resume a draft release. Sign, notarize and staple the final DMG,
    then generate its signed Sparkle appcast and `SHA256SUMS`.
-4. Mount and copy the DMG to an isolated install location. Verify the app's
+5. Mount and copy the DMG to an isolated install location. Verify the app's
    signature, ticket, Gatekeeper assessment and arm64 helpers; load every bundled
    theme; launch it and require an attached terminal using the expected daemon
    and session-host build. Stop only this test's isolated service afterward.
-5. Upload `Harness.dmg`, `appcast.xml` and `SHA256SUMS` to the draft and publish it.
-6. Download the public DMG and appcast without authentication and compare their
+6. Upload `Harness.dmg`, `appcast.xml` and `SHA256SUMS` to the draft and publish it.
+7. Download the public DMG and appcast without authentication and compare their
    bytes with the verified artifacts.
-7. With `deploy_appcast`, commit the signed feed to the website repository and
+8. With `deploy_appcast`, commit the signed feed to the website repository and
    verify that both `thebestterminal.com` and `harnesscli.dev` serve the exact feed.
 
 The workflow retains the DMG, appcast, checksum and DMG notarization receipt as

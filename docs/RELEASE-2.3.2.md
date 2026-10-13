@@ -43,6 +43,8 @@ Verified on Apple silicon with macOS 27.0.1 and Swift 6.4:
   log viewers. All 24 daemon round-trip tests passed with coverage enabled.
 - The snapshot fixture waits for asynchronous subscriber delivery before checking
   its output. Ring insertion alone does not imply delivery has completed.
+- HTTP fixture startup has its own readiness deadline, exits promptly on server
+  failure and reports the server log. Service-operation deadlines remain unchanged.
 
 A separate optimized performance run enabled the benchmarks: 51 passed, with
 three display-drawable fluidity measurements skipped. The normal-suite skips
@@ -54,7 +56,8 @@ replace a human evaluation of animation feel or a previous-version Sparkle insta
 ## Published artifact checks
 
 The [release workflow](../.github/workflows/release.yml) builds with Xcode 26.6 on
-macOS 26 after shipping CI. It verifies Developer ID signatures, notarizes and
+macOS 26 and requires successful CI for the exact source commit before creating a
+release draft. It verifies Developer ID signatures, notarizes and
 staples the app and DMG, and checks Gatekeeper acceptance. Its DMG smoke test requires
 a live terminal attached to the expected daemon and session-host build in an
 isolated home. The workflow publishes downloads before comparing their public

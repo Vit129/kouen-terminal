@@ -6,8 +6,31 @@ import HarnessCore
 final class AISummaryServiceTests: XCTestCase {
     func testLocalHTTPDiscoverySubmissionDedupCancellationPrivacyAndRecovery() throws {
         let root = URL(fileURLWithPath: "/tmp/hai-" + UUID().uuidString.prefix(8)); try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true); defer { try? FileManager.default.removeItem(at: root) }
-        let server = Process(); server.executableURL = URL(fileURLWithPath: "/usr/bin/python3"); server.arguments = ["-u", "-c", Self.serverScript, root.path]; server.standardOutput = FileHandle.nullDevice; server.standardError = FileHandle.nullDevice; try server.run(); defer { if server.isRunning { server.terminate(); server.waitUntilExit() } }
-        let portFile = root.appendingPathComponent("port"); XCTAssertTrue(wait { (try? String(contentsOf: portFile, encoding: .utf8)).flatMap(Int.init) != nil }); let port = try String(contentsOf: portFile, encoding: .utf8).trimmingCharacters(in: .whitespacesAndNewlines)
+        let logURL = root.appendingPathComponent("server.log")
+        _ = FileManager.default.createFile(atPath: logURL.path, contents: nil)
+        let log = try FileHandle(forWritingTo: logURL)
+        defer { try? log.close() }
+        let server = Process()
+        server.executableURL = URL(fileURLWithPath: "/usr/bin/python3")
+        server.arguments = ["-u", "-c", Self.serverScript, root.path]
+        server.standardOutput = log
+        server.standardError = log
+        try server.run()
+        defer { if server.isRunning { server.terminate(); server.waitUntilExit() } }
+        let portFile = root.appendingPathComponent("port")
+        func readyPort() -> String? {
+            guard let value = try? String(contentsOf: portFile, encoding: .utf8),
+                  let port = UInt16(value), port > 0 else { return nil }
+            return String(port)
+        }
+        // Interpreter cold start is fixture setup, independent of the five-second
+        // service-operation deadlines below. Stop promptly if the server exits.
+        guard wait(timeout: 30, { readyPort() != nil || !server.isRunning }),
+              let port = readyPort() else {
+            let diagnostics = (try? String(contentsOf: logURL, encoding: .utf8)) ?? "No server log"
+            XCTFail("HTTP fixture did not become ready (running: \(server.isRunning)): \(diagnostics.prefix(2000))")
+            return
+        }
         #if os(macOS)
         let protection = try HistoryProtection(keyMaterial: Data(repeating: 46, count: 32))
         #else
@@ -60,7 +83,7 @@ final class AISummaryServiceTests: XCTestCase {
         let disk = try Data(contentsOf: root.appendingPathComponent("activity.sqlite")) + ((try? Data(contentsOf: root.appendingPathComponent("activity.sqlite-wal"))) ?? Data()); XCTAssertFalse(String(decoding: disk, as: UTF8.self).contains("PRIVATE_AI_PROSE_SENTINEL"))
         #endif
     }
-    private func wait(_ condition: () -> Bool) -> Bool { let end = Date().addingTimeInterval(5); while Date() < end { if condition() { return true }; Thread.sleep(forTimeInterval: 0.02) }; return condition() }
+    private func wait(timeout: TimeInterval = 5, _ condition: () -> Bool) -> Bool { let end = Date().addingTimeInterval(timeout); while Date() < end { if condition() { return true }; Thread.sleep(forTimeInterval: 0.02) }; return condition() }
     private static let serverScript = #"""
 import http.server, threading, pathlib, sys, json, time
 root=pathlib.Path(sys.argv[1]); lock=threading.Lock()
