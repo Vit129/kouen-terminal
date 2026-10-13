@@ -16,11 +16,23 @@ final class MobileBridgeAgentCommandTests: XCTestCase {
         XCTAssertNil(MobileBridgeServer.agentCommandInput(kind: "shell", value: "ls", currentMode: nil))
     }
 
-    func testAgyUsesItsOwnModelAndEffortAllowlistAndHasNoModeCycle() {
-        XCTAssertEqual(text(MobileBridgeServer.agentCommandInput(kind: "model", value: "gemini-3.8-flash", currentMode: nil, agent: .antigravity)), ["/model gemini-3.8-flash", "\r"])
-        XCTAssertNil(MobileBridgeServer.agentCommandInput(kind: "model", value: "opus", currentMode: nil, agent: .antigravity))
-        XCTAssertNil(MobileBridgeServer.agentCommandInput(kind: "effort", value: "max", currentMode: nil, agent: .antigravity))
-        XCTAssertNil(MobileBridgeServer.agentCommandInput(kind: "mode", value: "plan", currentMode: "manual", agent: .antigravity))
+    func testAgyAllowlistComesFromItsCatalogAndHasNoModeCycle() {
+        let catalog = AgyModelCatalog.parse("""
+        gemini-3.8-flash-high\tGemini 3.8 Flash (High)
+        gemini-3.8-flash-low\tGemini 3.8 Flash (Low)
+        claude-opus-5-5-medium\tClaude Opus 5.5 (Medium)
+        gpt-oss-120b-medium\tGPT-OSS 120B (Medium)
+        Fetching available models...
+        """)
+        XCTAssertEqual(catalog.models, [["gemini-3.8-flash", "Gemini 3.8 Flash"], ["claude-opus-5-5", "Claude Opus 5.5"], ["gpt-oss-120b", "GPT-OSS 120B"]])
+        XCTAssertEqual(catalog.efforts, ["low", "medium", "high"])
+
+        XCTAssertEqual(text(MobileBridgeServer.agentCommandInput(kind: "model", value: "gemini-3.8-flash", currentMode: nil, agent: .antigravity, agyCatalog: catalog)), ["/model gemini-3.8-flash", "\r"])
+        XCTAssertNil(MobileBridgeServer.agentCommandInput(kind: "model", value: "opus", currentMode: nil, agent: .antigravity, agyCatalog: catalog))
+        XCTAssertNil(MobileBridgeServer.agentCommandInput(kind: "effort", value: "max", currentMode: nil, agent: .antigravity, agyCatalog: catalog))
+        XCTAssertNil(MobileBridgeServer.agentCommandInput(kind: "mode", value: "plan", currentMode: "manual", agent: .antigravity, agyCatalog: catalog))
+        // No catalog (agy missing) → nothing is allowed rather than a stale guess.
+        XCTAssertNil(MobileBridgeServer.agentCommandInput(kind: "model", value: "gemini-3.8-flash", currentMode: nil, agent: .antigravity))
     }
 
     func testModeCountsShiftTabPressesAlongTheVerifiedCycle() {
