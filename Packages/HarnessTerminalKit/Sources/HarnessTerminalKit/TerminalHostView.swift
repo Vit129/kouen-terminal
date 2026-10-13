@@ -358,6 +358,10 @@ public final class TerminalHostView: NSView {
             keys?.consume(event) ?? false
         }
         native.onInput = { data in inputGate.route(data) }
+        native.onNotice = { [weak self] message in
+            guard let self, !self.isInvalidated else { return }
+            self.hostDelegate?.terminalHostShowMessage(message, surfaceID: self.surfaceID)
+        }
         native.onResize = { cols, rows in io.resize(rows: UInt16(rows), cols: UInt16(cols)) }
         native.onTitle = { [weak self] title in
             guard let self else { return }
@@ -1032,6 +1036,7 @@ public final class TerminalHostView: NSView {
         outputSubscription = nil
         inputGate.setSiblings([])
         nativeView.onInput = nil
+        nativeView.onNotice = nil
         nativeView.onResize = nil
         hostDelegate = nil
         hideReconnectingOverlay()

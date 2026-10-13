@@ -492,6 +492,8 @@ public final class HarnessTerminalSurfaceView: NSView {
         var remaining = files
         var paths: [String] = []
         func next() {
+            // A pane closed mid-upload has no input sink: stop instead of uploading the rest.
+            guard onInput != nil else { return }
             guard !remaining.isEmpty else {
                 if !paths.isEmpty { pasteText(paths.map(Self.shellQuotedPath).joined(separator: " ")) }
                 return
@@ -515,6 +517,8 @@ public final class HarnessTerminalSurfaceView: NSView {
 
     /// Bytes the terminal produces for the PTY (typed input, key sequences, DSR/DA).
     public var onInput: ((Data) -> Void)?
+    /// A short user-facing message the view can't show itself, such as a refused paste.
+    public var onNotice: ((String) -> Void)?
     /// New grid size after a resize (columns, rows) — the host forwards this to the daemon.
     public var onResize: ((Int, Int) -> Void)?
     /// When false, a resize reflows this client's primary screen and does not vote a PTY size.
@@ -1277,6 +1281,8 @@ public final class HarnessTerminalSurfaceView: NSView {
     }
 
     func testingInputModes() -> TerminalModes { inputModes() }
+
+    func testingPasteText(_ raw: String) { pasteText(raw) }
 
     var testingHistoryRestorePending: Bool { historyRestore != nil }
 
@@ -4653,7 +4659,11 @@ public final class HarnessTerminalSurfaceView: NSView {
         // Paste protection: confirm risky text when the program hasn't enabled bracketed paste
         // (which would otherwise run embedded newlines as commands the moment they're pasted).
         let bracketed = inputModes().bracketedPaste
-        if pasteProtection, !bracketed, Self.isUnsafePaste(normalized), let window {
+        if pasteProtection, !bracketed, Self.isUnsafePaste(normalized) {
+            guard let window else {
+                onNotice?("Paste blocked: it contains line breaks or control characters, and this pane has no window to confirm it in.")
+                return
+            }
             confirmPaste(normalized, in: window)
             return
         }
