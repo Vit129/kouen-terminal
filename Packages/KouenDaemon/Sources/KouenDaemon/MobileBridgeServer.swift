@@ -1306,7 +1306,9 @@ public final class MobileBridgeServer: @unchecked Sendable {
         }
       }
       if (cur.transcript) return;
-      const lines = clean.split('\n').map(stripChrome).filter(l => l.trim().length > 0);
+      // A line with no letter or digit is TUI redraw noise once cursor moves are stripped
+      // (Copilot's "◉ " spinner frames, box borders) — each frame would otherwise become a row.
+      const lines = clean.split('\n').map(stripChrome).filter(l => /[\p{L}\p{N}]/u.test(l));
       for (const line of lines) {
         const trimmed = line.trim();
         if (trimmed.startsWith('> ') || trimmed.startsWith('$ ')) {
