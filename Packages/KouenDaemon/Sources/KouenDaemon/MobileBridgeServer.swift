@@ -746,16 +746,17 @@ public final class MobileBridgeServer: @unchecked Sendable {
       ["sonnet", "Sonnet", "Everyday coding"],
       ["haiku", "Haiku", "Fast, cheap: summaries, search"],
       ["fable", "Fable", "Largest model"]];
-    // From `agy models` (base names; agy's /model picks the default thinking level, /effort sets it).
-    // ponytail: hand-copied list, goes stale when agy adds models; upgrade = daemon runs `agy models`.
-    const AGY_MODEL_OPTS = [
-      ["gemini-3.8-flash", "Gemini 3.8 Flash", "Fast, Google's default"],
-      ["claude-opus-5-5", "Claude Opus 5.5", "Hardest work"],
-      ["claude-sonnet-5-5", "Claude Sonnet 5.5", "Everyday coding"],
-      ["gpt-oss-120b", "GPT-OSS 120B", "Open-weight model"]];
+    // agy's list arrives from the daemon (it runs `agy models`), asked for once per page load the
+    // first time an agy session is open. Empty until then: the daemon only accepts what agy lists.
+    let agyModelOpts = [], agyEfforts = [], agyAsked = false;
     const isAgy = () => !!cur && /antigravity|agy/i.test(cur.agent || "");
-    const modelOpts = () => isAgy() ? AGY_MODEL_OPTS : MODEL_OPTS;
-    const effortOpts = () => isAgy() ? ["low", "medium", "high"] : EFFORTS;
+    const modelOpts = () => isAgy() ? agyModelOpts : MODEL_OPTS;
+    const effortOpts = () => isAgy() ? agyEfforts : EFFORTS;
+    function askAgyModels() {
+      if (agyAsked || !isAgy() || !ws || ws.readyState !== WebSocket.OPEN) return;
+      agyAsked = true;
+      ws.send(JSON.stringify({ agyModels: true }));
+    }
     const EFFORTS = ["low", "medium", "high", "xhigh", "max"];
     const EFFORT_LABEL = { low: "Low", medium: "Medium", high: "High", xhigh: "XHigh", max: "Max" };
     const MODE_OPTS = [
@@ -857,6 +858,7 @@ public final class MobileBridgeServer: @unchecked Sendable {
     }
 
     function renderComposer() {
+      askAgyModels();
       const show = canControl();
       $("ctl").hidden = !show;
       if (!show) return;
@@ -879,6 +881,7 @@ public final class MobileBridgeServer: @unchecked Sendable {
         ${modelOpts().map(([id, name, d]) => `<button class="opt" role="radio" aria-checked="${cur.modelName === name || (cur.modelName || "").toLowerCase().startsWith(id)}" data-m="${id}"><span class="t">${name}</span><span class="ck">✓</span><span class="d">${esc(d)}</span></button>`).join("")}
         <h5>Effort</h5>
         <div class="seg" role="group" aria-label="Effort">${effortOpts().map(e => `<button data-e="${e}" aria-pressed="${e === cur.effort}">${EFFORT_LABEL[e]}</button>`).join("")}</div>
+        ${isAgy() && !agyModelOpts.length ? '<p class="hint">agy\'s model list hasn\'t loaded yet — reopen this in a moment (it comes from `agy models` on the Mac).</p>' : ""}
         <p class="hint">Sent to ${isAgy() ? "agy" : "Claude Code"} as /model and /effort. ${isAgy() ? "The model" : "The effort"} can't be read back, so it shows what you last picked here.</p></div>`, true);
       $("panel-body").querySelectorAll("[data-m]").forEach(b => b.onclick = () => {
         const o = modelOpts().find(x => x[0] === b.dataset.m);
@@ -1252,6 +1255,10 @@ public final class MobileBridgeServer: @unchecked Sendable {
         }
       }
       if (msg.transcript) applyTranscript(msg.transcript);
+      if (msg.agyModels) {
+        agyModelOpts = msg.agyModels.models.map(([id, label]) => [id, label, id]);
+        agyEfforts = msg.agyModels.efforts;
+      }
       if (msg.ok === "attached") {
         if (cur) ws.send(JSON.stringify({ gitDiff: { path: cur.cwd } }));
       }
@@ -1857,6 +1864,8 @@ public final class MobileBridgeServer: @unchecked Sendable {
         /// `{"agentCommand":{"kind":"model|effort|mode","value":"..."}}` — drives the attached Claude
         /// Code TUI through its own slash commands / Shift+Tab; values are allowlisted server-side.
         var agentCommand: AgentCommandRequest?
+        /// `{"agyModels":true}` — asks for agy's current model list (`AgyModelCatalog`).
+        var agyModels: Bool?
 
         /// `agent` is the page's own idea of the agent ("claude-code"/"antigravity"), used only when the
         /// daemon's detector has nothing for the pane (agy is often missed right after launch).
@@ -1931,6 +1940,10 @@ public final class MobileBridgeServer: @unchecked Sendable {
 
     // P37 Phase D3 (browser mirror)
     private struct BrowserOkAck: Encodable { var ok: String }
+    private struct AgyModelsPush: Encodable {
+        struct Body: Encodable { var models: [[String]]; var efforts: [String] }
+        var agyModels: Body
+    }
     /// Dynamic error text (from the GUI's own `BrowserResponsePayload.error`, not a fixed
     /// string this file already inlines elsewhere) needs real JSON encoding for safe quoting —
     /// unlike the static `#"{"error":"..."}"#` literals used throughout this file.
@@ -3118,18 +3131,21 @@ public final class MobileBridgeServer: @unchecked Sendable {
     static let modeCycle = ["manual", "acceptEdits", "plan", "auto"]
     static let commandModels: Set<String> = ["opus", "sonnet", "haiku", "fable"]
     static let commandEfforts: Set<String> = ["low", "medium", "high", "xhigh", "max"]
-    /// agy's `/model` base names (from `agy models`) and the efforts its models accept.
-    static let agyCommandModels: Set<String> = ["gemini-3.8-flash", "claude-opus-5-5", "claude-sonnet-5-5", "gpt-oss-120b"]
-    static let agyCommandEfforts: Set<String> = ["low", "medium", "high"]
+    /// Claude takes family aliases, which always resolve to that family's newest model — so this
+    /// list only changes when a whole new family ships. agy's list comes from `AgyModelCatalog`.
 
     /// Chunks to type for an agent command, or nil when the request is not allowlisted. Pure so it is
     /// unit-testable; `currentMode` is the mode last read from the transcript (a cycle needs a start).
-    static func agentCommandInput(kind: String, value: String, currentMode: String?, agent: AgentKind = .claudeCode) -> [Data]? {
+    /// `agyCatalog` is what `agy models` reported (nil = unavailable, so nothing is allowed for agy).
+    static func agentCommandInput(kind: String, value: String, currentMode: String?, agent: AgentKind = .claudeCode,
+                                  agyCatalog: AgyModelCatalog.Catalog? = nil) -> [Data]? {
         let agy = agent == .antigravity
+        let models = agy ? Set((agyCatalog?.models ?? []).map { $0[0] }) : commandModels
+        let efforts = agy ? Set(agyCatalog?.efforts ?? []) : commandEfforts
         switch kind {
-        case "model" where (agy ? agyCommandModels : commandModels).contains(value):
+        case "model" where models.contains(value):
             return [Data("/model \(value)".utf8), Data("\r".utf8)]
-        case "effort" where (agy ? agyCommandEfforts : commandEfforts).contains(value):
+        case "effort" where efforts.contains(value):
             return [Data("/effort \(value)".utf8), Data("\r".utf8)]
         case "mode" where !agy:
             guard let from = currentMode.flatMap(modeCycle.firstIndex(of:)),
@@ -3153,7 +3169,8 @@ public final class MobileBridgeServer: @unchecked Sendable {
             sendText(#"{"error":"model and effort can only be changed on a Claude or agy session (detected: \#(detected?.rawValue ?? "none"))"}"#, on: connection)
             return
         }
-        guard let chunks = Self.agentCommandInput(kind: cmd.kind, value: cmd.value, currentMode: state.agentMode, agent: kind) else {
+        let catalog = kind == .antigravity ? AgyModelCatalog.current() : nil
+        guard let chunks = Self.agentCommandInput(kind: cmd.kind, value: cmd.value, currentMode: state.agentMode, agent: kind, agyCatalog: catalog) else {
             sendText(#"{"error":"unsupported agent command"}"#, on: connection)
             return
         }
@@ -3256,6 +3273,11 @@ public final class MobileBridgeServer: @unchecked Sendable {
         } else if let cmd = message.agentCommand {
             state.controlQueue.async { [weak self] in
                 self?.handleAgentCommand(cmd, connection: connection, state: state)
+            }
+        } else if message.agyModels == true {
+            state.controlQueue.async { [weak self] in
+                guard let catalog = AgyModelCatalog.current() else { return } // page keeps its fallback list
+                self?.sendJSON(AgyModelsPush(agyModels: .init(models: catalog.models, efforts: catalog.efforts)), on: connection)
             }
         } else if message.stop == true {
             state.controlQueue.async { [weak self] in
