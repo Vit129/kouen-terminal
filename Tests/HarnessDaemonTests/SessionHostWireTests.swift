@@ -23,7 +23,11 @@ final class SessionHostWireTests: XCTestCase {
         XCTAssertEqual(lstat(path, &info), 0)
         XCTAssertEqual(info.st_mode & 0o777, 0o600)
 
+        #if canImport(Darwin)
         let client = socket(AF_UNIX, SOCK_STREAM, 0)
+        #else
+        let client = socket(AF_UNIX, Int32(SOCK_STREAM.rawValue), 0)
+        #endif
         defer { close(client) }
         var address = sockaddr_un(); address.sun_family = sa_family_t(AF_UNIX)
         let capacity = MemoryLayout.size(ofValue: address.sun_path)

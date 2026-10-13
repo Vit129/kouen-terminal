@@ -110,7 +110,9 @@ final class WindowAppearanceTests: XCTestCase {
 
         // Reuse the same panel, as the controller does across settings changes and toggles.
         for opacity: Float in [1, 0.8, 1, 0.5] {
-            WindowAppearance.applyTransparency(opacity: opacity, blur: 20, opaqueBackground: .red, to: panel)
+            WindowAppearance.applyTransparency(
+                opacity: opacity, blur: 20, opaqueBackground: .red, to: panel, accessibility: ChromeAccessibility()
+            )
             let opaque = opacity == 1
             XCTAssertEqual(panel.isOpaque, opaque)
             XCTAssertEqual(panel.backgroundColor, opaque ? .red : .clear)
@@ -123,7 +125,9 @@ final class WindowAppearanceTests: XCTestCase {
         defer { panel.close() }
 
         for (opacity, opaque): (Float, Bool) in [(0.998, false), (0.999, true), (2, true), (-1, false)] {
-            WindowAppearance.applyTransparency(opacity: opacity, blur: 20, opaqueBackground: .blue, to: panel)
+            WindowAppearance.applyTransparency(
+                opacity: opacity, blur: 20, opaqueBackground: .blue, to: panel, accessibility: ChromeAccessibility()
+            )
             XCTAssertEqual(panel.isOpaque, opaque, "opacity: \(opacity)")
             XCTAssertEqual(panel.backgroundColor, opaque ? .blue : .clear)
         }

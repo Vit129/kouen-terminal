@@ -1,6 +1,15 @@
 import XCTest
 @testable import HarnessCore
 @testable import HarnessDaemonCore
+#if canImport(Darwin)
+import Darwin
+private let systemClose = Darwin.close
+private let systemWrite = Darwin.write
+#else
+import Glibc
+private let systemClose = Glibc.close
+private let systemWrite = Glibc.write
+#endif
 
 /// A read-only attach is a viewer for the life of its connection: every request that would type,
 /// paste, take control or upgrade the role gets a truthful refusal, and nothing reaches the child.
@@ -116,13 +125,13 @@ private final class RawConnection {
         return nil
     }
 
-    func close() { Darwin.close(fd) }
+    func close() { _ = systemClose(fd) }
 
     private func write(_ data: Data) throws {
         try data.withUnsafeBytes { raw in
             var offset = 0
             while offset < raw.count {
-                let written = Darwin.write(fd, raw.baseAddress! + offset, raw.count - offset)
+                let written = systemWrite(fd, raw.baseAddress! + offset, raw.count - offset)
                 if written < 0, errno == EINTR || errno == EAGAIN { continue }
                 guard written > 0 else { throw POSIXError(.EPIPE) }
                 offset += written

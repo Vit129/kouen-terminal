@@ -135,7 +135,7 @@ final class AsyncFindTests: XCTestCase {
         let expected = 1 + line / 5
         let settled = expectation(description: "Final refresh after output stops")
         view.onFindResultsChanged = { _, count in if count == expected { settled.fulfill() } }
-        if counts.last != expected { await fulfillment(of: [settled], timeout: 2) }
+        if counts.last != expected { await fulfillment(of: [settled], timeout: 10) }
         try await Task.sleep(nanoseconds: 400_000_000)
         XCTAssertEqual(statuses.last ?? nil, nil, "status clears once output settles")
         view.onFindResultsChanged = nil

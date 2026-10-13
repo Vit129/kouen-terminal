@@ -10,7 +10,8 @@ final class PaneCloseJobPolicyTests: XCTestCase {
 
     func testCloseEndsBackgroundJobsAndKeepsDetachedOnes() throws {
         let marker = "harnessjob\(Int.random(in: 100_000...999_999))"
-        let pty = try RealPty(id: UUID().uuidString, cwd: NSTemporaryDirectory(), shell: "/bin/sh",
+        // Bash forwards the hangup to its jobs; dash, which is /bin/sh on Debian, does not.
+        let pty = try RealPty(id: UUID().uuidString, cwd: NSTemporaryDirectory(), shell: "/bin/bash",
                               rows: 24, cols: 80, scrollbackBytes: 65536)
         pty.start()
         let output = OutputAccumulator()
@@ -31,7 +32,7 @@ final class PaneCloseJobPolicyTests: XCTestCase {
     private static func processes(named prefix: String) -> [pid_t] {
         let ps = Process()
         ps.executableURL = URL(fileURLWithPath: "/bin/ps")
-        ps.arguments = ["-axo", "pid=,command="]
+        ps.arguments = ["-eo", "pid=,args="]
         let pipe = Pipe()
         ps.standardOutput = pipe
         guard (try? ps.run()) != nil else { return [] }
