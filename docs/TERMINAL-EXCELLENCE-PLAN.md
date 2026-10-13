@@ -287,6 +287,12 @@ The final consumer check covers the added output-subscription identity guard.
 - Full-history 10k-row reflow now costs 11.31 ms versus 6.07 ms: decoding/repacking compact
   storage is a documented CPU tradeoff. Bounded viewport previews and off-main full reflow
   preserve interactive behavior. Further optimization remains open, as do regex CPU and startup.
+  A 2026-10-13 release rerun of `testReflowCostAcrossWidths` measured 5.4–8.9 ms at 10,000
+  history lines and 35.5–40.6 ms at 50,000. The drag preview stays at 0.03–0.08 ms and
+  height-only resize at 0.02 ms at every depth. Live drags commit full reflow off-main with
+  latest-wins coalescing, and animated layouts commit once after settling. Each commit at the
+  default holds the emulator queue for about one 120 Hz frame, so resumable reflow waits until
+  the default or common settings show a multi-frame stall.
 
 - Final release consumer check retains the large gains: 43–58% less elapsed time than
   `7dbebe7`. Six workloads are within roughly 4% of the earlier follow-up; Unicode returned
