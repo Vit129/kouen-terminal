@@ -77,7 +77,7 @@ final class SessionLifecycleService {
                     try? await Task.sleep(for: .milliseconds(500))
                     await coord.requestDaemon(.sendData(surfaceID: surfaceID.uuidString, data: Data((initialCommand + "\r").utf8), origin: .automation))
                 }
-            } else if let config = ProjectConfig.load(from: resolvedCWD), let setup = config.setupScript, !setup.isEmpty {
+            } else if let config = ProjectConfig.load(from: parentRepoPath ?? resolvedCWD), let setup = config.setupScript, !setup.isEmpty {
                 if let tab = coord.snapshot.activeWorkspace?.sessions.first(where: { $0.id == sessionID })?.tabs.first,
                    let surfaceID = tab.rootPane.allSurfaceIDs().first {
                     // Small delay to let shell initialize before sending command

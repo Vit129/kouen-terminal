@@ -58,4 +58,34 @@ public struct ProjectConfig: Codable, Sendable, Equatable {
         else { return nil }
         return try? JSONDecoder().decode(ProjectConfig.self, from: data)
     }
+
+    /// Starts the repo's `setupScript` in a freshly created worktree without waiting for it.
+    /// Config is read from the PARENT repo — the worktree's own folder name is the task slug, so
+    /// `load(from:)` would look up `~/.config/kouen/projects/<slug>.json` and miss the personal
+    /// override. Detached because callers sit on a synchronous daemon/IPC handler where an
+    /// `npm install` would stall every other client; output goes to a temp log for diagnosis.
+    /// Returns false when there is no script or it fails to spawn.
+    @discardableResult
+    public static func launchSetupScript(parentRepoPath: String, worktreePath: String) -> Bool {
+        guard let script = load(from: parentRepoPath)?.setupScript, !script.isEmpty else { return false }
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/bin/sh")
+        process.arguments = ["-c", script]
+        process.currentDirectoryURL = URL(fileURLWithPath: worktreePath)
+        var environment = ProcessInfo.processInfo.environment
+        environment["KOUEN_PARENT_REPO"] = parentRepoPath
+        environment["KOUEN_WORKTREE_PATH"] = worktreePath
+        process.environment = environment
+        let logPath = NSTemporaryDirectory() + "kouen-setup-\((worktreePath as NSString).lastPathComponent).log"
+        FileManager.default.createFile(atPath: logPath, contents: nil)
+        let log = FileHandle(forWritingAtPath: logPath)
+        process.standardOutput = log ?? FileHandle.nullDevice
+        process.standardError = log ?? FileHandle.nullDevice
+        do {
+            try process.run()
+            return true
+        } catch {
+            return false
+        }
+    }
 }
