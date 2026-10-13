@@ -59,6 +59,11 @@ domains must serve the same signed feed so existing installations can upgrade. T
 not need to be copied to the website: the generated appcast points Sparkle at
 the GitHub Release asset URL for the matching tag.
 
+The app requires signed feeds and verification before archive extraction, using
+the existing `SUPublicEDKey`. `generate-appcast.sh` uses the resolved Sparkle tools
+to generate and verify the signed feed. Never hand-edit signed XML; changes require
+regeneration with the existing release key. See [Sparkle's signing settings](https://sparkle-project.org/documentation/customization/).
+
 ## Running a release from GitHub
 
 1. Merge the code and version bump that should ship, and check that CI is green

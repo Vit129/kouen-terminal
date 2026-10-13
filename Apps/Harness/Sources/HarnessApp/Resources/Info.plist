@@ -187,6 +187,10 @@
     <string>https://thebestterminal.com/appcast.xml</string>
     <key>SUPublicEDKey</key>
     <string>3LBPx8Uv5L5ptqRqdCWovmUIPLxcDEPnivy8cOpIlH8=</string>
+    <key>SURequireSignedFeed</key>
+    <true/>
+    <key>SUVerifyUpdateBeforeExtraction</key>
+    <true/>
     <key>SUEnableAutomaticChecks</key>
     <true/>
     <key>SUScheduledCheckInterval</key>

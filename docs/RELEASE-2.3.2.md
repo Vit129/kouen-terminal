@@ -30,8 +30,13 @@ Verified on Apple silicon with macOS 27.0.1 and Swift 6.4:
   2.3.2/136, and contain no first-party agent executable or package.
 - Release scripts passed shell syntax checks, workflow YAML parsed successfully,
   and the release helper's dry run accepted the matching version declarations.
+- A disposable signing fixture generated and verified an appcast with the pinned
+  Sparkle tools. Altering its signed content was rejected. The test did not access
+  the production signing key.
 
-The skipped tests comprise 54 opt-in performance benchmarks, a theme-data exporter,
+A separate optimized performance run enabled the benchmarks: 51 passed, with
+three display-drawable fluidity measurements skipped. The normal-suite skips
+comprise 54 opt-in performance benchmarks, a theme-data exporter,
 two tests requiring an uninstalled font, an unsupported system Bash version and a
 test requiring a separately configured SSH target. Automated native fixtures do not
 replace a human evaluation of animation feel or a previous-version Sparkle install.
@@ -43,7 +48,9 @@ macOS 26 after shipping CI. It verifies Developer ID signatures, notarizes and
 staples the app and DMG, and checks Gatekeeper acceptance. Its DMG smoke test requires
 a live terminal attached to the expected daemon and session-host build in an
 isolated home. The workflow publishes downloads before comparing their public
-bytes and updating the signed feeds on both supported domains.
+bytes and updating the signed feeds on both supported domains. The app requires
+signed-feed authentication and archive verification before extraction; generation
+and verification use the same resolved Sparkle tools as the app.
 
 The [GitHub release](https://github.com/robzilla1738/harness-terminal/releases/tag/v2.3.2)
 retains the download, appcast and `SHA256SUMS`. The workflow retains the notarization

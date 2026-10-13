@@ -6,7 +6,7 @@
 extension ReleaseNotes {
     public static let current = ReleaseNotes(
         version: "2.3.2",
-        changelogDigest: "b1173312f668a6f5",
+        changelogDigest: "693ae622423c53ae",
         sections: [
             Section(title: "Fixed", items: [
                 "App updates stage the current daemon and session-host helpers before connecting",
@@ -17,6 +17,7 @@ extension ReleaseNotes {
             ]),
             Section(title: "Changed", items: [
                 "Release validation exercises session survival, pane lifecycle, and the installed DMG",
+                "Sparkle verifies signed update feeds and authenticates update archives before extraction, using the existing update-signing key",
             ]),
         ]
     )

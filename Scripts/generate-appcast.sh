@@ -52,6 +52,11 @@ if [[ -n "${SPARKLE_EDDSA_PRIVATE_KEY_FILE:-}" ]]; then
   GEN_ARGS+=(--ed-key-file "$SPARKLE_EDDSA_PRIVATE_KEY_FILE")
 fi
 "$GEN" "${GEN_ARGS[@]}" "$ARCHIVES"
+VERIFY_ARGS=(--verify)
+if [[ -n "${SPARKLE_EDDSA_PRIVATE_KEY_FILE:-}" ]]; then
+  VERIFY_ARGS+=(--ed-key-file "$SPARKLE_EDDSA_PRIVATE_KEY_FILE")
+fi
+"${GEN%/*}/sign_update" "${VERIFY_ARGS[@]}" "$ARCHIVES/appcast.xml"
 echo ""
 echo "Wrote $ARCHIVES/appcast.xml"
 echo "Next: upload appcast.xml to https://thebestterminal.com/appcast.xml and keep the archive URLs live."
