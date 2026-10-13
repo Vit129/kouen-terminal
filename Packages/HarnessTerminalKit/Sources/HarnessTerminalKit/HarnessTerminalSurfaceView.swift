@@ -1277,6 +1277,10 @@ public final class HarnessTerminalSurfaceView: NSView {
         emulatorSync { $0.readGrid() }
     }
 
+    nonisolated static func testingSelectedText(_ selection: TerminalSelection, emulator: TerminalEmulator) -> String {
+        selectedText(selection, emulator: emulator)
+    }
+
     func testingWaitForEmulatorIdle() {
         // Drain the parse queue AND apply any staged main hop — tests call this in place of
         // spinning the runloop, so the mirrors (incl. modes/alt-screen, smooth scrolling clamps
@@ -4929,7 +4933,7 @@ public final class HarnessTerminalSurfaceView: NSView {
             let start = row == sel.startRow ? sel.startColumn : 0
             var end = row == sel.endRow ? sel.endColumn : cells.count - 1
             let continues = row < sel.endRow && emulator.isBufferLineWrapped(row)
-            if continues, cells.last == .blank, emulator.bufferLine(row + 1).first?.width == .wide {
+            if continues, emulator.wideDeferralGap(atBufferLine: row) > 0 {
                 end = min(end, cells.count - 2)
             }
             let segment = rowText(cells: cells, startCol: start, endCol: end,

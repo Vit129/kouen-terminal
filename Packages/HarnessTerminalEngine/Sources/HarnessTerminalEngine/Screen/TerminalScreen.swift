@@ -925,6 +925,13 @@ final class TerminalScreen {
                 for c in 0 ..< copyCols {
                     next[r * nc + c] = cells[rowStart(r) + c]
                 }
+                // A wide glyph whose tail fell past the new margin cannot be drawn in one cell.
+                let edge = r * nc + copyCols - 1
+                if copyCols < cols, next[edge].width == .wide {
+                    var gap = TerminalGridCell.blank
+                    gap.background = next[edge].background
+                    next[edge] = gap
+                }
             }
             cells = next
             firstRow = 0
@@ -957,7 +964,10 @@ final class TerminalScreen {
     /// row soft-wrapped) and MUST be preserved, or reflow/capture would shift content left. `next`
     /// is the following physical row (nil if this is the last row).
     ///
-    /// KNOWN RESIDUAL CORNER: a default-pen ECH/EL that erases exactly the last column of a
+    /// The gap is the cell the deferral skipped, so it holds no glyph but may carry the
+    /// background of an earlier erase.
+    ///
+    /// KNOWN RESIDUAL CORNER: an ECH/EL that erases exactly the last column of a
     /// soft-wrapped row whose continuation happens to start with a wide glyph is
     /// indistinguishable from a genuine deferral gap at the cell level, and that erased blank
     /// is dropped on reflow. Distinguishing them requires a per-row "deferral" flag set only
@@ -965,9 +975,17 @@ final class TerminalScreen {
     /// deferred (tracked in the release-audit backlog) because the plumbing risk outweighs
     /// this corner's likelihood.
     private func wideDeferralGap(row: [TerminalGridCell], next: [TerminalGridCell]?) -> Int {
-        guard let next, let last = row.last, isBlank(last) else { return 0 }
+        guard let next, let last = row.last, last.codepoint == 0, last.combining0 == 0,
+              last.width == .normal else { return 0 }
         for cell in next where cell.width != .spacerTail { return cell.width == .wide ? 1 : 0 }
         return 0
+    }
+
+    /// `wideDeferralGap` for buffer line `index` (`[history ++ viewport]`), so selection copies
+    /// the same logical text that capture and reflow produce.
+    func wideDeferralGap(atBufferLine index: Int) -> Int {
+        guard isLineWrapped(index), index + 1 < bufferLineCount else { return 0 }
+        return wideDeferralGap(row: bufferLine(index), next: bufferLine(index + 1))
     }
 
     /// Whether viewport row `r` (in the live `cells` grid) is entirely default-blank.

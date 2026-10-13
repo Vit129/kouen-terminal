@@ -455,6 +455,9 @@ public final class TerminalEmulator: VTParserHandler {
     /// Whether screen row `row` soft-wraps into the next.
     public func isBufferLineWrapped(_ line: Int) -> Bool { current.isLineWrapped(line) }
 
+    /// 1 when buffer line `line` ends in the blank a deferred wide glyph left behind, else 0.
+    public func wideDeferralGap(atBufferLine line: Int) -> Int { current.wideDeferralGap(atBufferLine: line) }
+
     func screenRowWraps(_ row: Int) -> Bool { current.isLineWrapped(current.historyCount + row) }
 
     /// Virtual-line span `[first, last]` of the logical (soft-wrapped) line containing virtual
