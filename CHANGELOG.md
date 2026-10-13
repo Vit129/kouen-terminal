@@ -5,6 +5,23 @@ All notable changes to Kouen are documented here. The format is based on
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Each released version
 has a matching `vX.Y.Z` tag and a signed, notarized DMG on
 [GitHub Releases](https://github.com/Vit129/kouen-terminal/releases).
+## [4.21.6] - 2026-10-13
+
+### Added
+- Companion chat UI — image chips, model/mode meta, agent commands from the phone ([`8f7f13b`](https://github.com/Vit129/kouen-terminal/commit/8f7f13b4935ca42db5db2d8f3e7e696a2b1e7065))
+- Model/effort picker for agy and keep the Companion on the open session across reloads ([`c735460`](https://github.com/Vit129/kouen-terminal/commit/c7354600a37d8e9497ea26c1080afcf79f67b1b3))
+- Read agy's model list from `agy models` instead of a hand-copied one ([`d4e1db1`](https://github.com/Vit129/kouen-terminal/commit/d4e1db1826eaabdf8f0e9111f374998870d06b5e))
+
+### Fixed
+- Give the preview daemon its own Companion port so it doesn't collide with installed Kouen ([`535885a`](https://github.com/Vit129/kouen-terminal/commit/535885af20f7cd49f0de935f28e5e6212e5df2b9))
+- Drop TUI spinner/border redraw frames from the Companion feed ([`b1843fa`](https://github.com/Vit129/kouen-terminal/commit/b1843fa6eb732e5e6522170f77bba1bc2aaff8c8))
+- Preview daemon picks Companion port 8081 itself, however it was started ([`064bc4d`](https://github.com/Vit129/kouen-terminal/commit/064bc4d67da7aa2db4b81bad794b8510ae447570))
+- Key Companion credentials by host:port and drop rejected ones so the QR can pair ([`06ffbcd`](https://github.com/Vit129/kouen-terminal/commit/06ffbcd84cb5774428ea83c4ef1a893f19061f28))
+- Agy model switch when the detector misses the pane; keep Claude transcripts on in preview ([`68eefa2`](https://github.com/Vit129/kouen-terminal/commit/68eefa25224d520cbbb738db31fd37de540e974b))
+- Fall back to the page's agent hint when the detector reports an unsupported kind ([`78f61b5`](https://github.com/Vit129/kouen-terminal/commit/78f61b57e0f3f5411ec861c3a1c3edc506d3ac62))
+- Drop Claude harness plumbing, show agy tool-only replies, survive agy db writes ([`2fb464d`](https://github.com/Vit129/kouen-terminal/commit/2fb464dc7488de00d71405cdaa20c163781c7619))
+
+
 ## [4.21.5] - 2026-10-12
 
 ### Added
