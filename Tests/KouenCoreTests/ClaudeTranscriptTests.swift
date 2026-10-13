@@ -25,6 +25,26 @@ final class ClaudeTranscriptTests: XCTestCase {
         ])
     }
 
+    func testTS5801_placeholdersStrippedAndImageBlockBecomesAttachment() {
+        let got = items(#"{"uuid":"u9","message":{"role":"user","content":[{"type":"text","text":"[Image #4]"},{"type":"image","source":{"type":"base64","data":"AAA"}},{"type":"text","text":"look [Pasted text #2 +10 lines] here"}]}}"#)
+        XCTAssertEqual(got, [
+            TranscriptItem(id: "u9#1", role: .user, text: "", attachment: "image"),
+            TranscriptItem(id: "u9#2", role: .user, text: "look  here"),
+        ])
+    }
+
+    func testTS5802_metaTakesLastModelAndMode() {
+        let lines = [
+            #"{"type":"permission-mode","permissionMode":"manual"}"#,
+            #"{"message":{"role":"assistant","model":"claude-opus-5-5","content":"a"}}"#,
+            #"{"type":"permission-mode","permissionMode":"plan"}"#,
+            #"{"message":{"role":"assistant","model":"<synthetic>","content":"a"}}"#,
+        ].map { Data($0.utf8) }
+        let m = ClaudeTranscriptLine.meta(from: lines)
+        XCTAssertEqual(m.model, "claude-opus-5-5")
+        XCTAssertEqual(m.mode, "plan")
+    }
+
     func testTS5702_bashToolTargetIsTheCommand() {
         let got = items(#"{"uuid":"a2","message":{"role":"assistant","content":[{"type":"tool_use","name":"Bash","input":{"command":"swift test"}}]}}"#)
         XCTAssertEqual(got.first?.toolTarget, "swift test")

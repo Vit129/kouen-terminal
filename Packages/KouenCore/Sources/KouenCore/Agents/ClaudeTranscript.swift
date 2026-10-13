@@ -11,8 +11,11 @@ public struct TranscriptItem: Codable, Sendable, Equatable {
     public let text: String
     public let toolName: String?
     public let toolTarget: String?
+    /// "image" for a user-attached image block (the bytes stay on the Mac; the phone shows a chip).
+    public let attachment: String?
 
-    public init(id: String, role: Role, text: String, toolName: String? = nil, toolTarget: String? = nil) {
+    public init(id: String, role: Role, text: String, toolName: String? = nil, toolTarget: String? = nil, attachment: String? = nil) {
+        self.attachment = attachment
         self.id = id
         self.role = role
         self.text = text
@@ -42,6 +45,8 @@ public enum ClaudeTranscriptLine {
             switch part["type"] as? String {
             case "text":
                 if let item = textItem(part["text"] as? String ?? "", isUser: isUser, id: id) { result.append(item) }
+            case "image":
+                if isUser { result.append(TranscriptItem(id: id, role: .user, text: "", attachment: "image")) }
             case "tool_use":
                 let name = part["name"] as? String ?? "Tool"
                 result.append(TranscriptItem(id: id, role: .tool, text: "", toolName: name,
@@ -61,7 +66,24 @@ public enum ClaudeTranscriptLine {
         return parts.compactMap { $0["text"] as? String }.joined()
     }
 
-    private static func textItem(_ raw: String, isUser: Bool, id: String) -> TranscriptItem? {
+    /// Current model and permission mode from raw JSONL lines (last one wins). Model comes from
+    /// assistant `message.model`; mode from the `permission-mode` bookkeeping lines.
+    public static func meta(from lines: [Data]) -> (model: String?, mode: String?) {
+        var model: String?, mode: String?
+        for line in lines {
+            guard let json = try? JSONSerialization.jsonObject(with: line) as? [String: Any] else { continue }
+            if json["type"] as? String == "permission-mode", let m = json["permissionMode"] as? String { mode = m }
+            if let msg = json["message"] as? [String: Any], msg["role"] as? String == "assistant",
+               let m = msg["model"] as? String, !m.hasPrefix("<") { model = m }
+        }
+        return (model, mode)
+    }
+
+    /// `[Image #4]` / `[Pasted text #2 +10 lines]`: the TUI's stand-ins for attachments, not words.
+    private static let placeholder = try! NSRegularExpression(pattern: #"\[(?:Image|Pasted text|Pasted image)[^\]]*#\d+[^\]]*\]"#)
+
+    private static func textItem(_ source: String, isUser: Bool, id: String) -> TranscriptItem? {
+        let raw = placeholder.stringByReplacingMatches(in: source, range: NSRange(source.startIndex..., in: source), withTemplate: "")
         let text = raw.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else { return nil }
         // Claude injects these as `user` lines; they are harness plumbing, not something the person typed.
