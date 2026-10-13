@@ -8,7 +8,8 @@ final class LinkHoverTests: XCTestCase {
     private func makeView() throws -> (HarnessTerminalSurfaceView, NSWindow) {
         guard MTLCreateSystemDefaultDevice() != nil else { throw XCTSkip("Metal unavailable") }
         let view = HarnessTerminalSurfaceView()
-        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 640, height: 480), styleMask: [.titled], backing: .buffered, defer: false)
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 640, height: 480), styleMask: [.titled],
+                              backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false
         window.contentView = view
         view.layoutSubtreeIfNeeded()
