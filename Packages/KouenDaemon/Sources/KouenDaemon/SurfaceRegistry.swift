@@ -1087,19 +1087,15 @@ public final class SurfaceRegistry: @unchecked Sendable {
             let infos = WorktreeManager().list(repoPath: repoPath).map(Self.worktreeInfoSummary)
             return .worktrees(infos)
         case let .worktreeCreate(repoPath, sessionID, branch, baseRef):
-            // ── DISABLED: worktree creation turned off by request ────────────────────────
-            // Kouen no longer creates git worktrees via IPC either. Call commented out (kept
-            // for easy re-enable). To restore: delete this error return + uncomment the block.
-            _ = (repoPath, sessionID, branch, baseRef)
-            return .error("Worktree creation is disabled in this build.")
-            /*
             guard let path = WorktreeManager().create(
                 repoPath: repoPath, sessionID: sessionID, branch: branch, baseRef: baseRef
             ) else {
                 return .error("git worktree add failed")
             }
+            // Each worktree needs its own deps (never a symlinked node_modules — CASE-041), so
+            // the project's setupScript runs here, detached, same as the in-app task path.
+            ProjectConfig.launchSetupScript(parentRepoPath: repoPath, worktreePath: path)
             return .worktreePath(path)
-            */
         case let .worktreeRemove(repoPath, worktreePath, force):
             let ok = WorktreeManager().remove(repoPath: repoPath, worktreePath: worktreePath, force: force)
             return ok ? .ok : .error("git worktree remove failed")
