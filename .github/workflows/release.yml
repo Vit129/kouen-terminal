@@ -319,13 +319,19 @@ jobs:
       - name: Smoke test final DMG
         run: Scripts/smoke-dmg.sh Harness.dmg
 
+      - name: Archive UUID-verified dSYMs
+        run: |
+          set -euo pipefail
+          Scripts/archive-dsyms.sh Harness.app .build/release "dist/Harness-$APP_VERSION-dSYMs.zip"
+          echo "DSYM_ARCHIVE=dist/Harness-$APP_VERSION-dSYMs.zip" >> "$GITHUB_ENV"
+
       - name: Upload verified release artifacts
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           [[ "$(gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json isDraft --jq .isDraft)" == "true" ]]
-          gh release upload "$RELEASE_TAG" Harness.dmg dist/appcast.xml dist/SHA256SUMS --repo "$GITHUB_REPOSITORY" --clobber
+          gh release upload "$RELEASE_TAG" Harness.dmg dist/appcast.xml dist/SHA256SUMS "$DSYM_ARCHIVE" --repo "$GITHUB_REPOSITORY" --clobber
           checksum="$(awk '{print $1}' dist/SHA256SUMS)"
           printf '\nSHA-256 (`Harness.dmg`): `%s`\n' "$checksum" >> "$RELEASE_NOTES_PATH"
 
@@ -432,6 +438,7 @@ jobs:
             dist/appcast.xml
             dist/SHA256SUMS
             dist/dmg-notarization.json
+            dist/Harness-*-dSYMs.zip
           if-no-files-found: ignore
 
       - name: Delete temporary keychain

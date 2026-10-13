@@ -116,13 +116,18 @@ the environment.
    signature, ticket, Gatekeeper assessment and arm64 helpers; load every bundled
    theme; launch it and require an attached terminal using the expected daemon
    and session-host build. Stop only this test's isolated service afterward.
-6. Upload `Harness.dmg`, `appcast.xml` and `SHA256SUMS` to the draft and publish it.
-7. Download the public DMG and appcast without authentication and compare their
+6. Zip the dSYMs for the app and its three helpers as `Harness-<version>-dSYMs.zip`,
+   failing unless each dSYM's UUID matches the shipped binary. Release executables are
+   stripped of debug and local symbols, so this zip is what symbolicates their crash
+   reports. Set `HARNESS_STRIP=0` for a local build that keeps symbols.
+7. Upload `Harness.dmg`, `appcast.xml`, `SHA256SUMS` and the dSYM zip to the draft and
+   publish it.
+8. Download the public DMG and appcast without authentication and compare their
    bytes with the verified artifacts.
-8. With `deploy_appcast`, commit the signed feed to the website repository and
+9. With `deploy_appcast`, commit the signed feed to the website repository and
    verify that both `thebestterminal.com` and `harnesscli.dev` serve the exact feed.
 
-The workflow retains the DMG, appcast, checksum and DMG notarization receipt as
+The workflow retains the DMG, appcast, checksum, dSYM zip and DMG notarization receipt as
 its `harness-release-<tag>` artifact. Its temporary signing keychain is always
 removed. The final DMG is notarized once; no archive is rebuilt after verification.
 

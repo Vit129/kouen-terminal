@@ -97,6 +97,15 @@ if [[ -d "$FONTS" ]]; then
 fi
 
 chmod +x "$APP/Contents/MacOS/"*
+
+# Release executables ship without debug and local symbols, which halves their size. Crash
+# reports symbolicate against the dSYMs in the build directory (Scripts/archive-dsyms.sh);
+# stripping keeps each binary's UUID. HARNESS_STRIP=0 keeps symbols for local profiling.
+if [[ "$CONFIG" == "release" && "${HARNESS_STRIP:-1}" != "0" ]]; then
+  for executable in Harness HarnessSessionHost HarnessDaemon harness-cli; do
+    strip -S -x "$APP/Contents/MacOS/$executable"
+  done
+fi
 python3 "$ROOT/Scripts/package-macos-tools.py" "$APP"
 
 # Logo provenance and redistribution licenses accompany the compiled marks.
