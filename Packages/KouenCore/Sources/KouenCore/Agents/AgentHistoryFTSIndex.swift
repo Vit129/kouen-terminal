@@ -68,7 +68,9 @@ public final class AgentHistoryFTSIndex: @unchecked Sendable {
     private static let logger = Logger(subsystem: "com.vit129.kouen", category: "history")
     #endif
 
-    public static let schemaVersion: Int32 = 2
+    /// Bump whenever extraction changes (not just the schema): cached records of unchanged
+    /// transcripts are otherwise served as-is forever. 3 = plumbing filter + agy tool turns.
+    public static let schemaVersion: Int32 = 3
 
     private let dbPath: String
     #if canImport(SQLite3)

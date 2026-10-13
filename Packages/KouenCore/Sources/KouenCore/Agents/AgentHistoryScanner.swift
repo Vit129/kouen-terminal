@@ -677,10 +677,7 @@ public actor AgentHistoryScanner {
                 }
                 let role = (msg["role"] as? String)?.lowercased() ?? ""
                 if role == "user" && firstPrompt == nil {
-                    let trimmed = ClaudeTranscriptLine.messageText(msg).trimmingCharacters(in: .whitespacesAndNewlines)
-                    if !trimmed.isEmpty {
-                        firstPrompt = trimmed
-                    }
+                    firstPrompt = ClaudeTranscriptLine.humanText(ClaudeTranscriptLine.messageText(msg), isUser: true)
                 }
             }
             if cwd != nil && firstPrompt != nil { break }
@@ -694,8 +691,7 @@ public actor AgentHistoryScanner {
             }
 
             let role = (msg["role"] as? String)?.lowercased() ?? ""
-            let trimmed = ClaudeTranscriptLine.messageText(msg).trimmingCharacters(in: .whitespacesAndNewlines)
-            if !trimmed.isEmpty {
+            if let trimmed = ClaudeTranscriptLine.humanText(ClaudeTranscriptLine.messageText(msg), isUser: role == "user") {
                 let turnRole = (role == "user") ? "YOU" : "AGENT"
                 if turns.count >= Self.maxLatestTurns { turns.removeFirst() }
                 turns.append(AgentHistoryTurn(role: turnRole, content: String(trimmed.prefix(Self.turnContentLimit))))
@@ -1003,6 +999,49 @@ public actor AgentHistoryScanner {
     }
 
     #if canImport(SQLite3)
+    /// One History turn from an agy transcript event: the user's request, or the agent's reply. A
+    /// reply with no text (agy often answers with tool calls only) becomes "tool: first arg", so a
+    /// session where the agent only ran commands doesn't look like it never answered.
+    static func antigravityTurn(_ json: [String: Any]) -> (role: String, text: String)? {
+        let type = json["type"] as? String ?? ""
+        var text = json["content"] as? String ?? ""
+        switch type {
+        case "USER_INPUT":
+            if let start = text.range(of: "<USER_REQUEST>"), let end = text.range(of: "</USER_REQUEST>") {
+                text = String(text[start.upperBound..<end.lowerBound])
+            }
+            text = text.trimmingCharacters(in: .whitespacesAndNewlines)
+            return text.isEmpty ? nil : ("YOU", text)
+        case "PLANNER_RESPONSE":
+            text = text.trimmingCharacters(in: .whitespacesAndNewlines)
+            if text.isEmpty, let calls = json["tool_calls"] as? [[String: Any]] {
+                text = calls.compactMap { call -> String? in
+                    guard let name = call["name"] as? String else { return nil }
+                    // args values are JSON-encoded strings ("\"git status\""); show the first one bare.
+                    let arg = (call["args"] as? [String: Any])?.values.compactMap { $0 as? String }.first?
+                        .trimmingCharacters(in: CharacterSet(charactersIn: "\""))
+                    return arg.map { "→ \(name): \($0.prefix(120))" } ?? "→ \(name)"
+                }.joined(separator: "\n")
+            }
+            return text.isEmpty ? nil : ("AGENT", text)
+        default:
+            return nil
+        }
+    }
+
+    /// Appends a turn, folding a run of tool-only agent turns ("→ …") into one so a long command
+    /// sequence doesn't push the user's request out of the last `maxLatestTurns`.
+    static func appendTurn(_ turns: inout [AgentHistoryTurn], role: String, text: String) {
+        let content = String(text.prefix(turnContentLimit))
+        if let last = turns.last, last.role == role, last.content.hasPrefix("→ "), content.hasPrefix("→ ") {
+            let lines = (last.content + "\n" + content).split(separator: "\n").suffix(4)
+            turns[turns.count - 1] = AgentHistoryTurn(role: role, content: lines.joined(separator: "\n"))
+            return
+        }
+        if turns.count >= maxLatestTurns { turns.removeFirst() }
+        turns.append(AgentHistoryTurn(role: role, content: content))
+    }
+
     public static func readAntigravitySummaries(
         dbPath: String,
         brainDir: URL,
@@ -1013,6 +1052,9 @@ public actor AgentHistoryScanner {
             return []
         }
         defer { sqlite3_close(db) }
+        // agy writes this db while it runs; without a busy timeout a read that lands mid-write fails
+        // and the whole Antigravity history silently comes back empty.
+        sqlite3_busy_timeout(db, 2000)
 
         var stmt: OpaquePointer?
         let sql = """
@@ -1067,27 +1109,14 @@ public actor AgentHistoryScanner {
                         var promptFound = false
                         var parts: [String] = []
                         for line in lines {
-                            guard let json = try? JSONSerialization.jsonObject(with: line) as? [String: Any] else { continue }
-                            let type = json["type"] as? String ?? ""
-                            let text = json["content"] as? String ?? ""
-                            if type == "USER_INPUT" || type == "PLANNER_RESPONSE" {
-                                var clean = text
-                                if let start = clean.range(of: "<USER_REQUEST>"),
-                                   let end = clean.range(of: "</USER_REQUEST>") {
-                                    clean = String(clean[start.upperBound..<end.lowerBound])
-                                }
-                                let trimmed = clean.trimmingCharacters(in: .whitespacesAndNewlines)
-                                if !trimmed.isEmpty {
-                                    parts.append(trimmed)
-                                    if type == "USER_INPUT" && !promptFound {
-                                        firstPrompt = trimmed
-                                        promptFound = true
-                                    }
-                                    let role = (type == "USER_INPUT") ? "YOU" : "AGENT"
-                                    if turns.count >= maxLatestTurns { turns.removeFirst() }
-                                    turns.append(AgentHistoryTurn(role: role, content: String(trimmed.prefix(turnContentLimit))))
-                                }
+                            guard let json = try? JSONSerialization.jsonObject(with: line) as? [String: Any],
+                                  let (role, trimmed) = antigravityTurn(json) else { continue }
+                            parts.append(trimmed)
+                            if role == "YOU" && !promptFound {
+                                firstPrompt = trimmed
+                                promptFound = true
                             }
+                            appendTurn(&turns, role: role, text: trimmed)
                         }
                         fullTranscript = parts.joined(separator: "\n")
                     }
@@ -1272,23 +1301,10 @@ public actor AgentHistoryScanner {
                 continue
             }
 
-            let type = json["type"] as? String ?? ""
-            let content = json["content"] as? String ?? ""
-
             // Only the real conversation — GENERIC (tool output), SYSTEM_MESSAGE and CHECKPOINT
             // entries would otherwise show up (and get handed off) as "AGENT" turns.
-            if !content.isEmpty, type == "USER_INPUT" || type == "PLANNER_RESPONSE" {
-                let role = (type == "USER_INPUT") ? "YOU" : "AGENT"
-                var displayContent = content
-                if let rangeStart = displayContent.range(of: "<USER_REQUEST>"),
-                   let rangeEnd = displayContent.range(of: "</USER_REQUEST>") {
-                    displayContent = String(displayContent[rangeStart.upperBound..<rangeEnd.lowerBound])
-                }
-                displayContent = displayContent.trimmingCharacters(in: .whitespacesAndNewlines)
-                if !displayContent.isEmpty {
-                    if turns.count >= Self.maxLatestTurns { turns.removeFirst() }
-                    turns.append(AgentHistoryTurn(role: turnRole(role), content: String(displayContent.prefix(Self.turnContentLimit))))
-                }
+            if let (role, displayContent) = Self.antigravityTurn(json) {
+                Self.appendTurn(&turns, role: turnRole(role), text: displayContent)
             }
         }
 
