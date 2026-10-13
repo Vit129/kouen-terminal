@@ -976,6 +976,7 @@ final class PaletteViewController: NSViewController, NSTableViewDataSource, NSTa
                 }
             }
             matches.sort { $0.score > $1.score }
+            if matches.isEmpty { matches.append((Self.searchSettingsAction(query), 0)) }
         }
 
         // Group into ordered sections with header rows.
@@ -1017,6 +1018,27 @@ final class PaletteViewController: NSViewController, NSTableViewDataSource, NSTa
 
         rows = newRows
         selectableRowIndexes = selectable
+    }
+
+    /// The no-results row: carry the query into Settings search instead of a dead end.
+    private static func searchSettingsAction(_ query: String) -> PaletteAction {
+        PaletteAction(
+            id: "settings.search",
+            title: "Search Settings for “\(query)”",
+            subtitle: "Open Settings at the first matching control",
+            symbol: "gearshape",
+            shortcut: "",
+            section: .settings,
+            handler: { SettingsWindowController.show(search: query) }
+        )
+    }
+
+    func testingResultTitles(for query: String) -> [String] {
+        rebuildRows(query: query)
+        return selectableRowIndexes.compactMap { index in
+            if case let .item(action) = rows[index] { return action.title }
+            return nil
+        }
     }
 
     private func selectFirstSelectable() {

@@ -125,7 +125,9 @@ final class SettingsViewController: NSViewController, NSFontChanging {
     private var pages: [SettingsPane: NSView] = [:]
     /// The pane shown first; `SettingsWindowController.show(pane:)` sets it before the view loads.
     var initialPane: SettingsPane = .appearance
-    private var currentPane: SettingsPane = .appearance
+    /// Opens with this text in the search field, landing on its first matching control.
+    var initialSearch: String?
+    private(set) var currentPane: SettingsPane = .appearance
     /// Group-card surfaces + hairline dividers, tracked so a live theme change can
     /// re-skin them (they're created inline by the `settingsGroup` factory rather than
     /// stored individually).
@@ -176,6 +178,15 @@ final class SettingsViewController: NSViewController, NSFontChanging {
         layoutShell()
         showPage(initialPane)
         observeChromeChanges()
+        if let initialSearch, !initialSearch.isEmpty {
+            settingsSearch.stringValue = initialSearch
+            filterSections(initialSearch)
+        }
+    }
+
+    override func viewDidAppear() {
+        super.viewDidAppear()
+        if !(initialSearch ?? "").isEmpty { view.window?.makeFirstResponder(settingsSearch) }
     }
 
     // MARK: - Control configuration (initial state from settings)
@@ -566,6 +577,7 @@ final class SettingsViewController: NSViewController, NSFontChanging {
 
         settingsSearch.placeholderString = "Search"
         settingsSearch.onChange = { [weak self] query in self?.filterSections(query) }
+        settingsSearch.onSubmit = { [weak self] in self?.showNextSearchMatch() }
         settingsSearch.setAccessibilityLabel("Search settings")
         settingsSearch.translatesAutoresizingMaskIntoConstraints = false
 
@@ -595,14 +607,16 @@ final class SettingsViewController: NSViewController, NSFontChanging {
         container.addSubview(settingsSearch)
         container.addSubview(buttons)
         container.addSubview(noResultsLabel)
+        let buttonsTop = buttons.topAnchor.constraint(equalTo: settingsSearch.bottomAnchor, constant: 16)
+        buttonsTopToSearch = buttonsTop
         NSLayoutConstraint.activate([
+            buttonsTop,
             title.topAnchor.constraint(equalTo: container.topAnchor, constant: 26),
             title.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: 18),
             title.trailingAnchor.constraint(equalTo: container.trailingAnchor, constant: -18),
             settingsSearch.topAnchor.constraint(equalTo: title.bottomAnchor, constant: 14),
             settingsSearch.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: 14),
             settingsSearch.trailingAnchor.constraint(equalTo: container.trailingAnchor, constant: -14),
-            buttons.topAnchor.constraint(equalTo: settingsSearch.bottomAnchor, constant: 16),
             buttons.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: 10),
             buttons.trailingAnchor.constraint(equalTo: container.trailingAnchor, constant: -10),
             noResultsLabel.topAnchor.constraint(equalTo: settingsSearch.bottomAnchor, constant: 18),
@@ -611,25 +625,107 @@ final class SettingsViewController: NSViewController, NSFontChanging {
         return container
     }
 
-    /// Filter the sidebar by pane title and keywords. When the pane on screen drops out of the
-    /// results, the first match takes its place, so the right side always shows a hit.
+    /// One control that matches the settings search.
+    struct SearchMatch {
+        let pane: SettingsPane
+        fileprivate let row: SettingsFormRow
+        var title: String { row.title }
+    }
+
+    private var searchMatches: [SearchMatch] = []
+    private(set) var searchMatchIndex = 0
+
+    /// Controls whose title and hint contain every word of `query`, title matches first,
+    /// each group in sidebar order and then page order. Rows hidden by other settings are skipped.
+    func settingsSearchMatches(_ query: String) -> [SearchMatch] {
+        let words = query.lowercased().split(whereSeparator: \.isWhitespace).map(String.init)
+        guard !words.isEmpty else { return [] }
+        var titled: [SearchMatch] = [], hinted: [SearchMatch] = []
+        for pane in SettingsPane.allCases {
+            guard let page = pages[pane] else { continue }
+            for row in Self.formRows(in: page) where !row.isHidden && !(row.superview?.isHidden ?? false) {
+                let title = row.title.lowercased()
+                let text = title + " " + (row.hint ?? "").lowercased()
+                guard words.allSatisfy(text.contains) else { continue }
+                let match = SearchMatch(pane: pane, row: row)
+                if words.allSatisfy(title.contains) { titled.append(match) } else { hinted.append(match) }
+            }
+        }
+        return titled + hinted
+    }
+
+    private static func formRows(in root: NSView) -> [SettingsFormRow] {
+        if let row = root as? SettingsFormRow { return [row] }
+        return root.subviews.flatMap(formRows)
+    }
+
+    /// Filter the sidebar to panes whose title, keywords, or controls match, and land on the
+    /// first matching control. Return in the search field steps through the rest.
     private func filterSections(_ raw: String) {
         let query = raw.lowercased().trimmingCharacters(in: .whitespaces)
+        searchMatches = settingsSearchMatches(query)
+        searchMatchIndex = 0
+        let matchedPanes = Set(searchMatches.map(\.pane))
         for button in sidebarButtons {
             guard !query.isEmpty, let pane = SettingsPane(rawValue: button.tag) else {
                 button.isHidden = false
                 continue
             }
-            let hits = pane.title.lowercased().contains(query) || pane.keywords.contains { $0.contains(query) }
+            let hits = matchedPanes.contains(pane) || pane.title.lowercased().contains(query)
+                || pane.keywords.contains { $0.contains(query) }
             button.isHidden = !hits
         }
         let visible = sidebarButtons.filter { !$0.isHidden }
-        noResultsLabel.isHidden = !visible.isEmpty
-        if !visible.contains(where: { $0.tag == currentPane.rawValue }),
-           let first = visible.first, let pane = SettingsPane(rawValue: first.tag) {
-            showPage(pane)
+        if let first = searchMatches.first {
+            reveal(first)
+        } else {
+            highlightedRow?.setSearchHighlight(false)
+            highlightedRow = nil
+            if !visible.contains(where: { $0.tag == currentPane.rawValue }),
+               let first = visible.first, let pane = SettingsPane(rawValue: first.tag) {
+                showPage(pane)
+            }
         }
+        updateSearchStatus(query: query, anyPane: !visible.isEmpty)
     }
+
+    private weak var highlightedRow: SettingsFormRow?
+
+    func showNextSearchMatch() {
+        guard !searchMatches.isEmpty else { return }
+        searchMatchIndex = (searchMatchIndex + 1) % searchMatches.count
+        reveal(searchMatches[searchMatchIndex])
+        updateSearchStatus(query: settingsSearch.stringValue, anyPane: true)
+    }
+
+    private func reveal(_ match: SearchMatch) {
+        if currentPane != match.pane { showPage(match.pane, refresh: false) }
+        highlightedRow?.setSearchHighlight(false)
+        highlightedRow = match.row
+        match.row.setSearchHighlight(true)
+        view.layoutSubtreeIfNeeded()
+        let target = match.row.superview ?? match.row
+        target.scrollToVisible(target.bounds.insetBy(dx: 0, dy: -48))
+        NSAccessibility.post(element: view, notification: .announcementRequested, userInfo: [
+            .announcement: "\(match.title), \(match.pane.title)",
+            .priority: NSAccessibilityPriorityLevel.medium.rawValue,
+        ])
+    }
+
+    private func updateSearchStatus(query: String, anyPane: Bool) {
+        if query.isEmpty {
+            noResultsLabel.isHidden = true
+        } else if searchMatches.count > 1 {
+            noResultsLabel.stringValue = "\(searchMatchIndex + 1) of \(searchMatches.count) · Return for next"
+            noResultsLabel.isHidden = false
+        } else {
+            noResultsLabel.stringValue = "No matching settings"
+            noResultsLabel.isHidden = anyPane
+        }
+        buttonsTopToSearch?.constant = noResultsLabel.isHidden ? 16 : 36
+    }
+
+    private var buttonsTopToSearch: NSLayoutConstraint?
 
     /// ↑ / ↓ on a focused sidebar row move through the visible panes.
     private func moveSelection(by delta: Int) {
@@ -2711,6 +2807,7 @@ private enum Form {
 /// leaves, so a long hint never pushes the control out of its column.
 @MainActor
 private final class SettingsFormRow: NSView {
+    let title: String
     private let titleLabel: NSTextField
     private let hintLabel = NSTextField(wrappingLabelWithString: "")
     private let control: NSView
@@ -2725,6 +2822,7 @@ private final class SettingsFormRow: NSView {
     }
 
     init(title: String, hint: String?, control: NSView) {
+        self.title = title
         titleLabel = NSTextField(wrappingLabelWithString: title)
         self.control = control
         super.init(frame: .zero)
@@ -2772,6 +2870,15 @@ private final class SettingsFormRow: NSView {
 
     @available(*, unavailable)
     required init?(coder: NSCoder) { fatalError() }
+
+    /// Tints the row's full-width wrapper while it is the current search match.
+    func setSearchHighlight(_ on: Bool) {
+        guard let wrapper = superview else { return }
+        wrapper.wantsLayer = true
+        wrapper.layer?.cornerRadius = HarnessDesign.Radius.control
+        wrapper.layer?.backgroundColor = on ? HarnessChrome.current.accentSoft.cgColor : nil
+        setAccessibilityLabel(on ? "\(title), search match" : nil)
+    }
 
     /// Wrap the text to the room left of the control. Wrapping labels size from
     /// `preferredMaxLayoutWidth`, so it follows the row's real width after each pass.
@@ -2945,10 +3052,11 @@ enum SettingsWindowController {
         (window?.contentViewController as? SettingsViewController)?.adoptExternalSettingsWrite()
     }
 
-    static func show(pane: SettingsPane = .appearance) {
+    static func show(pane: SettingsPane = .appearance, search: String? = nil) {
         window?.close()
         let controller = SettingsViewController()
         controller.initialPane = pane
+        controller.initialSearch = search
         let win = NSWindow(contentViewController: controller)
         win.title = "Settings"
         win.styleMask = [.titled, .closable, .resizable]

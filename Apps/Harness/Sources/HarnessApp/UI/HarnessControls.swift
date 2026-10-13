@@ -178,6 +178,8 @@ final class HarnessSecureTextField: NSSecureTextField {
 @MainActor
 final class HarnessSearchField: NSView, NSTextFieldDelegate {
     var onChange: ((String) -> Void)?
+    /// Return in the field. Unset leaves Return to the field's default behavior.
+    var onSubmit: (() -> Void)?
     private let field = NSTextField()
     private let magnifier = NSImageView()
     // Same layout-churn guard as HarnessTextField — skip redundant CALayer writes.
@@ -263,6 +265,12 @@ final class HarnessSearchField: NSView, NSTextFieldDelegate {
 
     func controlTextDidChange(_ obj: Notification) {
         onChange?(field.stringValue)
+    }
+
+    func control(_ control: NSControl, textView: NSTextView, doCommandBy selector: Selector) -> Bool {
+        guard selector == #selector(NSResponder.insertNewline(_:)), let onSubmit else { return false }
+        onSubmit()
+        return true
     }
 }
 
