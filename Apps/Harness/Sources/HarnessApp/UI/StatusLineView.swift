@@ -16,10 +16,12 @@ final class StatusLineView: NSView {
     private var heightConstraint: NSLayoutConstraint!
     private static let mainRowHeight: CGFloat = 26
     private static let extraRowHeight: CGFloat = 22
-    private var refreshTimer: Timer?
-    /// Interval (seconds) `refreshTimer` is currently armed at; -1 = never armed. Lets
-    /// `reconcileTimer` skip churning the timer when `status-interval` is unchanged.
+    /// Read in `deinit`, which is nonisolated. Every other access is on the main actor.
+    nonisolated(unsafe) private var refreshTimer: Timer?
+    /// Interval (seconds) `refreshTimer` is currently armed at; 0 = disarmed, -1 = never
+    /// reconciled. Lets `reconcileTimer` skip churning the timer when nothing changed.
     private var statusIntervalSeconds = -1
+    var isRefreshTimerArmed: Bool { refreshTimer != nil }
     /// Vertical row placement for a bottom-anchored footer: main row hugs the bottom, extra
     /// `status 2..5` rows stack upward. Swapped with `topRowConstraints` by `position`.
     private var bottomRowConstraints: [NSLayoutConstraint] = []
@@ -113,11 +115,17 @@ final class StatusLineView: NSView {
             name: NotificationBus.shared.snapshotChanged,
             object: nil
         )
-        reconcileTimer()
         refresh()
     }
 
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+
+    deinit { refreshTimer?.invalidate() }
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        reconcileTimer()
+    }
 
     func applyChrome() {
         // Re-run the backdrop install so it re-reads HarnessChrome.backgroundOpacity.
@@ -149,9 +157,8 @@ final class StatusLineView: NSView {
     }
 
     @objc private func snapshotChanged(_ note: Notification) {
-        // A daemon push also lands on `set-option status-interval`, so reconcile the timer cadence
-        // before refreshing (idempotent when unchanged).
-        reconcileTimer()
+        // A daemon push also lands on `set-option status-interval`. `refresh` reconciles the
+        // timer cadence once visibility is current (idempotent when unchanged).
         refresh()
     }
 
@@ -160,9 +167,11 @@ final class StatusLineView: NSView {
     /// snapshot churn — a refresh is just an attributed-string set. Idempotent: a no-op when the
     /// interval is unchanged, so reconciling on every snapshot/option change stays cheap. The
     /// compositor (`WindowAttachClient`) honors the same option with the same default, so the GUI
-    /// and attached clients tick in lockstep.
+    /// and attached clients tick in lockstep. A hidden or windowless line has nothing to redraw,
+    /// so it stays disarmed until it is shown again.
     private func reconcileTimer() {
-        let seconds = HarnessOptions.shared.get("status-interval", scope: .global)?.intValue ?? 15
+        let configured = HarnessOptions.shared.get("status-interval", scope: .global)?.intValue ?? 15
+        let seconds = window != nil && !isHidden ? max(0, configured) : 0
         guard seconds != statusIntervalSeconds else { return }
         statusIntervalSeconds = seconds
         refreshTimer?.invalidate()
@@ -184,6 +193,7 @@ final class StatusLineView: NSView {
         let showInSettings = settings.effectiveStatusLineEnabled && settings.showStatusLine
         let count = showInSettings ? (options.get("status", scope: .global)?.statusLineCount ?? 1) : 0
         isHidden = count == 0
+        reconcileTimer()
         guard count > 0 else {
             // Collapse the band to 0 so the terminal split fills the freed space
             // (a hidden view still reserves its height constraint otherwise).

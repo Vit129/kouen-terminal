@@ -121,7 +121,12 @@ final class ContentAreaViewController: NSViewController, TerminalTabBarDelegate 
     /// enabled, that means the renderer just copied the selection — surface a brief
     /// "Selection copied" toast.
     private var pasteboardCountAtMouseDown: Int = NSPasteboard.general.changeCount
-    private var copySelectionMonitor: Any?
+    /// Read in `deinit`, which is nonisolated. Every other access is on the main actor.
+    nonisolated(unsafe) private var copySelectionMonitor: Any?
+
+    deinit {
+        if let copySelectionMonitor { NSEvent.removeMonitor(copySelectionMonitor) }
+    }
 
     override func loadView() {
         view = NSView()
@@ -257,6 +262,7 @@ final class ContentAreaViewController: NSViewController, TerminalTabBarDelegate 
     }
 
     private func installCopySelectionToast() {
+        guard copySelectionMonitor == nil else { return }
         copySelectionMonitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .leftMouseUp]) { [weak self] event in
             guard let self else { return event }
             if event.type == .leftMouseDown {
