@@ -5,8 +5,8 @@ final class SettingsViewControllerFollowSystemThemeTests: XCTestCase {
     func testFollowSystemShowsLightAndDarkThemeSelectors() throws {
         let source = try settingsViewControllerSource()
 
-        XCTAssertTrue(source.contains("private let systemLightThemePopup = HarnessSelect(frame: .zero)"))
-        XCTAssertTrue(source.contains("private let systemDarkThemePopup = HarnessSelect(frame: .zero)"))
+        XCTAssertTrue(source.contains("let systemLightThemePopup = HarnessSelect(frame: .zero)"))
+        XCTAssertTrue(source.contains("let systemDarkThemePopup = HarnessSelect(frame: .zero)"))
         XCTAssertTrue(source.contains("settingsRow(\"Light theme\", systemLightThemePopup)"))
         XCTAssertTrue(source.contains("settingsRow(\"Dark theme\", systemDarkThemePopup)"))
         // Theme shows one picker; Light shows the light half; Auto (follow macOS) shows both.
@@ -247,14 +247,21 @@ final class SettingsViewControllerFollowSystemThemeTests: XCTestCase {
     }
 
     private func settingsViewControllerSource() throws -> String {
-        let url = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
-            .appendingPathComponent("Apps/Harness/Sources/HarnessApp/Settings/SettingsViewController.swift")
-        return try String(contentsOf: url, encoding: .utf8)
+        try typeSource("SettingsViewController", in: "Apps/Harness/Sources/HarnessApp/Settings")
     }
 
     private func sessionCoordinatorSource() throws -> String {
-        let url = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
-            .appendingPathComponent("Apps/Harness/Sources/HarnessApp/Services/SessionCoordinator.swift")
-        return try String(contentsOf: url, encoding: .utf8)
+        try typeSource("SessionCoordinator", in: "Apps/Harness/Sources/HarnessApp/Services")
+    }
+
+    /// The type's main file plus its `Type+Topic.swift` extension files.
+    private func typeSource(_ type: String, in directory: String) throws -> String {
+        let directoryURL = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
+            .appendingPathComponent(directory)
+        let names = try FileManager.default.contentsOfDirectory(atPath: directoryURL.path)
+            .filter { $0 == "\(type).swift" || ($0.hasPrefix("\(type)+") && $0.hasSuffix(".swift")) }
+            .sorted()
+        return try names.map { try String(contentsOf: directoryURL.appendingPathComponent($0), encoding: .utf8) }
+            .joined(separator: "\n")
     }
 }
