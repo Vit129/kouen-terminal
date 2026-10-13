@@ -46,6 +46,33 @@ final class PtyInputWriter: @unchecked Sendable {
         return true
     }
 
+    /// An interrupt that must not wait behind queued input. With nothing queued and room in the
+    /// PTY, `byte` is written in order like any keystroke. Otherwise the queued input is
+    /// dropped and `signal` interrupts the foreground job directly: a paste backlog is exactly
+    /// when Ctrl-C matters, and the byte itself would only join the back of that queue.
+    /// Takes ownership of the supplied dup. Controls already queued still apply, in order.
+    func interrupt(_ byte: UInt8, master incoming: (fd: Int32, generation: UInt64)?, signal: (Int32) -> Bool) -> Bool {
+        guard let incoming else { return false }
+        lock.lock()
+        defer { lock.unlock() }
+        guard incoming.generation >= newestGeneration else { sysClose(incoming.fd); return false }
+        if incoming.generation > newestGeneration {
+            clearLocked()
+            newestGeneration = incoming.generation
+        }
+        defer { sysClose(incoming.fd) }
+        if pending.isEmpty, barriers.isEmpty, waiting == nil {
+            var value = byte
+            if sysWrite(incoming.fd, &value, 1) == 1 { return true }
+            guard errno == EAGAIN || errno == EWOULDBLOCK || errno == EINTR else { return false }
+        }
+        pending.removeAll(keepingCapacity: true)
+        for index in barriers.indices { barriers[index].remaining = 0 }
+        let delivered = signal(incoming.fd)
+        if barriers.isEmpty { clearLocked() } else { scheduleLocked() }
+        return delivered
+    }
+
     /// Control records share the input order. Later writes cannot cross a resize
     /// boundary, even when a large paste is waiting for the PTY to become writable.
     func perform(afterInput incoming: (fd: Int32, generation: UInt64), apply: @escaping @Sendable () -> Void, cancel: @escaping @Sendable () -> Void) -> Bool {

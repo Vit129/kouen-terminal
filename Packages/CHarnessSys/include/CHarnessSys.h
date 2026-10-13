@@ -25,6 +25,15 @@ int harness_pty_make_controlling(int fd);
 int harness_open_rdwr(const char *path);
 int harness_set_nonblocking(int fd);
 
+// The terminal's interrupt character when its line discipline turns it into a signal (ISIG on
+// and VINTR enabled), or -1. Works on a PTY master, which shares the slave's termios.
+int harness_pty_interrupt_char(int fd);
+
+// Send `sig` to the PTY's foreground process group, as typing the signal character would
+// (TIOCSIG on the master). Darwin also flushes the terminal's queued input unless NOFLSH is
+// set. Returns 0, or -1 where TIOCSIG is unavailable or fails.
+int harness_pty_signal(int fd, int sig);
+
 // Peer UID of a connected AF_UNIX stream socket (getpeereid on Darwin, SO_PEERCRED on Linux), or -1.
 long harness_peer_uid(int fd);
 

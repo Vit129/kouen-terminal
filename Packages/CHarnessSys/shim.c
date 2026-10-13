@@ -21,6 +21,7 @@ unsigned int harness_power_sleep_cancelled(void) { return kIOMessageSystemWillNo
 #include <sys/syscall.h>
 #include <termios.h>
 #include <fcntl.h>
+#include <stdint.h>
 #include <unistd.h>
 #include <stdlib.h>
 #include <string.h>
@@ -61,6 +62,26 @@ int harness_set_nonblocking(int fd) {
     int flags = fcntl(fd, F_GETFL, 0);
     if (flags < 0) return -1;
     return fcntl(fd, F_SETFL, flags | O_NONBLOCK);
+}
+
+int harness_pty_interrupt_char(int fd) {
+    struct termios t;
+    if (tcgetattr(fd, &t) != 0 || (t.c_lflag & ISIG) == 0) return -1;
+    cc_t c = t.c_cc[VINTR];
+#ifdef _POSIX_VDISABLE
+    if (c == (cc_t)_POSIX_VDISABLE) return -1;
+#endif
+    return (int)c;
+}
+
+int harness_pty_signal(int fd, int sig) {
+#ifdef TIOCSIG
+    // Both Darwin and Linux take the signal number by value.
+    return ioctl(fd, TIOCSIG, (void *)(intptr_t)sig);
+#else
+    (void)fd; (void)sig;
+    return -1;
+#endif
 }
 
 long harness_peer_uid(int fd) {

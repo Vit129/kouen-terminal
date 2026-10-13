@@ -556,6 +556,13 @@ public final class RealPty: @unchecked Sendable {
         lifecycleLock.lock()
         let current = generation, fd = master >= 0 ? sysDup(master) : -1
         lifecycleLock.unlock()
+        // A lone interrupt character in a mode where the terminal turns it into SIGINT gets
+        // priority over queued input. Raw-mode programs read it as data, so it keeps its place.
+        if data.count == 1, fd >= 0, let byte = data.first, harness_pty_interrupt_char(fd) == Int32(byte) {
+            let accepted = inputWriter.interrupt(byte, master: (fd, current)) { harness_pty_signal($0, SIGINT) == 0 }
+            if accepted { lastInputGeneration = current }
+            return accepted
+        }
         let accepted = inputWriter.write(data, master: fd >= 0 ? (fd, current) : nil)
         if accepted, !data.isEmpty { lastInputGeneration = current }
         return accepted
