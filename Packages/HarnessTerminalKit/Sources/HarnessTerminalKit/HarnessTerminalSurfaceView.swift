@@ -894,6 +894,13 @@ public final class HarnessTerminalSurfaceView: NSView {
     private var findOptions = TerminalBufferSearchOptions.default
     private var findCancellation: TerminalSearchCancellation?
     private var findDebounce: DispatchWorkItem?
+    /// Content refresh for an active query while output streams: at most one per
+    /// `findRefreshInterval`, never cancelling a search already running.
+    private var findRefreshScheduled = false
+    private var findRefreshQueued = false
+    private var findInFlight = false
+    private var findLastStart: TimeInterval = 0
+    static let findRefreshInterval: TimeInterval = 0.25
     private var findContentRevision: UInt64 = 0
     private var accessibleCache: (revision: UInt64, text: TerminalAccessibilityText, cursorLine: Int, cursorColumn: Int, history: Int)?
     private var findTargetLine: Int?
@@ -4240,6 +4247,8 @@ public final class HarnessTerminalSurfaceView: NSView {
         findQuery = ""
         findCancellation?.cancel()
         findDebounce?.cancel()
+        findInFlight = false
+        findRefreshQueued = false
         findMatches = []
         findCurrentIndex = 0
         onFindResultsChanged?(0, 0)
@@ -4260,62 +4269,91 @@ public final class HarnessTerminalSurfaceView: NSView {
     private func invalidateFindContent() {
         findContentRevision &+= 1
         if findActive, findQuery.isEmpty, !findMatches.isEmpty { findMatches = []; onFindResultsChanged?(0, 0) }
-        if findActive, !findQuery.isEmpty { scheduleFind() }
+        if findActive, !findQuery.isEmpty { scheduleFindRefresh() }
     }
 
+    /// Output changed under an active query. The current matches stay on screen and the search
+    /// re-runs at most every `findRefreshInterval`, so streaming output never blanks the results.
+    private func scheduleFindRefresh() {
+        guard !findRefreshScheduled else { return }
+        if findInFlight || findDebounce.map({ !$0.isCancelled }) == true { findRefreshQueued = true; return }
+        findRefreshScheduled = true
+        let wait = max(0, findLastStart + Self.findRefreshInterval - ProcessInfo.processInfo.systemUptime)
+        DispatchQueue.main.asyncAfter(deadline: .now() + wait) { [weak self] in
+            guard let self else { return }
+            self.findRefreshScheduled = false
+            guard self.findActive, !self.findQuery.isEmpty else { return }
+            if self.findInFlight { self.findRefreshQueued = true; return }
+            self.runFind(refreshing: true)
+        }
+    }
+
+    /// A new query, scope, or option: clear the old matches and search after a short debounce.
     private func scheduleFind() {
         findCancellation?.cancel()
         findDebounce?.cancel()
+        findInFlight = false
+        findRefreshQueued = false
         findMatches = []
         onFindResultsChanged?(0, 0)
         guard !findQuery.isEmpty else { onFindStatusChanged?(nil); scheduleRender(); return }
-        let cancellation = TerminalSearchCancellation()
-        findCancellation = cancellation
-        let query = findQuery, options = findOptions, revision = findContentRevision
-        let commandScope = findCommandScope
         onFindStatusChanged?("Searching…")
-        let work = DispatchWorkItem { [weak self] in
-            guard let self, !cancellation.isCancelled else { return }
-            let search: @Sendable (TerminalTextSnapshot, TerminalTextRange?) -> Void = { [weak self] snapshot, scope in
-                DispatchQueue.global(qos: .userInitiated).async { [weak self] in
-                    guard !cancellation.isCancelled else { return }
-                    let result = TerminalBufferSearch.search(query: query, options: options,
-                        lineCount: commandScope != nil && scope == nil ? 0 : snapshot.lineCount,
-                        clusters: snapshot.clusters, within: scope,
-                        isWrapped: snapshot.isWrapped, cancelled: { cancellation.isCancelled }, line: snapshot.line)
-                    DispatchQueue.main.async { [weak self] in
-                        guard let self, !cancellation.isCancelled, self.findActive,
-                              revision == self.findContentRevision else { return }
-                        switch result {
-                        case let .matches(matches, limited):
-                            self.findMatches = matches
-                            let position = self.findPosition?.position
-                            self.findCurrentIndex = self.findTargetLine.flatMap { target in
-                                matches.firstIndex { $0.bufferLine == target }
-                            } ?? position.flatMap { position in
-                                matches.firstIndex { match in
-                                    match.spans.contains { $0.bufferLine == position.line && $0.columns.contains(position.column) }
-                                }
-                            } ?? 0
-                            self.findTargetLine = nil
-                            if !matches.isEmpty { self.scrollToCurrentMatch() }
-                            self.onFindResultsChanged?(matches.isEmpty ? 0 : self.findCurrentIndex + 1, matches.count)
-                            self.onFindStatusChanged?(limited ? "Results limited" : nil)
-                        case let .invalidPattern(message): self.onFindStatusChanged?("Invalid pattern: " + message)
-                        case .cancelled: return
-                        case .expired: self.onFindStatusChanged?("Output changed. Search again.")
-                        }
-                        self.scheduleRender()
-                    }
-                }
-            }
-
-            self.emulatorState.async { emulator in search(emulator.textSnapshot(), commandScope?.outputRange) }
-
-        }
+        let work = DispatchWorkItem { [weak self] in self?.runFind(refreshing: false) }
         findDebounce = work
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.12, execute: work)
         scheduleRender()
+    }
+
+    /// Search the current text. A refresh keeps the current match without scrolling, because
+    /// the user may be reading it while output arrives.
+    private func runFind(refreshing: Bool) {
+        findDebounce = nil
+        let cancellation = TerminalSearchCancellation()
+        findCancellation = cancellation
+        findInFlight = true
+        findLastStart = ProcessInfo.processInfo.systemUptime
+        let query = findQuery, options = findOptions, revision = findContentRevision
+        let commandScope = findCommandScope
+        if refreshing { onFindStatusChanged?("Updating…") }
+        let search: @Sendable (TerminalTextSnapshot, TerminalTextRange?) -> Void = { [weak self] snapshot, scope in
+            DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+                guard !cancellation.isCancelled else { return }
+                let result = TerminalBufferSearch.search(query: query, options: options,
+                    lineCount: commandScope != nil && scope == nil ? 0 : snapshot.lineCount,
+                    clusters: snapshot.clusters, within: scope,
+                    isWrapped: snapshot.isWrapped, cancelled: { cancellation.isCancelled }, line: snapshot.line)
+                DispatchQueue.main.async { [weak self] in
+                    guard let self, !cancellation.isCancelled, self.findActive else { return }
+                    self.findInFlight = false
+                    var stale = revision != self.findContentRevision || self.findRefreshQueued
+                    self.findRefreshQueued = false
+                    switch result {
+                    case let .matches(matches, limited):
+                        let previousLine = refreshing && self.findMatches.indices.contains(self.findCurrentIndex)
+                            ? self.findMatches[self.findCurrentIndex].bufferLine : nil
+                        self.findMatches = matches
+                        let position = self.findPosition?.position
+                        self.findCurrentIndex = self.findTargetLine.flatMap { target in
+                            matches.firstIndex { $0.bufferLine == target }
+                        } ?? position.flatMap { position in
+                            matches.firstIndex { match in
+                                match.spans.contains { $0.bufferLine == position.line && $0.columns.contains(position.column) }
+                            }
+                        } ?? previousLine.flatMap { line in matches.firstIndex { $0.bufferLine >= line } } ?? 0
+                        self.findTargetLine = nil
+                        if !matches.isEmpty, !refreshing { self.scrollToCurrentMatch() }
+                        self.onFindResultsChanged?(matches.isEmpty ? 0 : self.findCurrentIndex + 1, matches.count)
+                        if !stale { self.onFindStatusChanged?(limited ? "Results limited" : nil) }
+                    case let .invalidPattern(message): self.onFindStatusChanged?("Invalid pattern: " + message)
+                    case .cancelled: return
+                    case .expired: stale = true
+                    }
+                    if stale { self.scheduleFindRefresh() }
+                    self.scheduleRender()
+                }
+            }
+        }
+        emulatorState.async { emulator in search(emulator.textSnapshot(), commandScope?.outputRange) }
     }
 
     public func revealSearchResult(query: String, caseSensitive: Bool, line: Int, fingerprint: UInt64) -> Bool {

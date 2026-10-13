@@ -102,4 +102,44 @@ final class AsyncFindTests: XCTestCase {
         view.endFind()
     }
 
+    /// Output used to clear the matches and restart the debounce on every chunk, so a steady
+    /// stream kept Find at zero results. Results must stay visible, refresh while output
+    /// arrives, and report "Updating…" until the stream settles.
+    func testResultsStayVisibleAndRefreshWhileOutputStreams() async throws {
+        let view = HarnessTerminalSurfaceView()
+        view.testingResizeGrid(cols: 40, rows: 10)
+        view.receive("needle one\r\n")
+        view.testingWaitForEmulatorIdle()
+        let initial = expectation(description: "Initial search")
+        view.onFindResultsChanged = { _, count in if count == 1 { initial.fulfill() } }
+        view.updateFind(query: "needle")
+        await fulfillment(of: [initial], timeout: 2)
+
+        var counts: [Int] = []
+        var statuses: [String?] = []
+        view.onFindResultsChanged = { _, count in counts.append(count) }
+        view.onFindStatusChanged = { statuses.append($0) }
+        let streamEnd = Date().addingTimeInterval(1.2)
+        var line = 0
+        while Date() < streamEnd {
+            line += 1
+            view.receive("output \(line)\(line % 5 == 0 ? " needle" : "")\r\n")
+            try await Task.sleep(nanoseconds: 30_000_000)
+        }
+        XCTAssertFalse(counts.contains(0), "streaming output must not blank the results")
+        XCTAssertGreaterThan(counts.count, 1, "results refresh while output arrives")
+        XCTAssertLessThanOrEqual(counts.count, Int(1.2 / HarnessTerminalSurfaceView.findRefreshInterval) + 2,
+                                 "refreshes are bounded by the refresh interval")
+        XCTAssertTrue(statuses.contains("Updating…"))
+
+        let expected = 1 + line / 5
+        let settled = expectation(description: "Final refresh after output stops")
+        view.onFindResultsChanged = { _, count in if count == expected { settled.fulfill() } }
+        if counts.last != expected { await fulfillment(of: [settled], timeout: 2) }
+        try await Task.sleep(nanoseconds: 400_000_000)
+        XCTAssertEqual(statuses.last ?? nil, nil, "status clears once output settles")
+        view.onFindResultsChanged = nil
+        view.onFindStatusChanged = nil
+        view.endFind()
+    }
 }
