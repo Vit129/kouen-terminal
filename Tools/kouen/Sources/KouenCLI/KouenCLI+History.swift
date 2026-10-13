@@ -178,7 +178,7 @@ extension KouenCLI {
     }
 
     /// New tab in the active workspace, wait for its surface, then type `command`. Shared by
-    /// `history resume` and `happy adopt`. Same spawn/poll shape `handleWake` and
+    /// `history resume`. Same spawn/poll shape `handleWake` and
     /// `kouenSpawnAgent` (MCP) use.
     static func openTab(running command: String, cwd: String?, client: DaemonClient, label: String) async throws -> UUID {
         let snap = try snapshot(client)

@@ -102,23 +102,13 @@ final class AgentLaunchCommandsTests: XCTestCase {
         XCTAssertEqual(AgentLaunchCommands.launch(kind: .codex, mode: .cloud), "codex")
     }
 
-    func testHappyLaunchAndResumeCommands() throws {
-        XCTAssertEqual(AgentLaunchCommands.launch(kind: .claudeCode, mode: .happy), "happy claude")
-        XCTAssertEqual(AgentLaunchCommands.launch(kind: .antigravity, mode: .happy), "happy agy")
-        XCTAssertEqual(AgentLaunchCommands.launch(kind: .copilot, mode: .happy), "happy acp -- copilot --acp")
-        XCTAssertEqual(AgentLaunchCommands.launch(kind: .codex, mode: .happy), "happy codex")
-        XCTAssertEqual(AgentLaunchCommands.resume(kind: .codex, sessionID: "s-1", mode: .happy), "happy codex resume s-1")
+    func testLegacyHappyModeDecodesToRemoteControl() throws {
+        XCTAssertEqual(try JSONDecoder().decode(AgentSessionMode.self, from: Data("\"happy\"".utf8)), .remoteControl)
         XCTAssertEqual(
-            AgentLaunchCommands.resume(kind: .claudeCode, sessionID: "s-123", mode: .happy),
-            "happy claude --resume s-123"
+            try JSONDecoder().decode([AgentKind: AgentSessionMode].self, from: Data(#"{"codex":"happy"}"#.utf8))[.codex],
+            .remoteControl
         )
-        XCTAssertEqual(AgentLaunchCommands.happyCommand(kind: .claudeCode, mode: .happy), "happy claude")
-        XCTAssertNil(AgentLaunchCommands.happyCommand(kind: .claudeCode, mode: .remoteControl))
-        // Agents without a happyCommand fall back to local, never to a bogus `happy` binary.
-        XCTAssertEqual(AgentLaunchCommands.launch(kind: .kiro, mode: .happy), "kiro")
-        XCTAssertNil(AgentLaunchCommands.happyCommand(kind: .kiro, mode: .happy))
-        let data = try JSONEncoder().encode(AgentSessionMode.happy)
-        XCTAssertEqual(try JSONDecoder().decode(AgentSessionMode.self, from: data), .happy)
+        XCTAssertThrowsError(try JSONDecoder().decode(AgentSessionMode.self, from: Data("\"bogus\"".utf8)))
     }
 
     func testOtherAgentsLaunchCommands() {
