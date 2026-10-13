@@ -49,40 +49,26 @@ if set -q KOUEN; and set -q KOUEN_CLAUDE_SESSION_MODE; and not set -q __kouen_cl
             end
         end
         if test $rc -eq 1
-            /usr/bin/open -a "Google Chrome" "https://claude.ai/code" >/dev/null 2>&1 &
+            # replaced by Kouen Companion; run `kouen rc`
+            # /usr/bin/open -a "Google Chrome" "https://claude.ai/code" >/dev/null 2>&1 &
             __kouen_next rc >/dev/null 2>&1
-            if type -q happy; and test -f "$HOME/.happy/access.key"
-                set -l claude_path $HAPPY_CLAUDE_PATH
-                test -n "$claude_path"; or set claude_path (type -p claude)
-                env HAPPY_CLAUDE_PATH=$claude_path happy claude $argv
-            else
                 __kouen_claude_next $argv
-            end
         else if test "$KOUEN_CLAUDE_SESSION_MODE" = cloud; and test $resume -eq 0
             __kouen_claude_next --cloud $argv
         else if test "$KOUEN_CLAUDE_SESSION_MODE" = cloud; or test "$KOUEN_CLAUDE_SESSION_MODE" = remote-control
             if test "$KOUEN_CLAUDE_SESSION_MODE" = remote-control
-                /usr/bin/open -a "Google Chrome" "https://claude.ai/code" >/dev/null 2>&1 &
+                # replaced by Kouen Companion; run `kouen rc`
+                # /usr/bin/open -a "Google Chrome" "https://claude.ai/code" >/dev/null 2>&1 &
                 __kouen_next rc >/dev/null 2>&1
             end
-            if type -q happy; and test -f "$HOME/.happy/access.key"
-                set -l claude_path $HAPPY_CLAUDE_PATH
-                test -n "$claude_path"; or set claude_path (type -p claude)
-                env HAPPY_CLAUDE_PATH=$claude_path happy claude --remote-control --remote-control-session-name-prefix kouen $argv
-            else
                 __kouen_claude_next --remote-control --remote-control-session-name-prefix kouen $argv
-            end
-        else if test "$KOUEN_CLAUDE_SESSION_MODE" = happy; and type -q happy
-            set -l claude_path $HAPPY_CLAUDE_PATH
-            test -n "$claude_path"; or set claude_path (type -p claude)
-            env HAPPY_CLAUDE_PATH=$claude_path happy claude --remote-control --remote-control-session-name-prefix kouen $argv
         else
             __kouen_claude_next $argv
         end
     end
 end
-# Codex session mode: a `codex` typed by hand runs through Happy when $KOUEN_CODEX_SESSION_MODE is `happy` or `remote-control` with Happy logged in.
-if set -q KOUEN; and begin test "$KOUEN_CODEX_SESSION_MODE" = happy; or test "$KOUEN_CODEX_SESSION_MODE" = remote-control; end; and not set -q __kouen_codex_wrapped
+# Codex session mode: a `codex` typed by hand gets the Companion opened when $KOUEN_CODEX_SESSION_MODE is `remote-control`.
+if set -q KOUEN; and begin test "$KOUEN_CODEX_SESSION_MODE" = remote-control; end; and not set -q __kouen_codex_wrapped
     set -g __kouen_codex_wrapped 1
     if functions -q codex
         functions -c codex __kouen_codex_next
@@ -106,18 +92,15 @@ if set -q KOUEN; and begin test "$KOUEN_CODEX_SESSION_MODE" = happy; or test "$K
             end
         end
         if test "$KOUEN_CODEX_SESSION_MODE" = remote-control; or test $rc -eq 1
-            /usr/bin/open -a "Google Chrome" "https://chatgpt.com" >/dev/null 2>&1 &
+            # replaced by Kouen Companion; run `kouen rc`
+            # /usr/bin/open -a "Google Chrome" "https://chatgpt.com" >/dev/null 2>&1 &
             __kouen_next rc >/dev/null 2>&1
         end
-        if type -q happy; and test -f "$HOME/.happy/access.key"
-            happy codex $argv
-        else
             __kouen_codex_next $argv
-        end
     end
 end
-# Antigravity (agy) session mode: a `agy` typed by hand gets --remote-control, or happy agy when in happy mode.
-if set -q KOUEN; and begin test "$KOUEN_AGY_SESSION_MODE" = remote-control; or test "$KOUEN_AGY_SESSION_MODE" = happy; end; and not set -q __kouen_agy_wrapped
+# Antigravity (agy) session mode: a `agy` typed by hand gets --remote-control.
+if set -q KOUEN; and begin test "$KOUEN_AGY_SESSION_MODE" = remote-control; end; and not set -q __kouen_agy_wrapped
     set -g __kouen_agy_wrapped 1
     if functions -q agy
         functions -c agy __kouen_agy_next
@@ -142,11 +125,9 @@ if set -q KOUEN; and begin test "$KOUEN_AGY_SESSION_MODE" = remote-control; or t
             end
         end
         if test "$KOUEN_AGY_SESSION_MODE" = remote-control; or test $rc -eq 1
-            /usr/bin/open -a "Google Chrome" "https://antigravity.google.com" >/dev/null 2>&1 &
+            # replaced by Kouen Companion; run `kouen rc`
+            # /usr/bin/open -a "Google Chrome" "https://antigravity.google.com" >/dev/null 2>&1 &
             __kouen_next rc >/dev/null 2>&1
-        end
-        if test "$KOUEN_AGY_SESSION_MODE" = happy; and type -q happy
-            happy agy $argv; return
         end
         if test $rc -eq 1
             __kouen_agy_next $argv
@@ -155,8 +136,8 @@ if set -q KOUEN; and begin test "$KOUEN_AGY_SESSION_MODE" = remote-control; or t
         end
     end
 end
-# GitHub Copilot session mode: a `copilot` typed by hand gets --remote when in remote-control mode ($KOUEN_COPILOT_SESSION_MODE), or happy acp when happy.
-if set -q KOUEN; and begin test "$KOUEN_COPILOT_SESSION_MODE" = remote-control; or test "$KOUEN_COPILOT_SESSION_MODE" = happy; end; and not set -q __kouen_copilot_wrapped
+# GitHub Copilot session mode: a `copilot` typed by hand gets --remote when in remote-control mode ($KOUEN_COPILOT_SESSION_MODE).
+if set -q KOUEN; and begin test "$KOUEN_COPILOT_SESSION_MODE" = remote-control; end; and not set -q __kouen_copilot_wrapped
     set -g __kouen_copilot_wrapped 1
     if functions -q copilot
         functions -c copilot __kouen_copilot_next
@@ -179,9 +160,6 @@ if set -q KOUEN; and begin test "$KOUEN_COPILOT_SESSION_MODE" = remote-control; 
         end
         if test "$KOUEN_COPILOT_SESSION_MODE" = remote-control; or test $rc -eq 1
             __kouen_next rc >/dev/null 2>&1
-        end
-        if test "$KOUEN_COPILOT_SESSION_MODE" = happy; and type -q happy
-            happy acp -- copilot --acp $argv; return
         end
         if test $rc -eq 1
             __kouen_copilot_next $argv

@@ -248,6 +248,9 @@ final class DaemonLauncher: @unchecked Sendable {
         if let port = mobileBridgePortIfEnabled() {
             environment["KOUEN_MOBILE_BRIDGE_PORT"] = String(port)
         }
+        // The bridge listens on the page port (daemon default 8080); preview takes 8081 so its
+        // Companion can run next to the installed Kouen's instead of failing to bind.
+        if isPreview { environment["KOUEN_MOBILE_BRIDGE_PAGE_PORT"] = "8081" }
         proc.environment = environment
         try? KouenPaths.ensureDirectories()
         do {

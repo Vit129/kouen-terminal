@@ -65,26 +65,21 @@ final class ShellIntegrationTests: XCTestCase {
         }
     }
 
-    /// `happy` mode: a hand-typed `claude` / `codex` runs through Happy and falls back to the plain
-    /// command when `happy` is missing. (Behavior was exercised against fake binaries in zsh and bash.)
-    func testScriptsRouteClaudeAndCodexThroughHappyMode() {
+    func testScriptsWrapCodexInRemoteControlMode() {
         for shell in ShellIntegration.Shell.allCases {
             let s = ShellIntegration.script(for: shell)
-            XCTAssertTrue(s.contains("happy claude"), "\(shell) must route claude via happy")
-            XCTAssertTrue(s.contains("happy codex"), "\(shell) must route codex via happy")
             XCTAssertTrue(s.contains("KOUEN_CODEX_SESSION_MODE"), "\(shell) must read codex mode")
             XCTAssertTrue(s.contains("__kouen_codex_next"), "\(shell) must chain codex")
-            XCTAssertTrue(s.contains("HAPPY_CLAUDE_PATH"), "\(shell) must pin the real claude binary")
+            XCTAssertFalse(s.lowercased().contains("happy"), "\(shell) must not reference Happy")
         }
     }
 
-    func testScriptsOpenGoogleChromeOnRemoteControl() {
+    func testVendorWebAutoOpenIsCommentedOut() {
         for shell in ShellIntegration.Shell.allCases {
             let s = ShellIntegration.script(for: shell)
-            XCTAssertTrue(s.contains("Google Chrome"), "\(shell) wrapper must reference Google Chrome")
-            XCTAssertTrue(s.contains("https://claude.ai/code"), "\(shell) wrapper must contain claude remote URL")
-            XCTAssertTrue(s.contains("https://antigravity.google.com"), "\(shell) wrapper must contain antigravity remote URL")
-            XCTAssertTrue(s.contains("https://chatgpt.com"), "\(shell) wrapper must contain codex remote URL")
+            for line in s.split(separator: "\n") where line.contains("Google Chrome") {
+                XCTAssertTrue(line.trimmingCharacters(in: .whitespaces).hasPrefix("#"), "\(shell): vendor web open must stay commented out: \(line)")
+            }
             XCTAssertTrue(s.contains("__kouen_next rc"), "\(shell) wrapper must open the companion via kouen-cli rc")
             XCTAssertFalse(s.contains("localhost:7777"), "\(shell) wrapper must not hardcode the companion port")
         }

@@ -37,12 +37,8 @@ An entry in the existing `RemoteHostStore` (SSH remote machine config), exposed 
 _Avoid_: Remote Host
 
 **Session Mode**:
-How an agent is launched in a pane, per agent (`AgentSessionMode`, `agentSessionModes` in `settings.json`): `local`, `remote-control` (default; vendor mobile/desktop app), `cloud`, or `happy` (through the Happy wrapper). One launch table resolves agent + mode to a command.
+How an agent is launched in a pane, per agent (`AgentSessionMode`, `agentSessionModes` in `settings.json`): `local`, `remote-control` (default; vendor mobile/desktop app), or `cloud`. One launch table resolves agent + mode to a command.
 _Avoid_: Launch profile, Connection type
-
-**Happy**:
-A third-party cross-vendor mobile/web app and wrapper (`happy claude|codex|agy|acp`). Kouen runs no relay itself; Happy's daemon is started by the Kouen daemon whenever Happy is installed and logged in. A phone-started session is headless until adopted (`kouen-cli happy adopt`).
-_Avoid_: Mobile bridge (the deprecated built-in QR/Tailscale bridge)
 
 **Checkpoint**:
 An automatic per-agent-turn snapshot of the working tree stored as a `refs/kouen/checkpoints/<session>/<turn>` git ref (never the real index or `git stash`); `kouen undo` reverts to it.
@@ -119,6 +115,6 @@ _Avoid_: Terminal autocomplete, AI prompt popup
 - A **Host (MCP resource)** is read-only via MCP — creating/editing a Host remains a Settings-UI-only action.
 - An **Automation** is independent of Tasks, Worktrees, and Hosts.
 - An **Agent Routing Rule** resolves to an existing **AgentKind** value — it selects the binary to spawn, not the internal model.
-- A **Session Mode** is per agent, not per tab; `happy` and `remote-control` can both apply to a hand-typed `claude` when Happy is logged in.
+- A **Session Mode** is per agent, not per tab; a legacy `happy` value in `settings.json` decodes to `remote-control`.
 - An **Orchestrator** creates **Worker** sessions via `kouenSpawnWorker` — a Worker is an ordinary session whose lifecycle is managed by the Orchestrator.
 - An **Auto-Fix Loop** only ever retries the same **Worker** on its own **Worktree** — it never spawns a second Worker on the same Task, and never touches the **Merge Waiver** gate.
