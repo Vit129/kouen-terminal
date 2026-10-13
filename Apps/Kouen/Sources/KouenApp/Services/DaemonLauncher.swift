@@ -244,6 +244,13 @@ final class DaemonLauncher: @unchecked Sendable {
         proc.standardOutput = nil
         proc.standardError = nil
         var environment = ProcessInfo.processInfo.environment
+        // An app launched from inside a Claude Code session (e.g. `make preview` run by an agent)
+        // inherits its markers; every shell then starts `claude` as a child session with
+        // transcript saving off, which blanks the Companion's transcript feed.
+        // Only the session markers — other CLAUDE_CODE_* vars are user config and must pass through.
+        for key in ["CLAUDECODE", "CLAUDE_CODE_CHILD_SESSION", "CLAUDE_CODE_ENTRYPOINT", "CLAUDE_CODE_SSE_PORT"] {
+            environment[key] = nil
+        }
         environment["KOUEN_HOME"] = KouenPaths.applicationSupport.path
         if let port = mobileBridgePortIfEnabled() {
             environment["KOUEN_MOBILE_BRIDGE_PORT"] = String(port)

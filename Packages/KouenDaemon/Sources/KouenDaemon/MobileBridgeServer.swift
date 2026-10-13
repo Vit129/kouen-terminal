@@ -871,7 +871,8 @@ public final class MobileBridgeServer: @unchecked Sendable {
     }
 
     function sendAgentCommand(kind, value) {
-      if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ agentCommand: { kind, value } }));
+      const agent = isAgy() ? "antigravity" : "claude-code";
+      if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ agentCommand: { kind, value, agent } }));
     }
     function openModel() {
       panel("Model", `<div class="pick" role="radiogroup" aria-label="Model">
@@ -1240,6 +1241,8 @@ public final class MobileBridgeServer: @unchecked Sendable {
             cur.state = updated.state;
             cur.branch = updated.branch;
             cur.agent = updated.agent;
+            $("s-meta").textContent = cur.agent + " · " + cur.branch;
+            renderComposer();
             if (cur.state === "idle" && cur.files && cur.files.length > 0 && cur.branch && cur.branch !== 'main' && cur.branch !== 'master' && cur.branch !== '—' && !cur.out.some(x => x[0] === 'pr' || x[0] === 'prdone')) {
               cur.out.push(["pr"]);
               renderPane();
@@ -1855,7 +1858,9 @@ public final class MobileBridgeServer: @unchecked Sendable {
         /// Code TUI through its own slash commands / Shift+Tab; values are allowlisted server-side.
         var agentCommand: AgentCommandRequest?
 
-        struct AgentCommandRequest: Decodable { var kind: String; var value: String }
+        /// `agent` is the page's own idea of the agent ("claude-code"/"antigravity"), used only when the
+        /// daemon's detector has nothing for the pane (agy is often missed right after launch).
+        struct AgentCommandRequest: Decodable { var kind: String; var value: String; var agent: String? }
         struct GitDiffRequest: Decodable { var path: String? }
         struct CreateDraftPRRequest: Decodable { var title: String?; var path: String? }
         struct SpawnPayload: Decodable { var cwd: String? }
@@ -3138,7 +3143,7 @@ public final class MobileBridgeServer: @unchecked Sendable {
 
     private func handleAgentCommand(_ cmd: ControlMessage.AgentCommandRequest, connection: NWConnection, state: ConnectionState) {
         guard let surfaceID = state.surfaceID, let subscription = state.subscription,
-              let kind = AgentDetector.snapshot(forSurfaceKey: surfaceID)?.kind,
+              let kind = AgentDetector.snapshot(forSurfaceKey: surfaceID)?.kind ?? cmd.agent.flatMap(AgentKind.init(rawValue:)),
               kind == .claudeCode || kind == .antigravity else {
             sendText(#"{"error":"model and effort can only be changed on an attached Claude or agy session"}"#, on: connection)
             return
