@@ -52,11 +52,11 @@ final class IconTileView: NSView {
         let faceRect = bounds
         face.frame = faceRect
         face.cornerRadius = (faceRect.height * 0.25).rounded()
-        let markScale: CGFloat = 0.76
+        let markScale: CGFloat = 0.64
         let markSide = (faceRect.height * markScale).rounded()
         glyph.frame = NSRect(x: faceRect.midX - markSide / 2, y: faceRect.midY - markSide / 2, width: markSide, height: markSide)
-        // Draw the prompt as one balanced mark, independent of font metrics.
-        let scale = faceRect.height / 16
+        // Draw the prompt as one balanced mark, independent of font metrics, sized with the logos.
+        let scale = markSide / 12
         let path = CGMutablePath()
         path.move(to: CGPoint(x: -4.5, y: 3))
         path.addLine(to: CGPoint(x: -1, y: 0))

@@ -49,9 +49,9 @@ enum HarnessDesign {
     static let footerHeight: CGFloat = 40
     static let tabPillHeight: CGFloat = 30
     /// Leading app tile in sidebar rows.
-    static let iconTileSize = NSSize(width: 28, height: 23)
+    static let iconTileSize = NSSize(width: 32, height: 26)
     /// A lower rectangle, with enough leading room inside the pill's curved end.
-    static let tabIconTileSize = NSSize(width: 20, height: 16)
+    static let tabIconTileSize = NSSize(width: 25, height: 20)
     static let tabIconTileInset: CGFloat = 12
     static var sidebarTabRowHeight: CGFloat { tabPillHeight + 2 * Spacing.xxs }
     static let sidebarSessionHeaderHeight: CGFloat = 30
