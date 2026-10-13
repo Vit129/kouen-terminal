@@ -1,7 +1,7 @@
 import AppKit
 import HarnessCore
 
-/// Uniform monochrome agent marks on transparent faces; terminal tiles retain chrome.
+/// Shell prompts and monochrome agent marks share one dark rounded tile.
 @MainActor
 final class IconTileView: NSView {
     enum Content: Equatable {
@@ -74,23 +74,21 @@ final class IconTileView: NSView {
     func apply(_ content: Content) {
         if self.content != content { needsLayout = true }
         self.content = content
-        let base: NSColor
         switch content {
         case .terminal:
-            base = NSColor.fromHex("#272C2D")!
             prompt.isHidden = false
             glyph.isHidden = true
         case let .agent(kind):
-            base = .clear
             prompt.isHidden = true
             glyph.isHidden = false
             glyph.image = AgentIconRenderer.templateOrMonogramImage(for: kind, size: badgeSize.height)
-            glyph.contentTintColor = .labelColor
+            // The face stays dark in every theme, so the mark must not follow labelColor.
+            glyph.contentTintColor = NSColor(white: 0.94, alpha: 1)
         }
         CATransaction.begin()
         CATransaction.setDisableActions(true)
-        face.backgroundColor = base.cgColor
-        face.borderColor = (content == .terminal ? NSColor.white.withAlphaComponent(0.14) : NSColor.clear).cgColor
+        face.backgroundColor = NSColor.fromHex("#272C2D")!.cgColor
+        face.borderColor = NSColor.white.withAlphaComponent(0.14).cgColor
         CATransaction.commit()
     }
 

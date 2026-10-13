@@ -27,14 +27,11 @@ do {
     signal(SIGHUP, SIG_IGN)
     let executable = URL(fileURLWithPath: CommandLine.arguments[0]).resolvingSymlinksInPath()
     service = SessionHostService(daemonExecutable: HarnessToolLocator.companion("HarnessDaemon", to: executable))
-    service.onShutdown = {
-        DaemonLifecycle.removeOwnedPIDFile(at: HarnessPaths.daemonPIDURL, ownPID: getpid())
-        exit(0)
-    }
+    service.onShutdown = finishShutdown
     for number in [SIGTERM, SIGINT] {
         signal(number, SIG_IGN)
         let source = DispatchSource.makeSignalSource(signal: number, queue: .global())
-        source.setEventHandler { if service.stop() { service.onShutdown?() } }
+        source.setEventHandler(handler: handleStopSignal)
         source.resume(); signals.append(source)
     }
     try service.start()
@@ -45,3 +42,14 @@ do {
     exit(1)
 }
 enum SessionHostStartupError: Error { case alreadyOwned }
+
+// Functions, not closure literals: top-level closures inherit main-actor isolation, and these
+// run on signal and owner queues, where Swift's isolation check would trap.
+@Sendable private func finishShutdown() {
+    DaemonLifecycle.removeOwnedPIDFile(at: HarnessPaths.daemonPIDURL, ownPID: getpid())
+    exit(0)
+}
+
+@Sendable private func handleStopSignal() {
+    if service.stop() { service.onShutdown?() }
+}

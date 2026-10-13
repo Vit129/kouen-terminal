@@ -178,6 +178,11 @@ private final class WorkerSocketOwnership: @unchecked Sendable {
 }
 private let workerSocketOwnership = WorkerSocketOwnership()
 
+// A function, not a closure literal, so the parent watch can run it off the main actor.
+@Sendable private func exitAfterParentLoss() {
+    workerSocketOwnership.removeOwnedSocket(); _exit(0)
+}
+
 // MARK: - Bootstrap
 
 if CommandLine.arguments.dropFirst().contains("--search-regex-worker") { exit(IsolatedRegex.runWorker()) }
@@ -200,11 +205,11 @@ if hosted {
     // host recovers. The write-lease descriptor remains held until all threads exit.
     #if canImport(Darwin)
     let parentWatch = DispatchSource.makeProcessSource(identifier: parent, eventMask: .exit, queue: .global())
-    parentWatch.setEventHandler { workerSocketOwnership.removeOwnedSocket(); _exit(0) }; parentWatch.resume()
+    parentWatch.setEventHandler(handler: exitAfterParentLoss); parentWatch.resume()
     #else
     let parentWatch = DispatchSource.makeTimerSource(queue: .global())
     parentWatch.schedule(deadline: .now(), repeating: 0.25)
-    parentWatch.setEventHandler { if getppid() != parent { workerSocketOwnership.removeOwnedSocket(); _exit(0) } }; parentWatch.resume()
+    parentWatch.setEventHandler { @Sendable in if getppid() != parent { exitAfterParentLoss() } }; parentWatch.resume()
     #endif
     // Catch a parent that exited between the identity check and watcher arming.
     guard getppid() == parent, ProcessScan.generation(parent) == identity else { _exit(0) }
@@ -222,10 +227,12 @@ ignoreSIGPIPE()
 
 let workerSocket = ProcessInfo.processInfo.environment["HARNESS_DAEMON_SOCKET"].map { URL(fileURLWithPath: $0) }
 let server = DaemonServer(enableVersionBanner: true, enablePowerManagement: true, socketURL: workerSocket ?? HarnessPaths.socketURL, mutationLease: mutationLease)
-nonisolated(unsafe) var hasShutDown = false
-let shutdownLock = NSLock()
+nonisolated(unsafe) private var hasShutDown = false
+private let shutdownLock = NSLock()
 
-let shutdown: @Sendable () -> Void = {
+// A function, not a closure literal: top-level closures inherit main-actor isolation, and this
+// runs on signal and server queues, where Swift's isolation check would trap.
+@Sendable private func shutdown() {
     shutdownLock.lock()
     let already = hasShutDown
     hasShutDown = true
