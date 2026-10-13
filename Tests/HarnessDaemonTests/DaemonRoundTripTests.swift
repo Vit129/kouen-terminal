@@ -311,11 +311,14 @@ final class DaemonRoundTripTests: XCTestCase {
         let client = DaemonClient()
         let sid = UUID().uuidString
         _ = try client.request(.ensureSurface(surfaceID: sid, cwd: nil, shell: "/bin/sh", rows: 24, cols: 80, scrollbackBytes: nil))
-        _ = try client.request(.sendData(surfaceID: sid, data: Data("PS1=''; stty -echo\n".utf8)))
-        usleep(300_000)
+        // Darwin's ONLCR conversion can repeat a CR when the tty output queue fills.
+        // Emit exact CRLF bytes so this test measures replay transport, not that line discipline.
+        _ = try client.request(.sendData(surfaceID: sid, data: Data("PS1=''; stty -echo -opost; printf 'RESYNC_READY\\r\\n'\n".utf8)))
+        let pty = try XCTUnwrap(server.registry.sessionForTesting(surfaceID: sid))
+        XCTAssertTrue(waitUntil(timeout: 5) { pty.replay(fromSequence: nil).contains("RESYNC_READY\r\n") })
         let count = 20_000
-        let flood = "i=0; while [ $i -lt \(count / 2) ]; do echo FLOOD_$i; i=$((i+1)); done; read go; "
-            + "while [ $i -lt \(count) ]; do echo FLOOD_$i; i=$((i+1)); done; echo FLOOD_DONE\n"
+        let flood = "i=0; while [ $i -lt \(count / 2) ]; do printf 'FLOOD_%s\\r\\n' \"$i\"; i=$((i+1)); done; read go; "
+            + "while [ $i -lt \(count) ]; do printf 'FLOOD_%s\\r\\n' \"$i\"; i=$((i+1)); done; printf 'FLOOD_DONE\\r\\n'\n"
         _ = try client.request(.sendData(surfaceID: sid, data: Data(flood.utf8)))
         usleep(50_000)
 
@@ -340,10 +343,20 @@ final class DaemonRoundTripTests: XCTestCase {
         }
         XCTAssertTrue(run.contains { $0.sequence < reply.historyEnd } && run.contains { $0.sequence >= reply.historyEnd })
         // Each line's number wherever it sits on its line (the shell's own output can share the first).
-        let numbers = output.snapshot.components(separatedBy: "\r\n").compactMap { line in
+        let lines = output.snapshot.components(separatedBy: "\r\n")
+        let numbers = lines.compactMap { line in
             line.range(of: "FLOOD_").flatMap { Int(line[$0.upperBound...]) }
         }
-        XCTAssertEqual(numbers, Array(0 ..< count), "every line once, in order")
+        let expected = Array(0 ..< count)
+        if numbers != expected {
+            let received = Set(numbers)
+            let missing = expected.filter { !received.contains($0) }
+            let malformed = lines.filter { line in
+                guard let marker = line.range(of: "FLOOD_") else { return false }
+                return Int(line[marker.upperBound...]) == nil && !line.contains("FLOOD_DONE")
+            }.prefix(8).map { String(reflecting: String($0.prefix(200))) }
+            XCTFail("Expected every line once, in order; received \(numbers.count)/\(count), missing \(missing.prefix(12)), malformed \(malformed)")
+        }
     }
 
     /// A pane fills while no client is attached (as after the app quits): the daemon parses its

@@ -12,12 +12,14 @@ Verified on Apple silicon with macOS 27.0.1 and Swift 6.4:
 
 - Swift debug build, optimized release build and unsigned app assembly passed.
 - The committed Xcode project built successfully with code signing disabled.
-- The complete Swift suite discovered 2,542 tests across 15 modules: 2,483 passed,
+- The complete Swift suite discovered 2,543 tests across 15 modules: 2,484 passed,
   59 skipped and no failures. Live socket and PTY fixtures were enabled.
 - Nine native pane-layout tests cover persistent view identity and focus, animated
   movement, interrupted transitions, hit testing, geometry, content changes and
   header configurations. Two real-process pane lifecycle tests cover retained
   closing views and resize requests arriving during the final output drain.
+- Native disclosure-button clicks and accessibility presses both toggle the
+  section and expose its expanded state correctly.
 - Six daemon-launcher regressions cover healthy services, missing workers, uncertain
   replacement receipts, failed adoption and incompatible owners with live programs.
 - The actual 2.1.0 upgrade fixture preserved programs without authorization, then
@@ -33,6 +35,12 @@ Verified on Apple silicon with macOS 27.0.1 and Swift 6.4:
 - A disposable signing fixture generated and verified an appcast with the pinned
   Sparkle tools. Altering its signed content was rejected. The test did not access
   the production signing key.
+- A CI replay-test failure was traced to macOS PTY newline conversion repeating a
+  carriage return under backpressure. An independent shell/PTY fixture reproduced
+  it without Harness. The replay fixture now emits exact CRLF bytes with output
+  postprocessing disabled, preserving its checks for all 20,000 lines and contiguous
+  byte sequences. Failure diagnostics report malformed lines without overflowing
+  log viewers. All 24 daemon round-trip tests passed with coverage enabled.
 
 A separate optimized performance run enabled the benchmarks: 51 passed, with
 three display-drawable fluidity measurements skipped. The normal-suite skips
