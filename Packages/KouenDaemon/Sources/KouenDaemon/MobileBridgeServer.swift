@@ -616,10 +616,28 @@ public final class MobileBridgeServer: @unchecked Sendable {
     const LABEL = { wait: "WAITING", run: "WORKING", idle: "IDLE" };
     const $ = id => document.getElementById(id);
     let ws = null, sessions = [], cur = null, atts = [], pv = "local", authed = false;
+    let needsAttach = null, failedRetries = 0; // needsAttach: null = socket not open yet
     const params = new URLSearchParams(location.search);
     const wsPort = params.get('wsport') || location.port;
-    const credKey = 'kouenDeviceCreds:' + location.hostname;
+    // Keyed by host:port: the installed Kouen (8080) and a preview (8081) share a hostname but are
+    // different daemons with different paired-device stores.
+    const credKey = 'kouenDeviceCreds:' + location.host;
+    let sentCreds = false;
     function storedCreds() { try { return JSON.parse(localStorage.getItem(credKey)); } catch { return null; } }
+    // Which session was open plus each session's picked model/effort and transcript feed, so a
+    // reload or an iOS background kill comes back to the same screen instead of the list.
+    const viewKey = 'kouenView:' + location.host;
+    let view = (() => { try { return JSON.parse(localStorage.getItem(viewKey)) || {}; } catch { return {}; } })();
+    view.s = view.s || {};
+    let saveTimer = null;
+    function saveView() {
+      clearTimeout(saveTimer);
+      saveTimer = setTimeout(() => {
+        view.open = cur ? cur.id : null;
+        if (cur) view.s[cur.id] = { modelName: cur.modelName, effort: cur.effort, out: cur.transcript ? cur.out.slice(-150) : undefined };
+        try { localStorage.setItem(viewKey, JSON.stringify(view)); } catch {}
+      }, 500);
+    }
 
     function esc(t) { return (t || '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
     function stripANSI(str) {
@@ -665,6 +683,13 @@ public final class MobileBridgeServer: @unchecked Sendable {
 
     function openSession(s) {
       cur = s;
+      const saved = view.s[s.id];
+      if (saved) {
+        cur.modelName = cur.modelName || saved.modelName;
+        cur.effort = cur.effort || saved.effort;
+        if (saved.out && cur.out.length <= 1) cur.out = saved.out;
+      }
+      saveView();
       $("scr-list").hidden = true; $("scr-list").style.display = "none";
       $("scr-sess").hidden = false; $("scr-sess").style.display = "contents";
       $("s-name").textContent = s.name;
@@ -683,6 +708,7 @@ public final class MobileBridgeServer: @unchecked Sendable {
         ws.send(JSON.stringify({ detach: true }));
       }
       cur = null;
+      saveView();
       renderList();
     }
     $("back").onclick = back;
@@ -720,6 +746,16 @@ public final class MobileBridgeServer: @unchecked Sendable {
       ["sonnet", "Sonnet", "Everyday coding"],
       ["haiku", "Haiku", "Fast, cheap: summaries, search"],
       ["fable", "Fable", "Largest model"]];
+    // From `agy models` (base names; agy's /model picks the default thinking level, /effort sets it).
+    // ponytail: hand-copied list, goes stale when agy adds models; upgrade = daemon runs `agy models`.
+    const AGY_MODEL_OPTS = [
+      ["gemini-3.8-flash", "Gemini 3.8 Flash", "Fast, Google's default"],
+      ["claude-opus-5-5", "Claude Opus 5.5", "Hardest work"],
+      ["claude-sonnet-5-5", "Claude Sonnet 5.5", "Everyday coding"],
+      ["gpt-oss-120b", "GPT-OSS 120B", "Open-weight model"]];
+    const isAgy = () => !!cur && /antigravity|agy/i.test(cur.agent || "");
+    const modelOpts = () => isAgy() ? AGY_MODEL_OPTS : MODEL_OPTS;
+    const effortOpts = () => isAgy() ? ["low", "medium", "high"] : EFFORTS;
     const EFFORTS = ["low", "medium", "high", "xhigh", "max"];
     const EFFORT_LABEL = { low: "Low", medium: "Medium", high: "High", xhigh: "XHigh", max: "Max" };
     const MODE_OPTS = [
@@ -733,8 +769,9 @@ public final class MobileBridgeServer: @unchecked Sendable {
       if (!m) return id || "";
       return m[1][0].toUpperCase() + m[1].slice(1) + " " + m[2] + (m[3] ? "." + m[3] : "");
     }
-    // The model/effort/mode controls drive Claude Code's own TUI; other agents have no verified mechanism.
-    const canControl = () => !!cur && (cur.transcript || /claude/i.test(cur.agent || ""));
+    // The model/effort/mode controls drive Claude Code's or agy's own TUI slash commands; other agents
+    // have no verified mechanism. Mode (Shift+Tab cycle) is only verified for Claude.
+    const canControl = () => !!cur && (cur.transcript || /claude/i.test(cur.agent || "") || isAgy());
 
     // Working = the agent still owes a reply. With a transcript: last item is the user's message or a
     // tool call, and the daemon does not say idle/waiting. Without: the daemon's activity state.
@@ -834,20 +871,21 @@ public final class MobileBridgeServer: @unchecked Sendable {
     }
 
     function sendAgentCommand(kind, value) {
-      if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ agentCommand: { kind, value } }));
+      const agent = isAgy() ? "antigravity" : "claude-code";
+      if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ agentCommand: { kind, value, agent } }));
     }
     function openModel() {
       panel("Model", `<div class="pick" role="radiogroup" aria-label="Model">
-        ${MODEL_OPTS.map(([id, name, d]) => `<button class="opt" role="radio" aria-checked="${(cur.modelName || "").toLowerCase().startsWith(id)}" data-m="${id}"><span class="t">${name}</span><span class="ck">✓</span><span class="d">${esc(d)}</span></button>`).join("")}
+        ${modelOpts().map(([id, name, d]) => `<button class="opt" role="radio" aria-checked="${cur.modelName === name || (cur.modelName || "").toLowerCase().startsWith(id)}" data-m="${id}"><span class="t">${name}</span><span class="ck">✓</span><span class="d">${esc(d)}</span></button>`).join("")}
         <h5>Effort</h5>
-        <div class="seg" role="group" aria-label="Effort">${EFFORTS.map(e => `<button data-e="${e}" aria-pressed="${e === cur.effort}">${EFFORT_LABEL[e]}</button>`).join("")}</div>
-        <p class="hint">Sent to Claude Code as /model and /effort. The current effort can't be read back, so it only shows once you set it here.</p></div>`, true);
+        <div class="seg" role="group" aria-label="Effort">${effortOpts().map(e => `<button data-e="${e}" aria-pressed="${e === cur.effort}">${EFFORT_LABEL[e]}</button>`).join("")}</div>
+        <p class="hint">Sent to ${isAgy() ? "agy" : "Claude Code"} as /model and /effort. ${isAgy() ? "The model" : "The effort"} can't be read back, so it shows what you last picked here.</p></div>`, true);
       $("panel-body").querySelectorAll("[data-m]").forEach(b => b.onclick = () => {
-        const o = MODEL_OPTS.find(x => x[0] === b.dataset.m);
-        sendAgentCommand("model", o[0]); cur.modelName = o[1]; renderComposer(); $("panel").hidden = true; toast("Model: " + o[1], "/model " + o[0]);
+        const o = modelOpts().find(x => x[0] === b.dataset.m);
+        sendAgentCommand("model", o[0]); cur.modelName = o[1]; renderComposer(); saveView(); $("panel").hidden = true;
       });
       $("panel-body").querySelectorAll("[data-e]").forEach(b => b.onclick = () => {
-        sendAgentCommand("effort", b.dataset.e); cur.effort = b.dataset.e; renderComposer(); $("panel").hidden = true; toast("Effort: " + EFFORT_LABEL[cur.effort], "/effort " + cur.effort);
+        sendAgentCommand("effort", b.dataset.e); cur.effort = b.dataset.e; renderComposer(); saveView(); $("panel").hidden = true;
       });
     }
     function openMode() {
@@ -1158,6 +1196,7 @@ public final class MobileBridgeServer: @unchecked Sendable {
       if (t.model) cur.modelName = modelLabel(t.model);
       if (t.mode) cur.mode = t.mode;
       renderPane();
+      saveView();
     }
 
     function handleWSJSON(msg) {
@@ -1189,12 +1228,21 @@ public final class MobileBridgeServer: @unchecked Sendable {
           };
         });
         renderList();
+        // First list after a (re)connect: reopen the saved session, or re-attach the one on screen —
+        // the new socket has no attachment, so without this the open session silently goes stale.
+        if (needsAttach) {
+          needsAttach = false;
+          const target = sessions.find(s => s.id === (cur ? cur.id : view.open));
+          if (target) openSession(cur ? Object.assign(cur, { cwd: target.cwd }) : target);
+        }
         if (cur) {
           const updated = sessions.find(s => s.id === cur.id);
           if (updated) {
             cur.state = updated.state;
             cur.branch = updated.branch;
             cur.agent = updated.agent;
+            $("s-meta").textContent = cur.agent + " · " + cur.branch;
+            renderComposer();
             if (cur.state === "idle" && cur.files && cur.files.length > 0 && cur.branch && cur.branch !== 'main' && cur.branch !== 'master' && cur.branch !== '—' && !cur.out.some(x => x[0] === 'pr' || x[0] === 'prdone')) {
               cur.out.push(["pr"]);
               renderPane();
@@ -1342,7 +1390,9 @@ public final class MobileBridgeServer: @unchecked Sendable {
       ws = new WebSocket(wsUrl);
       ws.binaryType = 'arraybuffer';
       ws.onopen = () => {
+        needsAttach = true;
         const creds = storedCreds();
+        sentCreds = !!creds;
         if (creds) {
           ws.send(JSON.stringify({ deviceAuth: creds }));
         } else if (params.get('token')) {
@@ -1359,7 +1409,20 @@ public final class MobileBridgeServer: @unchecked Sendable {
         }
       };
       ws.onclose = (ev) => {
-        if (!sawServerError) {
+        // iOS drops the socket on every background/lock and the retry reconnects silently, so a
+        // plain drop only becomes a notice once retries keep failing while the page is in view.
+        const wasOpen = needsAttach !== null;
+        failedRetries = wasOpen ? 0 : failedRetries + 1;
+        needsAttach = null;
+        // Stored credentials this daemon doesn't know (revoked, or another daemon's): drop them and
+        // retry, so the QR token / pairing screen gets a turn instead of being rejected forever.
+        if (ev.code === 1008 && sentCreds) {
+          try { localStorage.removeItem(credKey); } catch {}
+          sentCreds = false;
+          setTimeout(connectWS, 300);
+          return;
+        }
+        if (!sawServerError && (ev.code === 1008 || (failedRetries === 3 && document.visibilityState === 'visible'))) {
           showError(ev.code === 1008
             ? 'Pairing rejected — rescan the QR code.'
             : 'Connection lost — check the daemon is running and try again.');
@@ -1795,7 +1858,9 @@ public final class MobileBridgeServer: @unchecked Sendable {
         /// Code TUI through its own slash commands / Shift+Tab; values are allowlisted server-side.
         var agentCommand: AgentCommandRequest?
 
-        struct AgentCommandRequest: Decodable { var kind: String; var value: String }
+        /// `agent` is the page's own idea of the agent ("claude-code"/"antigravity"), used only when the
+        /// daemon's detector has nothing for the pane (agy is often missed right after launch).
+        struct AgentCommandRequest: Decodable { var kind: String; var value: String; var agent: String? }
         struct GitDiffRequest: Decodable { var path: String? }
         struct CreateDraftPRRequest: Decodable { var title: String?; var path: String? }
         struct SpawnPayload: Decodable { var cwd: String? }
@@ -3053,16 +3118,20 @@ public final class MobileBridgeServer: @unchecked Sendable {
     static let modeCycle = ["manual", "acceptEdits", "plan", "auto"]
     static let commandModels: Set<String> = ["opus", "sonnet", "haiku", "fable"]
     static let commandEfforts: Set<String> = ["low", "medium", "high", "xhigh", "max"]
+    /// agy's `/model` base names (from `agy models`) and the efforts its models accept.
+    static let agyCommandModels: Set<String> = ["gemini-3.8-flash", "claude-opus-5-5", "claude-sonnet-5-5", "gpt-oss-120b"]
+    static let agyCommandEfforts: Set<String> = ["low", "medium", "high"]
 
     /// Chunks to type for an agent command, or nil when the request is not allowlisted. Pure so it is
     /// unit-testable; `currentMode` is the mode last read from the transcript (a cycle needs a start).
-    static func agentCommandInput(kind: String, value: String, currentMode: String?) -> [Data]? {
+    static func agentCommandInput(kind: String, value: String, currentMode: String?, agent: AgentKind = .claudeCode) -> [Data]? {
+        let agy = agent == .antigravity
         switch kind {
-        case "model" where commandModels.contains(value):
+        case "model" where (agy ? agyCommandModels : commandModels).contains(value):
             return [Data("/model \(value)".utf8), Data("\r".utf8)]
-        case "effort" where commandEfforts.contains(value):
+        case "effort" where (agy ? agyCommandEfforts : commandEfforts).contains(value):
             return [Data("/effort \(value)".utf8), Data("\r".utf8)]
-        case "mode":
+        case "mode" where !agy:
             guard let from = currentMode.flatMap(modeCycle.firstIndex(of:)),
                   let to = modeCycle.firstIndex(of: value) else { return nil }
             let presses = (to - from + modeCycle.count) % modeCycle.count
@@ -3073,12 +3142,18 @@ public final class MobileBridgeServer: @unchecked Sendable {
     }
 
     private func handleAgentCommand(_ cmd: ControlMessage.AgentCommandRequest, connection: NWConnection, state: ConnectionState) {
-        guard let surfaceID = state.surfaceID, let subscription = state.subscription,
-              AgentDetector.snapshot(forSurfaceKey: surfaceID)?.kind == .claudeCode else {
-            sendText(#"{"error":"model, effort and mode can only be changed on an attached Claude session"}"#, on: connection)
+        guard let surfaceID = state.surfaceID, let subscription = state.subscription else {
+            sendText(#"{"error":"not attached to a session — go back and reopen it"}"#, on: connection)
             return
         }
-        guard let chunks = Self.agentCommandInput(kind: cmd.kind, value: cmd.value, currentMode: state.agentMode) else {
+        let supported: Set<AgentKind> = [.claudeCode, .antigravity]
+        let detected = AgentDetector.snapshot(forSurfaceKey: surfaceID)?.kind
+        let hinted = cmd.agent.flatMap(AgentKind.init(rawValue:))
+        guard let kind = [detected, hinted].compactMap({ $0 }).first(where: supported.contains) else {
+            sendText(#"{"error":"model and effort can only be changed on a Claude or agy session (detected: \#(detected?.rawValue ?? "none"))"}"#, on: connection)
+            return
+        }
+        guard let chunks = Self.agentCommandInput(kind: cmd.kind, value: cmd.value, currentMode: state.agentMode, agent: kind) else {
             sendText(#"{"error":"unsupported agent command"}"#, on: connection)
             return
         }
