@@ -700,6 +700,73 @@ final class MetalRendererTests: XCTestCase {
         )
     }
 
+    func testFullDamageRelocatesRowsThatMovedUp() throws {
+        // Scrolling through history while output arrives moves every visible row; rows whose
+        // content only moved re-bind from their old slot instead of re-encoding.
+        try assertSalvage(
+            first: frame("\u{1b}[?25lAAAA\r\nBBBB\r\nCCCC\r\nDDDD", cols: 8, rows: 4),
+            second: frame("\u{1b}[?25lBBBB\r\nCCCC\r\nDDDD\r\nEEEE", cols: 8, rows: 4),
+            expectedEncodedRows: 1,
+            "rows that moved up re-bind; only the new row re-encodes"
+        )
+    }
+
+    func testFullDamageRelocatesRowsThatMovedDown() throws {
+        try assertSalvage(
+            first: frame("\u{1b}[?25lAAAA\r\nBBBB\r\nCCCC\r\nDDDD", cols: 8, rows: 4),
+            second: frame("\u{1b}[?25lZZZZ\r\nAAAA\r\nBBBB\r\nCCCC", cols: 8, rows: 4),
+            expectedEncodedRows: 1,
+            "rows that moved down re-bind; only the new row re-encodes"
+        )
+    }
+
+    /// A relocated row is reused from the cache, but its bytes in the flat buffer changed (new
+    /// content at that offset, new baked Y). The upload must include it: a ring slot last written
+    /// before the move would otherwise keep drawing the old row there, overlapping two rows.
+    func testRelocatedRowsUploadToAReusedRingSlot() throws {
+        try assertRelocationReachesGPU(
+            before: "AAAA\r\nBBBB\r\nCCCC\r\nDDDD", after: "BBBB\r\nCCCC\r\nDDDD\r\nEEEE"
+        )
+    }
+
+    func testRelocatedRowsOfDifferentLengthUploadEveryShiftedRow() throws {
+        // The moved rows hold fewer instances than the rows they replace, so the unmoved last
+        // row (reused in place, never re-encoded) now sits at a different buffer offset.
+        try assertRelocationReachesGPU(
+            before: "AAAAAA\r\nB\r\nCC\r\nS", after: "B\r\nCC\r\nB\r\nS", encodedRows: 0
+        )
+    }
+
+    private func assertRelocationReachesGPU(
+        before: String, after: String, rows: Int = 4, encodedRows: Int = 1,
+        file: StaticString = #filePath, line: UInt = #line
+    ) throws {
+        let (device, renderer) = try makeRenderer()
+        let cols = 8
+        let clear = RenderColor(red: 0, green: 0, blue: 0, alpha: 1)
+        let size = renderer.surfacePixelSize(columns: cols, rows: rows)
+        guard let target = makeTarget(device, width: size.width, height: size.height),
+              let refTarget = makeTarget(device, width: size.width, height: size.height)
+        else { throw XCTSkip("no texture") }
+        let before = frame("\u{1b}[?25l" + before, cols: cols, rows: rows)
+        let after = frame("\u{1b}[?25l" + after, cols: cols, rows: rows)
+
+        // Two frames fill both ring slots with the old layout; the third reuses the first slot.
+        renderer.render(before, to: target, clearColor: clear, damage: TerminalDamage(full: true))
+        renderer.render(before, to: target, clearColor: clear, damage: TerminalDamage(full: true))
+        renderer.render(after, to: target, clearColor: clear, damage: TerminalDamage(full: true))
+        XCTAssertEqual(renderer.stats.encodedRows, encodedRows, "moved rows still re-bind from the cache", file: file, line: line)
+
+        let reference = try makeRenderer(device: device)
+        reference.render(after, to: refTarget, clearColor: clear)
+        XCTAssertTrue(
+            readPixelBytes(target, width: size.width, height: size.height)
+                == readPixelBytes(refTarget, width: size.width, height: size.height),
+            "relocated rows must reach the GPU, not leave the slot's old rows in place",
+            file: file, line: line
+        )
+    }
+
     func testSalvageIncludesCursorRow() throws {
         // Cursor inversion is a uniform, so its row remains eligible for content salvage.
         var first = frame("AAAA\r\nBBBB\r\nCCCC\r\nDDDD", cols: 8, rows: 4)

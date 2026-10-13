@@ -165,6 +165,43 @@ final class ScrollReuseTests: XCTestCase {
         XCTAssertLessThanOrEqual(top.offset, 50)
     }
 
+    func testScrollingWhileOutputArrivesReusesMovedRows() throws {
+        // A TUI redrawing its status row while the user reads history: every scroll tick lands
+        // together with output, so the pure-scroll fast path refuses. Rows that only moved must
+        // still re-bind instead of re-encoding the whole viewport each tick.
+        guard MTLCreateSystemDefaultDevice() != nil else { throw XCTSkip("No Metal device available") }
+        let window = makeWindow()
+        defer { window.contentView = nil }
+        let view = try makeHostedView(in: window)
+        var lastStats: TerminalRenderStats?
+        view.onRenderStats = { lastStats = $0 }
+
+        for i in 0 ..< 200 { view.receive("history line \(i)\r\n") }
+        view.testingWaitForEmulatorIdle()
+        view.testingForceRender()
+        drainRenderPipeline(view)
+        guard lastStats != nil else { throw XCTSkip("no present happened (drawable unavailable)") }
+        let frameRows = view.testingGridSize.rows + 1
+
+        view.testingScrollBy(lines: 3)
+        view.testingForceRender()
+        drainRenderPipeline(view)
+        guard lastStats != nil else { throw XCTSkip("scrolled present dropped (drawable unavailable)") }
+
+        for tick in 0 ..< 3 {
+            view.receive("\u{1b}[s\u{1b}[999;1Hspinner \(tick)\u{1b}[u") // off-screen status redraw
+            view.receive("streamed line \(tick)\r\n")                     // history grows
+            view.testingWaitForEmulatorIdle()
+            lastStats = nil
+            view.testingScrollBy(lines: 3)
+            view.testingForceRender()
+            drainRenderPipeline(view)
+            guard let stats = lastStats else { throw XCTSkip("scrolled present dropped (drawable unavailable)") }
+            XCTAssertLessThanOrEqual(stats.encodedRows, 3, "only newly exposed rows re-encode (tick \(tick))")
+            XCTAssertGreaterThanOrEqual(stats.reusedRows, frameRows - 3, "moved rows re-bind (tick \(tick))")
+        }
+    }
+
     func testOutputWhileScrolledFallsBackToFullRebuild() throws {
         guard MTLCreateSystemDefaultDevice() != nil else { throw XCTSkip("No Metal device available") }
         let window = makeWindow()

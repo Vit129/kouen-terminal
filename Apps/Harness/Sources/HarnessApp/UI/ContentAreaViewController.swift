@@ -63,6 +63,10 @@ final class SessionStartupView: NSStackView {
             heading.stringValue = "Session service needs attention"
             if upgrade.shutdownPending == true {
                 detail.stringValue = "The session service is still shutting down. Retry after its programs have exited."
+            } else if upgrade.daemonAvailable == false,
+                      upgrade.sessionHostProtocolLevel == DaemonStats.currentSessionHostProtocolLevel {
+                heading.stringValue = "Reconnect to your sessions"
+                detail.stringValue = "Your programs are still running. Retry to recover the application daemon and reconnect to them."
             } else if upgrade.shellCount != nil {
                 heading.stringValue = "Finish updating Harness"
                 detail.stringValue = "The installed app cannot connect to the older session service. Your existing programs have been preserved. Save your work before restarting the service; saved layouts will reopen with fresh shells."
@@ -110,6 +114,7 @@ final class ContentAreaViewController: NSViewController, TerminalTabBarDelegate 
     private let retryButton = NSButton(title: "Retry", target: nil, action: nil)
     private let startupNotice = SessionStartupView()
     private var lastStructureKey = ""
+    private var lastContainerKey = ""
     private var pendingReload: Bool?
     /// Pasteboard change counter captured at left-mouse-down. On mouse-up, if it
     /// has incremented inside the terminal area AND the user has `copy-on-select`
@@ -441,34 +446,35 @@ final class ContentAreaViewController: NSViewController, TerminalTabBarDelegate 
             paneContainer?.applyRatios(from: displayNode)
             return
         }
-        // Only a pane added to or removed from the tab on screen animates; switching tabs or
-        // zooming swaps the layout at once.
+        // Keep the live islands mounted when only this tab's split tree changes.
+        // Removing their ancestor tears down every Metal drawable and changes focus.
         let sameTab = lastAnimatedTab == "\(tab.id)|\(tab.zoomedPaneID?.uuidString ?? "")"
         lastAnimatedTab = "\(tab.id)|\(tab.zoomedPaneID?.uuidString ?? "")"
-        let before = sameTab ? PaneTransitions.frames(of: paneContainer, in: terminalHost) : [:]
         lastStructureKey = key
-
-        paneContainer?.removeFromSuperview()
-        let container = PaneContainerView(
-            tabID: tab.id,
-            owner: context.owner,
-            sidebarVisible: tabRowHidden,
-            node: displayNode,
-            cwd: tab.cwd,
-            program: tab.currentCommand,
-            agent: tab.agent?.kind.commandToken,
-            themeName: context.snapshot.themeName
-        )
-        container.translatesAutoresizingMaskIntoConstraints = false
-        terminalHost.addSubview(container)
-        NSLayoutConstraint.activate([
-            container.topAnchor.constraint(equalTo: terminalHost.topAnchor),
-            container.leadingAnchor.constraint(equalTo: terminalHost.leadingAnchor),
-            container.trailingAnchor.constraint(equalTo: terminalHost.trailingAnchor),
-            container.bottomAnchor.constraint(equalTo: terminalHost.bottomAnchor),
-        ])
-        paneContainer = container
-        PaneTransitions.animate(from: before, into: container, in: terminalHost)
+        let containerKey = "\(density)|\(context.owner)|\(workspace.id)|\(tab.id)"
+        if !force, containerKey == lastContainerKey, let paneContainer {
+            paneContainer.update(node: displayNode, animated: sameTab)
+        } else {
+            paneContainer?.removeFromSuperview()
+            let container = PaneContainerView(
+                tabID: tab.id,
+                owner: context.owner,
+                sidebarVisible: tabRowHidden,
+                node: displayNode,
+                cwd: tab.cwd
+            )
+            container.translatesAutoresizingMaskIntoConstraints = false
+            terminalHost.addSubview(container)
+            NSLayoutConstraint.activate([
+                container.topAnchor.constraint(equalTo: terminalHost.topAnchor),
+                container.leadingAnchor.constraint(equalTo: terminalHost.leadingAnchor),
+                container.trailingAnchor.constraint(equalTo: terminalHost.trailingAnchor),
+                container.bottomAnchor.constraint(equalTo: terminalHost.bottomAnchor),
+            ])
+            paneContainer = container
+            lastContainerKey = containerKey
+            terminalHost.layoutSubtreeIfNeeded()
+        }
         // Re-assert the focused-pane border after the (re)mount — reused hosts keep
         // their flag, but a freshly shown tab needs its active pane established. Only the
         // window in front owns the app's active pane.
@@ -517,13 +523,32 @@ final class PaneContainerView: NSView {
     private let tabID: TabID?
     private let hostOwner: String
     private var islands: [PaneIslandView] = []
+    private let content = NSView()
+    private var slots: [SurfaceID: NSView] = [:]
+    private var leaves: [PaneLeaf] = []
+    private let separated: Bool
+    private let contentProvider: (PaneLeaf) -> NSView
+    private var retired: [PaneIslandView] = []
+    private(set) var transition: PaneTransitions?
+    private var laidOutSize = NSSize.zero
 
-    init(tabID: TabID, owner: String, sidebarVisible: Bool = false, node: PaneNode, cwd: String, program: String?, agent: String? = nil, themeName: String) {
+    init(tabID: TabID, owner: String, sidebarVisible: Bool = false, node: PaneNode, cwd: String, contentProvider: ((PaneLeaf) -> NSView)? = nil) {
         self.tabID = tabID; self.hostOwner = owner
+        let coordinator = SessionCoordinator.shared
+        separated = coordinator.settings.paneDensity.separatedIslands
+        self.contentProvider = contentProvider ?? { leaf in
+            switch leaf.paneContent {
+            case .terminal:
+                let directory = leaf.cwd ?? coordinator.snapshot(for: owner).workspaces.flatMap(\.sessions)
+                    .flatMap(\.tabs).first { $0.id == tabID }?.cwd ?? cwd
+                return coordinator.terminalHost(for: leaf.surfaceID, cwd: directory)
+            case .preview: return coordinator.previewHost(for: leaf, owner: owner)
+            case .unsupported: return NSTextField(wrappingLabelWithString: PreviewError.unsupported.localizedDescription)
+            }
+        }
         super.init(frame: .zero)
         HarnessDesign.makeClear(self)
         let settings = SessionCoordinator.shared.settings
-        let separated = settings.paneDensity.separatedIslands
         showsHeaders = separated && settings.paneHeaders
         // The root pads by half the gap; each island insets by the other half.
         let pad = ChromeLayout.containerPadding(separated: separated, padsTop: sidebarVisible, gap: settings.paneSpacing)
@@ -532,7 +557,6 @@ final class PaneContainerView: NSView {
         let leadingPadding = sidebarVisible
             ? -ChromeLayout.cardInsets(separated: separated, gap: coordinator.settings.paneSpacing).leading
             : pad.leading
-        let content = NSView()
         content.translatesAutoresizingMaskIntoConstraints = false
         addSubview(content)
         NSLayoutConstraint.activate([
@@ -541,7 +565,8 @@ final class PaneContainerView: NSView {
             content.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -CGFloat(pad.trailing)),
             content.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -CGFloat(pad.bottom)),
         ])
-        build(node: node, cwd: cwd, program: program, agent: agent, into: content, separated: separated)
+        leaves = node.allLeaves()
+        build(node: node, into: content)
         refreshHeaders()
         NotificationCenter.default.addObserver(
             self, selector: #selector(activeSurfaceDidChange),
@@ -565,6 +590,49 @@ final class PaneContainerView: NSView {
 
     func island(for surfaceID: SurfaceID) -> PaneIslandView? {
         islands.first { $0.surfaceID == surfaceID }
+    }
+
+    var retainedIslands: [PaneIslandView] { islands + retired }
+
+    func update(node: PaneNode, animated: Bool) {
+        let before = islandFrames(in: self)
+        transition?.cancel()
+        transition = nil
+        retired.forEach { $0.removeFromSuperview() }
+        let previousKinds = Dictionary(leaves.map { ($0.surfaceID, $0.paneContent.kind) }, uniquingKeysWith: { first, _ in first })
+        leaves = node.allLeaves()
+        let wanted = Dictionary(leaves.map { ($0.surfaceID, $0.paneContent.kind) }, uniquingKeysWith: { first, _ in first })
+        retired = islands.filter { wanted[$0.surfaceID] != previousKinds[$0.surfaceID] }
+        islands.removeAll { wanted[$0.surfaceID] != previousKinds[$0.surfaceID] }
+        for island in retired {
+            island.isRetiring = true
+            island.layer?.zPosition = -1
+        }
+        content.subviews.forEach { $0.removeFromSuperview() }
+        slots.removeAll(keepingCapacity: true)
+        build(node: node, into: content)
+        needsLayout = true
+        layoutSubtreeIfNeeded()
+        let after = islandFrames(in: self)
+        if animated, let movement = PaneTransitions(container: self, from: before, to: after) {
+            transition = movement
+            movement.start()
+        } else { finishTransition() }
+        refreshContent(from: node)
+        refreshHeaders()
+    }
+
+    func finishTransition() {
+        transition?.finish()
+        transition = nil
+        retired.forEach { $0.removeFromSuperview() }
+        retired.removeAll()
+        updateGapFill()
+    }
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        if window == nil { finishTransition() }
     }
 
     private var showsHeaders = false
@@ -625,9 +693,60 @@ final class PaneContainerView: NSView {
     }
 
     override func layout() {
+        let splits = descendants(of: content).compactMap { $0 as? HarnessSplitView }
+        let applying = splits.map(\.isApplyingLayout)
+        for split in splits { split.isApplyingLayout = true }
+        defer { for (split, value) in zip(splits, applying) { split.isApplyingLayout = value } }
         super.layout()
+        guard bounds.width > 1, bounds.height > 1 else { return }
+        if laidOutSize != bounds.size { finishTransition() }
+        laidOutSize = bounds.size
+        content.layoutSubtreeIfNeeded()
+        settleDividers(in: content)
+        if transition == nil {
+            var mountedContent = false
+            let insets = ChromeLayout.cardInsets(separated: separated, gap: coordinator.settings.paneSpacing)
+            for leaf in leaves {
+                guard let slot = slots[leaf.surfaceID] else { continue }
+                let rect = convert(slot.bounds, from: slot)
+                let frame = rect.insetBy(dx: min(insets.leading, rect.width / 2), dy: min(insets.top, rect.height / 2))
+                let island: PaneIslandView
+                if let existing = self.island(for: leaf.surfaceID) { island = existing }
+                else {
+                    island = PaneIslandView(surfaceID: leaf.surfaceID, separated: separated, showsHeader: showsHeaders)
+                    island.frame = frame
+                    // New panes start behind the survivor that reveals them as it shrinks.
+                    addSubview(island, positioned: .above, relativeTo: content)
+                    islands.append(island)
+                    island.embed(contentProvider(leaf))
+                    mountedContent = true
+                }
+                if island.frame != frame { island.frame = frame }
+                island.layoutSubtreeIfNeeded()
+            }
+            if mountedContent { refreshHeaders() }
+        }
         updateGapFill()
         updateCornerHandles()
+    }
+
+    private func settleDividers(in view: NSView) {
+        if let split = view as? HarnessSplitView {
+            split.adopt(ratio: split.preferredRatio)
+            split.layoutSubtreeIfNeeded()
+        }
+        for child in view.subviews { settleDividers(in: child) }
+    }
+
+    override func hitTest(_ point: NSPoint) -> NSView? {
+        let hit = super.hitTest(point)
+        guard hit != nil, !(hit is SplitCornerHandle), transition == nil else { return hit }
+        for split in descendants(of: content).compactMap({ $0 as? HarnessSplitView }).reversed() {
+            let local = split.convert(point, from: superview)
+            let divider = split.splitView(split, effectiveRect: .zero, forDrawnRect: .zero, ofDividerAt: 0)
+            if divider.contains(local) { return split }
+        }
+        return hit
     }
 
     // MARK: - Corner handles
@@ -636,7 +755,7 @@ final class PaneContainerView: NSView {
 
     /// One handle per place two perpendicular dividers meet, kept on top of the panes.
     private func updateCornerHandles() {
-        let splits = descendants(of: self).compactMap { $0 as? HarnessSplitView }
+        let splits = descendants(of: content).compactMap { $0 as? HarnessSplitView }
         let junctions = SplitCornerHandle.junctions(of: splits, in: self)
         while cornerHandles.count > junctions.count { cornerHandles.removeLast().removeFromSuperview() }
         while cornerHandles.count < junctions.count {
@@ -661,6 +780,7 @@ final class PaneContainerView: NSView {
     /// Fill = the container minus each island's rounded rect, in the chrome color at the
     /// frame paint opacity, so the gutter matches the tab row and the sidebar.
     func updateGapFill() {
+        for handle in cornerHandles { handle.isHidden = transition != nil }
         guard let layer else { return }
         if gapFill.superlayer !== layer {
             layer.insertSublayer(gapFill, at: 0)
@@ -670,14 +790,18 @@ final class PaneContainerView: NSView {
         gapFill.frame = bounds
         let path = CGMutablePath()
         path.addRect(bounds)
-        for island in islands where island.superview != nil {
+        for island in islands + retired where island.superview != nil {
             // The hole stops one point inside the card, under its hairline, so the two
             // antialiased edges never share a pixel and leave a see-through seam.
             let overlap = island.layer?.borderWidth ?? 0
             let rect = convert(island.bounds, from: island).insetBy(dx: overlap, dy: overlap)
             guard rect.width > 0, rect.height > 0 else { continue }
             let radius = max(0, min((island.layer?.cornerRadius ?? 0) - overlap, rect.width / 2, rect.height / 2))
-            path.addRoundedRect(in: rect, cornerWidth: radius, cornerHeight: radius)
+            let outline = CGPath(roundedRect: rect, cornerWidth: radius, cornerHeight: radius, transform: nil)
+            var translation = CGAffineTransform(translationX: island.frame.minX, y: island.frame.minY)
+            if let mask = island.transitionMask?.copy(using: &translation) {
+                path.addPath(outline.intersection(mask))
+            } else { path.addPath(outline) }
         }
         gapFill.path = path
         gapFill.fillRule = .evenOdd
@@ -696,27 +820,19 @@ final class PaneContainerView: NSView {
     //
     // tabFor(surfaceID:in:) was also removed: it was only used by refreshChrome.
 
-    private func build(node: PaneNode, cwd: String, program: String?, agent: String?, into parent: NSView, separated: Bool) {
+    private func build(node: PaneNode, into parent: NSView) {
         switch node {
         case let .leaf(leaf):
-            let host: NSView
-            switch leaf.paneContent {
-            case .terminal: host = coordinator.terminalHost(for: leaf.surfaceID, cwd: leaf.cwd ?? cwd)
-            case .preview: host = coordinator.previewHost(for: leaf, owner: hostOwner)
-            case .unsupported: host = NSTextField(wrappingLabelWithString: PreviewError.unsupported.localizedDescription)
-            }
-            let island = PaneIslandView(surfaceID: leaf.surfaceID, separated: separated, showsHeader: showsHeaders)
-            island.translatesAutoresizingMaskIntoConstraints = false
-            parent.addSubview(island)
-            let insets = ChromeLayout.cardInsets(separated: separated, gap: coordinator.settings.paneSpacing)
+            let slot = NSView()
+            slot.translatesAutoresizingMaskIntoConstraints = false
+            parent.addSubview(slot)
             NSLayoutConstraint.activate([
-                island.topAnchor.constraint(equalTo: parent.topAnchor, constant: CGFloat(insets.top)),
-                island.leadingAnchor.constraint(equalTo: parent.leadingAnchor, constant: CGFloat(insets.leading)),
-                island.trailingAnchor.constraint(equalTo: parent.trailingAnchor, constant: -CGFloat(insets.trailing)),
-                island.bottomAnchor.constraint(equalTo: parent.bottomAnchor, constant: -CGFloat(insets.bottom)),
+                slot.topAnchor.constraint(equalTo: parent.topAnchor),
+                slot.leadingAnchor.constraint(equalTo: parent.leadingAnchor),
+                slot.trailingAnchor.constraint(equalTo: parent.trailingAnchor),
+                slot.bottomAnchor.constraint(equalTo: parent.bottomAnchor),
             ])
-            island.embed(host)
-            islands.append(island)
+            slots[leaf.surfaceID] = slot
         case let .branch(direction, ratio, firstNode, secondNode):
             let split = HarnessSplitView()
             split.dividerStyle = .thin
@@ -746,24 +862,10 @@ final class PaneContainerView: NSView {
                 split.trailingAnchor.constraint(equalTo: parent.trailingAnchor),
                 split.bottomAnchor.constraint(equalTo: parent.bottomAnchor),
             ])
-            // Build the child panes first, then set the divider — so each child lays out once
-            // at ~final bounds instead of resizing (and re-sizing its PTY) twice.
-            // Comfortable separates with the island inset. Compact stays flush; its
-            // divider is the 1pt border and does not also inset the island.
-            build(node: firstNode, cwd: cwd, program: program, agent: agent, into: first, separated: separated)
-            build(node: secondNode, cwd: cwd, program: program, agent: agent, into: second, separated: separated)
-            // [weak split]: rapid tab switching can tear down this PaneContainerView before the
-            // async fires, leaving `split` pointing at a detached view with stale bounds — a
-            // no-op setPosition call that can confuse AppKit's divider accounting on the new
-            // container. The explicit bounds check below guards the case where layout hasn't
-            // run yet (zero-size container), which would force the divider to one edge.
-            DispatchQueue.main.async { [weak split] in
-                guard let split, split.bounds.width > 1, split.bounds.height > 1 else { return }
-                let position = (direction == .horizontal ? split.frame.width : split.frame.height) * ratio
-                if position > 50 {
-                    split.setPosition(position, ofDividerAt: 0)
-                }
-            }
+            // This tree contains geometry only. Live content is mounted afterward,
+            // once all nested dividers have their final bounds and saved ratios.
+            build(node: firstNode, into: first)
+            build(node: secondNode, into: second)
         }
     }
 
@@ -779,14 +881,20 @@ final class PaneContainerView: NSView {
         }
         collect(node)
         guard NSEvent.pressedMouseButtons == 0 else { return }
+        var changed = false
         func visit(_ view: NSView) {
             if let split = view as? HarnessSplitView, !split.isSavingRatio,
                let a = split.firstPaneID, let b = split.secondPaneID, let ratio = wanted["\(a)|\(b)"] {
-                split.adopt(ratio: CGFloat(ratio))
+                changed = split.adopt(ratio: CGFloat(ratio)) || changed
             }
             view.subviews.forEach(visit)
         }
-        visit(self)
+        visit(content)
+        if changed {
+            finishTransition()
+            needsLayout = true
+            layoutSubtreeIfNeeded()
+        }
     }
 
     /// Representative leaf of a subtree (its first leaf in traversal order). Paired
@@ -802,6 +910,17 @@ final class PaneContainerView: NSView {
 /// Rounded terminal island: an optional title row over the terminal host.
 @MainActor
 final class PaneIslandView: NSView {
+    var isRetiring = false
+    override func hitTest(_ point: NSPoint) -> NSView? { isRetiring ? nil : super.hitTest(point) }
+    private(set) var transitionMask: CGPath?
+    private let revealMask = CAShapeLayer()
+
+    func setTransitionMask(_ path: CGPath?) {
+        transitionMask = path
+        revealMask.frame = bounds
+        revealMask.path = path
+        layer?.mask = path == nil ? nil : revealMask
+    }
     private(set) weak var terminalHost: TerminalHostView?
     private(set) weak var contentView: NSView?
     private let separated: Bool
@@ -953,60 +1072,68 @@ final class HarnessSplitView: NSSplitView, NSSplitViewDelegate {
     /// Share of the free length given to the first pane when AppKit leaves a gap.
     var preferredRatio: CGFloat = 0.5
     private var ratioDebounce: DispatchWorkItem?
-    private var tiling = false
+    var isApplyingLayout = false
+    private var trackingDivider = false
+    private var ratioSavePending = false
+    private var ratioSaveGeneration = 0
 
     /// A drag's ratio is on its way to the daemon: the snapshot may still hold the old one.
-    var isSavingRatio: Bool { ratioDebounce != nil }
+    var isSavingRatio: Bool { ratioDebounce != nil || ratioSavePending }
+
+    override func mouseDown(with event: NSEvent) {
+        trackingDivider = true
+        defer { trackingDivider = false }
+        super.mouseDown(with: event)
+    }
 
     /// Move the divider to `ratio` when it's visibly elsewhere.
-    func adopt(ratio: CGFloat) {
-        guard subviews.count >= 2 else { return }
-        let length = isVertical ? bounds.width : bounds.height
-        guard length > 50 else { return }
-        let current = (isVertical ? subviews[0].frame.width : subviews[0].frame.height) / length
-        guard abs(current - ratio) > 0.01 else { return }
-        preferredRatio = ratio
-        setPosition(length * ratio, ofDividerAt: 0)
+    @discardableResult
+    func adopt(ratio: CGFloat) -> Bool {
+        let applying = isApplyingLayout
+        isApplyingLayout = true
+        defer { isApplyingLayout = applying }
+        preferredRatio = ratio.isFinite ? min(1, max(0, ratio)) : 0.5
+        guard subviews.count >= 2 else { return false }
+        let length = max(0, (isVertical ? bounds.width : bounds.height) - dividerThickness)
+        let current = isVertical ? subviews[0].frame.width : subviews[0].frame.height
+        guard abs(current - length * preferredRatio) > 0.5 else { return false }
+        setPosition(length * preferredRatio, ofDividerAt: 0)
+        return true
     }
 
     override var dividerColor: NSColor { .clear }
 
-    /// AppKit can leave a 0-pt divider's panes at their fitting size, which shows
-    /// as an empty band. Tile them so the two panes cover the split.
+    func moveDivider(to position: CGFloat) {
+        let length = max(0, (isVertical ? bounds.width : bounds.height) - dividerThickness)
+        if length > 0 { preferredRatio = min(1, max(0, position / length)) }
+        setPosition(position, ofDividerAt: 0)
+    }
+
+    /// Resolve the saved ratio in the first layout, before mounting any live content.
+    /// AppKit's fitting-size pass must not replace it with a temporary 50/50 split.
     override func resizeSubviews(withOldSize oldSize: NSSize) {
-        if tiling {
+        let applying = isApplyingLayout
+        isApplyingLayout = true
+        defer { isApplyingLayout = applying }
+        guard subviews.count == 2, bounds.width > 1, bounds.height > 1 else {
             super.resizeSubviews(withOldSize: oldSize)
             return
         }
-        super.resizeSubviews(withOldSize: oldSize)
-        guard subviews.count == 2, bounds.width > 1, bounds.height > 1 else { return }
         let across = isVertical
         let total = across ? bounds.width : bounds.height
         let thickness = dividerThickness
-        let covered = subviews.reduce(CGFloat(0)) {
-            $0 + (across ? $1.frame.width : $1.frame.height)
-        }
-        if total - covered - thickness <= 1 {
-            if total > 0 {
-                let first = across ? subviews[0].frame.width : subviews[0].frame.height
-                preferredRatio = first / total
-            }
-            return
-        }
         let tiled = ChromeLayout.tiledSplit(
             length: Double(total),
             thickness: Double(thickness),
             ratio: Double(preferredRatio)
         )
-        tiling = true
         if across {
             subviews[0].frame = NSRect(x: 0, y: 0, width: tiled.first, height: bounds.height)
             subviews[1].frame = NSRect(x: tiled.secondOrigin, y: 0, width: tiled.second, height: bounds.height)
         } else {
-            subviews[0].frame = NSRect(x: 0, y: bounds.height - tiled.first, width: bounds.width, height: tiled.first)
-            subviews[1].frame = NSRect(x: 0, y: 0, width: bounds.width, height: tiled.second)
+            subviews[0].frame = NSRect(x: 0, y: isFlipped ? 0 : bounds.height - tiled.first, width: bounds.width, height: tiled.first)
+            subviews[1].frame = NSRect(x: 0, y: isFlipped ? tiled.secondOrigin : 0, width: bounds.width, height: tiled.second)
         }
-        tiling = false
     }
 
     /// Comfortable's gap is the island inset. The divider stays 0 so it does not
@@ -1037,9 +1164,10 @@ final class HarnessSplitView: NSSplitView, NSSplitViewDelegate {
     }
 
     func splitViewDidResizeSubviews(_ notification: Notification) {
-        // The divider-index key is present only when the user dragged a divider —
-        // skip programmatic setPosition and window/layout resizes.
-        guard notification.userInfo?["NSSplitViewDividerIndex"] != nil else { return }
+        // AppKit also includes the divider index for programmatic initial layout.
+        // Keep restoration separate from mouse and accessibility divider changes.
+        guard trackingDivider || !isApplyingLayout,
+              notification.userInfo?["NSSplitViewDividerIndex"] != nil else { return }
         saveRatio()
         // A divider drag moves the corner handles where it meets another divider.
         var view = superview
@@ -1050,21 +1178,29 @@ final class HarnessSplitView: NSSplitView, NSSplitViewDelegate {
     /// Save the divider's position as this split's ratio (debounced), as a drag does.
     func saveRatio() {
         guard let tabID, let firstPaneID, let secondPaneID, subviews.count >= 2 else { return }
-        let total = isVertical ? bounds.width : bounds.height
+        let total = (isVertical ? bounds.width : bounds.height) - dividerThickness
         guard total > 1 else { return }
         let firstSize = isVertical ? subviews[0].frame.width : subviews[0].frame.height
         let ratio = Double(firstSize / total)
+        preferredRatio = CGFloat(ratio)
+        ratioSaveGeneration += 1
+        let generation = ratioSaveGeneration
         // Coalesce the stream of drag events into one write after the drag settles.
         ratioDebounce?.cancel()
         let work = DispatchWorkItem { [weak self] in
             MainActor.assumeIsolated {
-                self?.ratioDebounce = nil
+                guard let self else { return }
+                self.ratioDebounce = nil
+                self.ratioSavePending = true
                 SessionCoordinator.shared.setSplitRatio(
                     tabID: tabID,
                     firstPaneID: firstPaneID,
                     secondPaneID: secondPaneID,
                     ratio: ratio
-                )
+                ) { [weak self] in
+                    guard let self, self.ratioSaveGeneration == generation else { return }
+                    self.ratioSavePending = false
+                }
             }
         }
         ratioDebounce = work

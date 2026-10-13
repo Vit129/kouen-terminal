@@ -122,7 +122,11 @@ def main():
                 # A harmless owned provider-shaped process supplies a real ancestry
                 # and kernel generation; a shell PID is not a provider identity.
                 fixture_binary = root / "claude"
-                shutil.copyfile("/bin/sleep", fixture_binary); fixture_binary.chmod(0o700)
+                # macOS kills copied platform binaries whose original signature
+                # no longer applies. Build our own harmless executable instead.
+                subprocess.run(["cc", "-x", "c", "-o", str(fixture_binary), "-"],
+                               input="#include <unistd.h>\nint main(void) { for (;;) pause(); }\n",
+                               text=True, capture_output=True, check=True, timeout=30)
                 fixture_pid_file = root / "fixture-agent.pid"
                 request("send", {"surfaceID": surface, "text": shlex.quote(str(fixture_binary)) + " 3600 & echo $! > " + shlex.quote(str(fixture_pid_file)) + "\n"})
                 until(lambda: fixture_pid_file.exists() and fixture_pid_file.read_text().strip().isdigit())
@@ -162,7 +166,7 @@ def main():
                 stream = socket.socket(socket.AF_UNIX)
                 stream.settimeout(5)
                 stream.connect(str(root / "harness.sock"))
-                attach = json.dumps({"request": {"attachStream": {"_0": {"surfaceID": surface, "readOnly": True, "history": False, "geometryEvents": True}}}}).encode()
+                attach = json.dumps({"request": {"attachStream": {"_0": {"surfaceID": surface, "readOnly": True, "history": False, "geometryEvents": True, "acknowledgesOutput": False}}}}).encode()
                 stream.sendall(struct.pack(">I", len(attach)) + attach)
 
                 def stream_read(count):

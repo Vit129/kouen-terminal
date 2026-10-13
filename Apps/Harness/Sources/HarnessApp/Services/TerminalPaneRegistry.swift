@@ -15,7 +15,7 @@ final class TerminalPaneRegistry {
     }
 
     func removeHost(for surfaceID: SurfaceID) {
-        hosts.removeValue(forKey: surfaceID)
+        hosts.removeValue(forKey: surfaceID)?.invalidate()
     }
 
     func allHosts() -> [TerminalHostView] {
@@ -25,7 +25,7 @@ final class TerminalPaneRegistry {
     func prune(keeping surfaceIDs: Set<SurfaceID>) {
         let removed = hosts.keys.filter { !surfaceIDs.contains($0) }
         for id in removed {
-            hosts.removeValue(forKey: id)
+            removeHost(for: id)
         }
     }
 }

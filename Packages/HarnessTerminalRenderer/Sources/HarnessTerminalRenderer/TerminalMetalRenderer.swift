@@ -922,6 +922,7 @@ public final class TerminalMetalRenderer {
 
         // Per-build memo: only a salvage pass in THIS build may populate it.
         salvageRowKeys = nil
+        salvageRelocatedRows = IndexSet()
         let cacheMatches = rowInstanceCache.columns == frame.columns
             && rowInstanceCache.rows == frame.rows
             && rowInstanceCache.originX == origin.x
@@ -947,7 +948,7 @@ public final class TerminalMetalRenderer {
             // suffix — the unchanged top band re-binds instead of re-encoding. nil = not
             // compatible or under the hit-rate floor → the plain full reset, exactly as before.
             let salvaged = salvageRowInstances(
-                frame, origin: origin, ligatures: ligatures
+                frame, origin: origin, ligatures: ligatures, cellHeight: cellSize.y
             )
             rowInstanceCache = RowInstanceCache(
                 columns: frame.columns,
@@ -1093,6 +1094,14 @@ public final class TerminalMetalRenderer {
                 } else {
                     rowInstances = previous!
                     encoded.reusedRows += 1
+                    // Reused, but the bytes at this offset belong to a different row than the
+                    // last upload (new content and baked Y, possibly a different instance count
+                    // that moves every later row), so upload from here to the end.
+                    if salvageRelocatedRows.contains(row) {
+                        bgLo = min(bgLo, flatBg.count); bgShift = min(bgShift, flatBg.count)
+                        glLo = min(glLo, flatGlyph.count); glShift = min(glShift, flatGlyph.count)
+                        deLo = min(deLo, flatDeco.count); deShift = min(deShift, flatDeco.count)
+                    }
                 }
                 appendRowToFlats(rowInstances)
             }
@@ -1287,7 +1296,8 @@ public final class TerminalMetalRenderer {
 
     /// Content-keyed salvage across a geometry change the row cache would otherwise discard
     /// wholesale (a column-count change, or full damage with a compatible cache): keep cached
-    /// rows whose content key matches the new frame's same-index row. Returns nil when the old
+    /// rows whose content key matches the new frame's same-index row, or relocate a cached row
+    /// with that key from another slot. Returns nil when the old
     /// cache isn't geometry-compatible (everything except `columns` must match — origin, rows,
     /// ligatures, atlas epoch, cell metrics) or when fewer than half the rows match (a near-total
     /// change isn't worth the bookkeeping — fall back to the plain full reset).
@@ -1296,9 +1306,12 @@ public final class TerminalMetalRenderer {
     /// (the key is O(columns) per row). Reset at the top of every build; entries exist only for
     /// rows whose key salvage actually computed against this frame.
     private var salvageRowKeys: [UInt64?]?
+    /// Rows `salvageRowInstances` filled from a different slot in this build. They count as
+    /// reused, but their flat-array bytes changed and must be uploaded.
+    private var salvageRelocatedRows = IndexSet()
 
     private func salvageRowInstances(
-        _ frame: TerminalFrame, origin: (x: Int, y: Int), ligatures: Bool
+        _ frame: TerminalFrame, origin: (x: Int, y: Int), ligatures: Bool, cellHeight: Float
     ) -> [EncodedRowInstances?]? {
         let cache = rowInstanceCache
         guard cache.rows == frame.rows,
@@ -1309,22 +1322,50 @@ public final class TerminalMetalRenderer {
               cache.cellPixelHeight == cellPixelHeight,
               cache.rowInstances.count == frame.rows
         else { return nil }
+        // Content keys are position-independent, so a row that only moved (scrolling through
+        // history while output arrives shifts every visible row) re-binds from its old slot
+        // with its baked Y moved, instead of the whole viewport re-encoding.
+        var sourceByKey: [UInt64: Int] = [:]
+        for (row, cached) in cache.rowInstances.enumerated() {
+            guard let key = cached?.contentKey, key != 0, sourceByKey[key] == nil else { continue }
+            sourceByKey[key] = row
+        }
         var salvaged: [EncodedRowInstances?] = Array(repeating: nil, count: frame.rows)
         var frameKeys: [UInt64?] = Array(repeating: nil, count: frame.rows)
         var hits = 0
+        var relocated = IndexSet()
         for row in 0 ..< frame.rows {
-            guard let cached = cache.rowInstances[row], cached.contentKey != 0 else { continue }
             let frameKey = Self.rowContentKey(frame, row: row, blinkHidden: textBlinkHidden)
             frameKeys[row] = frameKey
-            guard cached.contentKey == frameKey else { continue }
-            salvaged[row] = cached
-            hits += 1
+            if let cached = cache.rowInstances[row], cached.contentKey != 0, cached.contentKey == frameKey {
+                salvaged[row] = cached
+                hits += 1
+            } else if let source = sourceByKey[frameKey], let cached = cache.rowInstances[source] {
+                salvaged[row] = Self.shifted(cached, by: Float(row - source) * cellHeight)
+                relocated.insert(row)
+                hits += 1
+            }
         }
         // The keys were hashed against THIS frame, so the encode pass can reuse them whether or
         // not salvage clears the hit-rate floor (missed rows re-encode + stamp either way).
         salvageRowKeys = frameKeys
         guard hits * 2 >= frame.rows else { return nil }
+        salvageRelocatedRows = relocated
+        // The stable-upload cache holds the pre-move Y of relocated rows (see the rotation).
+        if !relocated.isEmpty { uploadedInstanceCache = nil }
         return salvaged
+    }
+
+    private static func shifted(_ row: EncodedRowInstances, by dy: Float) -> EncodedRowInstances {
+        guard dy != 0 else { return row }
+        var instances = row
+        for i in instances.backgrounds.indices { instances.backgrounds[i].origin.y += dy }
+        for i in instances.glyphs.indices {
+            instances.glyphs[i].origin.y += dy
+            instances.glyphs[i].cellOrigin.y += dy
+        }
+        for i in instances.decorations.indices { instances.decorations[i].origin.y += dy }
+        return instances
     }
 
     private func encodeRowInstances(
@@ -1474,14 +1515,8 @@ public final class TerminalMetalRenderer {
         for sourceRow in 0 ..< rows {
             let destRow = sourceRow + shift
             guard destRow >= 0, destRow < rows,
-                  var instances = rowInstanceCache.rowInstances[sourceRow] else { continue }
-            for i in instances.backgrounds.indices { instances.backgrounds[i].origin.y += dy }
-            for i in instances.glyphs.indices {
-                instances.glyphs[i].origin.y += dy
-                instances.glyphs[i].cellOrigin.y += dy
-            }
-            for i in instances.decorations.indices { instances.decorations[i].origin.y += dy }
-            rotated[destRow] = instances
+                  let instances = rowInstanceCache.rowInstances[sourceRow] else { continue }
+            rotated[destRow] = Self.shifted(instances, by: dy)
         }
         rowInstanceCache.rowInstances = rotated
 

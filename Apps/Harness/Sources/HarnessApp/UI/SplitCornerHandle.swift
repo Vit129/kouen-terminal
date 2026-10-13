@@ -19,7 +19,7 @@ final class SplitCornerHandle: NSView {
         for split in [across, along] {
             let point = split.convert(event.locationInWindow, from: nil)
             // NSSplitView is flipped, so a horizontal divider's position counts from the top.
-            split.setPosition(split.isVertical ? point.x : point.y, ofDividerAt: 0)
+            split.moveDivider(to: split.isVertical ? point.x : point.y)
         }
         superview?.needsLayout = true
     }

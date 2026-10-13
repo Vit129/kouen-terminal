@@ -410,6 +410,9 @@ public final class SessionHostService: @unchecked Sendable {
         case let .sendData(id, data): send(frontend.readOnly ? .ok : store.ptys[id]?.write(data) == true ? .ok : .error("Input was not accepted."), channel)
         case let .send(id, text): send(frontend.readOnly ? .ok : store.ptys[id]?.write(text) == true ? .ok : .error("Input was not accepted."), channel)
         case let .resizeSurface(id, rows, cols):
+            // A vote already on the wire may arrive after PTY exit while final
+            // output is draining. Finish that stream with EOF, not a control error.
+            if frontend.isFinishing { return }
             guard TerminalGeometry.isValid(cols: Int(cols), rows: Int(rows)) else { send(.error("Invalid terminal dimensions."), channel); return }
             guard store.ptys[id] != nil else { send(.error("Surface not found."), channel); return }
             let previousArbiter = arbiter
@@ -596,6 +599,7 @@ final class Frontend: @unchecked Sendable {
     private var held: [TerminalStreamFrame]?
     private var heldBytes = 0, floor: UInt64 = 0
     private var finishing = false
+    var isFinishing: Bool { outputLock.lock(); defer { outputLock.unlock() }; return finishing }
     private var replay: (id: UUID, chunks: [RealPty.ScrollbackReplaySegment], index: Int, end: UInt64)?
     init(channel: SessionHostChannel) { self.channel = channel }
     func retireWorker() { guard let prior = worker else { return }; worker = nil; prior.closeChannel(); if tokens.isEmpty { channel.closeChannel() } }

@@ -1,0 +1,51 @@
+# Harness 2.3.2 validation
+
+Version 2.3.2, build 136, contains terminal and release reliability changes. The
+first-party coding agent remains local development work and is excluded from the
+release source and packaged app. Existing third-party coding-tool integrations
+remain available. Public protocol 2, private session-host protocol 10 and terminal
+checkpoint schema 2 are unchanged.
+
+## Local verification
+
+Verified on Apple silicon with macOS 27.0.1 and Swift 6.4:
+
+- Swift debug build, optimized release build and unsigned app assembly passed.
+- The committed Xcode project built successfully with code signing disabled.
+- The complete Swift suite discovered 2,542 tests across 15 modules: 2,483 passed,
+  59 skipped and no failures. Live socket and PTY fixtures were enabled.
+- Nine native pane-layout tests cover persistent view identity and focus, animated
+  movement, interrupted transitions, hit testing, geometry, content changes and
+  header configurations. Two real-process pane lifecycle tests cover retained
+  closing views and resize requests arriving during the final output drain.
+- Six daemon-launcher regressions cover healthy services, missing workers, uncertain
+  replacement receipts, failed adoption and incompatible owners with live programs.
+- The actual 2.1.0 upgrade fixture preserved programs without authorization, then
+  performed an explicit isolated restart into 2.3.2 with saved session identities.
+- Session-survival validation preserved shell identity, environment, background
+  jobs, output attachments, pipe consumers and activity through daemon replacement
+  and crash recovery. Failed candidate activation rolled back safely; guarded
+  restart, owner-loss recovery and MCP isolation checks passed.
+- The assembled app and all three helper executables are arm64, agree on version
+  2.3.2/136, and contain no first-party agent executable or package.
+- Release scripts passed shell syntax checks, workflow YAML parsed successfully,
+  and the release helper's dry run accepted the matching version declarations.
+
+The skipped tests comprise 54 opt-in performance benchmarks, a theme-data exporter,
+two tests requiring an uninstalled font, an unsupported system Bash version and a
+test requiring a separately configured SSH target. Automated native fixtures do not
+replace a human evaluation of animation feel or a previous-version Sparkle install.
+
+## Published artifact checks
+
+The [release workflow](../.github/workflows/release.yml) builds with Xcode 26.6 on
+macOS 26 after shipping CI. It verifies Developer ID signatures, notarizes and
+staples the app and DMG, and checks Gatekeeper acceptance. Its DMG smoke test requires
+a live terminal attached to the expected daemon and session-host build in an
+isolated home. The workflow publishes downloads before comparing their public
+bytes and updating the signed feeds on both supported domains.
+
+The [GitHub release](https://github.com/robzilla1738/harness-terminal/releases/tag/v2.3.2)
+retains the download, appcast and `SHA256SUMS`. The workflow retains the notarization
+receipt. Published assets and their source tag must never be replaced; recovery
+uses the existing matching appcast or a new release version.

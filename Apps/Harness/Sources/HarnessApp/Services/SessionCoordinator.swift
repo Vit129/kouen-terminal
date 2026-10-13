@@ -371,7 +371,7 @@ final class SessionCoordinator: NSObject {
         link.onCapabilities = { [weak self] values in self?.notificationOwners[owner] = values.contains(DaemonStats.notificationPolicy) }
         link.onDirective = { [weak self] directive in self?.handleDirective(directive, owner: owner) }
         links[link.owner] = link
-        link.start()
+        if link.owner != DaemonSidebar.localID || localServiceReady { link.start() }
     }
 
     /// A background daemon moved: its windows and every sidebar re-render.
@@ -667,6 +667,7 @@ final class SessionCoordinator: NSObject {
     }
 
     func syncFromDaemon(completion: @escaping @MainActor @Sendable (Bool) -> Void) {
+        guard activeOwner != DaemonSidebar.localID || localServiceReady else { completion(false); return }
         requestDaemonAsync(.getSnapshot, refresh: false) { [weak self] response in
             guard let self, case let .snapshot(snapshot)? = response else { completion(false); return }
             self.applySnapshot(snapshot, metadataOnly: false)
@@ -677,9 +678,12 @@ final class SessionCoordinator: NSObject {
     /// Bumped by every applied snapshot, so an off-main fetch that started earlier can tell a
     /// newer sync already landed and drop its (possibly older) answer.
     private var appliedSnapshots = 0
-    var isAwaitingInitialSnapshot: Bool { appliedSnapshots == 0 }
+    private var hasLocalSnapshot = false
+    var isAwaitingInitialSnapshot: Bool { !hasLocalSnapshot }
 
     private(set) var localStartupState = SessionStartupState.connecting
+    private var localServiceReady = false
+    private var localConnectionCompletions: [@MainActor @Sendable (Bool) -> Void] = []
 
     private func updateLocalStartupState(_ state: SessionStartupState) {
         localStartupState = state
@@ -687,20 +691,40 @@ final class SessionCoordinator: NSObject {
     }
 
     func connectLocalService(completion: @escaping @MainActor @Sendable (Bool) -> Void = { _ in }) {
+        localConnectionCompletions.append(completion)
+        guard localConnectionCompletions.count == 1 else { return }
+        localServiceReady = false
+        links[DaemonSidebar.localID]?.stop()
         updateLocalStartupState(.connecting)
         DaemonLauncher.shared.ensureRunning { [weak self] ready in
             guard let self else { completion(false); return }
             guard ready else {
                 self.updateLocalStartupState(DaemonLauncher.shared.pendingUpgrade.map(SessionStartupState.blocked) ?? .unavailable)
-                completion(false)
+                self.finishLocalConnection(false)
                 return
             }
+            self.localServiceReady = true
             StartupMetrics.shared.mark(.daemonConnected)
-            self.syncFromDaemon { synced in
-                if !synced { self.updateLocalStartupState(.unavailable) }
-                completion(synced)
+            // The user may activate a remote window while local startup is pending.
+            // Hydrate the local endpoint regardless of which window is now active.
+            self.requestDaemonBatch([.getSnapshot], refresh: false, endpoint: .localControlSocket, deliverStaleResult: true) { response in
+                guard case let .snapshot(snapshot)? = response else {
+                    self.updateLocalStartupState(.unavailable)
+                    self.finishLocalConnection(false)
+                    return
+                }
+                self.hasLocalSnapshot = true
+                if self.activeOwner == DaemonSidebar.localID { self.applySnapshot(snapshot, metadataOnly: false) }
+                else if let link = self.links[DaemonSidebar.localID] { link.accept(snapshot); link.start() }
+                self.finishLocalConnection(true)
             }
         }
+    }
+
+    private func finishLocalConnection(_ synced: Bool) {
+        let completions = localConnectionCompletions
+        localConnectionCompletions.removeAll()
+        for completion in completions { completion(synced) }
     }
 
     func presentSessionServiceRestart() {
@@ -715,6 +739,8 @@ final class SessionCoordinator: NSObject {
         alert.addButton(withTitle: "Stop Shells and Restart")
         let result = alert.runModal()
         guard result != .alertFirstButtonReturn else { return }
+        localServiceReady = false
+        links[DaemonSidebar.localID]?.stop()
         updateLocalStartupState(.connecting)
         DaemonLauncher.shared.restart(force: result == .alertThirdButtonReturn) { failure in
             if let failure {
@@ -723,11 +749,16 @@ final class SessionCoordinator: NSObject {
                 error.messageText = "Session service could not restart"
                 error.informativeText = failure
                 error.runModal()
+                self.connectLocalService()
             } else { self.connectLocalService() }
         }
     }
 
     private func applySnapshot(_ remote: SessionSnapshot, metadataOnly: Bool) {
+        // Activation, settings and polling can race startup. Never mount an old
+        // service's panes before the compatibility handshake has admitted it.
+        guard activeOwner != DaemonSidebar.localID || localServiceReady else { return }
+        if activeOwner == DaemonSidebar.localID { hasLocalSnapshot = true }
         StartupMetrics.shared.mark(.firstSnapshot) // idempotent: records the first hydration only
         let firstSnapshot = appliedSnapshots == 0
         appliedSnapshots += 1
@@ -754,7 +785,8 @@ final class SessionCoordinator: NSObject {
             // the pane UI but never told the registry, so dead TerminalHostViews (and their Metal
             // surfaces) accumulated for the life of the app. Hosts are only ever registered while
             // building panes from a snapshot, so anything outside the latest snapshot is gone for
-            // good — explicit close paths still removeHost() eagerly for the common case.
+            // good. Only the confirmed snapshot retires IO: a failed close must keep its
+            // existing terminal usable.
             // Per-surface bookkeeping leaks one entry per pane ever created otherwise: these
             // only shrink on explicit callbacks (an OSC 7 nil-host reset / a command finish),
             // which a killed pane never emits. Panes on other attached daemons stay.
@@ -1384,10 +1416,6 @@ final class SessionCoordinator: NSObject {
 
     private func closeActiveTabOnly() {
         guard let tab = snapshot.activeWorkspace?.activeTab else { return }
-        let surfaces = tab.rootPane.allSurfaceIDs()
-        for surfaceID in surfaces {
-            terminalHosts.removeHost(for: surfaceID)
-        }
         requestDaemonAsync(.closeTab(tabID: tab.id))
         refreshSnapshot()
     }
@@ -1579,10 +1607,6 @@ final class SessionCoordinator: NSObject {
     /// select-first dance, so a failed/raced selection can never close a different
     /// session than the one the user confirmed.
     func closeSession(_ session: SessionGroup) {
-        let surfaces = session.tabs.flatMap { $0.rootPane.allSurfaceIDs() }
-        for surfaceID in surfaces {
-            terminalHosts.removeHost(for: surfaceID)
-        }
         requestDaemonAsync(.closeSession(sessionID: session.id))
         refreshSnapshot()
     }
@@ -1599,9 +1623,6 @@ final class SessionCoordinator: NSObject {
         let others = session.tabs.filter { $0.id != keepID }
         guard !others.isEmpty else { return }
         for tab in others {
-            for surfaceID in tab.rootPane.allSurfaceIDs() {
-                terminalHosts.removeHost(for: surfaceID)
-            }
             requestDaemonAsync(.closeTab(tabID: tab.id))
         }
         selectTab(workspaceID: workspace.id, tabID: keepID)
@@ -1963,10 +1984,11 @@ final class SessionCoordinator: NSObject {
     /// fingerprint, so this never remounts panes or re-fades the chrome.
     /// It lands after a debounce, so it goes to the tab's own daemon: the window may have gone
     /// behind one on another machine by then.
-    func setSplitRatio(tabID: TabID, firstPaneID: PaneID, secondPaneID: PaneID, ratio: Double) {
+    func setSplitRatio(tabID: TabID, firstPaneID: PaneID, secondPaneID: PaneID, ratio: Double,
+                       completion: @escaping @MainActor @Sendable () -> Void = {}) {
         let request = IPCRequest.resizePaneRatio(tabID: tabID, firstPaneID: firstPaneID, secondPaneID: secondPaneID, ratio: ratio)
-        logIfFailed(request, surface: tab(tabID)?.rootPane.allSurfaceIDs().first)
-        refreshSnapshot()
+        let endpoint = tab(tabID)?.rootPane.allSurfaceIDs().first.map(endpoint(forSurface:)) ?? activeEndpoint
+        requestDaemonBatch([request], endpoint: endpoint) { _ in completion() }
     }
 
     /// Commit a tab drag-reorder. Full sync so the tab bar rebuilds in the new order
@@ -2142,13 +2164,7 @@ final class SessionCoordinator: NSObject {
 
     func closeWorkspace(id: WorkspaceID) {
         guard snapshot.workspaces.count > 1 else { return }
-        guard let workspace = snapshot.workspaces.first(where: { $0.id == id }) else { return }
-        let surfaces = workspace.sessions.flatMap { session in
-            session.tabs.flatMap { $0.rootPane.allSurfaceIDs() }
-        }
-        for surfaceID in surfaces {
-            terminalHosts.removeHost(for: surfaceID)
-        }
+        guard snapshot.workspaces.contains(where: { $0.id == id }) else { return }
         requestDaemonAsync(.closeWorkspace(id: id))
         refreshSnapshot()
     }
@@ -2414,11 +2430,15 @@ final class SessionCoordinator: NSObject {
 
     private func startSnapshotSubscription() {
         snapshotSubscriptionGeneration += 1
+        snapshotSubscription?.cancel()
+        snapshotSubscription = nil
+        snapshotSubscriptionPending = false
+        // Switching to a local window must retire the previous remote subscription
+        // even when local readiness still prevents opening the replacement.
+        guard activeOwner != DaemonSidebar.localID || localServiceReady else { return }
         let generation = snapshotSubscriptionGeneration
         let subscribedOwner = activeOwner
         notificationOwners[subscribedOwner] = false
-        snapshotSubscription?.cancel()
-        snapshotSubscription = nil
         snapshotSubscriptionPending = true
         let service = DaemonSessionService(endpoint: activeEndpoint)
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
@@ -2497,6 +2517,7 @@ final class SessionCoordinator: NSObject {
     /// (structureChanged is computed independently) and a CLI theme change still applies
     /// (themeChanged forces the chrome path).
     func refreshSnapshot() {
+        guard activeOwner != DaemonSidebar.localID || localServiceReady else { return }
         guard pendingDaemonOperations[activeEndpoint, default: 0] == 0 else { refetch = true; return }
         guard !fetchInFlight else {
             refetch = true
@@ -2625,6 +2646,7 @@ final class SessionCoordinator: NSObject {
                                 operation: @escaping @Sendable (DaemonSessionService) throws -> IPCResponse,
                                 completion: @escaping @MainActor @Sendable (IPCResponse?) -> Void = { _ in }) {
         let endpoint = endpoint ?? activeEndpoint
+        guard endpoint != .localControlSocket || localServiceReady else { completion(nil); return }
         let owner = activeOwner, sent = selectionsSent
         let service = DaemonSessionService(endpoint: endpoint)
         pendingDaemonOperations[endpoint, default: 0] += 1
@@ -2680,9 +2702,6 @@ final class SessionCoordinator: NSObject {
 }
 
 extension SessionCoordinator: TerminalHostDelegate {
-    func terminalHostDidSubmitFirstShellPrompt(surfaceID: SurfaceID) {
-        DaemonLauncher.shared.firstPromptReady()
-    }
     func terminalHostDidChangeTitle(_ title: String, surfaceID: SurfaceID) {
         logIfFailed(.updateTabTitle(surfaceID: surfaceID.uuidString, title: title), surface: surfaceID)
         refreshSnapshot()

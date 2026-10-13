@@ -10,18 +10,20 @@ It runs on the `macos-26` runner with Xcode 26.6, the same runner and pinned
 `XCODE_VERSION` as CI, so a release is built by the toolchain CI tested. Bump
 `XCODE_VERSION` in `release.yml` and `ci.yml` together.
 
-## Harness 2.3.1 (135)
+## Harness 2.3.2 (136)
 
-This release improves terminal parsing, packed history, rendering and output transport;
-adds stable text anchors, precise command actions, Unicode grapheme handling and font
-controls; and fixes startup layout. The 2.3.1 patch adds explicit startup recovery for an older service and fenced cleanup of its control socket after an authorized restart. See [terminal quality](TERMINAL-QUALITY.md). See the [changelog](../CHANGELOG.md),
-[implementation evidence](DEVELOPMENT-IMPLEMENTATION.md), and
-[native acceptance](NATIVE-ACCEPTANCE.md). The private iOS companion remains separately distributed.
+This patch fixes daemon adoption after app updates, startup recovery, split-pane
+movement and closure, stale terminal IO, and relocated GPU row caches. The
+first-party coding agent remains in local development and is excluded from this
+release's source, app, CLI and documentation. Existing integrations with installed
+coding tools remain available.
 
-Version declarations and generated update notes move together. Run CI on the shipping commit,
-then the release workflow with `tag=v2.3.1` and `deploy_appcast=true`. Signing, notarization,
-DMG smoke testing, and live appcast verification must pass before publication. The GitHub
-release and workflow retain the publication evidence and asset checksum.
+See the [changelog](../CHANGELOG.md), [release validation](RELEASE-2.3.2.md), and
+[terminal quality](TERMINAL-QUALITY.md). Version declarations and generated update
+notes move together. Run CI on the shipping commit, then the release workflow with
+`tag=v2.3.2` and `deploy_appcast=true`. The app and DMG must pass signing,
+notarization and smoke testing before publication. The workflow verifies the
+public download before updating either live appcast domain.
 
 ## One-time GitHub setup
 
@@ -64,7 +66,7 @@ the GitHub Release asset URL for the matching tag.
 2. Open **Actions -> Release Harness -> Run workflow**.
 3. Select the release branch, normally `main`.
 4. Enter `tag` (required): `vX.Y.Z` matching `CFBundleShortVersionString`, for
-   example `v1.0.4`.
+   example `v2.3.2`.
 5. Optionally enter `release_name`; it defaults to `Harness <version> (<build>)`.
 6. Enable `deploy_appcast` (default off) only after `WEBSITE_REPOSITORY` and
    `WEBSITE_DEPLOY_TOKEN` are configured.
@@ -96,30 +98,41 @@ the environment.
 
 ## What the workflow does
 
-In order: `make release` (build `Harness.app`), check the bundle has no stray
-resource bundles, `make sign` (sign and notarize the app), `make dmg`, create a
-**draft** GitHub Release for the tag if none exists, `make finalize` (notarize and
-staple the DMG, upload it to the release, generate `dist/appcast.xml`),
-`Scripts/smoke-dmg.sh Harness.dmg`, upload the appcast to the release, and, with
-`deploy_appcast`, commit `public/appcast.xml` to the website repository and wait
-(up to about five minutes) for `https://thebestterminal.com/appcast.xml` to serve it.
-Only then is the release published and marked latest. `Harness.dmg` and
-`dist/appcast.xml` are also kept as the run's `harness-release-<tag>` artifact,
-and the temporary signing keychain is deleted even when a step fails.
+1. Reject a published version or an existing tag pointing to a different commit.
+2. Build the app, verify package contents, sign and notarize the app, and create
+   the DMG containing its already stapled ticket.
+3. Create or resume a draft release. Sign, notarize and staple the final DMG,
+   then generate its signed Sparkle appcast and `SHA256SUMS`.
+4. Mount and copy the DMG to an isolated install location. Verify the app's
+   signature, ticket, Gatekeeper assessment and arm64 helpers; load every bundled
+   theme; launch it and require an attached terminal using the expected daemon
+   and session-host build. Stop only this test's isolated service afterward.
+5. Upload `Harness.dmg`, `appcast.xml` and `SHA256SUMS` to the draft and publish it.
+6. Download the public DMG and appcast without authentication and compare their
+   bytes with the verified artifacts.
+7. With `deploy_appcast`, commit the signed feed to the website repository and
+   verify that both `thebestterminal.com` and `harnesscli.dev` serve the exact feed.
 
-## What the workflow publishes
+The workflow retains the DMG, appcast, checksum and DMG notarization receipt as
+its `harness-release-<tag>` artifact. Its temporary signing keychain is always
+removed. The final DMG is notarized once; no archive is rebuilt after verification.
 
-- A GitHub Release for the requested tag, created as a draft at the workflow
-  commit if one does not already exist, and published as the latest release once
-  every step has passed.
-- `Harness.dmg`, uploaded or replaced on that GitHub Release.
-- `dist/appcast.xml`, uploaded to the GitHub Release for audit/debugging.
-- Optionally, `public/appcast.xml` in the website repository.
+## Publication and recovery
 
-Installed apps only see the update after `https://thebestterminal.com/appcast.xml`
-serves the new appcast. If `deploy_appcast` is disabled, manually publish
-`dist/appcast.xml` to the website before expecting Sparkle auto-update to find
-the release.
+Published versions and tags are immutable. A failed run before publication may
+resume its draft at the same source commit. If publication succeeds but download
+or website verification fails, keep the last live feed unchanged and recover the
+existing release instead of rebuilding it:
+
+1. Download that release's `Harness.dmg`, `SHA256SUMS` and `appcast.xml`.
+2. Verify the checksum, signature and notarization of the downloaded artifact.
+3. Copy the unchanged signed `appcast.xml` to the website's `public/appcast.xml`,
+   commit and deploy it, then compare both live domains with the downloaded feed.
+
+If artifact bytes must change, create a new version and build number. README
+checksum or validation-document updates may land on `main` afterward; never move
+the release tag to those later documentation commits. When `deploy_appcast` is
+disabled, publish the verified feed only after the public download works.
 
 ## CI
 
@@ -128,7 +141,7 @@ the release.
 
 | Job | Runner | What it checks |
 | --- | --- | --- |
-| Build & test (macOS) | `macos-26`, Xcode 26.6 | `swift build`, `swift build -c release`, and `swift test --enable-code-coverage` with `HARNESS_LIVE_DAEMON_TESTS=1`; uploads the coverage data. |
+| Build & test (macOS) | `macos-26`, Xcode 26.6 | `swift build`, `swift build -c release`, and `swift test --enable-code-coverage` with `HARNESS_LIVE_DAEMON_TESTS=1`; exercises a real 2.1 upgrade and live session survival; uploads coverage. |
 | Build & test (Linux, headless daemon) | `ubuntu-24.04`, `swift:6.0` container | Debug and release builds of the daemon, CLI, and pure libraries, then `swift test` with the live daemon tests. |
 | Xcode project builds | `macos-26`, Xcode 26.6 | `xcodebuild` Debug build of the committed `Harness.xcodeproj`, so drift between `project.yml` and the targets is caught. |
 | Manifest version agreement | `ubuntu-24.04` | The Sparkle version agrees across `Package.swift`, `project.yml`, and `project.pbxproj`. |
@@ -161,10 +174,8 @@ DOWNLOAD_URL_PREFIX="https://github.com/robzilla1738/harness-terminal/releases/d
   make finalize
 ```
 
-`make finalize` uploads the DMG to an existing GitHub Release for `TAG`, so
-create the release (for example as a draft) before running it. `DEPLOY_WEBSITE=1
-WEBSITE_DIR=…` also copies the appcast into the website checkout and deploys it;
-see the header of `Scripts/finalize-release.sh`.
-
-Without `SPARKLE_EDDSA_PRIVATE_KEY_FILE`, Sparkle falls back to the private key in
-the login keychain and may show an interactive "Allow" prompt.
+`make finalize` produces the final notarized DMG, signed appcast and checksum
+locally. It does not publish files or change the website. Run `make smoke-dmg`,
+then follow the publication order above. `Scripts/release-hotfix.sh --tag vX.Y.Z
+--build N` can dispatch the protected workflow from a clean, already prepared
+`main`; it waits for CI and never rewrites versions or published tags.

@@ -8,6 +8,20 @@ has a matching `vX.Y.Z` tag and a signed, notarized DMG on
 
 ## [Unreleased]
 
+## [2.3.2] - 2026-10-13
+
+### Fixed
+
+- App updates stage the current daemon and session-host helpers before connecting. Compatible daemon replacements are verified before terminals attach; unavailable or incompatible services show recovery controls instead of a transparent, frozen window. Existing programs remain protected from automatic interruption.
+- Splitting and closing panes preserve the surviving terminal views, keyboard focus, and render surfaces. Pane frames animate directly, rapid changes continue from their current positions, and divider gestures retain their latest ratios.
+- Closing a split stops its terminal IO even while its last frame is animating out. Late resize requests on a closing output stream no longer produce “Surface not found.” errors.
+- Scrolling and reflow correctly upload relocated cached rows to the GPU, keeping terminal text and graphics aligned while retaining row reuse.
+- macOS service restarts recognize exited processes before their parents reap them, preventing false shutdown timeouts.
+
+### Changed
+
+- Release validation exercises session survival, pane lifecycle, and the installed DMG. Public downloads are verified before the updater feed is published, and published release versions remain immutable.
+
 ## [2.3.1] - 2026-10-11
 
 ### Fixed

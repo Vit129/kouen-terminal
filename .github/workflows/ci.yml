@@ -82,10 +82,13 @@ jobs:
       - name: Test
         env:
           HARNESS_LIVE_DAEMON_TESTS: "1"
-        run: swift test --enable-code-coverage
+        run: HARNESS_TEST_PRODUCTS="$(swift build --show-bin-path)" swift test --enable-code-coverage
 
       - name: Upgrade from a running 2.1 session service
         run: python3 Scripts/test-macos-upgrade.py
+
+      - name: Prove live session survival through daemon replacement
+        run: python3 Scripts/prove-session-survival.py
 
       - name: Upload coverage data
         uses: actions/upload-artifact@v7
@@ -154,7 +157,7 @@ jobs:
       - name: Live daemon tests
         env:
           HARNESS_LIVE_DAEMON_TESTS: "1"
-        run: swift test
+        run: HARNESS_TEST_PRODUCTS="$(swift build --show-bin-path)" swift test
 
   xcode-project:
     name: Xcode project builds

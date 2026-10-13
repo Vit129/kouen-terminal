@@ -10,11 +10,21 @@ import Foundation
 /// `/proc`. Kept in one place so the two callers can't drift apart.
 public enum ProcessScan {
     /// Positive kernel evidence of termination. kill(pid, 0) still succeeds for
-    /// unreaped Linux zombies, including when a container PID 1 does not reap.
+    /// unreaped zombies, including when a container PID 1 does not reap.
     /// Failure to read process state is never treated as termination.
     public static func isZombie(_ pid: Int32) -> Bool {
-        #if os(Linux)
-        guard pid > 0, let record = try? String(contentsOfFile: "/proc/\(pid)/stat", encoding: .utf8), let close = record.lastIndex(of: ")") else { return false }
+        guard pid > 0 else { return false }
+        #if canImport(Darwin)
+        // libproc can no longer describe a process once its task has exited.
+        // The BSD process entry retains its state until the parent calls waitpid.
+        var query = [CTL_KERN, KERN_PROC, KERN_PROC_PID, pid]
+        var info = kinfo_proc()
+        var size = MemoryLayout<kinfo_proc>.size
+        guard sysctl(&query, UInt32(query.count), &info, &size, nil, 0) == 0,
+              size == MemoryLayout<kinfo_proc>.size else { return false }
+        return info.kp_proc.p_stat == SZOMB
+        #elseif os(Linux)
+        guard let record = try? String(contentsOfFile: "/proc/\(pid)/stat", encoding: .utf8), let close = record.lastIndex(of: ")") else { return false }
         let state = record[record.index(after: close)...].split(whereSeparator: \.isWhitespace).first
         return state == "Z" || state == "X"
         #else

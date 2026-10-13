@@ -15,9 +15,11 @@ are listed in the [changelog](CHANGELOG.md) and [GitHub Releases](https://github
 
 ## Download
 
-**Harness 2.3** improves terminal throughput and history handling, keeps selections and
-search attached to text during resize, adds precise command-output actions and font
-controls, and fixes the startup layout jump. See [terminal quality](docs/TERMINAL-QUALITY.md),
+**Harness 2.3.2** fixes daemon adoption after app updates, smooths split-pane movement
+and closing, eliminates stale closing-pane IO, and improves cached GPU row reuse.
+The 2.3 series also improves throughput and history handling, keeps selections and
+search attached to text during resize, and adds precise command-output actions and font
+controls. See [release validation](docs/RELEASE-2.3.2.md), [terminal quality](docs/TERMINAL-QUALITY.md),
 the [changelog](CHANGELOG.md), and [performance results](docs/SCORECARD.md) for behavior,
 measured results, and verification limits.
 

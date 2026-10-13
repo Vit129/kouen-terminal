@@ -27,7 +27,9 @@ final class DaemonLauncher: @unchecked Sendable {
     static let shared = DaemonLauncher()
 
     private var fallbackProcess: Process?
-    private var refreshedAfterPrompt = false
+    private var refreshedInstalledBinaries = false
+    private let request: @Sendable (IPCRequest, TimeInterval) throws -> IPCResponse
+    private let stopEmptyOwner: @Sendable () throws -> Void
     private let queue = DispatchQueue(label: "com.robert.harness.daemon-launcher")
     private let upgradeLock = NSLock()
     private var upgrade: DaemonUpgrade?
@@ -40,10 +42,15 @@ final class DaemonLauncher: @unchecked Sendable {
             guard let self else { return }
             let failure: String?
             do {
-                switch try DaemonClient().request(.replaceDaemon(executable: self.daemonExecutableURL()?.path), timeout: 30) {
+                guard let executable = self.daemonExecutableURL() else { throw DaemonSessionError.daemonError("The updated application daemon is missing from this installation.") }
+                switch try self.request(.replaceDaemon(executable: executable.path), 30) {
                 case .ok:
                     let stats = self.daemonStats()
-                    self.setUpgrade(stats.map { $0.updateAvailable ? DaemonUpgrade(stats: $0) : nil } ?? nil)
+                    guard let stats, stats.isReadyForClient else {
+                        self.setUpgrade(DaemonUpgrade(stats: stats))
+                        throw DaemonSessionError.daemonError("The replacement has not become ready. Existing programs remain in the session host; retry the connection.")
+                    }
+                    self.setUpgrade(stats.updateAvailable ? DaemonUpgrade(stats: stats) : nil)
                     failure = nil
                 case let .error(message): failure = message
                 default: failure = "Unexpected replacement response; running work is retained."
@@ -57,7 +64,11 @@ final class DaemonLauncher: @unchecked Sendable {
         upgradeLock.lock(); upgrade = value; upgradeLock.unlock()
     }
 
-    private init() {}
+    init(request: @escaping @Sendable (IPCRequest, TimeInterval) throws -> IPCResponse = { try DaemonClient().request($0, timeout: $1) },
+         stopEmptyOwner: @escaping @Sendable () throws -> Void = { _ = try DaemonRestart.stop(force: false) }) {
+        self.request = request
+        self.stopEmptyOwner = stopEmptyOwner
+    }
 
     /// Ensure a daemon is reachable, off the main thread. `completion` runs on the
     /// main thread with `true` if the daemon answers. Safe to call at launch — the
@@ -94,26 +105,40 @@ final class DaemonLauncher: @unchecked Sendable {
     func ensureRunningBlocking() -> Bool {
         #if !DEBUG
         var adoptServiceChanges = false
+        // Stage helpers even when an incompatible service prevents the first prompt.
+        // Atomic installation preserves the live executable and its programs.
+        if !refreshedInstalledBinaries, !HarnessPaths.hasHomeOverride {
+            refreshedInstalledBinaries = true
+            refreshInstalledBinaries()
+        }
         #endif
         if let stats = daemonStats(timeout: 0.4) {
             if stats.shutdownPending == true { setUpgrade(DaemonUpgrade(stats: stats)); return false }
-            setUpgrade(stats.updateAvailable || stats.compatibility != .compatible
+            setUpgrade(stats.updateAvailable || !stats.isReadyForClient
                 ? DaemonUpgrade(stats: stats) : nil)
-            if stats.daemonUpdateAvailable, stats.daemonAvailable != false, stats.compatibility == .compatible, stats.supports(DaemonStats.sessionHost) {
-                if case .ok = try? DaemonClient().request(.replaceDaemon(executable: daemonExecutableURL()?.path), timeout: 30) {
-                    if let updated = daemonStats() { setUpgrade(updated.updateAvailable ? DaemonUpgrade(stats: updated) : nil) }
-                }
-                return true
-            }
             // An idle legacy shell still owns environment and background jobs.
-            if stats.updateAvailable, stats.compatibility == .compatible,
+            if stats.updateAvailable,
                stats.mayRestartWithoutInterruption, stats.supports(DaemonStats.guardedRestart) {
-                do { _ = try DaemonRestart.stop(force: false) }
-                catch { return true } // A concurrent new shell wins over automatic adoption.
+                do { try stopEmptyOwner() }
+                catch { return stats.isReadyForClient } // A concurrent new shell wins over automatic adoption.
                 #if !DEBUG
                 adoptServiceChanges = true
                 #endif
-            } else { return stats.compatibility == .compatible }
+            } else {
+                if stats.canReplaceApplicationDaemon, stats.daemonUpdateAvailable || stats.daemonAvailable == false,
+                   let executable = daemonExecutableURL() {
+                    do {
+                        let response = try request(.replaceDaemon(executable: executable.path), 30)
+                        if case let .error(message) = response { fputs("Harness: daemon adoption failed: \(message)\n", harnessStderr) }
+                    } catch { fputs("Harness: daemon adoption could not be confirmed: \(error)\n", harnessStderr) }
+                    // A receipt or live session host alone cannot prove the control service
+                    // is usable. Reconcile both successful and uncertain replacements.
+                    guard let updated = daemonStats() else { return false }
+                    setUpgrade(updated.updateAvailable || !updated.isReadyForClient ? DaemonUpgrade(stats: updated) : nil)
+                    return updated.isReadyForClient
+                }
+                return stats.isReadyForClient
+            }
         } else if daemonResponds(timeout: 0.2) {
             setUpgrade(DaemonUpgrade(stats: nil))
             return false
@@ -132,9 +157,7 @@ final class DaemonLauncher: @unchecked Sendable {
         // interval.
         #if !DEBUG
         if !HarnessPaths.hasHomeOverride {
-            // With no live owner, boot the bundled version rather than starting a stale
-            // installed helper that cannot reach the prompt which normally defers refresh.
-            refreshInstalledBinaries()
+            // The helpers were staged before discovery, so an absent owner starts current code.
             if installLaunchAgentIfPossible(activateChanges: adoptServiceChanges), waitUntilResponding(timeoutSeconds: 4) { return true }
         }
         #endif
@@ -148,13 +171,13 @@ final class DaemonLauncher: @unchecked Sendable {
     }
 
     private func daemonResponds(timeout: TimeInterval = 0.5) -> Bool {
-        guard let response = try? DaemonClient().request(.ping, timeout: timeout) else { return false }
+        guard let response = try? request(.ping, timeout) else { return false }
         if case .pong = response { return true }
         return false
     }
 
     private func daemonStats(timeout: TimeInterval = 0.5) -> DaemonStats? {
-        guard let response = try? DaemonClient().request(.daemonStats, timeout: timeout),
+        guard let response = try? request(.daemonStats, timeout),
               case let .daemonStats(stats) = response
         else { return nil }
         return stats
@@ -168,27 +191,17 @@ final class DaemonLauncher: @unchecked Sendable {
         let deadline = DispatchTime.now() + timeoutSeconds
         repeat {
             if let stats = daemonStats(timeout: min(timeoutSeconds, 1)) {
-                setUpgrade(stats.updateAvailable || stats.compatibility != .compatible
+                setUpgrade(stats.updateAvailable || !stats.isReadyForClient
                     ? DaemonUpgrade(stats: stats) : nil)
-                return stats.compatibility == .compatible
+                return stats.isReadyForClient
             }
             if daemonResponds(timeout: 0.2) { setUpgrade(DaemonUpgrade(stats: nil)); return false }
         } while ready.wait(timeout: deadline) == .success && DispatchTime.now() < deadline
         // bind() publishes the pathname before listen() accepts connections. Socket
         // readiness can advance after the last filesystem event, so verify once more.
         guard let stats = daemonStats(timeout: 0.3) else { return false }
-        setUpgrade(stats.updateAvailable || stats.compatibility != .compatible ? DaemonUpgrade(stats: stats) : nil)
-        return stats.compatibility == .compatible
-    }
-
-    func firstPromptReady() {
-        #if !DEBUG
-        queue.async { [weak self] in
-            guard let self, !refreshedAfterPrompt, !HarnessPaths.hasHomeOverride else { return }
-            refreshedAfterPrompt = true
-            refreshInstalledBinaries()
-        }
-        #endif
+        setUpgrade(stats.updateAvailable || !stats.isReadyForClient ? DaemonUpgrade(stats: stats) : nil)
+        return stats.isReadyForClient
     }
 
     private func installLaunchAgentIfPossible(activateChanges: Bool = false) -> Bool {
@@ -225,7 +238,7 @@ final class DaemonLauncher: @unchecked Sendable {
         }
     }
 
-    /// Refresh installed helpers after the first prompt. Unchanged signed bundles
+    /// Refresh installed helpers before connecting. Unchanged signed bundles
     /// keep their executable inodes; running services adopt candidates on restart.
     private func refreshInstalledBinaries() {
         if let owner = bundledBinaryURL(named: "HarnessSessionHost"),
@@ -249,7 +262,7 @@ final class DaemonLauncher: @unchecked Sendable {
 
     /// The daemon the LaunchAgent should supervise: the installed AppSupport copy when present
     /// (canonical — what onboarding/`harness-cli install` write, survives the app moving, and
-    /// refreshed after the first prompt), else wherever the bundle/dev daemon lives. DEBUG keeps
+    /// refreshed before connecting), else wherever the bundle/dev daemon lives. DEBUG keeps
     /// the bundle/dev path so the Xcode loop restarts into the freshly built daemon, not a
     /// previously installed release copy.
     private func launchAgentDaemonTarget() -> URL? {

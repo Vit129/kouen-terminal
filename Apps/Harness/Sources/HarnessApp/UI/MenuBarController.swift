@@ -125,7 +125,7 @@ final class MenuBarController: NSObject, NSMenuDelegate {
             if let failure {
                 let alert = NSAlert(); alert.messageText = "Daemon replacement could not complete"
                 alert.informativeText = failure; alert.runModal()
-            } else { SessionCoordinator.shared.refreshSnapshot() }
+            } else { SessionCoordinator.shared.connectLocalService() }
         }
     }
 

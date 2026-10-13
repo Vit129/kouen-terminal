@@ -19,10 +19,28 @@ final class WindowAppearanceTests: XCTestCase {
         XCTAssertEqual(view.heading.stringValue, "Finish updating Harness")
         XCTAssertFalse(view.restart.isHidden)
         XCTAssertTrue(view.detail.stringValue.contains("Save your work"))
+        var unavailable = stats
+        unavailable.daemonAvailable = false
+        unavailable.sessionHostProtocolLevel = DaemonStats.currentSessionHostProtocolLevel
+        view.configure(.blocked(DaemonUpgrade(stats: unavailable)))
+        XCTAssertEqual(view.heading.stringValue, "Reconnect to your sessions")
+        XCTAssertFalse(view.retry.isHidden)
+        XCTAssertTrue(view.restart.isHidden, "An unavailable worker should offer session-preserving recovery first")
         view.configure(.unavailable)
         XCTAssertEqual(view.heading.stringValue, "Couldn’t load your sessions")
         XCTAssertFalse(view.retry.isHidden)
         XCTAssertTrue(view.restart.isHidden)
+    }
+
+    func testBackgroundRefreshCannotHydrateBeforeTheCompatibilityHandshake() async {
+        let coordinator = SessionCoordinator.shared
+        coordinator.refreshSnapshot()
+        let refreshed = await withCheckedContinuation { continuation in
+            coordinator.syncFromDaemon { continuation.resume(returning: $0) }
+        }
+        XCTAssertFalse(refreshed)
+        XCTAssertTrue(coordinator.isAwaitingInitialSnapshot)
+        XCTAssertTrue(coordinator.snapshot.workspaces.isEmpty)
     }
 
     override class func setUp() {

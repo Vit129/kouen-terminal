@@ -12,10 +12,10 @@ import Foundation
 /// build when the two disagree (v1.3.0/v1.3.1 shipped daemons that reported 1.2.0).
 public enum HarnessVersion {
     /// Marketing version, matches `CFBundleShortVersionString`.
-    public static let short = "2.3.1"
+    public static let short = "2.3.2"
     /// Build number, matches `CFBundleVersion`. Used as the secondary-DA firmware field
     /// and for displaying available updates. Protocol/capabilities govern compatibility;
     /// a build difference does not authorize restarting programs.
-    public static let build = 135
+    public static let build = 136
     public static let protocolLevel = 2
 }

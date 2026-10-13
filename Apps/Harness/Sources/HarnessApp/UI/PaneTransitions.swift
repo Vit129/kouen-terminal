@@ -1,77 +1,84 @@
 import AppKit
 import HarnessCore
 
-/// Opening and closing a split, animated. The panes are laid out at their final size at once
-/// (so no shell sees a stream of resizes), and only their cards move: a new pane grows out of
-/// the one it split from, and a closed pane's card shrinks away into the space its sibling
-/// takes. Skipped under Reduce Motion, and for anything but one pane added or removed.
+/// Resize the surviving cards at display cadence. Their terminal views stay mounted,
+/// so text is repainted at its real pixel size and PTY resize votes coalesce normally.
+/// The actual entering/closing pane sits underneath; no blank ghost or scaled text.
 @MainActor
-enum PaneTransitions {
-    /// Where each pane's card sat before a rebuild, in `space`'s coordinates.
-    static func frames(of container: PaneContainerView?, in space: NSView) -> [SurfaceID: NSRect] {
-        container?.islandFrames(in: space) ?? [:]
-    }
+final class PaneTransitions: NSObject {
+    private weak var container: PaneContainerView?
+    private let before: [SurfaceID: NSRect]
+    private let after: [SurfaceID: NSRect]
+    private let revealed: [PaneIslandView]
+    private var link: CADisplayLink?
+    private var started: CFTimeInterval = 0
 
-    static func animate(from before: [SurfaceID: NSRect], into container: PaneContainerView, in space: NSView) {
-        guard !before.isEmpty, !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion else { return }
-        space.layoutSubtreeIfNeeded()
-        let after = container.islandFrames(in: space)
+    init?(container: PaneContainerView, from before: [SurfaceID: NSRect], to after: [SurfaceID: NSRect]) {
         let added = Set(after.keys).subtracting(before.keys)
         let removed = Set(before.keys).subtracting(after.keys)
-        if added.count == 1, removed.isEmpty, let surface = added.first, let frame = after[surface],
-           let island = container.island(for: surface),
-           let parent = before.values.first(where: { $0.contains(NSPoint(x: frame.midX, y: frame.midY)) }) {
-            grow(island, from: parent, to: frame)
-        } else if removed.count == 1, added.isEmpty, let surface = removed.first, let frame = before[surface] {
-            let neighbour = after.values.first { $0.intersects(frame.insetBy(dx: -24, dy: -24)) }
-            ghost(of: frame, shrinkingToward: neighbour, in: space)
+        guard container.window != nil, !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion,
+              added.count + removed.count == 1,
+              after.contains(where: { id, frame in before[id].map { $0 != frame } == true }) else { return nil }
+        self.container = container
+        self.before = before
+        self.after = after
+        revealed = container.retainedIslands.filter { added.contains($0.surfaceID) || removed.contains($0.surfaceID) }
+    }
+
+    func start() {
+        started = CACurrentMediaTime()
+        apply(progress: 0)
+        guard let container else { return }
+        let link = container.displayLink(target: self, selector: #selector(tick))
+        if let rate = container.window?.screen?.maximumFramesPerSecond, rate > 60 {
+            link.preferredFrameRateRange = CAFrameRateRange(minimum: 60, maximum: Float(rate), preferred: Float(rate))
         }
+        link.add(to: .main, forMode: .common)
+        self.link = link
     }
 
-    /// The new card starts small and transparent at the side of `parent` it split from.
-    private static func grow(_ island: NSView, from parent: NSRect, to frame: NSRect) {
-        guard let layer = island.layer else { return }
-        let dx = (parent.midX - frame.midX) * 0.35
-        let dy = (parent.midY - frame.midY) * 0.35
-        let start = transform(scale: 0.94, offset: CGPoint(x: dx, y: dy), size: frame.size)
-        let move = CABasicAnimation(keyPath: "transform")
-        move.fromValue = NSValue(caTransform3D: start)
-        move.toValue = NSValue(caTransform3D: CATransform3DIdentity)
-        let fade = CABasicAnimation(keyPath: "opacity")
-        fade.fromValue = 0
-        fade.toValue = 1
-        let group = CAAnimationGroup()
-        group.animations = [move, fade]
-        group.duration = HarnessDesign.Motion.standard
-        group.timingFunction = CAMediaTimingFunction(controlPoints: 0.2, 0.9, 0.25, 1)
-        layer.add(group, forKey: "paneOpen")
+    @objc private func tick() {
+        guard let container, container.window != nil else { cancel(); return }
+        let progress = min(1, (CACurrentMediaTime() - started) / HarnessDesign.Motion.standard)
+        apply(progress: progress)
+        if progress >= 1 { container.finishTransition() }
     }
 
-    /// A card-colored stand-in for the closed pane fades and shrinks toward its neighbour.
-    private static func ghost(of frame: NSRect, shrinkingToward neighbour: NSRect?, in space: NSView) {
-        let c = HarnessChrome.current
-        let ghost = NSView(frame: frame)
-        ghost.wantsLayer = true
-        ghost.layer?.backgroundColor = c.terminalBackground.withAlphaComponent(HarnessChrome.paintOpacity).cgColor
-        ghost.layer?.cornerRadius = HarnessDesign.Radius.overlay
-        ghost.layer?.borderWidth = 1
-        ghost.layer?.borderColor = c.borderStrong.cgColor
-        space.addSubview(ghost, positioned: .above, relativeTo: nil)
-        let toward = neighbour.map { CGPoint(x: ($0.midX - frame.midX) * 0.3, y: ($0.midY - frame.midY) * 0.3) } ?? .zero
-        NSAnimationContext.runAnimationGroup({ context in
-            context.duration = HarnessDesign.Motion.fast
-            context.timingFunction = CAMediaTimingFunction(name: .easeIn)
-            ghost.animator().alphaValue = 0
-            ghost.animator().frame = frame.insetBy(dx: frame.width * 0.04, dy: frame.height * 0.04).offsetBy(dx: toward.x, dy: toward.y)
-        }, completionHandler: { [weak ghost] in
-            DispatchQueue.main.async { [weak ghost] in ghost?.removeFromSuperview() }
-        })
+    func apply(progress: Double) {
+        guard let container else { return }
+        let progress = min(1, max(0, progress))
+        let eased = CGFloat(1 - pow(1 - progress, 3))
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        for (id, target) in after {
+            guard let source = before[id], source != target, let island = container.island(for: id) else { continue }
+            island.frame = NSRect(
+                x: source.minX + (target.minX - source.minX) * eased,
+                y: source.minY + (target.minY - source.minY) * eased,
+                width: source.width + (target.width - source.width) * eased,
+                height: source.height + (target.height - source.height) * eased
+            )
+            island.layoutSubtreeIfNeeded()
+        }
+        // A translucent terminal cannot simply overlap another: the underlying
+        // text and backgrounds would composite twice. Reveal only uncovered pixels.
+        for island in revealed {
+            let occupied = CGMutablePath()
+            for id in after.keys where before[id] != nil {
+                guard let survivor = container.island(for: id), survivor.frame.intersects(island.frame) else { continue }
+                let rect = island.convert(survivor.bounds, from: survivor)
+                let radius = survivor.layer?.cornerRadius ?? 0
+                occupied.addRoundedRect(in: rect, cornerWidth: radius, cornerHeight: radius)
+            }
+            island.setTransitionMask(CGPath(rect: island.bounds, transform: nil).subtracting(occupied))
+        }
+        container.updateGapFill()
+        CATransaction.commit()
     }
 
-    /// Scale about the card's center, then shift.
-    private static func transform(scale: CGFloat, offset: CGPoint, size: CGSize) -> CATransform3D {
-        var t = CATransform3DMakeTranslation(offset.x + size.width / 2, offset.y + size.height / 2, 0)
-        t = CATransform3DScale(t, scale, scale, 1)
-        return CATransform3DTranslate(t, -size.width / 2, -size.height / 2, 0)
+    func finish() { cancel(); apply(progress: 1); revealed.forEach { $0.setTransitionMask(nil) } }
+    func cancel() {
+        link?.invalidate(); link = nil
+        revealed.forEach { $0.setTransitionMask(nil) }
     }
 }

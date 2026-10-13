@@ -113,6 +113,13 @@ public extension DaemonStats {
     var updateAvailable: Bool {
         daemonUpdateAvailable || sessionHostUpdateAvailable
     }
+    var isReadyForClient: Bool {
+        compatibility == .compatible && daemonAvailable != false && shutdownPending != true
+    }
+    var canReplaceApplicationDaemon: Bool {
+        supports(Self.sessionHost) && sessionHostProtocolLevel == Self.currentSessionHostProtocolLevel
+            && shutdownPending != true
+    }
     var daemonUpdateAvailable: Bool { protocolLevel != HarnessVersion.protocolLevel || build != HarnessVersion.build || !Set(Self.currentCapabilities).isSubset(of: Set(capabilities ?? [])) }
     var sessionHostUpdateAvailable: Bool {
         guard sessionHostPID != nil else { return false }

@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: "Release tag to create/update, matching Info.plist (for example v1.0.4)"
+        description: "Unpublished release tag matching Info.plist (for example v2.3.2)"
         required: true
         type: string
       release_name:
@@ -79,6 +79,24 @@ jobs:
           echo "RELEASE_TAG=$RELEASE_TAG" >> "$GITHUB_ENV"
           echo "APP_VERSION=$VERSION" >> "$GITHUB_ENV"
           echo "APP_BUILD=$BUILD" >> "$GITHUB_ENV"
+
+      - name: Protect published versions and source tags
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          draft="$(gh api "repos/$GITHUB_REPOSITORY/releases" --paginate --jq ".[] | select(.tag_name == \"$RELEASE_TAG\") | .draft")"
+          if [[ "$draft" == "false" ]]; then
+            echo "Release $RELEASE_TAG is already public. Recover its existing appcast or use a new version; published assets are immutable." >&2
+            exit 1
+          fi
+          if git show-ref --verify --quiet "refs/tags/$RELEASE_TAG"; then
+            tagged="$(git rev-parse "$RELEASE_TAG^{commit}")"
+            if [[ "$tagged" != "$GITHUB_SHA" ]]; then
+              echo "Tag $RELEASE_TAG points at $tagged, not this build's $GITHUB_SHA." >&2
+              exit 1
+            fi
+          fi
 
       - name: Prepare public release notes
         run: |
@@ -286,10 +304,46 @@ jobs:
       - name: Smoke test final DMG
         run: Scripts/smoke-dmg.sh Harness.dmg
 
-      - name: Upload appcast to GitHub release
+      - name: Upload verified release artifacts
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release upload "$RELEASE_TAG" dist/appcast.xml --repo "$GITHUB_REPOSITORY" --clobber
+        run: |
+          set -euo pipefail
+          [[ "$(gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json isDraft --jq .isDraft)" == "true" ]]
+          gh release upload "$RELEASE_TAG" Harness.dmg dist/appcast.xml dist/SHA256SUMS --repo "$GITHUB_REPOSITORY" --clobber
+          checksum="$(awk '{print $1}' dist/SHA256SUMS)"
+          printf '\nSHA-256 (`Harness.dmg`): `%s`\n' "$checksum" >> "$RELEASE_NOTES_PATH"
+
+      - name: Publish GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          INPUT_RELEASE_NAME: ${{ inputs.release_name }}
+        run: |
+          set -euo pipefail
+
+          RELEASE_NAME="$INPUT_RELEASE_NAME"
+          if [[ -z "$RELEASE_NAME" ]]; then
+            RELEASE_NAME="Harness $APP_VERSION ($APP_BUILD)"
+          fi
+
+          gh release edit "$RELEASE_TAG" \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "$RELEASE_NAME" \
+            --notes-file "$RELEASE_NOTES_PATH" \
+            --draft=false \
+            --latest
+
+      - name: Verify public downloads before updating clients
+        run: |
+          set -euo pipefail
+          download="$RUNNER_TEMP/published-release"
+          mkdir -p "$download"
+          prefix="https://github.com/$GITHUB_REPOSITORY/releases/download/$RELEASE_TAG"
+          curl --fail --location --retry 5 --retry-delay 2 "$prefix/Harness.dmg" -o "$download/Harness.dmg"
+          curl --fail --location --retry 5 --retry-delay 2 "$prefix/appcast.xml" -o "$download/appcast.xml"
+          cmp Harness.dmg "$download/Harness.dmg"
+          cmp dist/appcast.xml "$download/appcast.xml"
+          echo "Public DMG and appcast exactly match the verified artifacts."
 
       - name: Checkout website repository
         if: ${{ inputs.deploy_appcast }}
@@ -353,26 +407,6 @@ jobs:
           echo "Last live SHA-256: ${actual:-unavailable}" >&2
           exit 1
 
-      - name: Publish GitHub release
-        env:
-          GH_TOKEN: ${{ github.token }}
-          INPUT_RELEASE_NAME: ${{ inputs.release_name }}
-        run: |
-          set -euo pipefail
-
-          RELEASE_NAME="$INPUT_RELEASE_NAME"
-          if [[ -z "$RELEASE_NAME" ]]; then
-            RELEASE_NAME="Harness $APP_VERSION ($APP_BUILD)"
-          fi
-
-          gh release edit "$RELEASE_TAG" \
-            --repo "$GITHUB_REPOSITORY" \
-            --target "$GITHUB_SHA" \
-            --title "$RELEASE_NAME" \
-            --notes-file "$RELEASE_NOTES_PATH" \
-            --draft=false \
-            --latest
-
       - name: Upload release artifacts
         if: ${{ always() }}
         uses: actions/upload-artifact@v7
@@ -381,6 +415,8 @@ jobs:
           path: |
             Harness.dmg
             dist/appcast.xml
+            dist/SHA256SUMS
+            dist/dmg-notarization.json
           if-no-files-found: ignore
 
       - name: Delete temporary keychain

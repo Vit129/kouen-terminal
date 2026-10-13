@@ -7,6 +7,13 @@ Protocol compatibility and explicitly advertised capabilities determine which
 operations a client can use. Unknown protocols require recovery; they are not
 assumed compatible because their build number is newer.
 
+The macOS app stages updated installed helpers before its first connection, even
+when an older service cannot reach a prompt. It automatically replaces a compatible
+application daemon and checks fresh readiness afterward. Local panes and snapshot
+subscriptions wait for that handshake. An unavailable or incompatible service shows
+recovery controls; it cannot mount an empty or stale terminal layout. A session-host
+update still waits for an empty owner or an explicitly authorized restart.
+
 Executables are copied to verified temporary files in the destination directory,
 flushed, and atomically renamed. Running processes retain their original executable
 inode. Service changes are staged beside the definition with a `.pending` extension
@@ -148,6 +155,12 @@ Natural exit and explicit pane closure drain pending PTY output and delivers acc
 notifying observers of exit. Hosted subscriptions close after bounded output drain;
 closed-surface exit receipts have a 14-day/500-surface bound. Process generations
 prevent a predecessor's delayed exit callback from closing a replacement shell.
+
+When a confirmed layout removes a pane, the app immediately invalidates its IO and
+reconnect callbacks while retaining its last rendered view for the close animation.
+The surviving terminal stays mounted and keeps keyboard focus. The host ignores
+late resize votes on an attachment already draining its final output; unrelated
+requests for a missing surface still report an error.
 
 The session host owns a structural closed-history catalog of surface IDs and close
 times, separate from encrypted terminal text. Closed disk histories, resize journals

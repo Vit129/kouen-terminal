@@ -7,6 +7,36 @@ import Glibc
 #endif
 
 final class StoppedOwnerSocketTests: XCTestCase {
+    func testExitedOwnerIsRecognizedBeforeItsParentReapsIt() throws {
+        var arguments: [UnsafeMutablePointer<CChar>?] = ["/bin/sleep", "30"].map { text in text.withCString { strdup($0) } } + [nil]
+        defer { for argument in arguments { free(argument) } }
+        var environment: [UnsafeMutablePointer<CChar>?] = [nil]
+        var pid: Int32 = 0
+        let result = arguments.withUnsafeMutableBufferPointer { arguments in
+            environment.withUnsafeMutableBufferPointer { environment in
+                posix_spawn(&pid, "/bin/sleep", nil, nil, arguments.baseAddress!, environment.baseAddress!)
+            }
+        }
+        guard result == 0 else { return XCTFail("spawn failed: \(result)") }
+        defer {
+            _ = kill(pid, SIGKILL)
+            var status: Int32 = 0
+            _ = waitpid(pid, &status, 0)
+        }
+        let generation = try XCTUnwrap(ProcessScan.generation(pid))
+        XCTAssertFalse(StoppedOwnerSocket.hasExited(pid: pid, generation: generation))
+        XCTAssertFalse(ProcessScan.isZombie(getpid()))
+        XCTAssertFalse(ProcessScan.isZombie(-1))
+        XCTAssertEqual(kill(pid, SIGTERM), 0)
+        let deadline = Date().addingTimeInterval(2)
+        while !StoppedOwnerSocket.hasExited(pid: pid, generation: generation), Date() < deadline {
+            Thread.sleep(forTimeInterval: 0.01)
+        }
+        XCTAssertEqual(kill(pid, 0), 0, "The parent has deliberately not reaped this process")
+        XCTAssertTrue(ProcessScan.isZombie(pid))
+        XCTAssertTrue(StoppedOwnerSocket.hasExited(pid: pid, generation: generation))
+    }
+
     private func withSocket(_ body: (URL, URL, Int32) throws -> Void) throws {
         let root = URL(fileURLWithPath: "/tmp/hss-\(UUID().uuidString.prefix(8))")
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)

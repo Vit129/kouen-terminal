@@ -27,17 +27,10 @@ ARCHIVES="${1:-$ROOT/dist}"
 # from. Override with DOWNLOAD_URL_PREFIX if you host downloads on a subpath/CDN.
 DOWNLOAD_URL_PREFIX="${DOWNLOAD_URL_PREFIX:-https://thebestterminal.com/}"
 
-# Locate generate_appcast: prefer PATH, else the resolved Sparkle SPM artifact, else Homebrew.
-GEN="$(command -v generate_appcast || true)"
-if [[ -z "$GEN" ]]; then
-  GEN="$(find "$ROOT/.build" -type f -name generate_appcast -perm -111 2>/dev/null | head -1 || true)"
-fi
-if [[ -z "$GEN" && -x "/opt/homebrew/Caskroom/sparkle/latest/bin/generate_appcast" ]]; then
-  GEN="/opt/homebrew/Caskroom/sparkle/latest/bin/generate_appcast"
-fi
-if [[ -z "$GEN" ]]; then
-  echo "generate_appcast not found." >&2
-  echo "Run 'swift package resolve' (Sparkle ships the tool under .build), or 'brew install --cask sparkle'." >&2
+# Use the same checksum-verified Sparkle artifact as the app, not a PATH or Homebrew version.
+GEN="$ROOT/.build/artifacts/sparkle/Sparkle/bin/generate_appcast"
+if [[ ! -x "$GEN" ]]; then
+  echo "Resolved Sparkle generate_appcast not found. Run 'swift package resolve'." >&2
   exit 1
 fi
 

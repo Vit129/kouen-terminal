@@ -120,6 +120,7 @@ public final class TerminalHostView: NSView {
     /// True while the pane is intentionally released (`detachFromDaemonSurface`) so the output
     /// stream ending does NOT trigger an auto-reconnect — the user/coordinator asked for the detach.
     private var intentionallyDetached = false
+    private var isInvalidated = false
     /// Backoff counter for `scheduleDaemonReconnect`, reset to 0 on a successful (re)connect.
     private var reconnectAttempts = 0
     private var reconnectInFlight = false
@@ -292,7 +293,7 @@ public final class TerminalHostView: NSView {
         super.init(frame: .zero)
         io.setErrorHandler { [weak self] message in
             DispatchQueue.main.async { [weak self] in
-                guard let self else { return }
+                guard let self, !self.isInvalidated else { return }
                 self.hostDelegate?.terminalHostShowMessage(message, surfaceID: self.surfaceID)
             }
         }
@@ -1016,6 +1017,27 @@ public final class TerminalHostView: NSView {
         nativeView.performCopyModeAction(action)
     }
 
+    /// End IO when the pane leaves the session. Its rendered content may remain
+    /// mounted until a close animation finishes, so deinit is too late to do this.
+    public func invalidate() {
+        guard !isInvalidated else { return }
+        isInvalidated = true
+        intentionallyDetached = true
+        attachGeneration += 1
+        reconnectCancellation.cancel()
+        attachProgress?.cancel()
+        attachProgress = nil
+        io.attach(subscription: nil)
+        outputSubscription?.cancel()
+        outputSubscription = nil
+        inputGate.setSiblings([])
+        nativeView.onInput = nil
+        nativeView.onResize = nil
+        hostDelegate = nil
+        hideReconnectingOverlay()
+        hideDetachedOverlay()
+    }
+
     /// Release this pane to headless: cancel the daemon output subscription, which drops this
     /// client's hold (subscription + size vote) on the surface while the PTY keeps running. The
     /// session stays alive for `reattachToDaemonSurface()` (or another client) to re-grab.
@@ -1033,7 +1055,7 @@ public final class TerminalHostView: NSView {
         intentionallyDetached = true // suppress auto-reconnect: this detach is deliberate
         outputSubscription?.cancel()
         outputSubscription = nil
-        io.attach(subscription: nil) // fall back to the per-call client while detached
+        io.attach(subscription: nil)
         hideReconnectingOverlay() // a deliberate release supersedes any in-flight reconnect cue
         showDetachedOverlay()
     }
@@ -1041,7 +1063,7 @@ public final class TerminalHostView: NSView {
     /// Re-grab a surface released with `detachFromDaemonSurface()`: reattach from where the pane
     /// left off so it catches up. No-op if still attached.
     public func reattachToDaemonSurface() {
-        guard outputSubscription == nil else { return }
+        guard !isInvalidated, outputSubscription == nil else { return }
         intentionallyDetached = false
         reconnectAttempts = 0
         hideReconnectingOverlay()
@@ -1217,8 +1239,8 @@ public final class TerminalHostView: NSView {
     /// Output-stream end handler, shared by the initial connect and the off-main reconnect. If we
     /// didn't ask for the stream to end (the daemon restarted/crashed and launchd respawned it — or,
     /// in dev, a newer build replaced it on launch), the pane would otherwise be stuck on a dead
-    /// socket: no output, and input writing to a dead fd. Drop to the per-call input fallback
-    /// immediately, then reconnect.
+    /// socket: no output, and input writing to a dead fd. Stop admitting input until the
+    /// replacement subscription is attached, then resume.
     private func makeOutputEndHandler() -> @Sendable () -> Void {
         let generation = attachGeneration
         return { [weak self] in
