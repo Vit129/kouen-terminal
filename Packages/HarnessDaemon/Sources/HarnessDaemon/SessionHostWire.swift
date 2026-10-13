@@ -1,3 +1,4 @@
+import CHarnessSys
 import Foundation
 import HarnessCore
 #if canImport(Darwin)
@@ -200,18 +201,29 @@ final class SessionHostListener: @unchecked Sendable {
         path.withCString { raw in withUnsafeMutablePointer(to: &address.sun_path) {
             _ = strncpy(UnsafeMutableRawPointer($0).assumingMemoryBound(to: CChar.self), raw, pathCapacity - 1)
         } }
+        // Same hardening as DaemonServer: no creation window, owner-only mode is mandatory,
+        // and peers must share our euid even if the 0o700 parent is ever loosened.
+        let previousMask = umask(0o177)
         let result = withUnsafePointer(to: &address) { $0.withMemoryRebound(to: sockaddr.self, capacity: 1) {
             bind(fd, $0, socklen_t(MemoryLayout<sockaddr_un>.size))
         } }
+        umask(previousMask)
         guard result == 0 else { close(fd); throw DaemonError.socketFailed }
-        _ = chmod(path, 0o600)
-        var info = stat(); if lstat(path, &info) == 0 { identity = (info.st_dev, info.st_ino) }
-        guard listen(fd, 128) == 0 else { close(fd); throw DaemonError.socketFailed }
+        var info = stat()
+        guard chmod(path, 0o600) == 0, lstat(path, &info) == 0 else {
+            close(fd); _ = unlink(path); throw DaemonError.socketFailed
+        }
+        identity = (info.st_dev, info.st_ino)
+        guard listen(fd, Int32(SOMAXCONN)) == 0 else { close(fd); throw DaemonError.socketFailed }
         let source = DispatchSource.makeReadSource(fileDescriptor: fd, queue: queue)
         source.setEventHandler {
             for _ in 0..<32 {
                 let client = accept(fd, nil, nil)
-                if client >= 0 { acceptChannel(SessionHostChannel(fd: client)) }
+                if client >= 0 {
+                    let peer = harness_peer_uid(client)
+                    guard peer >= 0, uid_t(peer) == geteuid() else { close(client); continue }
+                    acceptChannel(SessionHostChannel(fd: client))
+                }
                 else if errno == EINTR { continue }
                 else { break }
             }

@@ -10,6 +10,33 @@ import Glibc
 #endif
 
 final class SessionHostWireTests: XCTestCase {
+    func testListenerIsOwnerOnlyUnderPermissiveUmaskAndAcceptsSameUserPeers() throws {
+        let path = "/tmp/hs-\(UUID().uuidString.prefix(8)).sock"
+        let previous = umask(0)
+        defer { umask(previous) }
+        let listener = SessionHostListener(path: path)
+        let accepted = expectation(description: "same-user peer accepted")
+        try listener.start { channel in channel.closeChannel(); accepted.fulfill() }
+        defer { listener.stop() }
+
+        var info = stat()
+        XCTAssertEqual(lstat(path, &info), 0)
+        XCTAssertEqual(info.st_mode & 0o777, 0o600)
+
+        let client = socket(AF_UNIX, SOCK_STREAM, 0)
+        defer { close(client) }
+        var address = sockaddr_un(); address.sun_family = sa_family_t(AF_UNIX)
+        let capacity = MemoryLayout.size(ofValue: address.sun_path)
+        path.withCString { raw in withUnsafeMutablePointer(to: &address.sun_path) {
+            _ = strncpy(UnsafeMutableRawPointer($0).assumingMemoryBound(to: CChar.self), raw, capacity - 1)
+        } }
+        let connected = withUnsafePointer(to: &address) { $0.withMemoryRebound(to: sockaddr.self, capacity: 1) {
+            connect(client, $0, socklen_t(MemoryLayout<sockaddr_un>.size))
+        } }
+        XCTAssertEqual(connected, 0)
+        wait(for: [accepted], timeout: 5)
+    }
+
     func testPlainOutputAcknowledgementsAccumulateAcrossSmallBatchesAndRecovery() {
         var consumed: UInt64?
         var fences: [UInt64] = []
