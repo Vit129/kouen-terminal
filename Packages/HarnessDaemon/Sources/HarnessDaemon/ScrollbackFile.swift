@@ -251,10 +251,13 @@ final class ScrollbackFile: @unchecked Sendable {
             fd = open(url.path, O_WRONLY | O_APPEND | O_CLOEXEC | O_NOFOLLOW)
         }
         guard fd >= 0 else { throw POSIXError(.EIO) }
-        let handle = FileHandle(fileDescriptor: fd, closeOnDealloc: true); defer { try? handle.close() }
+        // Validate before FileHandle owns the descriptor, so each path closes it exactly once.
         var information = stat()
-        guard fstat(fd, &information) == 0, information.st_mode & S_IFMT == S_IFREG, information.st_uid == getuid() else { throw POSIXError(.EPERM) }
+        guard fstat(fd, &information) == 0, information.st_mode & S_IFMT == S_IFREG, information.st_uid == getuid() else {
+            close(fd); throw POSIXError(.EPERM)
+        }
         guard fchmod(fd, 0o600) == 0 else { let code = errno; close(fd); throw POSIXError(POSIXErrorCode(rawValue: code) ?? .EIO) }
+        let handle = FileHandle(fileDescriptor: fd, closeOnDealloc: true); defer { try? handle.close() }
         if information.st_size == 0 { try handle.write(contentsOf: Self.header(identifier)) }
         let segment = Segment(position: position, bytes: bytes, cols: size?.cols, rows: size?.rows)
         try handle.write(contentsOf: frame(segment, index: nextIndex, identifier: identifier))
