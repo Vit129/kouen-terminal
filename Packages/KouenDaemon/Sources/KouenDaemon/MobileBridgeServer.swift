@@ -3142,10 +3142,15 @@ public final class MobileBridgeServer: @unchecked Sendable {
     }
 
     private func handleAgentCommand(_ cmd: ControlMessage.AgentCommandRequest, connection: NWConnection, state: ConnectionState) {
-        guard let surfaceID = state.surfaceID, let subscription = state.subscription,
-              let kind = AgentDetector.snapshot(forSurfaceKey: surfaceID)?.kind ?? cmd.agent.flatMap(AgentKind.init(rawValue:)),
-              kind == .claudeCode || kind == .antigravity else {
-            sendText(#"{"error":"model and effort can only be changed on an attached Claude or agy session"}"#, on: connection)
+        guard let surfaceID = state.surfaceID, let subscription = state.subscription else {
+            sendText(#"{"error":"not attached to a session — go back and reopen it"}"#, on: connection)
+            return
+        }
+        let supported: Set<AgentKind> = [.claudeCode, .antigravity]
+        let detected = AgentDetector.snapshot(forSurfaceKey: surfaceID)?.kind
+        let hinted = cmd.agent.flatMap(AgentKind.init(rawValue:))
+        guard let kind = [detected, hinted].compactMap({ $0 }).first(where: supported.contains) else {
+            sendText(#"{"error":"model and effort can only be changed on a Claude or agy session (detected: \#(detected?.rawValue ?? "none"))"}"#, on: connection)
             return
         }
         guard let chunks = Self.agentCommandInput(kind: cmd.kind, value: cmd.value, currentMode: state.agentMode, agent: kind) else {
