@@ -291,6 +291,7 @@ public final class SessionHostService: @unchecked Sendable {
     }
     private func accept(_ channel: SessionHostChannel) {
         let frontend = Frontend(channel: channel)
+        frontend.tunnel = SocketPeer.isSSHForward(channel.fd)
         let accepted = store.queue.sync { () -> Bool in
             guard frontends.count < 128 else { return false }
             frontends[ObjectIdentifier(channel)] = frontend; return true
@@ -310,11 +311,16 @@ public final class SessionHostService: @unchecked Sendable {
         guard let frame = try? IPCCodec.decodeRequestOrInput(from: &buffer) else { send(.error("Unrecognized request."), frontend.channel); return }
         if case let .input(id, data) = frame {
             guard !stopping else { send(.inputRejected("Shutdown is in progress; terminal input was not accepted."), frontend.channel); return }
-            if !frontend.readOnly, store.ptys[id]?.write(data) != true, frontend.inputErrors { send(.inputRejected("Input was not accepted."), frontend.channel) }
+            if frontend.readOnly {
+                if frontend.inputErrors { send(.inputRejected(IPCRequest.readOnlyRefusal), frontend.channel) }
+            } else if store.ptys[id]?.write(data) != true, frontend.inputErrors {
+                send(.inputRejected("Input was not accepted."), frontend.channel)
+            }
             return
         }
         guard case let .request(request) = frame, let request else { send(.error("Unrecognized request."), frontend.channel); return }
         let channel = frontend.channel
+        if frontend.readOnly, !request.permittedOnReadOnlyConnection { send(.error(IPCRequest.readOnlyRefusal), channel); return }
         if request.requiresLocalOwner, frontend.tunnel { send(.error("This administrative operation requires a local owner connection."), channel); return }
         if stopping {
             switch request {
@@ -407,8 +413,8 @@ public final class SessionHostService: @unchecked Sendable {
             let applied = applyDisconnectedSize(size, surface: id)
             send(applied ? .ok : .error("Detached, but the remaining client size could not be applied. Resize the remaining pane to retry."), channel)
             ownership(id)
-        case let .sendData(id, data): send(frontend.readOnly ? .ok : store.ptys[id]?.write(data) == true ? .ok : .error("Input was not accepted."), channel)
-        case let .send(id, text): send(frontend.readOnly ? .ok : store.ptys[id]?.write(text) == true ? .ok : .error("Input was not accepted."), channel)
+        case let .sendData(id, data): send(store.ptys[id]?.write(data) == true ? .ok : .error("Input was not accepted."), channel)
+        case let .send(id, text): send(store.ptys[id]?.write(text) == true ? .ok : .error("Input was not accepted."), channel)
         case let .resizeSurface(id, rows, cols):
             // A vote already on the wire may arrive after PTY exit while final
             // output is draining. Finish that stream with EOF, not a control error.
@@ -419,7 +425,10 @@ public final class SessionHostService: @unchecked Sendable {
             if !frontend.readOnly, let size = arbiter.vote(client: channel.fd, surface: id, rows: rows, cols: cols), store.ptys[id]?.resize(rows: size.rows, cols: size.cols) != true { arbiter = previousArbiter; send(.error("Resize could not be confirmed; inspect the current pane size before retrying."), channel); return }
             send(.ok, channel); ownership(id)
         case let .identifyClient(label): frontend.label = label; send(.clientID(frontend.id), channel)
-        case let .presentClient(kind, version, _, tunnel): frontend.kind = kind; frontend.version = version; frontend.tunnel = tunnel; send(.ok, channel)
+        case let .presentClient(kind, version, _, tunnel):
+            frontend.kind = kind; frontend.version = version
+            frontend.tunnel = frontend.tunnel || tunnel
+            send(.ok, channel)
         case .listClients:
             send(.clients(frontends.values.map { ClientSummary(id: $0.id, label: $0.label, attachedSurfaceIDs: Array($0.tokens.keys), connectedAt: $0.connectedAt, kind: $0.kind, version: $0.version, principalUID: UInt32(getuid()), tunnel: $0.tunnel, age: Date().timeIntervalSince($0.connectedAt)) }), channel)
         case let .detachClient(id):
@@ -448,7 +457,7 @@ public final class SessionHostService: @unchecked Sendable {
     private func subscribe(_ id: String, label: String?, readOnly: Bool, frontend: Frontend) {
         frontend.cancelAttach()
         guard let pty = store.ptys[id] else { send(.error("Surface not found."), frontend.channel); return }
-        frontend.readOnly = readOnly; frontend.label = label ?? frontend.label
+        frontend.readOnly = frontend.readOnly || readOnly; frontend.label = label ?? frontend.label
         if let old = frontend.tokens[id] { pty.cancelSubscription(token: old) }
         let token = pty.subscribe { [weak frontend] data, sequence in frontend?.output(data, sequence: sequence) }
         frontend.tokens[id] = token; send(.ok, frontend.channel)
@@ -475,7 +484,7 @@ public final class SessionHostService: @unchecked Sendable {
             return
         }
         guard let pty = store.ptys[attach.surfaceID] else { send(.error("Surface not found."), frontend.channel); return }
-        frontend.readOnly = attach.readOnly; frontend.inputErrors = attach.inputErrors == true; frontend.stream = true
+        frontend.readOnly = frontend.readOnly || attach.readOnly; frontend.inputErrors = attach.inputErrors == true; frontend.stream = true
         frontend.label = attach.label ?? frontend.label
         frontend.beginAttach()
         if let old = frontend.tokens[attach.surfaceID] { pty.cancelSubscription(token: old) }

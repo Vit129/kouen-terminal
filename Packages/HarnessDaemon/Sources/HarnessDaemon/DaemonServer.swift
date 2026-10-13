@@ -88,8 +88,11 @@ public final class DaemonServer: @unchecked Sendable {
         var tunnel = false
     }
     private var clients: [Int32: ClientRecord] = [:]
-    /// File descriptors that may receive output but must not write to a child.
+    /// File descriptors that may receive output but must not write to a child. Once read-only,
+    /// a connection stays read-only until it closes.
     private var readOnlyClients: Set<Int32> = []
+    /// Connections from an SSH daemon forwarding the socket, found from the kernel peer at accept.
+    private var forwardedClients: Set<Int32> = []
     private var clientFDsByID: [UUID: Int32] = [:]
     /// Lock-guarded mirror of `clients.count` for `#{session_attached}`. The registry's
     /// format builder runs under its own lock on arbitrary threads, so it can't hop onto
@@ -321,6 +324,7 @@ public final class DaemonServer: @unchecked Sendable {
             return
         }
         setNoSigPipe(clientFD)
+        if SocketPeer.isSSHForward(clientFD) { forwardedClients.insert(clientFD) }
         let descriptor = ChannelDescriptor(clientFD)
         clientDescriptors[clientFD] = descriptor
         // Non-blocking so a slow/stuck client never blocks `write` on the serial queue.
@@ -341,6 +345,7 @@ public final class DaemonServer: @unchecked Sendable {
                 self.searches.removeValue(forKey: id)
             }
             self.readOnlyClients.remove(clientFD)
+            self.forwardedClients.remove(clientFD)
             if let removed = self.clients.removeValue(forKey: clientFD) {
                 self.clientFDsByID.removeValue(forKey: removed.id)
                 self.registeredClientCount.update(self.clients.count)
@@ -399,7 +404,9 @@ public final class DaemonServer: @unchecked Sendable {
             // Binary input frame on a persistent (subscription) connection: write straight to the
             // PTY, fire-and-forget — no reply (the echo comes back on the output stream).
             if case let .input(surfaceID, payload) = frame {
-                if !readOnlyClients.contains(fd) {
+                if readOnlyClients.contains(fd) {
+                    if inputErrorClients.contains(fd) { send(.inputRejected(IPCRequest.readOnlyRefusal), to: fd) }
+                } else {
                     let response = registry.handle(.sendData(surfaceID: surfaceID, data: payload))
                     if inputErrorClients.contains(fd), case let .error(message) = response {
                         send(.inputRejected(message), to: fd)
@@ -416,8 +423,11 @@ public final class DaemonServer: @unchecked Sendable {
                 send(.error("unrecognized request"), to: fd)
                 continue
             }
+            if readOnlyClients.contains(fd), !request.permittedOnReadOnlyConnection {
+                send(.error(IPCRequest.readOnlyRefusal), to: fd)
+                continue
+            }
             if case let .subscribeSurfaceOutput(surfaceID, label) = request {
-                readOnlyClients.remove(fd)
                 handleSubscribe(surfaceID: surfaceID, label: label, fd: fd)
                 continue
             }
@@ -434,17 +444,6 @@ public final class DaemonServer: @unchecked Sendable {
                 for subscription in outputSubscriptions[fd] ?? [] where subscription.surfaceID == surfaceID && subscription.token == token {
                     registry.acknowledgeSubscription(surfaceID: surfaceID, token: subscription.token, sequence: sequence)
                 }
-                continue
-            }
-            if case let .sendData(surfaceID, payload) = request, readOnlyClients.contains(fd) {
-                send(.ok, to: fd)
-                _ = surfaceID
-                _ = payload
-                continue
-            }
-            if case let .send(surfaceID, _) = request, readOnlyClients.contains(fd) {
-                send(.ok, to: fd)
-                _ = surfaceID
                 continue
             }
             if case let .subscribeSnapshot(label, directives, capabilities) = request {
@@ -551,7 +550,10 @@ public final class DaemonServer: @unchecked Sendable {
                 }
                 continue
             }
-            if request.requiresLocalOwner, peerUID(fd) != UInt32(getuid()) || clients[fd]?.tunnel == true { send(.error("This administrative operation requires a local owner connection."), to: fd); continue }
+            if request.requiresLocalOwner, !isLocalOwner(fd) {
+                send(.error("This administrative operation requires a local owner connection."), to: fd)
+                continue
+            }
             if case let .activity(.repositoryDigest(id, from, to, offset, limit)) = request {
                 scheduleSearch(id: id, fd: fd) { [registry] cancellation in
                     registry.handleActivity(.repositoryDigest(requestID: id, from: from, to: to, offset: offset, limit: limit), cancelled: { cancellation.read() })
@@ -566,7 +568,7 @@ public final class DaemonServer: @unchecked Sendable {
                 continue
             }
             if case let .activity(.schedules(id, operation)) = request {
-                guard peerUID(fd) == UInt32(getuid()), clients[fd]?.tunnel != true else { send(.error("Scheduling administration requires the local host."), to: fd); continue }
+                guard isLocalOwner(fd) else { send(.error("Scheduling administration requires the local host."), to: fd); continue }
                 scheduleSearch(id: id, fd: fd) { [registry] cancellation in
                     guard !cancellation.read() else { return .error("Cancelled") }
                     return registry.handleActivity(.schedules(requestID: id, operation: operation), cancelled: { cancellation.read() })
@@ -574,14 +576,14 @@ public final class DaemonServer: @unchecked Sendable {
                 continue
             }
             if case let .activity(.fanout(id, operation)) = request {
-                guard peerUID(fd) == UInt32(getuid()), clients[fd]?.tunnel != true else { send(.error("Fan-out administration requires the local host."), to: fd); continue }
+                guard isLocalOwner(fd) else { send(.error("Fan-out administration requires the local host."), to: fd); continue }
                 scheduleSearch(id: id, fd: fd) { [registry] cancellation in
                     registry.handleActivity(.fanout(requestID: id, operation: operation), cancelled: { cancellation.read() })
                 }
                 continue
             }
             if case let .activity(.worktrees(id, operation)) = request {
-                guard peerUID(fd) == UInt32(getuid()), clients[fd]?.tunnel != true else { send(.error("Managed worktree administration requires the local host."), to: fd); continue }
+                guard isLocalOwner(fd) else { send(.error("Managed worktree administration requires the local host."), to: fd); continue }
                 scheduleSearch(id: id, fd: fd) { [registry] cancellation in
                     registry.handleActivity(.worktrees(requestID: id, operation: operation), cancelled: { cancellation.read() })
                 }
@@ -687,7 +689,7 @@ public final class DaemonServer: @unchecked Sendable {
     private func handleClientLifecycle(_ request: IPCRequest, fd: Int32) -> IPCResponse? {
         switch request {
         case .activity(.hook), .activity(.resumePolicy), .activity(.resume), .activity(.explain), .activity(.power), .activity(.notifications), .activity(.terminateTree), .activity(.configure), .retryHistory:
-            guard peerUID(fd) == UInt32(getuid()), clients[fd]?.tunnel != true else { return .error("This operation is available only to local owner processes.") }
+            guard isLocalOwner(fd) else { return .error("This operation is available only to local owner processes.") }
             return nil
         case let .handoverDaemon(phase, checkpoint):
             guard SessionHostClient.configured != nil, peerUID(fd) == UInt32(getuid()) else {
@@ -699,7 +701,7 @@ public final class DaemonServer: @unchecked Sendable {
         case .replaceDaemon:
             return .error("Daemon replacement requires the stable session host. Close legacy shells before adopting that architecture.")
         case let .shutdownDaemon(requireEmpty):
-            guard peerUID(fd) == UInt32(getuid()), clients[fd]?.tunnel != true else {
+            guard isLocalOwner(fd) else {
                 return .error("Session-service administration requires a local owner connection.")
             }
             guard let onShutdown else { return .error("Shutdown is unavailable in this host.") }
@@ -736,7 +738,7 @@ public final class DaemonServer: @unchecked Sendable {
                         kind: entry.value.kind,
                         version: entry.value.version,
                         principalUID: entry.value.principalUID ?? peerUID(entry.key),
-                        tunnel: entry.value.tunnel,
+                        tunnel: isTunnel(entry.key),
                         age: Date().timeIntervalSince(entry.value.connectedAt)
                     )
                 }
@@ -754,7 +756,7 @@ public final class DaemonServer: @unchecked Sendable {
             guard var record = clients[fd] else { return .error("client is not identified") }
             record.kind = kind
             record.version = version
-            record.tunnel = tunnel
+            record.tunnel = record.tunnel || tunnel || forwardedClients.contains(fd)
             if record.principalUID == nil { record.principalUID = uid }
             clients[fd] = record
             return .ok
@@ -799,6 +801,16 @@ public final class DaemonServer: @unchecked Sendable {
         default:
             return nil
         }
+    }
+
+    /// A tunnel claim can only add restrictions, so the client's word is enough to set it and
+    /// never enough to clear a forward the kernel peer revealed.
+    private func isTunnel(_ fd: Int32) -> Bool {
+        forwardedClients.contains(fd) || clients[fd]?.tunnel == true
+    }
+
+    private func isLocalOwner(_ fd: Int32) -> Bool {
+        peerUID(fd) == UInt32(getuid()) && !isTunnel(fd)
     }
 
     private func peerUID(_ fd: Int32) -> UInt32? {
@@ -956,7 +968,7 @@ public final class DaemonServer: @unchecked Sendable {
             }
             return
         }
-        if attach.readOnly { readOnlyClients.insert(fd) } else { readOnlyClients.remove(fd) }
+        if attach.readOnly { readOnlyClients.insert(fd) }
         streamClients.insert(fd)
         if attach.inputErrors == true { inputErrorClients.insert(fd) }
         let gate = AttachGate()

@@ -56,6 +56,28 @@ requested — the entitlements file contains exactly one key (the sandbox opt-ou
 - IPC frames are length-prefixed and bounded (16 MiB max payload); oversized or unframeable
   input drops the connection; per-connection partial-frame and write-backlog caps bound
   memory. Hook/pipe-pane failures never log the command line (secret hygiene).
+- The session-host socket follows the same rules: created under `umask(0o177)`, a failed
+  `chmod` after bind is fatal, and each accept checks the peer UID.
+
+### Read-only connections
+
+- A read-only attach or subscription marks the whole connection read-only for its
+  lifetime. A later writable attach on the same connection cannot clear it.
+- Both front doors (daemon and session host) apply one allowlist,
+  `IPCRequest.permittedOnReadOnlyConnection`: queries, captures, replay, search, viewer
+  resize reports, and stream control. Everything else gets
+  `.error(IPCRequest.readOnlyRefusal)` instead of a silent `.ok`.
+- Input frames on a read-only connection are dropped. Clients that negotiated input errors
+  receive `.inputRejected` with the same refusal text.
+- A viewer's resize report returns `.ok` but never votes on the pane size.
+
+### Tunnels
+
+- A connection is a tunnel if its client says so (`presentClient(tunnel: true)`) or if
+  the kernel peer is `sshd` / `sshd-session` (an `ssh -L` socket forward). Tunnel status
+  is sticky: a client can set it but never clear it.
+- Tunnels are refused local-owner operations (scheduling, fan-out, managed worktrees, and
+  other `requiresLocalOwner` requests) even when the peer UID matches.
 
 ## Services surface
 
