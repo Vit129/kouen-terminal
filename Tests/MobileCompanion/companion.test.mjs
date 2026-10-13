@@ -19,4 +19,7 @@ assert.equal(md("## Title\n\n- a **b**\n- `c<d>`"), "<h4>Title</h4><ul><li>a <st
 assert.equal(md("1. x\n2. y"), "<ol><li>x</li><li>y</li></ol>");
 assert.match(md("| h |\n|---|\n| v |"), /<table><tr><th>h<\/th><\/tr><tr><td>v<\/td><\/tr><\/table>/);
 assert.equal(md("```\n<b>\n```"), "<pre><code>&lt;b&gt;</code></pre>");
+const lineFilter = new RegExp(script.match(/filter\(l => \/(.+?)\/u\.test\(l\)\)/)[1], "u");
+assert.ok(["◉ \u{F0E7}", "○ ", "╭──╮"].every(l => !lineFilter.test(l)), "spinner/border noise must be dropped");
+assert.ok(["Working", "ทดสอบ", "42"].every(l => lineFilter.test(l)));
 console.log("companion page js: ok");
