@@ -10,13 +10,12 @@ final class PaneTransitions: NSObject {
     private let before: [SurfaceID: NSRect]
     private let after: [SurfaceID: NSRect]
     private let revealed: [PaneIslandView]
-    private var link: CADisplayLink?
-    private var started: CFTimeInterval = 0
+    private var animation: DisplayAnimation?
 
     init?(container: PaneContainerView, from before: [SurfaceID: NSRect], to after: [SurfaceID: NSRect]) {
         let added = Set(after.keys).subtracting(before.keys)
         let removed = Set(before.keys).subtracting(after.keys)
-        guard container.window != nil, !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion,
+        guard container.window != nil, !DisplayAnimation.reducesMotion,
               added.count + removed.count == 1,
               after.contains(where: { id, frame in before[id].map { $0 != frame } == true }) else { return nil }
         self.container = container
@@ -26,22 +25,14 @@ final class PaneTransitions: NSObject {
     }
 
     func start() {
-        started = CACurrentMediaTime()
-        apply(progress: 0)
         guard let container else { return }
-        let link = container.displayLink(target: self, selector: #selector(tick))
-        if let rate = container.window?.screen?.maximumFramesPerSecond, rate > 60 {
-            link.preferredFrameRateRange = CAFrameRateRange(minimum: 60, maximum: Float(rate), preferred: Float(rate))
-        }
-        link.add(to: .main, forMode: .common)
-        self.link = link
-    }
-
-    @objc private func tick() {
-        guard let container, container.window != nil else { cancel(); return }
-        let progress = min(1, (CACurrentMediaTime() - started) / HarnessDesign.Motion.standard)
-        apply(progress: progress)
-        if progress >= 1 { container.finishTransition() }
+        let animation = DisplayAnimation(duration: HarnessDesign.Motion.standard, step: { [weak self] progress in
+            guard let self, let container = self.container, container.window != nil else { self?.cancel(); return }
+            self.apply(progress: progress)
+            if progress >= 1 { container.finishTransition() }
+        })
+        self.animation = animation
+        animation.start(on: container)
     }
 
     func apply(progress: Double) {
@@ -78,7 +69,7 @@ final class PaneTransitions: NSObject {
 
     func finish() { cancel(); apply(progress: 1); revealed.forEach { $0.setTransitionMask(nil) } }
     func cancel() {
-        link?.invalidate(); link = nil
+        animation?.cancel(); animation = nil
         revealed.forEach { $0.setTransitionMask(nil) }
     }
 }

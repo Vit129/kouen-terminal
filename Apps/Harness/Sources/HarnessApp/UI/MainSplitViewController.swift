@@ -39,7 +39,7 @@ final class MainSplitViewController: NSViewController {
     private let edgeDivider = NSView()
     /// Bumped each time a sidebar collapse/expand starts so any in-flight animation
     /// frame bails out — prevents two toggles from fighting over the divider position.
-    private var sidebarAnimToken = 0
+    private var sidebarAnimation: DisplayAnimation?
     /// Owned (not a singleton) so collapse state is per-window. Carries the
     /// `allowFullCollapse` flag the divider min-coordinate reads.
     private let splitDelegate = SplitChromeDelegate()
@@ -284,11 +284,12 @@ final class MainSplitViewController: NSViewController {
     private func applySidebarVisibility(_ visible: Bool, animated: Bool) {
         // Sidebar mode lists tabs in the sidebar; title-bar mode shows the tab row.
         content.setTabRowHidden(visible)
-        sidebarAnimToken &+= 1
+        sidebarAnimation?.cancel()
+        sidebarAnimation = nil
         let target = visible ? HarnessDesign.sidebarWidth : 0
         splitDelegate.allowFullCollapse = true
 
-        guard animated, let panel = split.subviews.first else {
+        guard animated, !DisplayAnimation.reducesMotion, view.window != nil, let panel = split.subviews.first else {
             let panel = split.subviews.first
             panel?.isHidden = false              // unhide so setPosition can size it to 0
             if split.bounds.width > 1 { split.setPosition(target, ofDividerAt: 0) }
@@ -311,13 +312,19 @@ final class MainSplitViewController: NSViewController {
             updateContentLeadingInset(visible: visible)
             return
         }
-        animateSidebar(from: start, to: target, t0: CACurrentMediaTime(), visible: visible, token: sidebarAnimToken)
+        let animation = DisplayAnimation(duration: HarnessDesign.Motion.standard, step: { [weak self] raw in
+            self?.stepSidebar(from: start, to: target, progress: raw)
+        }, completion: { [weak self] in
+            guard let self else { return }
+            if !visible { panel.isHidden = true }
+            self.splitDelegate.allowFullCollapse = false   // restore the 200pt drag floor
+            self.updateContentLeadingInset(visible: visible)
+        })
+        sidebarAnimation = animation
+        animation.start(on: view)
     }
 
-    private func animateSidebar(from start: CGFloat, to target: CGFloat, t0: CFTimeInterval, visible: Bool, token: Int) {
-        guard token == sidebarAnimToken, let panel = split.subviews.first else { return }
-        let duration = HarnessDesign.Motion.standard
-        let raw = min(1, max(0, (CACurrentMediaTime() - t0) / duration))
+    private func stepSidebar(from start: CGFloat, to target: CGFloat, progress raw: Double) {
         // easeInOutQuad — smooth start and settle.
         let eased = raw < 0.5 ? 2 * raw * raw : 1 - pow(-2 * raw + 2, 2) / 2
         let width = start + (target - start) * CGFloat(eased)
@@ -335,17 +342,6 @@ final class MainSplitViewController: NSViewController {
         setContentLeadingInset(forSidebarWidth: width)
         split.layoutSubtreeIfNeeded()
         CATransaction.commit()
-        if raw >= 1 {
-            if !visible { panel.isHidden = true }
-            splitDelegate.allowFullCollapse = false   // restore the 200pt drag floor
-            updateContentLeadingInset(visible: visible)
-            return
-        }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0 / 60.0) { [weak self] in
-            MainActor.assumeIsolated {
-                self?.animateSidebar(from: start, to: target, t0: t0, visible: visible, token: token)
-            }
-        }
     }
 
     /// Leading inset the title strip's path readout needs to clear the macOS traffic lights
