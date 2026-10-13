@@ -133,9 +133,11 @@ final class AsyncFindTests: XCTestCase {
         XCTAssertTrue(statuses.contains("Updating…"))
 
         let expected = 1 + line / 5
-        let settled = expectation(description: "Final refresh after output stops")
-        view.onFindResultsChanged = { _, count in if count == expected { settled.fulfill() } }
-        if counts.last != expected { await fulfillment(of: [settled], timeout: 10) }
+        if counts.last != expected {
+            let settled = expectation(description: "Final refresh after output stops")
+            view.onFindResultsChanged = { _, count in if count == expected { settled.fulfill() } }
+            await fulfillment(of: [settled], timeout: 5)
+        }
         try await Task.sleep(nanoseconds: 400_000_000)
         XCTAssertEqual(statuses.last ?? nil, nil, "status clears once output settles")
         view.onFindResultsChanged = nil
