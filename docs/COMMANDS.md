@@ -281,6 +281,7 @@ Built-in defaults include:
 - `pane-border-format` (string) — `FormatString` for the pane border label.
 - `remain-on-exit` (bool, default `on`) — keep dead panes visible so `respawn-pane` can revive them.
 - `repeat-time` (int, default `500`) — how long (ms) the prefix stays armed after a repeatable binding (`bind -r`).
+- `hook-shell-timeout` (int, default `10`) — seconds a hook's `if-shell` condition or `run-shell -b` capture may run before it is killed (`0` = no limit). A timed-out condition counts as false. Plain `run-shell` hooks are not limited.
 - `display-time` (int, default `750`) — how long (ms) `display-message` and status toasts stay visible.
 - `set-titles` (bool, default `off`) — apply `set-titles-string` to the outer terminal (OSC 2) on attach clients.
 - `set-titles-string` (string) — `FormatString` for the outer terminal title.

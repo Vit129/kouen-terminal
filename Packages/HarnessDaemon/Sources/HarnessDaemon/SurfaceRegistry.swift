@@ -1937,39 +1937,71 @@ public final class SurfaceRegistry: @unchecked Sendable {
             .flatMap { editor.surfaceID(forPaneID: $0)?.uuidString }
     }
 
-    /// Run `command` via `/bin/sh -c` for a `run-shell` hook. Async (fire-and-forget);
-    /// when `captureToBuffer` is set, stdout is stored in a paste buffer on completion.
+    /// `hook-shell-timeout` in seconds; `nil` when set to 0 (no limit).
+    var hookShellTimeout: TimeInterval? {
+        let seconds = optionStore.get("hook-shell-timeout")?.intValue ?? 10
+        return seconds > 0 ? TimeInterval(seconds) : nil
+    }
+
+    /// Captured `run-shell` jobs in flight. A hook storm beyond the cap is dropped, not queued.
+    private let hookCaptureLock = NSLock()
+    private var hookCapturesInFlight = 0
+    static let maxConcurrentHookCaptures = 8
+
+    /// Run `command` via `/bin/sh -c` for a `run-shell` hook. Async (fire-and-forget).
+    /// Without capture the job may run indefinitely. With capture, stdout is stored in a
+    /// paste buffer on exit, bounded by `hook-shell-timeout` and the paste-buffer size limit,
+    /// and the job runs off `hookQueue` so a slow capture never stalls other hooks.
     func runShellForHook(_ command: String, captureToBuffer: Bool) {
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/bin/sh")
-        process.arguments = ["-c", command]
-        let pipe = captureToBuffer ? Pipe() : nil
-        if let pipe { process.standardOutput = pipe }
-        process.terminationHandler = { [weak self] _ in
-            guard captureToBuffer, let pipe, let self else { return }
-            let data = pipe.fileHandleForReading.readDataToEndOfFile()
-            if !data.isEmpty {
-                _ = self.handle(.setBuffer(name: nil, data: data))
+        guard captureToBuffer else {
+            let process = Process()
+            process.executableURL = URL(fileURLWithPath: "/bin/sh")
+            process.arguments = ["-c", command]
+            process.standardInput = FileHandle.nullDevice
+            do { try process.run() } catch {
+                fputs("HarnessDaemon: run-shell hook failed: \(error)\n", harnessStderr)
             }
+            return
         }
-        do { try process.run() } catch {
-            fputs("HarnessDaemon: run-shell hook failed: \(error)\n", harnessStderr)
+        hookCaptureLock.lock()
+        guard hookCapturesInFlight < Self.maxConcurrentHookCaptures else {
+            hookCaptureLock.unlock()
+            fputs("HarnessDaemon: run-shell -b dropped: \(Self.maxConcurrentHookCaptures) captures already running\n", harnessStderr)
+            return
+        }
+        hookCapturesInFlight += 1
+        hookCaptureLock.unlock()
+        let timeout = hookShellTimeout
+        DispatchQueue.global(qos: .utility).async { [weak self] in
+            defer {
+                self?.hookCaptureLock.lock()
+                self?.hookCapturesInFlight -= 1
+                self?.hookCaptureLock.unlock()
+            }
+            do {
+                let output = try ProcessCapture.run(
+                    URL(fileURLWithPath: "/bin/sh"), arguments: ["-c", command], timeout: timeout,
+                    maxOutputBytes: PasteBufferStore.Configuration().maxTotalBytes,
+                    cancelled: { self == nil })
+                guard let self, !output.stdout.isEmpty else { return }
+                _ = self.handle(.setBuffer(name: nil, data: output.stdout))
+            } catch {
+                fputs("HarnessDaemon: run-shell -b hook failed: \(error.localizedDescription)\n", harnessStderr)
+            }
         }
     }
 
-    /// Run `command` via `/bin/sh -c` synchronously and report exit-0 for `if-shell`.
-    /// Called on `hookQueue`, never under the registry lock.
+    /// Run `command` via `/bin/sh -c` and report exit-0 for `if-shell`. Called on
+    /// `hookQueue`, never under the registry lock. Bounded by `hook-shell-timeout` because
+    /// the hook queue is serial: a condition that never exits would stall every later hook.
     func evaluateShellCondition(_ command: String) -> Bool {
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/bin/sh")
-        process.arguments = ["-c", command]
-        process.standardOutput = FileHandle.nullDevice
-        process.standardError = FileHandle.nullDevice
         do {
-            try process.run()
-            process.waitUntilExit()
-            return process.terminationStatus == 0
+            let output = try ProcessCapture.run(
+                URL(fileURLWithPath: "/bin/sh"), arguments: ["-c", command],
+                timeout: hookShellTimeout, maxOutputBytes: 1024 * 1024)
+            return output.status == 0
         } catch {
+            fputs("HarnessDaemon: if-shell condition failed: \(error.localizedDescription)\n", harnessStderr)
             return false
         }
     }
