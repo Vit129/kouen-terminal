@@ -72,8 +72,8 @@ protocol VTParserHandler: AnyObject {
     /// A final ESC byte (non-CSI) with any intermediate bytes (e.g. `ESC ( B`, `ESC M`).
     func parserESC(final: UInt8, intermediates: [UInt8])
     /// A complete OSC string payload (without the introducer or terminator).
-    /// `sequenceLength` counts from OSC (`ESC ]`) through the terminator (BEL or ST),
-    /// using the bytes actually kept when the payload was capped.
+    /// `sequenceLength` counts from OSC (`ESC ]`) through the terminator (BEL or ST).
+    /// A payload past its cap is never dispatched.
     /// The buffer is borrowed: valid only for this call, and it must not escape.
     func parserOSC(_ data: UnsafeBufferPointer<UInt8>, sequenceLength: Int)
     /// A complete DCS string payload (without the `ESC P` introducer or `ST`), e.g. Sixel.
@@ -147,6 +147,10 @@ final class VTParser<Handler: VTParserHandler> {
     // would be dead on the next `feed`.
     private var oscBuffer: [UInt8] = []
     private var borrowedOSC: UnsafeBufferPointer<UInt8>?
+    /// Set once an OSC or DCS/APC payload passes its cap. A truncated payload is a different
+    /// command (a cut OSC 52 or OSC 7501 prefix), so the sequence is consumed but never dispatched.
+    private var oscOverflow = false
+    private var stringOverflow = false
     /// Set when an ESC is seen inside an OSC/DCS/PM/APC/SOS string, so the next byte can
     /// be tested for the `\` that completes a String Terminator (`ESC \`).
     private var sawESCInString = false
@@ -212,7 +216,7 @@ final class VTParser<Handler: VTParserHandler> {
         state = .ground
         clearCSI()
         discardOSCPayload()
-        stringBuffer.removeAll(keepingCapacity: true)
+        discardStringPayload()
         sawESCInString = false
         utf8Remaining = 0
     }
@@ -345,19 +349,19 @@ final class VTParser<Handler: VTParserHandler> {
     private func appendOSCRun(_ buf: UnsafeBufferPointer<UInt8>, from start: Int, to end: Int) {
         if oscBuffer.isEmpty, borrowedOSC == nil, let borrowed = borrowCompleteOSC(buf, from: start, to: end) {
             borrowedOSC = borrowed
+            if borrowed.count < end - start { oscOverflow = true }
             return
         }
         var i = start
         while i < end, oscBuffer.count < 5 {
-            if oscBuffer.count < oscCap { oscBuffer.append(buf[i]) }
+            if oscBuffer.count < oscCap { oscBuffer.append(buf[i]) } else { oscOverflow = true }
             i += 1
         }
         guard i < end else { return }
-        let room = oscCap - oscBuffer.count
-        if room > 0 {
-            let take = min(room, end - i)
-            oscBuffer.append(contentsOf: UnsafeBufferPointer(rebasing: buf[i ..< i + take]))
-        }
+        let room = max(0, oscCap - oscBuffer.count)
+        let take = min(room, end - i)
+        if take > 0 { oscBuffer.append(contentsOf: UnsafeBufferPointer(rebasing: buf[i ..< i + take])) }
+        if take < end - i { oscOverflow = true }
     }
 
     /// The payload of an OSC whose terminator is inside this same feed buffer.
@@ -470,7 +474,7 @@ final class VTParser<Handler: VTParserHandler> {
         // the next ESC or BEL arrives.
         if byte == 0x18 || byte == 0x1A, state != .ground {
             discardOSCPayload()
-            stringBuffer.removeAll(keepingCapacity: true)
+            discardStringPayload()
             sawESCInString = false
             clearCSI()
             state = .ground
@@ -563,9 +567,9 @@ final class VTParser<Handler: VTParserHandler> {
             discardOSCPayload()
             state = .oscString
         case 0x50: // DCS 'P' — capture (Sixel)
-            stringKind = .dcs; stringBuffer.removeAll(keepingCapacity: true); state = .stringCapture
+            stringKind = .dcs; discardStringPayload(); state = .stringCapture
         case 0x5F: // APC '_' — capture (Kitty graphics)
-            stringKind = .apc; stringBuffer.removeAll(keepingCapacity: true); state = .stringCapture
+            stringKind = .apc; discardStringPayload(); state = .stringCapture
         case 0x58, 0x5E: // SOS 'X', PM '^' — no payload of interest, discard
             state = .stringConsume
         case 0x20 ... 0x2F: // intermediate
@@ -753,19 +757,22 @@ final class VTParser<Handler: VTParserHandler> {
         case 0x1B:
             sawESCInString = true
         default:
-            if borrowedOSC == nil, oscBuffer.count < oscCap { oscBuffer.append(byte) }
+            guard borrowedOSC == nil else { break }
+            if oscBuffer.count < oscCap { oscBuffer.append(byte) } else { oscOverflow = true }
         }
     }
 
     /// Dispatch the finished OSC, then drop it. `sequenceLength` counts the introducer
     /// (`ESC ]`, 2 bytes), the bytes kept under the cap, and the terminator (BEL = 1, ST = 2).
     private func finishOSC(terminatorBytes: Int) {
-        let count = borrowedOSC?.count ?? oscBuffer.count
-        let length = 2 + count + terminatorBytes
-        if let borrowed = borrowedOSC {
-            handler.parserOSC(borrowed, sequenceLength: length)
-        } else {
-            oscBuffer.withUnsafeBufferPointer { handler.parserOSC($0, sequenceLength: length) }
+        if !oscOverflow {
+            let count = borrowedOSC?.count ?? oscBuffer.count
+            let length = 2 + count + terminatorBytes
+            if let borrowed = borrowedOSC {
+                handler.parserOSC(borrowed, sequenceLength: length)
+            } else {
+                oscBuffer.withUnsafeBufferPointer { handler.parserOSC($0, sequenceLength: length) }
+            }
         }
         discardOSCPayload()
         state = .ground
@@ -774,6 +781,12 @@ final class VTParser<Handler: VTParserHandler> {
     private func discardOSCPayload() {
         borrowedOSC = nil
         oscBuffer.removeAll(keepingCapacity: true)
+        oscOverflow = false
+    }
+
+    private func discardStringPayload() {
+        stringBuffer.removeAll(keepingCapacity: true)
+        stringOverflow = false
     }
 
     /// OSC byte budget: the larger image cap once the buffer is recognizably `1337;…` (iTerm2
@@ -816,7 +829,7 @@ final class VTParser<Handler: VTParserHandler> {
             sawESCInString = false
             if byte == 0x5C { dispatchCapturedString(); state = .ground; return }
             // A lone ESC aborts the string and reprocesses from ground.
-            stringBuffer.removeAll(keepingCapacity: true)
+            discardStringPayload()
             state = .ground
             feedFromGround(byte)
             return
@@ -827,16 +840,18 @@ final class VTParser<Handler: VTParserHandler> {
         case 0x1B:
             sawESCInString = true
         default:
-            if stringBuffer.count < maxImageStringBytes { stringBuffer.append(byte) }
+            if stringBuffer.count < maxImageStringBytes { stringBuffer.append(byte) } else { stringOverflow = true }
         }
     }
 
     private func dispatchCapturedString() {
-        switch stringKind {
-        case .dcs: handler.parserDCS(stringBuffer)
-        case .apc: handler.parserAPC(stringBuffer)
+        if !stringOverflow {
+            switch stringKind {
+            case .dcs: handler.parserDCS(stringBuffer)
+            case .apc: handler.parserAPC(stringBuffer)
+            }
         }
-        stringBuffer.removeAll(keepingCapacity: true)
+        discardStringPayload()
     }
 
     /// Reprocess a byte as if freshly arriving in the ground state. Used when a string
@@ -864,6 +879,9 @@ extension VTParser {
         var utf8Min: UInt32
         var stringKind: String
         var stringBuffer: Data
+        // Optional so checkpoints written before overflow tracking still decode.
+        var oscOverflow: Bool?
+        var stringOverflow: Bool?
     }
 
     func checkpointState() throws -> CheckpointState {
@@ -887,7 +905,9 @@ extension VTParser {
             utf8Accumulator: utf8Accumulator,
             utf8Min: utf8Min,
             stringKind: stringKind.rawValue,
-            stringBuffer: Data(stringBuffer)
+            stringBuffer: Data(stringBuffer),
+            oscOverflow: oscOverflow,
+            stringOverflow: stringOverflow
         )
     }
 
@@ -925,6 +945,9 @@ extension VTParser {
         utf8Min = saved.utf8Min
         stringBuffer = Array(saved.stringBuffer)
         borrowedOSC = nil
+        // An older checkpoint saved at the cap may have been truncated, so treat it as overflowed.
+        oscOverflow = saved.oscOverflow ?? (oscBuffer.count >= oscCap)
+        stringOverflow = saved.stringOverflow ?? (stringBuffer.count >= maxImageStringBytes)
         codepointScratch.removeAll(keepingCapacity: true)
     }
 }
