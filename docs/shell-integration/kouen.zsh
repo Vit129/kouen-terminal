@@ -47,7 +47,7 @@ if [[ -n "$KOUEN" && -n "$KOUEN_CLAUDE_SESSION_MODE" && -z "$__kouen_claude_wrap
     if (( rc )); then
       /usr/bin/open -a "Google Chrome" "https://claude.ai/code" >/dev/null 2>&1 &
       (__kouen_next rc >/dev/null 2>&1 &)
-      if (( ${+commands[happy]} )) && [[ -f "$HOME/.happy/access.key" ]]; then HAPPY_CLAUDE_PATH="${HAPPY_CLAUDE_PATH:-${commands[claude]}}" happy claude "$@"; else __kouen_claude_next "$@"; fi
+      __kouen_claude_next "$@"
       return
     fi
     if [[ "$KOUEN_CLAUDE_SESSION_MODE" == cloud && $resume -eq 0 ]]; then
@@ -57,20 +57,14 @@ if [[ -n "$KOUEN" && -n "$KOUEN_CLAUDE_SESSION_MODE" && -z "$__kouen_claude_wrap
         /usr/bin/open -a "Google Chrome" "https://claude.ai/code" >/dev/null 2>&1 &
         (__kouen_next rc >/dev/null 2>&1 &)
       fi
-      if (( ${+commands[happy]} )) && [[ -f "$HOME/.happy/access.key" ]]; then
-        HAPPY_CLAUDE_PATH="${HAPPY_CLAUDE_PATH:-${commands[claude]}}" happy claude --remote-control --remote-control-session-name-prefix kouen "$@"
-      else
         __kouen_claude_next --remote-control --remote-control-session-name-prefix kouen "$@"
-      fi
-    elif [[ "$KOUEN_CLAUDE_SESSION_MODE" == happy ]] && (( ${+commands[happy]} )); then
-      HAPPY_CLAUDE_PATH="${HAPPY_CLAUDE_PATH:-${commands[claude]}}" happy claude --remote-control --remote-control-session-name-prefix kouen "$@"
     else
       __kouen_claude_next "$@"
     fi
   }
 fi
-# Codex session mode: a `codex` typed by hand runs through Happy when $KOUEN_CODEX_SESSION_MODE is `happy` or `remote-control` with Happy logged in.
-if [[ -n "$KOUEN" && ("$KOUEN_CODEX_SESSION_MODE" == "happy" || "$KOUEN_CODEX_SESSION_MODE" == "remote-control") && -z "$__kouen_codex_wrapped" ]]; then
+# Codex session mode: a `codex` typed by hand gets the Companion opened when $KOUEN_CODEX_SESSION_MODE is `remote-control`.
+if [[ -n "$KOUEN" && "$KOUEN_CODEX_SESSION_MODE" == "remote-control" && -z "$__kouen_codex_wrapped" ]]; then
   __kouen_codex_wrapped=1
   if (( ${+functions[codex]} )); then
     functions[__kouen_codex_next]=$functions[codex]
@@ -92,11 +86,11 @@ if [[ -n "$KOUEN" && ("$KOUEN_CODEX_SESSION_MODE" == "happy" || "$KOUEN_CODEX_SE
       /usr/bin/open -a "Google Chrome" "https://chatgpt.com" >/dev/null 2>&1 &
       (__kouen_next rc >/dev/null 2>&1 &)
     fi
-    if (( ${+commands[happy]} )) && [[ -f "$HOME/.happy/access.key" ]]; then happy codex "$@"; else __kouen_codex_next "$@"; fi
+    __kouen_codex_next "$@"
   }
 fi
-# Antigravity (agy) session mode: a `agy` typed by hand gets --remote-control, or happy agy when in happy mode.
-if [[ -n "$KOUEN" && ("$KOUEN_AGY_SESSION_MODE" == "remote-control" || "$KOUEN_AGY_SESSION_MODE" == "happy") && -z "$__kouen_agy_wrapped" ]]; then
+# Antigravity (agy) session mode: a `agy` typed by hand gets --remote-control.
+if [[ -n "$KOUEN" && "$KOUEN_AGY_SESSION_MODE" == "remote-control" && -z "$__kouen_agy_wrapped" ]]; then
   __kouen_agy_wrapped=1
   if (( ${+functions[agy]} )); then
     functions[__kouen_agy_next]=$functions[agy]
@@ -119,12 +113,11 @@ if [[ -n "$KOUEN" && ("$KOUEN_AGY_SESSION_MODE" == "remote-control" || "$KOUEN_A
       /usr/bin/open -a "Google Chrome" "https://antigravity.google.com" >/dev/null 2>&1 &
       (__kouen_next rc >/dev/null 2>&1 &)
     fi
-    if (( ${+commands[happy]} )) && [[ "$KOUEN_AGY_SESSION_MODE" == "happy" ]]; then happy agy "$@"; return; fi
     if (( rc )); then __kouen_agy_next "$@"; else __kouen_agy_next --remote-control "$@"; fi
   }
 fi
-# GitHub Copilot session mode: a `copilot` typed by hand gets --remote when in remote-control mode ($KOUEN_COPILOT_SESSION_MODE), or happy acp when happy.
-if [[ -n "$KOUEN" && ("$KOUEN_COPILOT_SESSION_MODE" == "remote-control" || "$KOUEN_COPILOT_SESSION_MODE" == "happy") && -z "$__kouen_copilot_wrapped" ]]; then
+# GitHub Copilot session mode: a `copilot` typed by hand gets --remote when in remote-control mode ($KOUEN_COPILOT_SESSION_MODE).
+if [[ -n "$KOUEN" && "$KOUEN_COPILOT_SESSION_MODE" == "remote-control" && -z "$__kouen_copilot_wrapped" ]]; then
   __kouen_copilot_wrapped=1
   if (( ${+functions[copilot]} )); then
     functions[__kouen_copilot_next]=$functions[copilot]
@@ -145,7 +138,6 @@ if [[ -n "$KOUEN" && ("$KOUEN_COPILOT_SESSION_MODE" == "remote-control" || "$KOU
     if [[ "$KOUEN_COPILOT_SESSION_MODE" == "remote-control" || $rc -eq 1 ]]; then
       (__kouen_next rc >/dev/null 2>&1 &)
     fi
-    if (( ${+commands[happy]} )) && [[ "$KOUEN_COPILOT_SESSION_MODE" == "happy" ]]; then happy acp -- copilot --acp "$@"; return; fi
     if (( rc )); then __kouen_copilot_next "$@"; else __kouen_copilot_next --remote "$@"; fi
   }
 fi
