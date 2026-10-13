@@ -207,6 +207,7 @@ final class ContentAreaViewController: NSViewController, TerminalTabBarDelegate 
         let structureChanged = payload.structureChanged
         let metadataOnly = payload.metadataOnly
         filePreview.switchToTab(tabID: SessionCoordinator.shared.snapshot.activeWorkspace?.activeTab?.id.uuidString)
+        WorktreeAutoIsolateService.shared.refreshNotices()
         refreshIsolationNotice()
         if metadataOnly && !structureChanged {
             refreshTabBarMetadata()
