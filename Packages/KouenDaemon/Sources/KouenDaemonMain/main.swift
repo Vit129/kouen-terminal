@@ -189,8 +189,11 @@ do {
     #if canImport(Network)
     let bridgeWSPort = ProcessInfo.processInfo.environment["KOUEN_MOBILE_BRIDGE_PORT"]
         .flatMap(UInt16.init) ?? 7777
+    // A preview daemon (KOUEN_HOME under /tmp/kouen-preview-*, set by Scripts/preview.sh) must not
+    // fight the installed Kouen for 8080 — however it was started (app spawn, relaunch, by hand).
+    let isPreviewHome = (ProcessInfo.processInfo.environment["KOUEN_HOME"] ?? "").contains("/kouen-preview-")
     let bridgePageURLPort = ProcessInfo.processInfo.environment["KOUEN_MOBILE_BRIDGE_PAGE_PORT"]
-        .flatMap(Int.init) ?? 8080
+        .flatMap(Int.init) ?? (isPreviewHome ? 8081 : 8080)
     // Must outlive this scope — a bare `MobileBridgeServer().start(...)` temporary gets
     // deallocated the instant `start()` returns, silently turning every `[weak self]` closure
     // inside it (listener callbacks, the pairing loop) into a no-op.
