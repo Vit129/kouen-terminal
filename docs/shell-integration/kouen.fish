@@ -49,14 +49,16 @@ if set -q KOUEN; and set -q KOUEN_CLAUDE_SESSION_MODE; and not set -q __kouen_cl
             end
         end
         if test $rc -eq 1
-            /usr/bin/open -a "Google Chrome" "https://claude.ai/code" >/dev/null 2>&1 &
+            # replaced by Kouen Companion; run `kouen rc`
+            # /usr/bin/open -a "Google Chrome" "https://claude.ai/code" >/dev/null 2>&1 &
             __kouen_next rc >/dev/null 2>&1
                 __kouen_claude_next $argv
         else if test "$KOUEN_CLAUDE_SESSION_MODE" = cloud; and test $resume -eq 0
             __kouen_claude_next --cloud $argv
         else if test "$KOUEN_CLAUDE_SESSION_MODE" = cloud; or test "$KOUEN_CLAUDE_SESSION_MODE" = remote-control
             if test "$KOUEN_CLAUDE_SESSION_MODE" = remote-control
-                /usr/bin/open -a "Google Chrome" "https://claude.ai/code" >/dev/null 2>&1 &
+                # replaced by Kouen Companion; run `kouen rc`
+                # /usr/bin/open -a "Google Chrome" "https://claude.ai/code" >/dev/null 2>&1 &
                 __kouen_next rc >/dev/null 2>&1
             end
                 __kouen_claude_next --remote-control --remote-control-session-name-prefix kouen $argv
@@ -90,7 +92,8 @@ if set -q KOUEN; and begin test "$KOUEN_CODEX_SESSION_MODE" = remote-control; en
             end
         end
         if test "$KOUEN_CODEX_SESSION_MODE" = remote-control; or test $rc -eq 1
-            /usr/bin/open -a "Google Chrome" "https://chatgpt.com" >/dev/null 2>&1 &
+            # replaced by Kouen Companion; run `kouen rc`
+            # /usr/bin/open -a "Google Chrome" "https://chatgpt.com" >/dev/null 2>&1 &
             __kouen_next rc >/dev/null 2>&1
         end
             __kouen_codex_next $argv
@@ -122,7 +125,8 @@ if set -q KOUEN; and begin test "$KOUEN_AGY_SESSION_MODE" = remote-control; end;
             end
         end
         if test "$KOUEN_AGY_SESSION_MODE" = remote-control; or test $rc -eq 1
-            /usr/bin/open -a "Google Chrome" "https://antigravity.google.com" >/dev/null 2>&1 &
+            # replaced by Kouen Companion; run `kouen rc`
+            # /usr/bin/open -a "Google Chrome" "https://antigravity.google.com" >/dev/null 2>&1 &
             __kouen_next rc >/dev/null 2>&1
         end
         if test $rc -eq 1

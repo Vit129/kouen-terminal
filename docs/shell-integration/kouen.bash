@@ -39,7 +39,8 @@ if [ -n "$KOUEN" ] && [ -n "$KOUEN_CLAUDE_SESSION_MODE" ] && [ -z "$__kouen_clau
       esac
     done
     if (( rc )); then
-      /usr/bin/open -a "Google Chrome" "https://claude.ai/code" >/dev/null 2>&1 &
+      # replaced by Kouen Companion; run `kouen rc`
+      # /usr/bin/open -a "Google Chrome" "https://claude.ai/code" >/dev/null 2>&1 &
       (__kouen_next rc >/dev/null 2>&1 &)
       __kouen_claude_next "$@"
       return
@@ -48,7 +49,8 @@ if [ -n "$KOUEN" ] && [ -n "$KOUEN_CLAUDE_SESSION_MODE" ] && [ -z "$__kouen_clau
       __kouen_claude_next --cloud "$@"
     elif [[ "$KOUEN_CLAUDE_SESSION_MODE" == cloud || "$KOUEN_CLAUDE_SESSION_MODE" == remote-control ]]; then
       if [[ "$KOUEN_CLAUDE_SESSION_MODE" == remote-control ]]; then
-        /usr/bin/open -a "Google Chrome" "https://claude.ai/code" >/dev/null 2>&1 &
+        # replaced by Kouen Companion; run `kouen rc`
+        # /usr/bin/open -a "Google Chrome" "https://claude.ai/code" >/dev/null 2>&1 &
         (__kouen_next rc >/dev/null 2>&1 &)
       fi
         __kouen_claude_next --remote-control --remote-control-session-name-prefix kouen "$@"
@@ -77,7 +79,8 @@ if [ -n "$KOUEN" ] && [ "$KOUEN_CODEX_SESSION_MODE" = "remote-control" ] && [ -z
       esac
     done
     if [[ "$KOUEN_CODEX_SESSION_MODE" == "remote-control" || $rc -eq 1 ]]; then
-      /usr/bin/open -a "Google Chrome" "https://chatgpt.com" >/dev/null 2>&1 &
+      # replaced by Kouen Companion; run `kouen rc`
+      # /usr/bin/open -a "Google Chrome" "https://chatgpt.com" >/dev/null 2>&1 &
       (__kouen_next rc >/dev/null 2>&1 &)
     fi
     __kouen_codex_next "$@"
@@ -104,7 +107,8 @@ if [ -n "$KOUEN" ] && [ "$KOUEN_AGY_SESSION_MODE" = "remote-control" ] && [ -z "
       esac
     done
     if [[ "$KOUEN_AGY_SESSION_MODE" == "remote-control" || $rc -eq 1 ]]; then
-      /usr/bin/open -a "Google Chrome" "https://antigravity.google.com" >/dev/null 2>&1 &
+      # replaced by Kouen Companion; run `kouen rc`
+      # /usr/bin/open -a "Google Chrome" "https://antigravity.google.com" >/dev/null 2>&1 &
       (__kouen_next rc >/dev/null 2>&1 &)
     fi
     if (( rc )); then __kouen_agy_next "$@"; else __kouen_agy_next --remote-control "$@"; fi
