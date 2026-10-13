@@ -52,25 +52,30 @@ public struct DefaultTerminalLaunchRequest: Equatable, Sendable {
         }
     }
 
+    // URL operands are attacker-controlled: shell quoting stops metacharacters, but a
+    // leading "-" would still reach the tool as an option (e.g. `man -P<command>`).
     private static func sshRequest(for url: URL) -> DefaultTerminalLaunchRequest? {
-        guard let host = url.host(percentEncoded: false), !host.isEmpty else { return nil }
+        guard let host = url.host(percentEncoded: false), isSafeHost(host) else { return nil }
+        let user = url.user(percentEncoded: false).flatMap { $0.isEmpty ? nil : $0 }
+        if let user, !isSafeOperand(user) || user.contains("@") { return nil }
         let destinationHost = host.contains(":") && !host.hasPrefix("[") ? "[\(host)]" : host
-        let destination = [url.user(percentEncoded: false), destinationHost]
-            .compactMap { value -> String? in
-                guard let value, !value.isEmpty else { return nil }
-                return value
-            }
-            .joined(separator: "@")
+        let destination = [user, destinationHost].compactMap { $0 }.joined(separator: "@")
         var parts = ["ssh"]
-        if let port = url.port { parts += ["-p", String(port)] }
-        parts.append(ShellQuoting.quote(destination))
+        if let port = url.port {
+            guard (1...65_535).contains(port) else { return nil }
+            parts += ["-p", String(port)]
+        }
+        parts += ["--", ShellQuoting.quote(destination)]
         return DefaultTerminalLaunchRequest(command: parts.joined(separator: " "), title: "ssh \(destinationHost)")
     }
 
     private static func telnetRequest(for url: URL) -> DefaultTerminalLaunchRequest? {
-        guard let host = url.host(percentEncoded: false), !host.isEmpty else { return nil }
+        guard let host = url.host(percentEncoded: false), isSafeHost(host) else { return nil }
         var parts = ["telnet", ShellQuoting.quote(host)]
-        if let port = url.port { parts.append(String(port)) }
+        if let port = url.port {
+            guard (1...65_535).contains(port) else { return nil }
+            parts.append(String(port))
+        }
         return DefaultTerminalLaunchRequest(command: parts.joined(separator: " "), title: "telnet \(host)")
     }
 
@@ -82,11 +87,25 @@ public struct DefaultTerminalLaunchRequest: Equatable, Sendable {
                 guard let value, !value.isEmpty else { return nil }
                 return value
             }
-        guard !topics.isEmpty else { return nil }
+        guard !topics.isEmpty, topics.allSatisfy(isSafeOperand) else { return nil }
         return DefaultTerminalLaunchRequest(
-            command: (["man"] + topics.map(ShellQuoting.quote)).joined(separator: " "),
+            command: (["man", "--"] + topics.map(ShellQuoting.quote)).joined(separator: " "),
             title: "man \(topics.last ?? "")"
         )
+    }
+
+    static func isSafeOperand(_ value: String) -> Bool {
+        guard !value.isEmpty, !value.hasPrefix("-") else { return false }
+        return !value.unicodeScalars.contains { scalar in
+            CharacterSet.whitespacesAndNewlines.contains(scalar) || CharacterSet.controlCharacters.contains(scalar)
+        }
+    }
+
+    private static let hostCharacters = CharacterSet(charactersIn:
+        "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789.-_:[]%")
+
+    static func isSafeHost(_ host: String) -> Bool {
+        isSafeOperand(host) && host.unicodeScalars.allSatisfy { hostCharacters.contains($0) }
     }
 
     private static func defaultFileIsDirectory(_ url: URL) -> Bool {
