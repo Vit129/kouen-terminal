@@ -1,9 +1,22 @@
 SHELL := /bin/bash
 
-.PHONY: build bench bench-record bench-check preview preview-stop preview-clean release release-notes package dmg smoke-dmg sign appcast finalize hotfix-release icon clean
+.PHONY: build test test-live lint bench bench-record bench-check preview preview-stop preview-clean release release-notes package dmg smoke-dmg sign appcast finalize hotfix-release icon clean
 
 build:
 	swift build
+
+# Unit suites. Live daemon/PTY suites skip without HARNESS_LIVE_DAEMON_TESTS=1, and the
+# summary at the end counts them so a skipped suite never reads as a pass.
+test:
+	set -o pipefail; swift test 2>&1 | python3 Scripts/test-summary.py
+
+# Everything `test` runs plus the live daemon/PTY integration suites (what CI runs).
+test-live:
+	set -o pipefail; HARNESS_LIVE_DAEMON_TESTS=1 swift test 2>&1 | python3 Scripts/test-summary.py
+
+# swift-format findings on lines changed since the merge base with origin/main (CI gate).
+lint:
+	python3 Scripts/lint-changed-lines.py
 
 bench:
 	HARNESS_BENCHMARKS=1 swift test -c release --filter HarnessBenchmarks
@@ -14,10 +27,11 @@ bench-record:
 	set -o pipefail; HARNESS_BENCHMARKS=1 swift test -c release --filter HarnessBenchmarks 2>&1 \
 		| python3 Scripts/benchmarks/compare_benchmarks.py --record benchmark-baselines.json
 
-# Compare a fresh run against the committed baseline; exits non-zero on a >15% regression.
+# Compare a fresh run against the committed baseline; exits non-zero on a >15% regression, or
+# when a baselined benchmark did not run or a new one is unrecorded (--strict).
 bench-check:
 	set -o pipefail; HARNESS_BENCHMARKS=1 swift test -c release --filter HarnessBenchmarks 2>&1 \
-		| python3 Scripts/benchmarks/compare_benchmarks.py --baseline benchmark-baselines.json
+		| python3 Scripts/benchmarks/compare_benchmarks.py --strict --baseline benchmark-baselines.json
 
 preview:
 	./Scripts/preview.sh

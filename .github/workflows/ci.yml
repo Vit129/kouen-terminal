@@ -178,27 +178,30 @@ jobs:
             -derivedDataPath .build/xcode CODE_SIGNING_ALLOWED=NO build
 
   lint:
-    name: Format lint (advisory)
+    name: Format lint (changed lines)
     runs-on: macos-26
-    # Style only — never block a merge on formatting. Surfaces drift for a human to clean up.
-    # Kept advisory (continue-on-error: true) because `swift format lint` operates on the full
-    # tree and the current codebase has pre-existing style violations that would make this job
-    # fail on every PR, breaking CI for non-style changes. Remove continue-on-error once the
-    # tree is clean and violations are held at zero.
-    continue-on-error: true
+    # The tree predates `.swift-format`, so only lines this change adds or edits are held to it.
+    # Layout notes from the pretty-printer are advisory. See Scripts/lint-changed-lines.py.
     steps:
       - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
 
       - name: Select Xcode ${{ env.XCODE_VERSION }}
         uses: maxim-lobanov/setup-xcode@v1
         with:
           xcode-version: ${{ env.XCODE_VERSION }}
 
-      - name: swift-format lint
+      - name: swift-format lint (changed lines)
+        env:
+          PR_BASE: ${{ github.event.pull_request.base.sha }}
+          PUSH_BEFORE: ${{ github.event.before }}
         run: |
-          # `swift format` ships with the toolchain; lint (don't rewrite) the first-party sources.
-          swift format lint --recursive --parallel \
-            Apps Packages Tools Tests Package.swift || true
+          set -euo pipefail
+          base="${PR_BASE:-$PUSH_BEFORE}"
+          # A new branch push has no previous commit; fall back to the merge base with main.
+          if [ -z "$base" ] || ! git cat-file -e "$base^{commit}" 2>/dev/null; then base=origin/main; fi
+          python3 Scripts/lint-changed-lines.py --base "$base"
 
   manifest-lint:
     name: Manifest version agreement
@@ -266,6 +269,13 @@ jobs:
           set -o pipefail
           mkdir -p .build
           swift test -c release --filter HarnessBenchmarks 2>&1 | tee .build/benchmark-results.txt
+
+      - name: Compare against baseline
+        # Shared runners are noisy, so this job stays non-blocking, but the comparison runs and
+        # reports a regression, a missing baseline, or a benchmark that did not run.
+        run: |
+          python3 Scripts/benchmarks/compare_benchmarks.py --strict \
+            --baseline benchmark-baselines.json --input .build/benchmark-results.txt
 
       - name: Upload benchmark results
         uses: actions/upload-artifact@v7

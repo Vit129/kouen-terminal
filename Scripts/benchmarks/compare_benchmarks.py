@@ -18,6 +18,9 @@ Policy:
   - New benchmarks (no baseline entry) are reported, never fail — record them deliberately.
   - Benchmarks missing from the run (filtered/skipped) are reported, never fail.
   - Improvements beyond the tolerance are flagged as "update the baseline" hints.
+  - --strict turns the advisory cases into failures: a missing baseline file, a baseline
+    benchmark absent from the run, or a run benchmark absent from the baseline. Use it
+    wherever a green result must mean every gated benchmark ran and was compared.
 
 The baseline file maps name → {"nanos": int, plus any informational fields from the run}.
 Re-record on intentional performance changes in the same PR, so the diff documents the new
@@ -58,6 +61,8 @@ def main():
                     help="allowed fractional slowdown before failing (default 0.15 = 15%%)")
     ap.add_argument("--input", metavar="FILE", default="-",
                     help="benchmark output to parse (default: stdin)")
+    ap.add_argument("--strict", action="store_true",
+                    help="fail on a missing baseline file, missing benchmarks, or unrecorded benchmarks")
     args = ap.parse_args()
 
     stream = sys.stdin if args.input == "-" else open(args.input, encoding="utf-8")
@@ -78,11 +83,12 @@ def main():
         with open(args.baseline, encoding="utf-8") as f:
             baseline = json.load(f)
     except FileNotFoundError:
+        outcome = "failing (--strict)" if args.strict else "treating as advisory, exit 0"
         print(f"compare_benchmarks: baseline {args.baseline} not found — run --record first "
-              "(treating as advisory, exit 0)", file=sys.stderr)
+              f"({outcome})", file=sys.stderr)
         for name, obj in sorted(results.items()):
             print(f"  NEW  {name}: {obj['nanos']:,} ns")
-        return 0
+        return 1 if args.strict else 0
 
     regressions, improvements, new, missing = [], [], [], []
     for name, obj in sorted(results.items()):
@@ -112,10 +118,15 @@ def main():
     if not (regressions or improvements or new or missing):
         print("  all benchmarks within tolerance")
 
+    failed = False
     if regressions:
         print(f"\n{len(regressions)} regression(s) beyond {args.tolerance:.0%} — failing", file=sys.stderr)
-        return 1
-    return 0
+        failed = True
+    if args.strict and (missing or new):
+        print(f"\n--strict: {len(missing)} missing and {len(new)} unrecorded benchmark(s) — failing",
+              file=sys.stderr)
+        failed = True
+    return 1 if failed else 0
 
 
 if __name__ == "__main__":

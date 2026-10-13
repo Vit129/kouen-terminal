@@ -154,8 +154,8 @@ disabled, publish the verified feed only after the public download works.
 | Build & test (Linux, headless daemon) | `ubuntu-24.04`, `swift:6.0` container | Debug and release builds of the daemon, CLI, and pure libraries, then `swift test` with the live daemon tests. |
 | Xcode project builds | `macos-26`, Xcode 26.6 | `xcodebuild` Debug build of the committed `Harness.xcodeproj`, so drift between `project.yml` and the targets is caught. |
 | Manifest version agreement | `ubuntu-24.04` | The Sparkle version agrees across `Package.swift`, `project.yml`, and `project.pbxproj`. |
-| Format lint (advisory) | `macos-26` | `swift format lint`; never blocks. |
-| Benchmarks (non-blocking) | `macos-26` | `swift test -c release --filter HarnessBenchmarks`; never blocks. |
+| Format lint (changed lines) | `macos-26` | `Scripts/lint-changed-lines.py` against `.swift-format`; blocks on rule, line-length, and trailing-whitespace findings on changed lines. Layout notes are advisory. |
+| Benchmarks (non-blocking) | `macos-26` | `swift test -c release --filter HarnessBenchmarks`, then `compare_benchmarks.py --strict` against `benchmark-baselines.json`; reports but never blocks. |
 
 Releases build with SwiftPM (`make release`), so the macOS build-and-test job is
 the one a release depends on.

@@ -224,8 +224,9 @@ Validate a source checkout before shipping changes:
 
 ```bash
 swift build
-swift test                              # fast, deterministic suite
-HARNESS_LIVE_DAEMON_TESTS=1 swift test  # adds the real socket / PTY / security tests
+make test       # fast, deterministic suite, ending with executed / failed / skipped totals
+make test-live  # adds the real socket / PTY / security tests (HARNESS_LIVE_DAEMON_TESTS=1)
+make lint       # swift-format findings on the lines you changed (the CI gate)
 make bench
 ```
 
