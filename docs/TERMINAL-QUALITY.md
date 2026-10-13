@@ -12,6 +12,17 @@ Right-click command output to copy its command, copy or select its output, find 
 
 Grapheme segmentation and width data are pinned to Unicode 18 inputs with verified checksums. Harness supports terminal mode 2027 and uses the engine's text layout for composed input and overlays. Font coverage still depends on the configured and installed fonts.
 
+### Input limits
+
+The engine bounds hostile or runaway input. Each limit keeps the stream parsing and the following output intact.
+
+- **Control sequences.** A CSI keeps up to 32 parameter groups and 128 values. That covers any supported SGR, including foreground, background, and underline truecolor in one sequence. A sequence past the cap is ignored whole rather than half-applied. A single number above 65,535 is clamped and still applied.
+- **Strings.** OSC payloads keep 1 MiB (32 MiB for inline images). An oversized OSC, DCS, or APC is consumed through its terminator and never dispatched, so it cannot set a title, link, clipboard, or image.
+- **One cell's text.** A grapheme cluster keeps its first 256 UTF-8 bytes. Further combining marks are consumed without moving the cursor, and copy returns the kept prefix.
+- **All clusters.** Clusters longer than a base and two marks, such as emoji ZWJ sequences, share an 8 MiB store per screen. Unused entries are collected first. When live clusters still fill it, a new cell keeps its base character and first two marks and drops the rest.
+
+`UnicodeAndCSILimitTests` and `ParserRobustnessTests` cover each edge.
+
 In **Settings → Terminal**, configure ordered fallback font families and OpenType features. Fallback families are comma-separated, for example `Menlo, Apple Color Emoji`. Feature values use four-character tags and nonnegative integers, for example `calt=0, ss01=1`. Invalid feature syntax is reported instead of silently changing the effective configuration. The same settings reach terminal rendering and Overview thumbnails.
 
 ## Output, history, and startup
