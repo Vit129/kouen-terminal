@@ -22,6 +22,40 @@ final class RealPtyLifecycleTests: XCTestCase {
         return pty
     }
 
+    /// The pane directory follows the foreground job. A background job elsewhere never steers it.
+    func testWorkingDirectoryFollowsTheForegroundJobOnly() throws {
+        let base = FileManager.default.temporaryDirectory.appendingPathComponent("hcwd-" + UUID().uuidString)
+        let names = ["shell", "background", "foreground"]
+        for name in names {
+            try FileManager.default.createDirectory(at: base.appendingPathComponent(name), withIntermediateDirectories: true)
+        }
+        defer { try? FileManager.default.removeItem(at: base) }
+        let real = try names.map { name -> String in
+            let resolved = try XCTUnwrap(realpath(base.appendingPathComponent(name).path, nil))
+            defer { free(resolved) }
+            return String(cString: resolved)
+        }
+        let pty = try makePty()
+        defer { pty.close() }
+        let output = OutputAccumulator()
+        _ = pty.subscribe { data, _ in _ = output.appendAndContains(String(decoding: data, as: UTF8.self), marker: "") }
+
+        pty.write("cd '\(real[0])'\n")
+        pty.write("(cd '\(real[1])' && exec perl -e 'sleep 30') &\n")
+        pty.write("echo READY_$((1+1))\n")
+        XCTAssertTrue(waitUntil(timeout: 8) { output.contains("READY_2") })
+        usleep(300_000)
+        for _ in 0 ..< 5 {
+            XCTAssertEqual(pty.probeWorkingDirectory()?.cwd, real[0], "a background job steered the pane directory")
+        }
+
+        pty.write("(cd '\(real[2])' && exec perl -e 'sleep 5')\n")
+        XCTAssertTrue(waitUntil(timeout: 5) { pty.probeWorkingDirectory()?.cwd == real[2] },
+                      "the foreground job's directory was not reported")
+        pty.write("\u{3}")
+        XCTAssertTrue(waitUntil(timeout: 5) { pty.probeWorkingDirectory()?.cwd == real[0] })
+    }
+
     /// A resize that commits just before the caller's deadline must report the size the PTY took.
     func testSlowCommittedResizeReportsTheAppliedSize() throws {
         let pty = try makePty()

@@ -1072,11 +1072,24 @@ public final class RealPty: @unchecked Sendable {
         // then run the proc scan OUTSIDE the lock (it walks every system PID).
         lifecycleLock.lock()
         let pid = childPID
+        let foreground = master >= 0 ? tcgetpgrp(master) : -1
         lifecycleLock.unlock()
-        guard pid > 0,
-              let cwd = Self.cwd(for: deepestReadableDescendant(of: pid, parents: parents ?? ProcessScan.parentMap()) ?? pid)
-        else { return nil }
-        return (pid, cwd)
+        guard pid > 0 else { return nil }
+        if let owner = Self.foregroundDirectoryOwner(shell: pid, foregroundGroup: foreground, parents: parents),
+           let cwd = Self.cwd(for: owner) {
+            return (pid, cwd)
+        }
+        return Self.cwd(for: pid).map { (pid, $0) }
+    }
+
+    /// The process whose directory the pane shows: the terminal's foreground job, never a
+    /// background one. Prefers the job's group leader, then its lowest-PID readable member so
+    /// repeated probes agree. Nil means the shell itself is in the foreground.
+    static func foregroundDirectoryOwner(shell: pid_t, foregroundGroup: pid_t, parents: [pid_t: pid_t]?) -> pid_t? {
+        guard foregroundGroup > 0, foregroundGroup != shell else { return nil }
+        if cwd(for: foregroundGroup) != nil { return foregroundGroup }
+        let candidates = (parents ?? ProcessScan.parentMap()).keys
+        return candidates.filter { getpgid($0) == foregroundGroup && cwd(for: $0) != nil }.min()
     }
 
     /// Name of the process that owns the terminal foreground (`#{pane_current_command}`):
@@ -2399,25 +2412,6 @@ public final class RealPty: @unchecked Sendable {
             handleOutput(Data(readBuffer.prefix(n)), generation: generation)
             remaining -= n
         }
-    }
-
-    private func deepestReadableDescendant(of pid: pid_t, parents: [pid_t: pid_t]) -> pid_t? {
-        var best: (pid: pid_t, depth: Int)?
-        for candidate in parents.keys where candidate != pid {
-            var cursor = candidate
-            var depth = 0
-            while let parent = parents[cursor], parent != 0, depth < 32 {
-                depth += 1
-                if parent == pid {
-                    if Self.cwd(for: candidate) != nil, best == nil || depth > best!.depth {
-                        best = (candidate, depth)
-                    }
-                    break
-                }
-                cursor = parent
-            }
-        }
-        return best?.pid
     }
 
     private static func cwd(for pid: pid_t) -> String? {
