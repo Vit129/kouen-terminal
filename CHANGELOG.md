@@ -8,6 +8,8 @@ has a matching `vX.Y.Z` tag and a signed, notarized DMG on
 
 ## [Unreleased]
 
+## [2.4.0] - 2026-10-13
+
 ### Added
 
 - Appearance settings open with a live preview of the selected theme, font, line height, and cell width. Revert restores the theme and font you started with.

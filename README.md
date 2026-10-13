@@ -15,11 +15,12 @@ are listed in the [changelog](CHANGELOG.md) and [GitHub Releases](https://github
 
 ## Download
 
-**Harness 2.3.2** fixes daemon adoption after app updates, smooths split-pane movement
-and closing, eliminates stale closing-pane IO, and improves cached GPU row reuse.
-The 2.3 series also improves throughput and history handling, keeps selections and
-search attached to text during resize, and adds precise command-output actions and font
-controls. See [release validation](docs/RELEASE-2.3.2.md), [terminal quality](docs/TERMINAL-QUALITY.md),
+**Harness 2.4** adds a live Appearance preview, interface text size, line height and
+cell width controls, ⌘-click file references, and a key binding editor. Updates settle
+cleanly: background services stop without crashing, launchd no longer relaunches a
+duplicate service, and coding-tool icons sit on dark tiles again. It also fixes a sidebar
+crash with split panes and keeps wide characters aligned through resizing.
+See [release validation](docs/RELEASE-2.4.0.md), [terminal quality](docs/TERMINAL-QUALITY.md),
 the [changelog](CHANGELOG.md), and [performance results](docs/SCORECARD.md) for behavior,
 measured results, and verification limits.
 

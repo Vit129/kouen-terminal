@@ -10,18 +10,21 @@ It runs on the `macos-26` runner with Xcode 26.6, the same runner and pinned
 `XCODE_VERSION` as CI, so a release is built by the toolchain CI tested. Bump
 `XCODE_VERSION` in `release.yml` and `ci.yml` together.
 
-## Harness 2.3.2 (136)
+## Harness 2.4.0 (137)
 
-This patch fixes daemon adoption after app updates, startup recovery, split-pane
-movement and closure, stale terminal IO, and relocated GPU row caches. The
+This release adds appearance, typography, file-link and key binding controls, and
+makes app updates settle cleanly: helpers stop without crashing, a duplicate start
+exits successfully so launchd stops relaunching it, and stale worker sockets are
+removed. Public protocol 2 and the session-host protocol are unchanged, so an
+update from 2.3.2 replaces the application daemon without interrupting shells. The
 first-party coding agent remains in local development and is excluded from this
 release's source, app, CLI and documentation. Existing integrations with installed
 coding tools remain available.
 
-See the [changelog](../CHANGELOG.md), [release validation](RELEASE-2.3.2.md), and
+See the [changelog](../CHANGELOG.md), [release validation](RELEASE-2.4.0.md), and
 [terminal quality](TERMINAL-QUALITY.md). Version declarations and generated update
 notes move together. Push the shipping commit to start CI, then run the release workflow with
-`tag=v2.3.2` and `deploy_appcast=true`. The app and DMG must pass signing,
+`tag=v2.4.0` and `deploy_appcast=true`. The app and DMG must pass signing,
 notarization and smoke testing before publication. The release build can run
 alongside CI, but draft creation requires successful main-branch CI for the exact
 source commit. The workflow verifies the
