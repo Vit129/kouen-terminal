@@ -538,103 +538,23 @@ public final class SurfaceRegistry: @unchecked Sendable {
             if editor.updatePaneActivity(surfaceID: id, { $0.unread = false }) { commit() }
             return .ok
         case let .snoozeAttention(surfaceID, minutes):
-            guard let id = UUID(uuidString: surfaceID), [0, 15, 60].contains(minutes) else {
-                return .error("Snooze must be 0, 15, or 60 minutes")
-            }
-            guard editor.snapshot.workspaces.flatMap(\.sessions).flatMap(\.tabs).contains(where: { $0.rootPane.allSurfaceIDs().contains(id) }) else { return .error("Pane not found") }
-            if editor.updatePaneActivity(surfaceID: id, {
-                $0.snoozedUntil = minutes == 0 ? nil : Date().addingTimeInterval(Double(minutes * 60))
-            }) { commit() }
-            return .ok
+            return snoozeAttentionLocked(surfaceID: surfaceID, minutes: minutes)
         case let .newWorkspace(name):
             let id = editor.addWorkspace(name: name)
             commit()
             return .workspaceID(id)
         case let .newSession(workspaceID, cwd, name, shell):
-            guard let sessionID = editor.addSession(to: workspaceID, cwd: cwd, name: name) else {
-                return .error("Workspace not found")
-            }
-            ensureSessionSurfaces(sessionID: sessionID, shell: shell)
-            commit()
-            fireHookLocked(.afterNewSession)
-            fireHookLocked(.sessionCreated)
-            return .sessionID(sessionID)
+            return newSessionLocked(workspaceID: workspaceID, cwd: cwd, name: name, shell: shell)
         case let .newSessionInGroup(targetSessionID, name):
-            guard let sessionID = editor.addGroupedSession(groupWith: targetSessionID, name: name) else {
-                return .error("Target session not found")
-            }
-            // Linked windows share live surfaces — ensure is an idempotent no-op for
-            // them and a revival for any dead leaf.
-            ensureSessionSurfaces(sessionID: sessionID, shell: nil)
-            commit()
-            fireHookLocked(.afterNewSession)
-            fireHookLocked(.sessionCreated)
-            return .sessionID(sessionID)
+            return newSessionInGroupLocked(targetSessionID: targetSessionID, name: name)
         case let .newTabInSession(sessionID, cwd):
-            guard let workspace = editor.snapshot.workspaces.first(where: { $0.sessions.contains(where: { $0.id == sessionID }) }) else { return .error("The source session has closed.") }
-            _ = editor.selectSession(workspaceID: workspace.id, sessionID: sessionID)
-            guard let tabID = editor.addTab(to: workspace.id, cwd: cwd) else { return .error("Could not create tab") }
-            ensureTabSurfaces(tabID: tabID, shell: nil)
-            editor.propagateNewTabToGroup(tabID)
-            commit()
-            fireHookLocked(.afterNewTab)
-            return .tabID(tabID)
+            return newTabInSessionLocked(sessionID: sessionID, cwd: cwd)
         case let .newTab(workspaceID, cwd, shell):
-            guard let tabID = editor.addTab(to: workspaceID, cwd: cwd) else {
-                return .error("Workspace not found")
-            }
-            ensureTabSurfaces(tabID: tabID, shell: shell)
-            editor.propagateNewTabToGroup(tabID)   // grouped sessions share the window list
-            commit()
-            fireHookLocked(.afterNewTab)
-            emitFirstPaneCreated(tabID: tabID)
-            return .tabID(tabID)
+            return newTabLocked(workspaceID: workspaceID, cwd: cwd, shell: shell)
         case let .newTabInWorkspace(named, cwd, shell):
-            guard let workspaceID = editor.resolveWorkspaceID(nameOrID: named) else {
-                return .error("Workspace not found: \(named)")
-            }
-            guard let tabID = editor.addTab(to: workspaceID, cwd: cwd) else {
-                return .error("Could not create tab")
-            }
-            ensureTabSurfaces(tabID: tabID, shell: shell)
-            editor.propagateNewTabToGroup(tabID)
-            commit()
-            fireHookLocked(.afterNewTab)
-            return .tabID(tabID)
+            return newTabInWorkspaceLocked(named: named, cwd: cwd, shell: shell)
         case let .newSplit(tabID, paneID, direction, shell, requestedCwd):
-            guard let workspace = editor.snapshot.workspaces.first(where: { ws in
-                ws.sessions.contains { session in session.tabs.contains { $0.id == tabID } }
-            }) else { return .error("Tab not found") }
-            let tab = workspace.sessions.flatMap { $0.tabs }.first { $0.id == tabID }
-            // Target-less split focuses the tab's active pane (falling back to its
-            // first leaf), matching tmux's "split the current pane".
-            let targetPane = paneID ?? tab?.activePaneID ?? tab?.rootPane.allPaneIDs().first
-            guard let paneID = targetPane,
-                  let newPaneID = editor.splitPane(
-                      in: workspace.id,
-                      tabID: tabID,
-                      paneID: paneID,
-                      direction: direction
-                  )
-            else { return .error("Could not split pane") }
-            if let surfaceID = editor.surfaceID(forPaneID: newPaneID) {
-                let cwd = requestedCwd ?? editor.snapshot.workspaces
-                    .flatMap { workspace in workspace.sessions.flatMap { $0.tabs } }
-                    .first(where: { $0.id == tabID })?
-                    .cwd
-                _ = createOrEnsureSurface(
-                    surfaceID: surfaceID.uuidString,
-                    cwd: cwd,
-                    shell: shell,
-                    rows: 24,
-                    cols: 80,
-                    scrollbackBytes: nil,
-                    freshlyCreated: true
-                )
-            }
-            commit()
-            fireHookLocked(.afterSplitPane, surfaceKey: editor.surfaceID(forPaneID: newPaneID)?.uuidString)
-            return .paneID(newPaneID)
+            return newSplitLocked(tabID: tabID, paneID: paneID, direction: direction, shell: shell, requestedCwd: requestedCwd)
         case let .selectWorkspace(id):
             guard editor.selectWorkspace(id) else { return .error("Workspace not found") }
             commit()
@@ -654,33 +574,9 @@ public final class SurfaceRegistry: @unchecked Sendable {
             emitFollow(FollowEvent(type: "session.view", payload: ["session": .string(sessionID.uuidString)]))
             return .ok
         case let .selectTab(workspaceID, tabID):
-            guard editor.selectTab(workspaceID: workspaceID, tabID: tabID) else {
-                return .error("Tab not found")
-            }
-            commit()
-            if let event = FollowHookBridge.event(hook: "tab-selected", context: Self.followContext(buildFormatContext())) {
-                emitFollow(event)
-            }
-            return .ok
+            return selectTabLocked(workspaceID: workspaceID, tabID: tabID)
         case let .moveTab(tabID, toSessionID, index):
-            let source = editor.snapshot.workspaces.flatMap(\.sessions).first { $0.tabs.contains { $0.id == tabID } }
-            // Moving a session's only tab dissolves it: capture its hook context first, as a close does.
-            let closedContext = source?.tabs.count == 1
-                ? buildFormatContext(surfaceKey: source?.tabs.first?.rootPane.allSurfaceIDs().first?.uuidString)
-                : nil
-            guard let session = editor.moveTab(tabID, toSessionID: toSessionID, index: index) else {
-                return .error("Cannot move that tab (not found, or shared with or into a grouped session)")
-            }
-            let dissolved = source.map { source in
-                !editor.snapshot.workspaces.contains { $0.sessions.contains { $0.id == source.id } }
-            } ?? false
-            if dissolved, let source { environmentStore.clearSession(source.id.uuidString) }
-            // A workspace emptied by the move gets a fresh session, which needs its shell.
-            ensureAllSnapshotSurfaces()
-            commit()
-            if dissolved, let closedContext { fireHookLocked(.sessionClosed, context: closedContext) }
-            if toSessionID == nil, session != source?.id { fireHookLocked(.sessionCreated) }
-            return .sessionID(session)
+            return moveTabLocked(tabID: tabID, toSessionID: toSessionID, index: index)
         case let .reorderTab(workspaceID, tabID, toIndex):
             guard editor.reorderTab(workspaceID: workspaceID, tabID: tabID, toIndex: toIndex) else {
                 return .error("Tab not found")
@@ -713,73 +609,11 @@ public final class SurfaceRegistry: @unchecked Sendable {
             commit()
             return .ok
         case let .closeTab(tabID):
-            let owningSession = editor.snapshot.workspaces
-                .flatMap(\.sessions)
-                .first(where: { $0.tabs.contains { $0.id == tabID } })?.id
-            // Grouped sessions: killing a window removes it from every member (tmux).
-            // Counterparts + their surfaces gathered BEFORE the close mutates the snapshot.
-            let counterparts = editor.groupCounterparts(of: tabID)
-            let allTabs = editor.snapshot.workspaces.flatMap { $0.sessions.flatMap { $0.tabs } }
-            // Union the surfaces of the window AND its counterparts: a peer's local split can
-            // diverge the layout, so a counterpart may carry surfaces this copy doesn't — omit
-            // them and those PTYs leak when the peer tab closes (closeSurfaces only reaps the
-            // ids it's handed, and nothing else sweeps surfaces orphaned mid-run).
-            let closedSurfaces = Array(Set(([tabID] + counterparts).flatMap { id in
-                allTabs.first(where: { $0.id == id })?.rootPane.allSurfaceIDs().map(\.uuidString) ?? []
-            }))
-            let closingTab = allTabs.first { $0.id == tabID }
-            guard editor.closeTab(tabID) else { return .error("Tab not found") }
-            if let closingTab, let owningSession {
-                recordClosed(.tab, sessionID: owningSession, name: closingTab.title, tabs: [closingTab])
-            }
-            for counterpart in counterparts { _ = editor.closeTab(counterpart) }
-            closeSurfaces(closedSurfaces)
-            ensureAllSnapshotSurfaces()
-            // tmux `renumber-windows`: keep indices contiguous after a tab closes.
-            if optionStore.get("renumber-windows")?.boolValue == true, let owningSession {
-                _ = editor.renumberWindows(sessionID: owningSession)
-            }
-            commit()
-            fireHookLocked(.afterKillTab)
-            return .ok
+            return closeTabLocked(tabID: tabID)
         case let .closeSession(sessionID):
-            let closingSession = editor.snapshot.workspaces
-                .flatMap(\.sessions)
-                .first(where: { $0.id == sessionID })
-            let closedSurfaces = closingSession?
-                .tabs
-                .flatMap { $0.rootPane.allSurfaceIDs().map(\.uuidString) } ?? []
-            // Hook context captured BEFORE the close: `#{session_name}` must describe
-            // the session that closed, not whatever survives it.
-            let closedContext = buildFormatContext(
-                surfaceKey: (closingSession?.activeTab ?? closingSession?.tabs.first)?
-                    .rootPane.allSurfaceIDs().first?.uuidString
-            )
-            guard editor.closeSession(sessionID) else { return .error("Session not found") }
-            if let closingSession { recordClosed(.session, sessionID: sessionID, name: closingSession.name, tabs: closingSession.tabs) }
-            closeSurfaces(closedSurfaces)
-            // Drop the session's per-session env so entries don't accumulate in environment.json.
-            environmentStore.clearSession(sessionID.uuidString)
-            ensureAllSnapshotSurfaces()
-            commit()
-            fireHookLocked(.sessionClosed, context: closedContext)
-            return .ok
+            return closeSessionLocked(sessionID: sessionID)
         case let .closeWorkspace(id):
-            let workspaceSessionIDs = editor.snapshot.workspaces
-                .first(where: { $0.id == id })?
-                .sessions.map(\.id) ?? []
-            let closedSurfaces = editor.snapshot.workspaces
-                .first(where: { $0.id == id })?
-                .sessions
-                .flatMap { $0.tabs }
-                .flatMap { $0.rootPane.allSurfaceIDs().map(\.uuidString) } ?? []
-            let closingSessions = editor.snapshot.workspaces.first(where: { $0.id == id })?.sessions ?? []
-            guard editor.closeWorkspace(id) else { return .error("Cannot close workspace") }
-            for session in closingSessions { recordClosed(.session, sessionID: session.id, name: session.name, tabs: session.tabs) }
-            closeSurfaces(closedSurfaces)
-            for sessionID in workspaceSessionIDs { environmentStore.clearSession(sessionID.uuidString) }
-            commit()
-            return .ok
+            return closeWorkspaceLocked(id: id)
         case let .setTheme(name):
             editor.setTheme(name)
             commit()
@@ -801,37 +635,7 @@ public final class SurfaceRegistry: @unchecked Sendable {
             commit()
             return .ok
         case .closeEphemeralSessions:
-            // Close each ephemeral session inline (NOT via re-entrant handle(.closeSession),
-            // which would deadlock on the non-recursive `lock` we already hold). Same helpers
-            // the .closeSession case uses, so PTYs are killed and the layout stays consistent.
-            let ids = editor.ephemeralSessionIDs()
-            // Unpinned tabs kept alive only by a pinned sibling: close them individually so a
-            // pinned tab keeps just itself (and its session container) across a clean quit.
-            let tabIDs = editor.ephemeralTabIDs()
-            guard !ids.isEmpty || !tabIDs.isEmpty else { return .ok }
-            for sessionID in ids {
-                let closedSurfaces = editor.snapshot.workspaces
-                    .flatMap(\.sessions)
-                    .first(where: { $0.id == sessionID })?
-                    .tabs
-                    .flatMap { $0.rootPane.allSurfaceIDs().map(\.uuidString) } ?? []
-                guard editor.closeSession(sessionID) else { continue }
-                closeSurfaces(closedSurfaces)
-                environmentStore.clearSession(sessionID.uuidString)
-            }
-            for tabID in tabIDs {
-                // Gather the tab's surfaces before removing it from the layout (mirrors the
-                // session loop above), then kill those PTYs.
-                let closedSurfaces = editor.snapshot.workspaces
-                    .flatMap(\.sessions).flatMap(\.tabs)
-                    .first(where: { $0.id == tabID })?
-                    .rootPane.allSurfaceIDs().map(\.uuidString) ?? []
-                guard editor.closeTab(tabID) else { continue }
-                closeSurfaces(closedSurfaces)
-            }
-            ensureAllSnapshotSurfaces()
-            commit()
-            return .ok
+            return closeEphemeralSessionsLocked()
         case let .send(surfaceID, text):
             guard let session = sessions[surfaceID] else {
                 return .error("Surface not found")
@@ -847,22 +651,7 @@ public final class SurfaceRegistry: @unchecked Sendable {
             acknowledgeProgramStatusIfCurrentLocked(surfaceID)
             return .ok
         case let .notify(surfaceID, title, body):
-            let notification = AgentNotification(
-                surfaceID: UUID(uuidString: surfaceID),
-                daemonSurfaceID: surfaceID,
-                title: title,
-                body: body
-            )
-            let snoozed = editor.listAttention().first { $0.surfaceID.uuidString == surfaceID }?.activity.isSnoozed ?? false
-            if !snoozed {
-                NotificationBus.shared.post(notification)
-                notifications.submit(NotificationNotice(surfaceID: surfaceID, runID: activity.currentRun(surfaceID: surfaceID)?.id, event: .agentWaiting, title: title, message: body))
-            }
-            markWaiting(surfaceKey: surfaceID, text: body)
-            noteProgramStatusNotifiedLocked(surfaceID)
-            commit()
-            fireHookLocked(.notificationPosted, surfaceKey: surfaceID)
-            return .ok
+            return notifyLocked(surfaceID: surfaceID, title: title, body: body)
         case let .clearNotification(surfaceID):
             if let uuid = UUID(uuidString: surfaceID) {
                 editor.clearTabNotification(surfaceID: uuid)
@@ -870,17 +659,7 @@ public final class SurfaceRegistry: @unchecked Sendable {
             commit()
             return .ok
         case let .updateTabTitle(surfaceID, title):
-            // OSC/program-driven rename. Honor `allow-rename` (global) and the
-            // per-tab `automatic-rename` flag — a manual `rename-tab` turns the
-            // latter off so the chosen name sticks (tmux semantics).
-            if let uuid = UUID(uuidString: surfaceID),
-               optionStore.get("allow-rename")?.boolValue ?? true,
-               automaticRenameEnabled(forSurfaceKey: surfaceID) {
-                editor.updateTabTitle(surfaceID: uuid, title: title)
-                commit()
-                fireHookLocked(.windowRenamed, surfaceKey: surfaceID)
-            }
-            return .ok
+            return updateTabTitleLocked(surfaceID: surfaceID, title: title)
         case let .updateTabCwd(surfaceID, path):
             if let uuid = UUID(uuidString: surfaceID) {
                 editor.updateTabCwd(surfaceID: uuid, path: path)
@@ -896,48 +675,20 @@ public final class SurfaceRegistry: @unchecked Sendable {
             }
             return .ok
         case let .previewPane(surfaceID, specification, updateExisting, capabilities):
-            guard capabilities.contains(DaemonStats.paneContent) else { return .error(PreviewError.unsupported.localizedDescription) }
-            do { _ = try specification.validatedURL() } catch { return .error(error.localizedDescription) }
-            guard let source = UUID(uuidString: surfaceID), let location = editor.paneLocation(forSurfaceKey: surfaceID),
-                  let workspace = editor.snapshot.workspaces.first(where: { $0.sessions.contains(where: { $0.tabs.contains(where: { $0.id == location.tabID }) }) }),
-                  let tab = workspace.sessions.flatMap(\.tabs).first(where: { $0.id == location.tabID }),
-                  let leaf = tab.rootPane.allLeaves().first(where: { $0.surfaceID == source }) else { return .error("The selected pane has closed.") }
-            if updateExisting {
-                guard case .preview = leaf.paneContent, sessions[surfaceID] == nil else { return .error("Only an existing preview can change its URL. Create a new preview beside a terminal to preserve its shell.") }
-                _ = editor.setPaneContent(surfaceID: source, content: .preview(specification)); commit(); return .paneID(leaf.id)
-            }
-            guard let id = editor.splitPane(in: workspace.id, tabID: tab.id, paneID: leaf.id, direction: .horizontal), let newSurface = editor.surfaceID(forPaneID: id) else { return .error("Could not create a preview pane.") }
-            _ = editor.setPaneContent(surfaceID: newSurface, content: .preview(specification))
-            commit(); return .paneID(id)
+            return previewPaneLocked(
+                surfaceID: surfaceID, specification: specification, updateExisting: updateExisting, capabilities: capabilities
+            )
         case .getSnapshot:
             return .snapshot(editor.snapshot.projected(for: []))
         case let .getSnapshotForClient(capabilities):
             return .snapshot(editor.snapshot.projected(for: capabilities))
         case let .createSurface(cwd, shell):
-            let surfaceID = UUID().uuidString
-            return createOrEnsureSurface(
-                surfaceID: surfaceID,
-                cwd: cwd,
-                shell: shell,
-                rows: 24,
-                cols: 80,
-                scrollbackBytes: nil,
-                freshlyCreated: true
-            ).map { .surfaceID($0) } ?? .error("Failed to launch shell")
+            return createSurfaceLocked(cwd: cwd, shell: shell)
         case let .ensureSurface(surfaceID, cwd, shell, rows, cols, scrollbackBytes, requireInLayout):
-            guard TerminalGeometry.isValid(cols: Int(cols), rows: Int(rows)) else { return .error("Terminal dimensions exceed the supported grid limit.") }
-            if requireInLayout == true,
-               !editor.snapshot.workspaces.flatMap(\.sessions).flatMap(\.tabs).contains(where: { $0.rootPane.allSurfaceIDs().contains(where: { $0.uuidString == surfaceID }) }) {
-                return .error("This pane has closed.")
-            }
-            return createOrEnsureSurface(
-                surfaceID: surfaceID,
-                cwd: cwd,
-                shell: shell,
-                rows: rows,
-                cols: cols,
-                scrollbackBytes: scrollbackBytes
-            ).map { _ in .ok } ?? .error("Failed to launch shell")
+            return ensureSurfaceLocked(
+                surfaceID: surfaceID, cwd: cwd, shell: shell, rows: rows, cols: cols,
+                scrollbackBytes: scrollbackBytes, requireInLayout: requireInLayout
+            )
         case .attachSurface:
             return .ok
         case let .sendKeys(surfaceID, keys):
@@ -966,14 +717,7 @@ public final class SurfaceRegistry: @unchecked Sendable {
             }
             return .text(session.captureGrid(start: start, end: end, joinWrapped: joinWrapped))
         case let .pipePane(surfaceID, shellCommand):
-            guard sessions[surfaceID] != nil else { return .error("Surface not found") }
-            if let shellCommand, !shellCommand.isEmpty {
-                if let error = startPipe(surfaceID: surfaceID, shellCommand: shellCommand) { return .error(error) }
-            } else {
-                guard !pipeChanges.contains(surfaceID) else { return .error("The pipe is being launched; retry after it finishes.") }
-                stopPipe(surfaceID: surfaceID)
-            }
-            return .ok
+            return pipePaneLocked(surfaceID: surfaceID, shellCommand: shellCommand)
         case let .linkWindow(tabID, targetSessionID):
             guard let newTabID = editor.linkWindow(tabID, toSessionID: targetSessionID) else {
                 return .error("Could not link window (tab or target session not found)")
@@ -983,29 +727,9 @@ public final class SurfaceRegistry: @unchecked Sendable {
             fireHookLocked(.windowLinked)
             return .tabID(newTabID)
         case let .unlinkWindow(tabID):
-            let removed = editor.snapshot.workspaces
-                .flatMap { $0.sessions }.flatMap { $0.tabs }
-                .first(where: { $0.id == tabID })?
-                .rootPane.allSurfaceIDs().map(\.uuidString) ?? []
-            guard editor.unlinkWindow(tabID) else { return .error("Window is not linked") }
-            closeSurfaces(removed)   // ref-counted: shared surfaces survive
-            commit()
-            fireHookLocked(.windowUnlinked)
-            return .ok
+            return unlinkWindowLocked(tabID: tabID)
         case let .killPane(paneID):
-            let killedSurfaceID = editor.surfaceID(forPaneID: paneID)?.uuidString
-            let closingSession = editor.snapshot.workspaces.flatMap(\.sessions).first { $0.tabs.contains { $0.rootPane.allPaneIDs().contains(paneID) } }
-            let closingTab = closingSession?.tabs.first { $0.rootPane.allPaneIDs().contains(paneID) }
-            let leaf = closingTab?.rootPane.allLeaves().first { $0.id == paneID }
-            guard editor.killPane(paneID) else { return .error("Pane not found") }
-            if let closingSession, let closingTab, let leaf {
-                recordClosed(.pane, sessionID: closingSession.id, name: closingTab.title,
-                             tabs: [Tab(title: closingTab.title, cwd: leaf.cwd ?? closingTab.cwd, rootPane: .leaf(leaf))])
-            }
-            if let killedSurfaceID { closeSurfaces([killedSurfaceID]) }
-            commit()
-            fireHookLocked(.afterKillPane, surfaceKey: killedSurfaceID)
-            return .ok
+            return killPaneLocked(paneID: paneID)
         case let .swapPanes(srcID, dstID):
             guard editor.swapPanes(srcID, dstID) else { return .error("Panes not found") }
             commit()
@@ -1019,17 +743,7 @@ public final class SurfaceRegistry: @unchecked Sendable {
             fireHookLocked(.afterResizePane, surfaceKey: editor.surfaceID(forPaneID: paneID)?.uuidString)
             return .ok
         case let .resizePaneRatio(tabID, firstPaneID, secondPaneID, ratio):
-            guard editor.setSplitRatio(
-                tabID: tabID,
-                firstPaneID: firstPaneID,
-                secondPaneID: secondPaneID,
-                ratio: ratio
-            ) else {
-                return .error("Split not found")
-            }
-            commit()
-            fireHookLocked(.afterResizePane)
-            return .ok
+            return resizePaneRatioLocked(tabID: tabID, firstPaneID: firstPaneID, secondPaneID: secondPaneID, ratio: ratio)
         case let .zoomPane(paneID):
             guard editor.zoomPane(paneID) else { return .error("Pane not found") }
             commit()
@@ -1039,18 +753,7 @@ public final class SurfaceRegistry: @unchecked Sendable {
             onClientDirective?(.copyMode(surfaceID: surfaceID, enabled: enabled))
             return .ok
         case let .renameTab(tabID, name):
-            guard editor.renameTab(tabID, name: name) else { return .error("Tab not found") }
-            // A manual rename sticks: turn off automatic-rename for this tab so a
-            // later OSC title doesn't clobber the chosen name.
-            optionStore.set(.bool(false), key: "automatic-rename", scope: .tab, target: tabID.uuidString)
-            commit()
-            // Hook context follows the RENAMED tab (a `-t` can name a non-active one),
-            // like the OSC automatic-rename path — never the focused tab's.
-            fireHookLocked(.windowRenamed, surfaceKey: editor.snapshot.workspaces
-                .flatMap { $0.sessions.flatMap(\.tabs) }
-                .first(where: { $0.id == tabID })?
-                .rootPane.allSurfaceIDs().first?.uuidString)
-            return .ok
+            return renameTabLocked(tabID: tabID, name: name)
         case let .renameSession(sessionID, name):
             guard editor.renameSession(sessionID, name: name) else { return .error("Session not found") }
             commit()
@@ -1116,17 +819,7 @@ public final class SurfaceRegistry: @unchecked Sendable {
             }
             return .text(final)
         case let .getBuffer(name):
-            let buffer: PasteBufferStore.Buffer?
-            if let name { buffer = bufferStore.get(name) }
-            else { buffer = bufferStore.mostRecent() }
-            guard let buffer else { return .error("Buffer not found") }
-            return .buffer(BufferSummary(
-                name: buffer.name,
-                byteCount: buffer.data.count,
-                preview: buffer.preview,
-                createdAt: buffer.createdAt,
-                data: buffer.data
-            ))
+            return getBufferLocked(name: name)
         case .listBuffers:
             let summaries = bufferStore.list().map {
                 BufferSummary(name: $0.name, byteCount: $0.data.count, preview: $0.preview, createdAt: $0.createdAt)
@@ -1135,73 +828,15 @@ public final class SurfaceRegistry: @unchecked Sendable {
         case let .deleteBuffer(name):
             return bufferStore.delete(name) ? .ok : .error("Buffer not found")
         case let .pasteBuffer(surfaceID, name, bracketed):
-            guard let session = sessions[surfaceID] else { return .error("Surface not found") }
-            let buffer: PasteBufferStore.Buffer?
-            if let name { buffer = bufferStore.get(name) }
-            else { buffer = bufferStore.mostRecent() }
-            guard let buffer else { return .error("Buffer not found") }
-            if bracketed {
-                // tmux `paste-buffer -p`: wrap in bracketed-paste markers so the
-                // program treats it as a single pasted block (DECSET 2004).
-                var out = Data("\u{1b}[200~".utf8)
-                out.append(buffer.data)
-                out.append(Data("\u{1b}[201~".utf8))
-                guard session.write(out) else { return .error("Input was not accepted: the pane is closed or its input queue is full. Wait for the program to read input, then try again.") }
-            } else {
-                guard session.write(buffer.data) else { return .error("Input was not accepted: the pane is closed or its input queue is full. Wait for the program to read input, then try again.") }
-            }
-            return .ok
+            return pasteBufferLocked(surfaceID: surfaceID, name: name, bracketed: bracketed)
         case let .selectPaneDirectional(currentPaneID, direction):
-            let target: Command.PaneTarget
-            switch direction {
-            case .left: target = .left
-            case .right: target = .right
-            case .up: target = .up
-            case .down: target = .down
-            }
-            guard let neighbor = editor.directionalNeighbor(of: currentPaneID, direction: target) else {
-                return .error("No neighbor in that direction")
-            }
-            // Persist the new focus server-side so every client agrees on the active
-            // pane (not just the caller). Best-effort: the neighbor is in the same tab.
-            if let loc = editor.tab(containingPaneID: neighbor) {
-                let previousFocus = activeSurfaceKeyLocked(workspaceID: loc.workspaceID, tabID: loc.tabID)
-                _ = editor.setActivePane(workspaceID: loc.workspaceID, tabID: loc.tabID, paneID: neighbor)
-                commit()
-                firePaneFocusChangeLocked(previousSurfaceKey: previousFocus, newPaneID: neighbor)
-            }
-            return .paneID(neighbor)
+            return selectPaneDirectionalLocked(currentPaneID: currentPaneID, direction: direction)
         case let .selectPane(tabID, paneID):
-            guard let loc = editor.tab(containingPaneID: paneID), loc.tabID == tabID else {
-                return .error("Pane not found in tab")
-            }
-            let previousFocus = activeSurfaceKeyLocked(workspaceID: loc.workspaceID, tabID: tabID)
-            guard editor.setActivePane(workspaceID: loc.workspaceID, tabID: tabID, paneID: paneID) else {
-                return .error("Could not select pane")
-            }
-            commit()
-            firePaneFocusChangeLocked(previousSurfaceKey: previousFocus, newPaneID: paneID)
-            return .ok
+            return selectPaneLocked(tabID: tabID, paneID: paneID)
         case let .applyLayout(tabID, layout, mainPaneID):
-            guard let template = LayoutTemplate(rawValue: layout) else {
-                return .error("Unknown layout: \(layout)")
-            }
-            guard editor.applyLayout(tabID: tabID, layout: template, mainPaneID: mainPaneID) else {
-                return .error("Tab not found or has fewer than 2 panes")
-            }
-            commit()
-            fireHookLocked(.windowLayoutChanged)
-            return .ok
+            return applyLayoutLocked(tabID: tabID, layout: layout, mainPaneID: mainPaneID)
         case let .nextLayout(tabID):
-            // No per-tab "last layout" memory yet (lands in Phase 6 with the
-            // option store); we cycle from `evenHorizontal` each call. That's
-            // already a useful "give me a different layout" gesture.
-            guard editor.applyLayout(tabID: tabID, layout: .evenHorizontal.next(), mainPaneID: nil) else {
-                return .error("Tab not found")
-            }
-            commit()
-            fireHookLocked(.windowLayoutChanged)
-            return .ok
+            return nextLayoutLocked(tabID: tabID)
         case let .previousLayout(tabID):
             guard editor.applyLayout(tabID: tabID, layout: .evenHorizontal.previous(), mainPaneID: nil) else {
                 return .error("Tab not found")
@@ -1229,49 +864,7 @@ public final class SurfaceRegistry: @unchecked Sendable {
             commit()
             return .paneID(newPane)
         case let .respawnPane(surfaceID, keepHistory):
-            // Last-known tab cwd as the fallback: after a natural shell exit there is no
-            // live PID left to probe, and respawning into $HOME instead of where the user
-            // was working would lose their place.
-            let surfaceTab = editor.tab(forSurfaceKey: surfaceID)
-            var fallbackCwd: String?
-            if let match = surfaceTab {
-                fallbackCwd = editor.snapshot.workspaces
-                    .first(where: { $0.id == match.workspaceID })?
-                    .sessions.flatMap { $0.tabs }
-                    .first(where: { $0.id == match.tabID })?
-                    .cwd
-            }
-            if let session = sessions[surfaceID] {
-                session.respawn(clearHistory: !keepHistory, fallbackCwd: fallbackCwd)
-                return .ok
-            }
-            // A naturally-exited `remain-on-exit` pane keeps its dead leaf in the layout, but its
-            // SessionPty was dropped from `sessions` on exit — so respawn-pane (whose entire purpose is
-            // reviving such a pane) must recreate the surface rather than fail "Surface not found".
-            // Only when the dead leaf still resolves; an unknown surface is a real error.
-            guard surfaceTab != nil else { return .error("Surface not found") }
-            let scrollbackURL = HarnessPaths.scrollbackFileURL(forSurfaceID: surfaceID)
-            var reviveScrollbackBytes: Int?
-            if keepHistory {
-                // Size the revived scrollback cap to at least the on-disk history (and the usual
-                // default floor) so reviving never TRIMS scrollback a normal reattach would keep:
-                // createOrEnsureSurface's nil default (1 MiB) would otherwise compact a larger
-                // persisted log on load. The live-respawn path above keeps the original cap; this
-                // is the dead-pane equivalent.
-                let onDisk = (try? FileManager.default.attributesOfItem(atPath: scrollbackURL.path)[.size]) as? Int ?? 0
-                reviveScrollbackBytes = onDisk > 0 ? max(onDisk, 1024 * 1024) : nil
-            } else {
-                // Honor `-k`: drop the persisted scrollback before the revived surface seeds its ring
-                // from disk, so it starts clean. The SessionPty that normally owns this file is gone, so
-                // delete it directly; the default cap is fine on a now-empty history.
-                try? FileManager.default.removeItem(at: scrollbackURL)
-                try? FileManager.default.removeItem(at: scrollbackURL.appendingPathExtension("sizes"))
-            }
-            guard createOrEnsureSurface(surfaceID: surfaceID, cwd: fallbackCwd, shell: nil,
-                                        rows: 24, cols: 80, scrollbackBytes: reviveScrollbackBytes) != nil else {
-                return .error("Could not respawn surface")
-            }
-            return .ok
+            return respawnPaneLocked(surfaceID: surfaceID, keepHistory: keepHistory)
         case let .clearHistory(surfaceID):
             guard let session = sessions[surfaceID] else { return .error("Surface not found") }
             session.clearScrollback()
@@ -1281,49 +874,7 @@ public final class SurfaceRegistry: @unchecked Sendable {
             session.injectSyntheticOutput(Data("\u{1b}[3J".utf8))
             return .ok
         case let .setOption(scopeRaw, target, key, raw):
-            guard let scope = OptionStore.Scope(rawValue: scopeRaw) else {
-                return .error("Unknown option scope: \(scopeRaw)")
-            }
-            // The on-disk key joins scope:target:key with colons; a colon in the option name or
-            // target would mis-parse on read-back. Option names and ID targets never contain one,
-            // so reject it rather than silently corrupt the store.
-            guard !key.contains(":"), !(target?.contains(":") ?? false) else {
-                return .error("Option name/target must not contain ':'")
-            }
-            // Reject unknown option names loudly (a `@`-prefixed user option always passes), so a
-            // typo like `moused` fails in every front-end instead of being silently persisted and
-            // never read — the project's no-silent-failure invariant.
-            guard OptionStore.isRecognizedOptionKey(key) else {
-                return .error("unknown option: \(key)")
-            }
-            // Scoped reads resolve by exact target and only fall back toward broader scopes —
-            // a nil-target non-global option is stored but unreachable by every read path.
-            // Reject it (defense in depth behind the CLI's own -T requirement).
-            guard scope == .global || target != nil else {
-                return .error("\(scopeRaw) scope requires a target")
-            }
-            // `persist-scrollback` is read per pane (with global fallback) only — a tab/
-            // session/workspace-scoped value would be stored but unreachable by every read
-            // path (the OptionStore fallback widens with nil targets only): a silent no-op
-            // on a security control. Reject loudly instead.
-            if key == "persist-scrollback", scope != .pane, scope != .global {
-                return .error("persist-scrollback is pane- or global-scoped")
-            }
-            optionStore.set(.init(parsing: raw), key: key, scope: scope, target: target)
-            // Keep the monitor tick's lock-free precheck honest: silence arming changed.
-            if key == "monitor-silence" { refreshSilenceArmedCache() }
-            // Apply the secrets-at-rest toggle to live surfaces immediately: disabling wipes
-            // the on-disk log synchronously (the user's intent is "gone now", not "gone at
-            // the next spawn"); re-enabling resumes persistence from that point — including
-            // for surfaces spawned while the option was off (they carry a suspended log
-            // writer) — documented in docs/SECURITY-POSTURE.md.
-
-            // Nudge snapshot subscribers (the attach-window compositor) so a runtime option
-            // change — status-*, mouse, pane-style, mode-keys — reaches attached clients instead
-            // of being stuck at their startup values. Re-uses the snapshot push as a generic
-            // "re-read server state" signal (revision unchanged; clients re-pull options).
-            onSnapshotCommitted?(editor.snapshot.revision)
-            return .ok
+            return setOptionLocked(scopeRaw: scopeRaw, target: target, key: key, raw: raw)
         case let .showOptions(scopeRaw):
             let scope = scopeRaw.flatMap(OptionStore.Scope.init(rawValue:))
             let entries = optionStore.snapshot(scope: scope).map { key, value in
@@ -1339,16 +890,7 @@ public final class SurfaceRegistry: @unchecked Sendable {
             }
             return .options(entries)
         case let .bindHook(eventRaw, source, condition):
-            guard let event = HookEvent(rawValue: eventRaw) else {
-                return .error("Unknown hook event: \(eventRaw)")
-            }
-            do {
-                let command = try CommandParser.parse(source)
-                let id = hookRegistry.bind(event: event, command: command, conditionFormat: condition)
-                return .hookID(id)
-            } catch {
-                return .error("Parse failed: \(error)")
-            }
+            return bindHookLocked(eventRaw: eventRaw, source: source, condition: condition)
         case let .unbindHook(id):
             return hookRegistry.unbind(id: id) ? .ok : .error("Hook not found")
         case let .listHooks(eventRaw):
@@ -1391,18 +933,7 @@ public final class SurfaceRegistry: @unchecked Sendable {
              .noteClientConnection, .noteTailscaleStatus:
             return .error("handled by the daemon server")
         case let .surfaceContext(surfaceID):
-            guard let session = sessions[surfaceID] else {
-                return .error("Surface not found")
-            }
-            let probed = session.probeForegroundProcess()
-            let command = session.probeForegroundArguments()
-            return .text(ControlPlane.contextJSON(ControlPlane.SurfaceContext(
-                pid: Int(probed?.pid ?? -1),
-                executable: probed?.executable ?? "",
-                cwd: session.currentWorkingDirectory() ?? "",
-                arguments: command?.arguments ?? [],
-                isShell: command?.isShell ?? false
-            )))
+            return surfaceContextLocked(surfaceID: surfaceID)
         case let .displayMessage(format, print):
             // Render via FormatString using whatever context the daemon can build right now
             // (active workspace/tab from snapshot).
@@ -1735,7 +1266,7 @@ public final class SurfaceRegistry: @unchecked Sendable {
     }
 
     /// A new tab's first pane is a pane like any split: report it as `pane.created` too.
-    private func emitFirstPaneCreated(tabID: TabID) {
+    func emitFirstPaneCreated(tabID: TabID) {
         guard let surface = editor.snapshot.workspaces.flatMap(\.sessions).flatMap(\.tabs)
             .first(where: { $0.id == tabID })?.rootPane.allSurfaceIDs().first,
               let event = FollowHookBridge.event(hook: "after-split-pane", context: Self.followContext(buildFormatContext(surfaceKey: surface.uuidString)))
@@ -1863,7 +1394,7 @@ public final class SurfaceRegistry: @unchecked Sendable {
     /// Fire the focus/active-pane hooks when the focused pane moves from `previousSurfaceKey` to
     /// `newPaneID`: `pane-focus-out` (old), `window-pane-changed`, then `pane-focus-in` (new). A
     /// no-op when focus didn't actually change. Call with the lock held, after `commit()`.
-    private func firePaneFocusChangeLocked(previousSurfaceKey: String?, newPaneID: PaneID) {
+    func firePaneFocusChangeLocked(previousSurfaceKey: String?, newPaneID: PaneID) {
         let newKey = editor.surfaceID(forPaneID: newPaneID)?.uuidString
         guard newKey != previousSurfaceKey else { return }
         if let previousSurfaceKey { fireHookLocked(.paneFocusOut, surfaceKey: previousSurfaceKey) }
@@ -1932,7 +1463,7 @@ public final class SurfaceRegistry: @unchecked Sendable {
     /// already inside `handle()` (which holds `lock`). The locking `activePaneSurfaceKey()` would
     /// re-enter the non-recursive `lock` and deadlock; it also reads the active *tab's* first leaf,
     /// not this tab's real active pane, so the focus-change hooks need this exact-pane variant.
-    private func activeSurfaceKeyLocked(workspaceID: WorkspaceID, tabID: TabID) -> String? {
+    func activeSurfaceKeyLocked(workspaceID: WorkspaceID, tabID: TabID) -> String? {
         editor.activePaneID(workspaceID: workspaceID, tabID: tabID)
             .flatMap { editor.surfaceID(forPaneID: $0)?.uuidString }
     }
@@ -2345,7 +1876,7 @@ public final class SurfaceRegistry: @unchecked Sendable {
 
     /// Only called for a tab the user just created (`newTab`/`newTabInWorkspace`), so the
     /// spawn is `freshlyCreated` — eligible for the one-shot version banner.
-    private func ensureTabSurfaces(tabID: TabID, shell: String?) {
+    func ensureTabSurfaces(tabID: TabID, shell: String?) {
         let tabs = editor.snapshot.workspaces.flatMap { workspace in workspace.sessions.flatMap { $0.tabs } }
         guard let tab = tabs.first(where: { $0.id == tabID })
         else { return }
@@ -2364,7 +1895,7 @@ public final class SurfaceRegistry: @unchecked Sendable {
 
     /// Only called for a session the user just created (`newSession`) — see
     /// `ensureTabSurfaces` on `freshlyCreated`.
-    private func ensureSessionSurfaces(sessionID: SessionID, shell: String?) {
+    func ensureSessionSurfaces(sessionID: SessionID, shell: String?) {
         let allSessions = editor.snapshot.workspaces.flatMap { $0.sessions }
         guard let session = allSessions.first(where: { $0.id == sessionID })
         else { return }
@@ -2384,7 +1915,7 @@ public final class SurfaceRegistry: @unchecked Sendable {
         }
     }
 
-    private func ensureAllSnapshotSurfaces() {
+    func ensureAllSnapshotSurfaces() {
         for tab in editor.snapshot.workspaces.flatMap({ workspace in workspace.sessions.flatMap { $0.tabs } }) {
             // Each pane reopens in its own directory; the tab's cwd is only its focused pane's.
             for leaf in tab.rootPane.allLeaves() where leaf.paneContent.isTerminal {
@@ -2404,7 +1935,7 @@ public final class SurfaceRegistry: @unchecked Sendable {
     /// any surviving tab. Linked windows (`link-window`) share surfaces across
     /// tabs/sessions, so a surface lives until its last referencing tab is gone.
     /// Called after the editor mutation, so `editor.snapshot` reflects survivors.
-    private func closeSurfaces(_ surfaceIDs: [String]) {
+    func closeSurfaces(_ surfaceIDs: [String]) {
         let stillReferenced = Set(editor.snapshot.workspaces.flatMap(\.sessions).flatMap(\.tabs).flatMap { $0.rootPane.allSurfaceIDs().map(\.uuidString) })
         var closing: [(id: String, session: SessionPty?, pipe: TerminalOutputPipe?)] = []
         for surfaceID in surfaceIDs where !stillReferenced.contains(surfaceID) {
@@ -2437,11 +1968,11 @@ public final class SurfaceRegistry: @unchecked Sendable {
     // MARK: pipe-pane
 
     private var pipes: [String: TerminalOutputPipe] = [:]
-    private var pipeChanges: Set<String> = []
+    var pipeChanges: Set<String> = []
 
     /// Enter and return with the registry lock, but spawn, subscribe and teardown
     /// outside it. Revalidate ownership before publishing the consumer.
-    private func startPipe(surfaceID: String, shellCommand: String) -> String? {
+    func startPipe(surfaceID: String, shellCommand: String) -> String? {
         guard !pipeChanges.contains(surfaceID), !surfaceClosures.contains(surfaceID), let session = sessions[surfaceID] else { return "The pane or its pipe is changing; retry after it finishes." }
         pipeChanges.insert(surfaceID)
         let previous = pipes.removeValue(forKey: surfaceID)
@@ -2491,7 +2022,7 @@ public final class SurfaceRegistry: @unchecked Sendable {
         return failure
     }
 
-    private func stopPipe(surfaceID: String) {
+    func stopPipe(surfaceID: String) {
         guard let pipe = pipes.removeValue(forKey: surfaceID) else { return }
         let session = sessions[surfaceID]
         lock.unlock()
@@ -2502,7 +2033,7 @@ public final class SurfaceRegistry: @unchecked Sendable {
 
     /// Whether OSC/program title auto-rename is enabled for the tab owning
     /// `surfaceKey` (per-tab `automatic-rename`, defaulting on).
-    private func automaticRenameEnabled(forSurfaceKey surfaceKey: String) -> Bool {
+    func automaticRenameEnabled(forSurfaceKey surfaceKey: String) -> Bool {
         guard let match = editor.tab(forSurfaceKey: surfaceKey) else { return true }
         return optionStore.get("automatic-rename", scope: .tab, target: match.tabID.uuidString)?.boolValue ?? true
     }
