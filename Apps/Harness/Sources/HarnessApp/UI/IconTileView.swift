@@ -51,7 +51,7 @@ final class IconTileView: NSView {
         CATransaction.setDisableActions(true)
         let faceRect = bounds
         face.frame = faceRect
-        face.cornerRadius = (faceRect.height * 0.25).rounded()
+        face.cornerRadius = (faceRect.height / 3).rounded()
         let markScale: CGFloat = 0.64
         let markSide = (faceRect.height * markScale).rounded()
         glyph.frame = NSRect(x: faceRect.midX - markSide / 2, y: faceRect.midY - markSide / 2, width: markSide, height: markSide)
