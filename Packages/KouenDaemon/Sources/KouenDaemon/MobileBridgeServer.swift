@@ -304,6 +304,12 @@ public final class MobileBridgeServer: @unchecked Sendable {
             set { lock.lock(); _browserPaneID = newValue; lock.unlock() }
         }
         private var _browserPaneID: UUID?
+        /// Claude's permission mode as last seen in the transcript: where a Shift+Tab cycle starts.
+        var agentMode: String? {
+            get { lock.lock(); defer { lock.unlock() }; return _agentMode }
+            set { lock.lock(); _agentMode = newValue; lock.unlock() }
+        }
+        private var _agentMode: String?
 
         private var _inFlightBytes: Int = 0
         static let maxInFlightBytes: Int = 1 * 1024 * 1024 // 1 MB backpressure cap
@@ -415,12 +421,35 @@ public final class MobileBridgeServer: @unchecked Sendable {
       .agent{font-family:var(--f-mono);font-size:11px;color:var(--muted);border:1px solid var(--line);border-radius:6px;padding:0 5px;margin-left:6px;font-weight:400}
       .section-label{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);padding:14px 16px 6px}
 
-      /* Output */
-      .out{padding:12px 16px;display:flex;flex-direction:column;gap:10px;font-size:14px}
+      /* Chat */
+      .out{padding:14px 16px 20px;display:flex;flex-direction:column;gap:12px}
       .msg{min-width:0}
-      .msg.bot{align-self:flex-start;background:var(--surface);border:1px solid var(--line);padding:8px 12px;border-radius:14px 14px 14px 4px;max-width:92%;white-space:pre-wrap;overflow-wrap:anywhere}
-      .msg.user{align-self:flex-end;background:var(--accent);color:var(--accent-ink);padding:8px 12px;border-radius:14px 14px 4px 14px;max-width:85%}
-      .tool{font-family:var(--f-mono);font-size:12px;color:var(--muted);background:var(--code-bg);border:1px solid var(--line);border-radius:8px;padding:6px 10px;overflow-x:auto;white-space:pre}
+      .msg.user{align-self:flex-end;background:var(--accent);color:var(--accent-ink);padding:9px 13px;border-radius:16px 16px 4px 16px;max-width:85%;white-space:pre-wrap;overflow-wrap:anywhere}
+      .bot{min-width:0;font-size:15px;line-height:1.55;overflow-wrap:anywhere}
+      .bot p{margin:0 0 8px}
+      .bot p:last-child,.bot ul:last-child,.bot ol:last-child{margin-bottom:0}
+      .bot ul,.bot ol{margin:0 0 8px;padding-left:20px}
+      .bot li{margin-bottom:4px}
+      .bot strong{font-weight:700}
+      .bot h4{font-size:15px;margin:10px 0 4px}
+      .bot code{font-family:var(--f-mono);font-size:12.5px;background:var(--code-bg);border:1px solid var(--line);border-radius:5px;padding:0 4px}
+      .bot pre{margin:0 0 8px;background:var(--code-bg);border:1px solid var(--line);border-radius:8px;padding:8px 10px;overflow-x:auto}
+      .bot pre code{border:0;padding:0;background:none}
+      .bot .tbl{overflow-x:auto;margin:0 0 8px}
+      .bot table{border-collapse:collapse;font-size:13px;min-width:100%}
+      .bot th,.bot td{border-bottom:1px solid var(--line);padding:5px 8px;text-align:left;vertical-align:top}
+      .bot th{color:var(--muted);font-weight:700}
+      .more{color:var(--accent);font-weight:700;font-size:13px;padding:2px 0;text-align:left}
+      .clamp{max-height:260px;overflow:hidden;-webkit-mask-image:linear-gradient(#000 70%,transparent);mask-image:linear-gradient(#000 70%,transparent)}
+      .tools{display:flex;flex-direction:column;gap:2px}
+      .tool{font-family:var(--f-mono);font-size:12px;color:var(--muted);display:flex;gap:8px;align-items:baseline;min-width:0}
+      .tool b{color:var(--ink);font-weight:600;flex:none}
+      .tool span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+      .toolsum{font-family:var(--f-mono);font-size:12px;color:var(--muted);text-align:left;padding:4px 0}
+      .img{align-self:flex-end;border-radius:12px;border:1px solid var(--line);background:linear-gradient(135deg,var(--code-bg),var(--accent-soft));padding:10px 16px;font-size:12px;color:var(--muted);font-family:var(--f-mono)}
+      .working{font-size:13px;color:var(--muted);display:flex;gap:8px;align-items:center}
+      .working i{width:8px;height:8px;border-radius:50%;background:var(--run)}
+      @media (prefers-reduced-motion:no-preference){.working i{animation:pulse 1.2s ease-in-out infinite}@keyframes pulse{50%{opacity:.25}}}
       .ask{border:1px solid var(--warn);background:var(--warn-soft);border-radius:12px;padding:10px 12px;display:flex;flex-direction:column;gap:8px}
       .ask strong{color:var(--warn)}
       .ask .row{display:flex;gap:8px}
@@ -468,6 +497,26 @@ public final class MobileBridgeServer: @unchecked Sendable {
       .inrow textarea{flex:1;min-width:0;resize:none;border:1px solid var(--line);border-radius:14px;padding:9px 12px;font:inherit;background:var(--bg);color:var(--ink);max-height:120px}
       .send{background:var(--accent);color:var(--accent-ink);border-radius:12px;width:40px;height:40px;font-size:18px}
       .send.stopping{background:var(--del);color:var(--del-ink);font-size:14px}
+      .ctl{display:flex;gap:6px;align-items:center;overflow-x:auto;padding:2px 0}
+      .chipbtn{display:inline-flex;align-items:center;gap:5px;border:1px solid var(--line);border-radius:999px;padding:5px 11px;font-size:13px;white-space:nowrap;min-height:32px}
+      .chipbtn:hover{background:var(--accent-soft)}
+      .chipbtn:disabled{opacity:.6;cursor:default}
+      .chipbtn .k{color:var(--muted)}
+      .chipbtn .car{color:var(--muted);font-size:10px}
+      .chipbtn.mode-plan{border-color:var(--warn);color:var(--warn)}
+      .pick{display:flex;flex-direction:column;padding:6px 8px 14px}
+      .pick h5{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:12px 8px 6px;font-weight:700}
+      .opt{display:grid;grid-template-columns:1fr auto;gap:2px 10px;text-align:left;padding:10px;border-radius:10px;align-items:center}
+      .opt:hover{background:var(--accent-soft)}
+      .opt .t{font-weight:700}
+      .opt .d{grid-column:1;font-size:12.5px;color:var(--muted)}
+      .opt .ck{grid-row:span 2;color:var(--accent);font-weight:700;visibility:hidden}
+      .opt[aria-checked="true"] .ck{visibility:visible}
+      .seg{display:grid;grid-template-columns:repeat(5,1fr);gap:4px;background:var(--code-bg);border:1px solid var(--line);border-radius:12px;padding:4px;margin:0 8px}
+      .seg button{padding:9px 2px;border-radius:9px;font-size:13px;font-weight:700;color:var(--muted)}
+      .seg button[aria-pressed="true"]{background:var(--surface);color:var(--ink);box-shadow:0 1px 3px rgba(0,0,0,.12)}
+      .hint{font-size:12.5px;color:var(--muted);margin:8px 10px 0}
+      .panel.small{height:auto;max-height:88%}
       .attach-list{display:flex;gap:6px;flex-wrap:wrap}
       .att{font-size:12px;background:var(--accent-soft);color:var(--accent);border-radius:8px;padding:2px 8px}
 
@@ -541,12 +590,16 @@ public final class MobileBridgeServer: @unchecked Sendable {
               <textarea id="msg" rows="1" placeholder="Message the agent…"></textarea>
               <button class="send" id="send" aria-label="Send">↑</button>
             </div>
+            <div class="ctl" id="ctl" hidden>
+              <button class="chipbtn" id="model-chip" aria-haspopup="dialog"></button>
+              <button class="chipbtn" id="mode-chip" aria-haspopup="dialog"></button>
+            </div>
           </div>
         </section>
 
         <!-- Slide-up Panel (Diff / Preview) -->
         <div class="panel-bg" id="panel" hidden>
-          <div class="panel" role="dialog" aria-labelledby="panel-t">
+          <div class="panel" id="panel-box" role="dialog" aria-labelledby="panel-t">
             <div class="grab"></div>
             <div class="panel-h"><h3 id="panel-t"></h3><button class="icon-btn" id="panel-x" aria-label="Close">✕</button></div>
             <div class="scroll" id="panel-body"></div>
@@ -634,34 +687,116 @@ public final class MobileBridgeServer: @unchecked Sendable {
     }
     $("back").onclick = back;
 
+    // <md-start> small markdown subset. Source is untrusted agent output: everything is
+    // HTML-escaped first, markup is only ever produced from the escaped text.
+    function mdInline(t) { return esc(t).replace(/`([^`]+)`/g, "<code>$1</code>").replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>"); }
+    function md(src) {
+      const L = String(src || "").split("\n"); let h = "", i = 0;
+      while (i < L.length) {
+        const l = L[i];
+        if (!l.trim()) { i++; continue; }
+        if (/^```/.test(l)) {
+          const code = []; i++;
+          while (i < L.length && !/^```/.test(L[i])) code.push(L[i++]);
+          i++;
+          h += "<pre><code>" + esc(code.join("\n")) + "</code></pre>"; continue;
+        }
+        if (/^#{1,6} /.test(l)) { h += "<h4>" + mdInline(l.replace(/^#+ /, "")) + "</h4>"; i++; continue; }
+        if (/^\|/.test(l)) {
+          const rows = [];
+          while (i < L.length && /^\|/.test(L[i])) { if (!/^\|[-| :]+\|$/.test(L[i])) rows.push(L[i].split("|").slice(1, -1).map(c => c.trim())); i++; }
+          h += '<div class="tbl"><table>' + rows.map((r, j) => "<tr>" + r.map(c => j ? "<td>" + mdInline(c) + "</td>" : "<th>" + mdInline(c) + "</th>").join("") + "</tr>").join("") + "</table></div>"; continue;
+        }
+        if (/^[-*] /.test(l)) { h += "<ul>"; while (i < L.length && /^[-*] /.test(L[i])) h += "<li>" + mdInline(L[i++].slice(2)) + "</li>"; h += "</ul>"; continue; }
+        if (/^\d+\. /.test(l)) { h += "<ol>"; while (i < L.length && /^\d+\. /.test(L[i])) h += "<li>" + mdInline(L[i++].replace(/^\d+\. /, "")) + "</li>"; h += "</ol>"; continue; }
+        h += "<p>" + mdInline(l) + "</p>"; i++;
+      }
+      return h;
+    }
+    // <md-end>
+
+    const MODEL_OPTS = [
+      ["opus", "Opus", "Hardest work: plans, reviews, tricky bugs"],
+      ["sonnet", "Sonnet", "Everyday coding"],
+      ["haiku", "Haiku", "Fast, cheap: summaries, search"],
+      ["fable", "Fable", "Largest model"]];
+    const EFFORTS = ["low", "medium", "high", "xhigh", "max"];
+    const EFFORT_LABEL = { low: "Low", medium: "Medium", high: "High", xhigh: "XHigh", max: "Max" };
+    const MODE_OPTS = [
+      ["auto", "Auto", "The agent handles permission decisions"],
+      ["manual", "Manual", "Ask before every change"],
+      ["acceptEdits", "Accept edits", "Accept file edits, ask for commands"],
+      ["plan", "Plan", "Write a plan before changing anything"]];
+    const modeName = id => { const m = MODE_OPTS.find(x => x[0] === id); return m ? m[1] : id; };
+    function modelLabel(id) {
+      const m = /^claude-([a-z]+)-(\d{1,2})(?:-(\d{1,2})(?!\d))?/.exec(id || "");
+      if (!m) return id || "";
+      return m[1][0].toUpperCase() + m[1].slice(1) + " " + m[2] + (m[3] ? "." + m[3] : "");
+    }
+    // The model/effort/mode controls drive Claude Code's own TUI; other agents have no verified mechanism.
+    const canControl = () => !!cur && (cur.transcript || /claude/i.test(cur.agent || ""));
+
+    // Working = the agent still owes a reply. With a transcript: last item is the user's message or a
+    // tool call, and the daemon does not say idle/waiting. Without: the daemon's activity state.
+    function isWorking() {
+      if (!cur) return false;
+      if (cur.transcript) {
+        const last = [...cur.out].reverse().find(x => x[0] === "user" || x[0] === "agent" || x[0] === "tool" || x[0] === "img");
+        if (!last || last[0] === "agent") return false;
+        return cur.state === "run" || (cur.sentAt && Date.now() - cur.sentAt < 4000);
+      }
+      return cur.state === "run";
+    }
+
     function renderPane() {
       if (!cur) return;
       const p = $("pane");
       const wasAtBottom = (p.scrollHeight - p.scrollTop - p.clientHeight) < 60;
       const items = cur.out;
-
-      p.innerHTML = '<div class="out">' + items.map(([k, t]) => {
-        if (k === "user") return `<div class="msg user">${esc(t)}</div>`;
-        if (k === "agent") return `<div class="msg bot">${esc(t)}</div>`;
-        if (k === "tool") return `<div class="tool${t.startsWith("Edit") ? " edit-link" : ""}">${esc(t)}</div>`;
-        if (k === "diff") {
-          const a = cur.files.reduce((x, f) => x + f[1], 0), d = cur.files.reduce((x, f) => x + f[2], 0);
-          return `<button class="card" data-c="diff"><span class="ic">±</span><span class="tx"><b>${cur.files.length} files changed</b><span>+${a} −${d} · ${esc(cur.files.map(f => f[0].split("/").pop()).join(", "))}</span></span><span class="go">Diff</span></button>`;
+      let h = "", i = 0;
+      while (i < items.length) {
+        const [k, t] = items[i];
+        if (k === "tool") {
+          const run = []; const start = i;
+          while (i < items.length && items[i][0] === "tool") run.push(items[i++][1]);
+          const rows = run.map(x => { const sp = x.indexOf(" "); return sp < 0 ? [x, ""] : [x.slice(0, sp), x.slice(sp + 1)]; });
+          if (rows.length === 1 || cur["tools" + start]) {
+            h += '<div class="tools">' + rows.map(([n, a]) => `<div class="tool"><b>${esc(n)}</b><span>${esc(a)}</span></div>`).join("") +
+              (rows.length > 1 ? `<button class="toolsum" data-tools="${start}">▾ Hide</button>` : "") + "</div>";
+          } else {
+            h += `<button class="toolsum" data-tools="${start}">▸ ${rows.length} tool calls · ${esc([...new Set(rows.map(r => r[0]))].join(", "))}</button>`;
+          }
+          continue;
         }
-        if (k === "preview") return `<button class="card" data-c="pv"><span class="ic">◳</span><span class="tx"><b>Dev server running</b><span>${esc(t)}</span></span><span class="go">Open</span></button>`;
-        if (k === "pr") return `<button class="card" data-c="pr"><span class="ic">⇡</span><span class="tx"><b>Ready for review</b><span>${esc(cur.branch)} → main</span></span><span class="go">Create draft PR</span></button>`;
-        if (k === "prdone") {
+        const idx = i++;
+        if (k === "user") h += `<div class="msg user">${esc(t)}</div>`;
+        else if (k === "img") h += `<div class="img" role="img" aria-label="Attached image">▣ image</div>`;
+        else if (k === "agent") {
+          const long = t.length > 520 && !cur["open" + idx];
+          h += `<div class="bot${long ? " clamp" : ""}">${md(t)}</div>` + (long ? `<button class="more" data-more="${idx}">Show more</button>` : "");
+        }
+        else if (k === "diff") {
+          const a = cur.files.reduce((x, f) => x + f[1], 0), d = cur.files.reduce((x, f) => x + f[2], 0);
+          h += `<button class="card" data-c="diff"><span class="ic">±</span><span class="tx"><b>${cur.files.length} files changed</b><span>+${a} −${d} · ${esc(cur.files.map(f => f[0].split("/").pop()).join(", "))}</span></span><span class="go">Diff</span></button>`;
+        }
+        else if (k === "preview") h += `<button class="card" data-c="pv"><span class="ic">◳</span><span class="tx"><b>Dev server running</b><span>${esc(t)}</span></span><span class="go">Open</span></button>`;
+        else if (k === "pr") h += `<button class="card" data-c="pr"><span class="ic">⇡</span><span class="tx"><b>Ready for review</b><span>${esc(cur.branch)} → main</span></span><span class="go">Create draft PR</span></button>`;
+        else if (k === "prdone") {
           const rawUrl = (cur.pr && cur.pr.url) ? String(cur.pr.url) : '';
           const isSafe = rawUrl.startsWith("https://github.com/");
           const safeUrl = isSafe ? esc(rawUrl) : '#';
-          const displayUrl = isSafe ? esc(rawUrl.replace('https://','')) : 'invalid URL';
+          const displayUrl = isSafe ? esc(rawUrl.replace('https://', '')) : 'invalid URL';
           const prNum = esc(String(cur.pr ? cur.pr.n : ''));
-          return `<a class="card" href="${safeUrl}" target="_blank" rel="noopener noreferrer"><span class="ic">⇡</span><span class="tx"><b>Draft PR #${prNum} opened</b><span>${displayUrl}</span></span><span class="go">GitHub ↗</span></a>`;
+          h += `<a class="card" href="${safeUrl}" target="_blank" rel="noopener noreferrer"><span class="ic">⇡</span><span class="tx"><b>Draft PR #${prNum} opened</b><span>${displayUrl}</span></span><span class="go">GitHub ↗</span></a>`;
         }
-        if (k === "ask") return `<div class="ask"><div><strong>Approval needed</strong></div><div class="tool">${esc(t)}</div><div class="row"><button class="btn primary" data-a="y">Allow</button><button class="btn ghost" data-a="n">Deny</button></div></div>`;
-        return `<div class="msg">${esc(t)}</div>`;
-      }).join("") + '</div>';
+        else if (k === "ask") h += `<div class="ask"><div><strong>Approval needed</strong></div><div class="tool"><span>${esc(t)}</span></div><div class="row"><button class="btn primary" data-a="y">Allow</button><button class="btn ghost" data-a="n">Deny</button></div></div>`;
+        else h += `<div class="bot"><p>${esc(t)}</p></div>`;
+      }
+      if (isWorking()) h += '<div class="working"><i></i>Working…</div>';
+      p.innerHTML = '<div class="out">' + h + '</div>';
 
+      p.querySelectorAll("[data-more]").forEach(b => b.onclick = () => { cur["open" + b.dataset.more] = 1; renderPane(); });
+      p.querySelectorAll("[data-tools]").forEach(b => b.onclick = () => { const k = "tools" + b.dataset.tools; cur[k] = !cur[k]; renderPane(); });
       p.querySelectorAll("[data-a]").forEach(b => {
         b.onclick = () => {
           const ans = b.dataset.a;
@@ -670,7 +805,6 @@ public final class MobileBridgeServer: @unchecked Sendable {
           renderPane();
         };
       });
-      p.querySelectorAll(".edit-link").forEach(x => x.onclick = openDiff);
       p.querySelectorAll("[data-c]").forEach(c => {
         c.onclick = () => ({ diff: openDiff, pv: openPreview, pr: openPR })[c.dataset.c]();
       });
@@ -681,12 +815,52 @@ public final class MobileBridgeServer: @unchecked Sendable {
       $("d-add").textContent = "+" + add;
       $("d-del").textContent = "−" + del;
       $("diff-btn").disabled = !cur.files || !cur.files.length;
+      renderComposer();
       syncSend();
     }
 
-    function panel(title, html) {
+    function renderComposer() {
+      const show = canControl();
+      $("ctl").hidden = !show;
+      if (!show) return;
+      const eff = cur.effort ? ` <span class="k">· ${EFFORT_LABEL[cur.effort] || esc(cur.effort)}</span>` : "";
+      $("model-chip").innerHTML = `${esc(cur.modelName || "Model")}${eff} <span class="car">▾</span>`;
+      const inCycle = MODE_OPTS.some(x => x[0] === cur.mode);
+      const mc = $("mode-chip");
+      mc.hidden = !cur.mode;
+      mc.disabled = !inCycle; // a mode outside Shift+Tab's cycle (e.g. bypass) is shown, not switchable
+      mc.className = "chipbtn" + (cur.mode === "plan" ? " mode-plan" : "");
+      mc.innerHTML = `${esc(modeName(cur.mode || ""))}${inCycle ? ' <span class="car">▾</span>' : ""}`;
+    }
+
+    function sendAgentCommand(kind, value) {
+      if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ agentCommand: { kind, value } }));
+    }
+    function openModel() {
+      panel("Model", `<div class="pick" role="radiogroup" aria-label="Model">
+        ${MODEL_OPTS.map(([id, name, d]) => `<button class="opt" role="radio" aria-checked="${(cur.modelName || "").toLowerCase().startsWith(id)}" data-m="${id}"><span class="t">${name}</span><span class="ck">✓</span><span class="d">${esc(d)}</span></button>`).join("")}
+        <h5>Effort</h5>
+        <div class="seg" role="group" aria-label="Effort">${EFFORTS.map(e => `<button data-e="${e}" aria-pressed="${e === cur.effort}">${EFFORT_LABEL[e]}</button>`).join("")}</div>
+        <p class="hint">Sent to Claude Code as /model and /effort. The current effort can't be read back, so it only shows once you set it here.</p></div>`, true);
+      $("panel-body").querySelectorAll("[data-m]").forEach(b => b.onclick = () => {
+        const o = MODEL_OPTS.find(x => x[0] === b.dataset.m);
+        sendAgentCommand("model", o[0]); cur.modelName = o[1]; renderComposer(); $("panel").hidden = true; toast("Model: " + o[1], "/model " + o[0]);
+      });
+      $("panel-body").querySelectorAll("[data-e]").forEach(b => b.onclick = () => {
+        sendAgentCommand("effort", b.dataset.e); cur.effort = b.dataset.e; renderComposer(); $("panel").hidden = true; toast("Effort: " + EFFORT_LABEL[cur.effort], "/effort " + cur.effort);
+      });
+    }
+    function openMode() {
+      panel("Mode", `<div class="pick" role="radiogroup" aria-label="Mode">${MODE_OPTS.map(([id, name, d]) => `<button class="opt" role="radio" aria-checked="${id === cur.mode}" data-o="${id}"><span class="t">${name}</span><span class="ck">✓</span><span class="d">${esc(d)}</span></button>`).join("")}</div>`, true);
+      $("panel-body").querySelectorAll("[data-o]").forEach(b => b.onclick = () => {
+        sendAgentCommand("mode", b.dataset.o); cur.mode = b.dataset.o; renderComposer(); $("panel").hidden = true; toast("Mode: " + modeName(cur.mode), "Shift+Tab");
+      });
+    }
+
+    function panel(title, html, small) {
       $("panel-t").textContent = title;
       $("panel-body").innerHTML = html;
+      $("panel-box").className = "panel" + (small ? " small" : "");
       $("panel").hidden = false;
     }
     $("panel-x").onclick = () => { $("panel").hidden = true; };
@@ -822,7 +996,7 @@ public final class MobileBridgeServer: @unchecked Sendable {
     }
 
     function syncSend() {
-      const stop = cur && cur.state === "run" && !$("msg").value.trim() && !atts.length;
+      const stop = isWorking() && !$("msg").value.trim() && !atts.length;
       const b = $("send");
       b.textContent = stop ? "■" : "↑";
       b.classList.toggle("stopping", stop);
@@ -839,7 +1013,7 @@ public final class MobileBridgeServer: @unchecked Sendable {
 
     function send(text) {
       if (!text.trim() && !atts.length) {
-        if (cur && cur.state === "run") {
+        if (isWorking()) {
           if (ws && ws.readyState === WebSocket.OPEN) {
             ws.send(JSON.stringify({ stop: true }));
           }
@@ -861,6 +1035,8 @@ public final class MobileBridgeServer: @unchecked Sendable {
       const attNames = atts.map(a => typeof a === 'object' ? a.name : a);
       const fullDisplay = text + (attNames.length ? (text ? "\n" : "") + "📎 " + attNames.join(", ") : "");
       cur.out.push(["user", fullDisplay]);
+      cur.sentAt = Date.now();
+      setTimeout(() => { if (cur) renderPane(); }, 4100);
       atts = [];
       renderAtts();
       $("msg").value = "";
@@ -902,6 +1078,8 @@ public final class MobileBridgeServer: @unchecked Sendable {
     }
 
     $("msg").addEventListener("input", syncSend);
+    $("model-chip").onclick = openModel;
+    $("mode-chip").onclick = openMode;
     $("send").onclick = () => send($("msg").value);
     $("msg").addEventListener("keydown", e => {
       if (e.key === "Enter" && !e.shiftKey) {
@@ -967,7 +1145,8 @@ public final class MobileBridgeServer: @unchecked Sendable {
       for (const it of t.items || []) {
         if (cur.seen.has(it.id)) continue;
         cur.seen.add(it.id);
-        if (it.role === "user") cur.out.push(["user", it.text]);
+        if (it.attachment) cur.out.push(["img", it.attachment]);
+        else if (it.role === "user") cur.out.push(["user", it.text]);
         else if (it.role === "assistant") cur.out.push(["agent", it.text]);
         else {
           const line = (it.toolName || "Tool") + (it.toolTarget ? " " + it.toolTarget : "");
@@ -976,6 +1155,8 @@ public final class MobileBridgeServer: @unchecked Sendable {
         }
       }
       if (cur.out.length > 400) cur.out = cur.out.slice(-400);
+      if (t.model) cur.modelName = modelLabel(t.model);
+      if (t.mode) cur.mode = t.mode;
       renderPane();
     }
 
@@ -1103,6 +1284,14 @@ public final class MobileBridgeServer: @unchecked Sendable {
       }, 1000);
     }
 
+    // Fallback view only (agents with no transcript): drop TUI chrome that is not conversation.
+    const CHROME_LINE = /[\u2500-\u259f\u2800-\u28ff]|CLAUDE CODE \||\bctx [░█ ]|\brem:\d+%|shift\+tab|\? for shortcuts|esc to interrupt|accept edits on|bypass permissions on/i;
+    const PLACEHOLDER = /\[(?:Image|Pasted text|Pasted image)[^\]]*#\d+[^\]]*\]/g;
+    function stripChrome(line) {
+      if (CHROME_LINE.test(line)) return "";
+      return line.replace(PLACEHOLDER, "");
+    }
+
     function handleTerminalBytes(raw) {
       if (!cur) return;
       const clean = stripANSI(raw);
@@ -1117,7 +1306,7 @@ public final class MobileBridgeServer: @unchecked Sendable {
         }
       }
       if (cur.transcript) return;
-      const lines = clean.split('\n').filter(l => l.trim().length > 0);
+      const lines = clean.split('\n').map(stripChrome).filter(l => l.trim().length > 0);
       for (const line of lines) {
         const trimmed = line.trim();
         if (trimmed.startsWith('> ') || trimmed.startsWith('$ ')) {
@@ -1600,7 +1789,11 @@ public final class MobileBridgeServer: @unchecked Sendable {
         var gitDiff: GitDiffRequest?
         var createDraftPR: CreateDraftPRRequest?
         var stop: Bool?
+        /// `{"agentCommand":{"kind":"model|effort|mode","value":"..."}}` — drives the attached Claude
+        /// Code TUI through its own slash commands / Shift+Tab; values are allowlisted server-side.
+        var agentCommand: AgentCommandRequest?
 
+        struct AgentCommandRequest: Decodable { var kind: String; var value: String }
         struct GitDiffRequest: Decodable { var path: String? }
         struct CreateDraftPRRequest: Decodable { var title: String?; var path: String? }
         struct SpawnPayload: Decodable { var cwd: String? }
@@ -1636,7 +1829,7 @@ public final class MobileBridgeServer: @unchecked Sendable {
     /// (first send after attach, or the agent switched sessions via /clear or /resume); otherwise
     /// append. Absent entirely for a surface with no transcript — the client keeps its raw view.
     struct TranscriptPush: Encodable {
-        struct Body: Encodable { var reset: Bool; var items: [TranscriptItem] }
+        struct Body: Encodable { var reset: Bool; var items: [TranscriptItem]; var model: String?; var mode: String? }
         var transcript: Body
     }
     static let transcriptBacklogLimit = 200
@@ -2027,8 +2220,10 @@ public final class MobileBridgeServer: @unchecked Sendable {
             offset = read.endOffset
             var items = read.lines.flatMap(ClaudeTranscriptLine.items(from:))
             if reset { items = Array(items.suffix(Self.transcriptBacklogLimit)) }
-            guard reset || !items.isEmpty else { return }
-            self.sendJSON(TranscriptPush(transcript: .init(reset: reset, items: items)), on: connection)
+            let meta = ClaudeTranscriptLine.meta(from: read.lines)
+            if let mode = meta.mode { state.agentMode = mode }
+            guard reset || !items.isEmpty || meta.model != nil || meta.mode != nil else { return }
+            self.sendJSON(TranscriptPush(transcript: .init(reset: reset, items: items, model: meta.model, mode: meta.mode)), on: connection)
         }
         state.transcriptTimer = timer
         timer.resume()
@@ -2851,6 +3046,49 @@ public final class MobileBridgeServer: @unchecked Sendable {
         }
     }
 
+    /// Claude Code's `Shift+Tab` cycle order, verified in a live TTY (claude 2.1.296): manual,
+    /// acceptEdits, plan, auto, then back to manual. `bypassPermissions` is not in the cycle.
+    static let modeCycle = ["manual", "acceptEdits", "plan", "auto"]
+    static let commandModels: Set<String> = ["opus", "sonnet", "haiku", "fable"]
+    static let commandEfforts: Set<String> = ["low", "medium", "high", "xhigh", "max"]
+
+    /// Chunks to type for an agent command, or nil when the request is not allowlisted. Pure so it is
+    /// unit-testable; `currentMode` is the mode last read from the transcript (a cycle needs a start).
+    static func agentCommandInput(kind: String, value: String, currentMode: String?) -> [Data]? {
+        switch kind {
+        case "model" where commandModels.contains(value):
+            return [Data("/model \(value)".utf8), Data("\r".utf8)]
+        case "effort" where commandEfforts.contains(value):
+            return [Data("/effort \(value)".utf8), Data("\r".utf8)]
+        case "mode":
+            guard let from = currentMode.flatMap(modeCycle.firstIndex(of:)),
+                  let to = modeCycle.firstIndex(of: value) else { return nil }
+            let presses = (to - from + modeCycle.count) % modeCycle.count
+            return Array(repeating: Data([0x1b, 0x5b, 0x5a]), count: presses)
+        default:
+            return nil
+        }
+    }
+
+    private func handleAgentCommand(_ cmd: ControlMessage.AgentCommandRequest, connection: NWConnection, state: ConnectionState) {
+        guard let surfaceID = state.surfaceID, let subscription = state.subscription,
+              AgentDetector.snapshot(forSurfaceKey: surfaceID)?.kind == .claudeCode else {
+            sendText(#"{"error":"model, effort and mode can only be changed on an attached Claude session"}"#, on: connection)
+            return
+        }
+        guard let chunks = Self.agentCommandInput(kind: cmd.kind, value: cmd.value, currentMode: state.agentMode) else {
+            sendText(#"{"error":"unsupported agent command"}"#, on: connection)
+            return
+        }
+        // Text and Enter go as separate writes (as a human types); the TUI treats one burst as a paste.
+        for chunk in chunks {
+            _ = subscription.sendInput(chunk, surfaceID: surfaceID)
+            Thread.sleep(forTimeInterval: 0.15)
+        }
+        if cmd.kind == "mode" { state.agentMode = cmd.value }
+        sendText(#"{"ok":"agentCommand"}"#, on: connection)
+    }
+
     private func handleStop(connection: NWConnection, state: ConnectionState) {
         guard let surfaceID = state.surfaceID, let subscription = state.subscription else {
             sendText(#"{"error":"no active session attached to stop"}"#, on: connection)
@@ -2937,6 +3175,10 @@ public final class MobileBridgeServer: @unchecked Sendable {
         } else if let pr = message.createDraftPR {
             state.controlQueue.async { [weak self] in
                 self?.handleCreateDraftPR(title: pr.title, path: pr.path, connection: connection, state: state)
+            }
+        } else if let cmd = message.agentCommand {
+            state.controlQueue.async { [weak self] in
+                self?.handleAgentCommand(cmd, connection: connection, state: state)
             }
         } else if message.stop == true {
             state.controlQueue.async { [weak self] in
