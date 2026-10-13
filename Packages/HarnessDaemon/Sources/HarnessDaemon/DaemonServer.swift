@@ -795,6 +795,7 @@ public final class DaemonServer: @unchecked Sendable {
                 protocolLevel: HarnessVersion.protocolLevel
             )
             stats.daemonAvailable = true
+            stats.daemonFootprintBytes = ProcessScan.physicalFootprint(getpid())
             stats.historyProtection = registry.activity.store.protectionKind
             stats.historyUnavailable = registry.activity.unavailable()
             return .daemonStats(stats)

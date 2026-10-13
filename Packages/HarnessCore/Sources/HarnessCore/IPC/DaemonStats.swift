@@ -39,6 +39,10 @@ public struct DaemonStats: Codable, Sendable {
     public var parkedSurfaceCount: Int?
     public var parkedStoredBytes: Int?
     public var parkedRawBytes: Int?
+    /// Physical footprint of the daemon and of the session host, from `ProcessScan.physicalFootprint`.
+    /// The app's own footprint is the client's to add.
+    public var daemonFootprintBytes: UInt64?
+    public var sessionHostFootprintBytes: UInt64?
     /// Milliseconds spent in each startup phase (`layout`, `surfaces`, `listen`).
     public var startupMillis: [String: Double]?
 

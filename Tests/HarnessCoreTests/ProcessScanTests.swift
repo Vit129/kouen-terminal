@@ -31,4 +31,15 @@ final class ProcessScanTests: XCTestCase {
         XCTAssertEqual(map[child.processIdentifier], getpid(),
                        "a spawned child's parent in the map is the test process")
     }
+
+    func testPhysicalFootprintCountsTouchedMemory() throws {
+        let before = try XCTUnwrap(ProcessScan.physicalFootprint(getpid()))
+        let size = 64 << 20
+        let block = UnsafeMutableRawPointer.allocate(byteCount: size, alignment: 4096)
+        defer { block.deallocate() }
+        block.initializeMemory(as: UInt8.self, repeating: 0xA5, count: size)
+        let after = try XCTUnwrap(ProcessScan.physicalFootprint(getpid()))
+        XCTAssertGreaterThan(after, before + UInt64(size / 2), "touched pages must be charged to the process")
+        XCTAssertNil(ProcessScan.physicalFootprint(0))
+    }
 }

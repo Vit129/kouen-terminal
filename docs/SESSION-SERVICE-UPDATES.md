@@ -77,7 +77,8 @@ replayed automatically. Mutation retry identities use a bounded sequence window:
 expired operations are rejected rather than executed again.
 
 `daemon-stats` reports `sessionHostPID`, `sessionHostVersion`, `sessionHostBuild`,
-`daemonPID`, `version`, `build`, and `daemonAvailable` separately. Private owner
+`daemonPID`, `version`, `build`, and `daemonAvailable` separately, plus
+`sessionHostFootprintBytes` and `daemonFootprintBytes` (the `footprint(1)` value). Private owner
 protocol/capability changes are reported as pending host updates even when build
 numbers match. An unavailable
 application daemon does not become a misleading healthy build or an empty layout.

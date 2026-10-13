@@ -247,6 +247,11 @@ extension HarnessCLI {
             print(String(format: "uptime: %.0fs", stats.uptimeSeconds))
             print("surfaces: \(stats.surfaceCount)")
             print("scrollback: \(stats.totalScrollbackBytes) bytes")
+            let memory = [("daemon", stats.daemonFootprintBytes), ("session host", stats.sessionHostFootprintBytes)]
+                .compactMap { name, bytes in
+                    bytes.map { "\(name) " + ByteCountFormatter.string(fromByteCount: Int64($0), countStyle: .memory) }
+                }
+            if !memory.isEmpty { print("memory: " + memory.joined(separator: ", ")) }
             print("clients: \(stats.clientCount)")
             print("subscribers: \(stats.subscriberCount)")
             print("snapshot-revision: \(stats.snapshotRevision)")

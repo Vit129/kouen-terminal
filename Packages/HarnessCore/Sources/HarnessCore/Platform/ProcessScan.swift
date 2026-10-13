@@ -48,6 +48,25 @@ public enum ProcessScan {
         return "\(boot.trimmingCharacters(in: .whitespacesAndNewlines)):\(pid):\(fields[19])"
         #endif
     }
+    /// Memory charged to the process: `phys_footprint` on Darwin, as `footprint(1)` reports it,
+    /// and resident pages on Linux. Nil when the kernel refuses to describe the process.
+    public static func physicalFootprint(_ pid: Int32) -> UInt64? {
+        guard pid > 0 else { return nil }
+        #if canImport(Darwin)
+        var info = rusage_info_v2()
+        let status = withUnsafeMutablePointer(to: &info) { pointer in
+            pointer.withMemoryRebound(to: rusage_info_t?.self, capacity: 1) { proc_pid_rusage(pid, RUSAGE_INFO_V2, $0) }
+        }
+        return status == 0 ? info.ri_phys_footprint : nil
+        #elseif os(Linux)
+        guard let statm = try? String(contentsOfFile: "/proc/\(pid)/statm", encoding: .utf8) else { return nil }
+        let fields = statm.split(whereSeparator: \.isWhitespace)
+        guard fields.count > 1, let pages = UInt64(fields[1]) else { return nil }
+        return pages * UInt64(sysconf(Int32(_SC_PAGESIZE)))
+        #else
+        return nil
+        #endif
+    }
     public static func workingDirectory(_ pid: Int32) -> String? {
         guard pid > 0 else { return nil }
         #if canImport(Darwin)

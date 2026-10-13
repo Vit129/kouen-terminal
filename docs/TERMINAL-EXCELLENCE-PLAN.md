@@ -152,6 +152,12 @@ Additional findings resolved during implementation:
   ring metadata and a conservative exceptional-cluster allowance. Configured line caps
   still apply first. Active screen, transient COW snapshots, rendering caches and raw bytes
   are additional memory, so 512 MiB is **not** a whole-process RSS promise.
+- History caps are per pane; there is no aggregate cap. At the default 10,000-line cap the
+  2026-10-10 scale run measured 287, 379, 578 and 780 MiB owned footprint at 1, 10, 30 and
+  50 sessions, about 10 MiB per extra pane, mostly in the app
+  (`docs/benchmarks/performance-rebuild-2026-10-10/scale-summary.json`). An aggregate
+  eviction policy matters only with unlimited scrollback across many panes, so it waits on a
+  measured need. `daemon-stats` and Connection Details report live footprints.
 - Exceptional clusters are limited to 256 UTF-8 bytes each and an 8 MiB pool per screen.
   Ordinary inline marks and ASCII stay allocation-free; extreme extending sequences beyond
   these limits are truncated. Pool reclamation is throttled under hostile output.

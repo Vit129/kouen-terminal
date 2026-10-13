@@ -461,8 +461,20 @@ final class MenuTarget: NSObject, NSMenuItemValidation, NSMenuDelegate {
             let details: String
             do {
                 guard case let .daemonStats(stats) = try DaemonClient(endpoint: endpoint).request(.daemonStats, timeout: 3) else { throw SetupError.invalid("Daemon did not answer") }
-                details = "Host: \(owner)\nConnection: \(state)\nDaemon: \(stats.version ?? "unknown") (\(stats.build.map(String.init) ?? "unknown"))\nFeatures: \((stats.capabilities ?? []).joined(separator: ", "))\nSurfaces: \(stats.surfaceCount)\n\nApp restarts reattach to surviving processes. Sleeping a local laptop pauses local processes. Reconnecting never reruns startup commands."
-            } catch { details = "Host: \(owner)\nConnection: \(state)\nDaemon request failed: \(error.localizedDescription)\n\nRetry the connection or edit the SSH destination and daemon socket." }
+                func size(_ bytes: UInt64?) -> String {
+                    bytes.map { ByteCountFormatter.string(fromByteCount: Int64($0), countStyle: .memory) } ?? "unknown"
+                }
+                let memory = "Memory: this app \(size(ProcessScan.physicalFootprint(getpid()))), "
+                    + "session host \(size(stats.sessionHostFootprintBytes)), daemon \(size(stats.daemonFootprintBytes))"
+                let daemon = "Daemon: \(stats.version ?? "unknown") (\(stats.build.map(String.init) ?? "unknown"))"
+                let features = (stats.capabilities ?? []).joined(separator: ", ")
+                details = "Host: \(owner)\nConnection: \(state)\n\(daemon)\nFeatures: \(features)\n"
+                    + "Surfaces: \(stats.surfaceCount)\n\(memory)\n\nApp restarts reattach to surviving processes. "
+                    + "Sleeping a local laptop pauses local processes. Reconnecting never reruns startup commands."
+            } catch {
+                details = "Host: \(owner)\nConnection: \(state)\nDaemon request failed: \(error.localizedDescription)\n\n"
+                    + "Retry the connection or edit the SSH destination and daemon socket."
+            }
             DispatchQueue.main.async {
                 let alert = NSAlert()
                 alert.messageText = "Connection Details"

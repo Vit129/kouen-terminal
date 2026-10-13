@@ -40,7 +40,7 @@ public enum CLICommandCatalog {
         .init("import", "Preview tmux layouts, iTerm2 colors or Ghostty settings; --dry-run writes nothing", json: true),
         .init("theme-preview", "Print deterministic themed sample output"),
         .init("ping", "Check the daemon is reachable"),
-        .init("daemon-stats", "Daemon pid, uptime, surface/client counts", json: true),
+        .init("daemon-stats", "Daemon pid, uptime, surface/client counts, memory", json: true),
         .init("list-workspaces", "List workspaces", json: true),
         .init("list-surfaces", "List terminal surfaces", json: true),
         .init("list-sessions", "List sidebar sessions", json: true),

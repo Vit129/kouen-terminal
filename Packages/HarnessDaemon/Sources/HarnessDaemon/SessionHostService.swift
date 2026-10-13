@@ -390,6 +390,7 @@ public final class SessionHostService: @unchecked Sendable {
                     stats.daemonAvailable = false
                 }
                 stats.daemonPID = stats.daemonAvailable == true ? worker?.process.processIdentifier : nil
+                stats.sessionHostFootprintBytes = ProcessScan.physicalFootprint(getpid())
                 stats.pid = getpid(); stats.sessionHostPID = getpid(); stats.sessionHostBuild = HarnessVersion.build; stats.sessionHostProtocolLevel = SessionHostRequest.protocolVersion; stats.sessionHostCapabilities = [DaemonStats.workloadInput]; stats.sessionHostVersion = HarnessVersion.short; stats.epoch = epoch
                 stats.surfaceCount = ptys.count; stats.clientCount = count; stats.pipeConsumerCount = pipeCount; stats.pendingProcessRetirements = pendingRetirements; stats.shutdownPending = shutdownPending; stats.pendingDaemonRetirements = daemonRetirements
                 let reasons = Array(Set(ptys.values.compactMap(\.historyUnavailable))).sorted()
