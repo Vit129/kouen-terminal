@@ -95,6 +95,7 @@ final class TerminalScreen {
             }
         }
         rowWrapped = Array(rowWrapped[firstRow...] + rowWrapped[..<firstRow])
+        rowWideDeferred = Array(rowWideDeferred[firstRow...] + rowWideDeferred[..<firstRow])
         rowMarks = Array(rowMarks[firstRow...] + rowMarks[..<firstRow])
         firstRow = 0
     }
@@ -199,17 +200,28 @@ final class TerminalScreen {
     private var retainedHistoryBlocks: [ObjectIdentifier: PackedHistoryBlock] = [:]
     private var historyBlockBytes = 0
 
-    private func historyLine(cells: [TerminalGridCell], wrapped: Bool, mark: SemanticMark? = nil) -> HistoryLine {
+    private func historyLine(
+        cells: [TerminalGridCell],
+        wrapped: Bool,
+        wideDeferred: Bool = false,
+        mark: SemanticMark? = nil
+    ) -> HistoryLine {
         if historyBlock.isFull { historyBlock = PackedHistoryBlock() }
-        return HistoryLine(cells: cells, wrapped: wrapped, mark: mark, block: historyBlock)
+        return HistoryLine(cells: cells, wrapped: wrapped, wideDeferred: wideDeferred, mark: mark, block: historyBlock)
     }
 
     private func appendViewportHistory(_ row: Int) {
         if historyBlock.isFull { historyBlock = PackedHistoryBlock() }
         let start = rowStart(row)
+        let phys = physicalRow(row)
         let line = cells.withUnsafeBufferPointer { source in
-            HistoryLine(cells: UnsafeBufferPointer(start: source.baseAddress! + start, count: cols),
-                wrapped: rowWrapped[physicalRow(row)], mark: rowMarks[physicalRow(row)], block: historyBlock)
+            HistoryLine(
+                cells: UnsafeBufferPointer(start: source.baseAddress! + start, count: cols),
+                wrapped: rowWrapped[phys],
+                wideDeferred: rowWideDeferred[phys],
+                mark: rowMarks[phys],
+                block: historyBlock
+            )
         }
         appendHistory(line)
     }
@@ -250,6 +262,10 @@ final class TerminalScreen {
     /// continues onto the next (set on autowrap in `wrapLine`), so reflow knows which physical
     /// rows form one logical line. Kept in sync with every row move (scroll/insert/delete/erase).
     private var rowWrapped: [Bool]
+    /// Per-row wide-deferral flag, parallel to `rowWrapped`: true only when a wide glyph at the
+    /// right margin wrapped early and left the last column as wrap padding. Cleared whenever the
+    /// last column is written or erased so an ECH/EL blank at the right margin is preserved.
+    private var rowWideDeferred: [Bool]
     /// Per-row OSC 133 semantic mark, parallel to `rowWrapped` (and carried into `HistoryLine`
     /// when a row scrolls off): non-nil marks a shell prompt line. Kept in lockstep with
     /// `rowWrapped` at every row move so prompt positions never drift.
@@ -297,6 +313,15 @@ final class TerminalScreen {
         if index < history.count { return history[index].wrapped }
         let r = index - history.count
         return r >= 0 && r < rowWrapped.count ? rowWrapped[physicalRow(r)] : false
+    }
+
+    /// Whether virtual line `index` left its final column blank because a wide glyph wrapped to
+    /// the next row rather than because of an explicit write or erase.
+    func isLineWideDeferred(_ index: Int) -> Bool {
+        guard index >= 0 else { return false }
+        if index < history.count { return history[index].wideDeferred }
+        let r = index - history.count
+        return r >= 0 && r < rowWideDeferred.count ? rowWideDeferred[physicalRow(r)] : false
     }
 
     /// The virtual-line span `[first, last]` of the logical (soft-wrapped) line containing `line` —
@@ -442,6 +467,7 @@ final class TerminalScreen {
         self.recordsHistory = recordsHistory
         self.cells = Array(repeating: .blank, count: c * r)
         self.rowWrapped = Array(repeating: false, count: r)
+        self.rowWideDeferred = Array(repeating: false, count: r)
         self.rowMarks = Array(repeating: nil, count: r)
         self.contentDamage = RowDamage(rows: r)
         self.tabStops = Self.defaultTabStops(c)
@@ -455,7 +481,8 @@ final class TerminalScreen {
     // MARK: - Snapshot
 
     func textSnapshot() -> TerminalTextSnapshot {
-        let history = history, cells = cells, wrapped = rowWrapped, cols = cols, rows = rows, firstRow = firstRow
+        let history = history, cells = cells, wrapped = rowWrapped, wideDeferred = rowWideDeferred
+        let cols = cols, rows = rows, firstRow = firstRow
         return TerminalTextSnapshot(lineCount: history.count + rows, historyCount: history.count,
             clusters: clusters, line: { index in
                 guard index >= 0, index < history.count + rows else { return [] }
@@ -465,6 +492,9 @@ final class TerminalScreen {
             }, wraps: { index in
                 guard index >= 0, index < history.count + rows else { return false }
                 return index < history.count ? history[index].wrapped : wrapped[(index - history.count + firstRow) % rows]
+            }, wideDeferred: { index in
+                guard index >= 0, index < history.count + rows else { return false }
+                return index < history.count ? history[index].wideDeferred : wideDeferred[(index - history.count + firstRow) % rows]
             })
     }
 
@@ -820,12 +850,17 @@ final class TerminalScreen {
     /// physical rows that ended in a soft autowrap are concatenated with their continuation
     /// into one logical line; otherwise every physical row is one line. Without `history`, the
     /// viewport alone.
-    func physicalRows(history includeHistory: Bool = true) -> [(cells: [TerminalGridCell], wrapped: Bool)] {
-        var phys: [(cells: [TerminalGridCell], wrapped: Bool)] = []
+    func physicalRows(
+        history includeHistory: Bool = true
+    ) -> [(cells: [TerminalGridCell], wrapped: Bool, wideDeferred: Bool)] {
+        var phys: [(cells: [TerminalGridCell], wrapped: Bool, wideDeferred: Bool)] = []
         phys.reserveCapacity((includeHistory ? history.count : 0) + rows)
-        if includeHistory { for h in history { phys.append((h.cells, h.wrapped)) } }
+        if includeHistory {
+            for h in history { phys.append((h.cells, h.wrapped, h.wideDeferred)) }
+        }
         for r in 0 ..< rows {
-            phys.append((viewportRowCells(r), rowWrapped[physicalRow(r)]))
+            let p = physicalRow(r)
+            phys.append((viewportRowCells(r), rowWrapped[p], rowWideDeferred[p]))
         }
         return phys
     }
@@ -837,7 +872,8 @@ final class TerminalScreen {
         var out: [[TerminalGridCell]] = []
         var current: [TerminalGridCell] = []
         for (idx, row) in phys.enumerated() {
-            let drop = row.wrapped ? wideDeferralGap(row: row.cells, next: idx + 1 < phys.count ? phys[idx + 1].cells : nil) : 0
+            let next = idx + 1 < phys.count ? phys[idx + 1].cells : nil
+            let drop = row.wrapped ? wideDeferralGap(row: row.cells, wideDeferred: row.wideDeferred, next: next) : 0
             let cells = drop > 0 ? Array(row.cells.dropLast(drop)) : row.cells
             current.append(contentsOf: cells)
             if !row.wrapped {
@@ -877,7 +913,8 @@ final class TerminalScreen {
         var current = ""
         var building = false
         for (idx, row) in phys.enumerated() {
-            let drop = row.wrapped ? wideDeferralGap(row: row.cells, next: idx + 1 < phys.count ? phys[idx + 1].cells : nil) : 0
+            let next = idx + 1 < phys.count ? phys[idx + 1].cells : nil
+            let drop = row.wrapped ? wideDeferralGap(row: row.cells, wideDeferred: row.wideDeferred, next: next) : 0
             let cells = drop > 0 ? Array(row.cells.dropLast(drop)) : row.cells
             current += text(cells, trimTrailing: !row.wrapped)
             building = true
@@ -938,6 +975,7 @@ final class TerminalScreen {
             cols = nc
             rows = nr
             rowWrapped = Array(repeating: false, count: nr)
+            rowWideDeferred = Array(repeating: false, count: nr)
             rowMarks = Array(repeating: nil, count: nr)
             cursorRow = min(cursorRow, nr - 1)
             cursorCol = min(cursorCol, nc - 1)
@@ -959,23 +997,11 @@ final class TerminalScreen {
     /// How many trailing cells of a soft-wrapped row are wrap *padding* (0 or 1), to drop when
     /// re-joining the logical line. The ONLY padding a soft wrap produces is the single gap left
     /// when a wide glyph couldn't fit the right margin and was deferred to the next row (`wrapLine`)
-    /// — identified by the next physical row beginning with that deferred `.wide` head. A trailing
-    /// blank NOT followed by a wide head is real content (e.g. an ECH/EL erasure, which leaves the
-    /// row soft-wrapped) and MUST be preserved, or reflow/capture would shift content left. `next`
-    /// is the following physical row (nil if this is the last row).
-    ///
-    /// The gap is the cell the deferral skipped, so it holds no glyph but may carry the
-    /// background of an earlier erase.
-    ///
-    /// KNOWN RESIDUAL CORNER: an ECH/EL that erases exactly the last column of a
-    /// soft-wrapped row whose continuation happens to start with a wide glyph is
-    /// indistinguishable from a genuine deferral gap at the cell level, and that erased blank
-    /// is dropped on reflow. Distinguishing them requires a per-row "deferral" flag set only
-    /// by the wide-wrap path in `print()` and carried through every row-mutation site —
-    /// deferred (tracked in the release-audit backlog) because the plumbing risk outweighs
-    /// this corner's likelihood.
-    private func wideDeferralGap(row: [TerminalGridCell], next: [TerminalGridCell]?) -> Int {
-        guard let next, let last = row.last, last.codepoint == 0, last.combining0 == 0,
+    /// — recorded by `wideDeferred` on the row and verified against the trailing blank and next
+    /// row's leading `.wide` head. Any later write or erase to the last column clears
+    /// `wideDeferred`, so an ECH/EL blank at the right margin is preserved as real content.
+    private func wideDeferralGap(row: [TerminalGridCell], wideDeferred: Bool, next: [TerminalGridCell]?) -> Int {
+        guard wideDeferred, let next, let last = row.last, last.codepoint == 0, last.combining0 == 0,
               last.width == .normal else { return 0 }
         for cell in next where cell.width != .spacerTail { return cell.width == .wide ? 1 : 0 }
         return 0
@@ -985,7 +1011,11 @@ final class TerminalScreen {
     /// the same logical text that capture and reflow produce.
     func wideDeferralGap(atBufferLine index: Int) -> Int {
         guard isLineWrapped(index), index + 1 < bufferLineCount else { return 0 }
-        return wideDeferralGap(row: bufferLine(index), next: bufferLine(index + 1))
+        return wideDeferralGap(
+            row: bufferLine(index),
+            wideDeferred: isLineWideDeferred(index),
+            next: bufferLine(index + 1)
+        )
     }
 
     /// Whether viewport row `r` (in the live `cells` grid) is entirely default-blank.
@@ -1032,6 +1062,7 @@ final class TerminalScreen {
         //    only; history is re-homed afterward.
         var newCells = [TerminalGridCell](); newCells.reserveCapacity(cols * nr)
         var newWrapped = [Bool](repeating: false, count: nr)
+        var newWideDeferred = [Bool](repeating: false, count: nr)
         var newMarks = [SemanticMark?](repeating: nil, count: nr)
         for slot in 0 ..< nr {
             let idx = boundary + slot
@@ -1040,12 +1071,15 @@ final class TerminalScreen {
                     let line = history[idx]
                     newCells.append(contentsOf: line.cells)
                     newWrapped[slot] = line.wrapped
+                    newWideDeferred[slot] = line.wideDeferred
                     newMarks[slot] = line.mark
                 } else {
                     let r = idx - historyCount
+                    let p = physicalRow(r)
                     newCells.append(contentsOf: viewportRowCells(r))
-                    newWrapped[slot] = rowWrapped[physicalRow(r)]
-                    newMarks[slot] = rowMarks[physicalRow(r)]
+                    newWrapped[slot] = rowWrapped[p]
+                    newWideDeferred[slot] = rowWideDeferred[p]
+                    newMarks[slot] = rowMarks[p]
                 }
             } else {
                 newCells.append(contentsOf: repeatElement(blank, count: cols))
@@ -1074,6 +1108,7 @@ final class TerminalScreen {
         cells = newCells
         firstRow = 0
         rowWrapped = newWrapped
+        rowWideDeferred = newWideDeferred
         rowMarks = newMarks
         rows = nr
         cursorRow = clamp(cursorAbs - boundary, 0, nr - 1)
@@ -1102,6 +1137,7 @@ final class TerminalScreen {
     private struct RewrapResult {
         var out: [[TerminalGridCell]]
         var wrapped: [Bool]
+        var wideDeferred: [Bool]
         var marks: [SemanticMark?]
         var logicalOf: [Int]            // source-row index → its logical line index
         var logicalFirstOutRow: [Int]   // logical line index → its first output row
@@ -1129,7 +1165,7 @@ final class TerminalScreen {
     /// Byte-identical to that algorithm across the corpus/property/fast-path/preview suites.
     private func rewrapRows(
         sourceCount: Int,
-        sourceRow: (Int) -> (cells: [TerminalGridCell], wrapped: Bool, mark: SemanticMark?),
+        sourceRow: (Int) -> (cells: [TerminalGridCell], wrapped: Bool, wideDeferred: Bool, mark: SemanticMark?),
         cursorAbsRow: Int,
         toCols nc: Int,
         anchorPositions: [TerminalTextPosition] = []
@@ -1137,6 +1173,7 @@ final class TerminalScreen {
         let blank = TerminalGridCell.blank
         var out: [[TerminalGridCell]] = []
         var outWrapped: [Bool] = []
+        var outWideDeferred: [Bool] = []
         var outMarks: [SemanticMark?] = []
         var logicalOf = [Int](repeating: 0, count: sourceCount)
         var logicalFirstOutRow: [Int] = []
@@ -1161,7 +1198,7 @@ final class TerminalScreen {
         var li = 0
         // One-row lookahead so each source row is fetched exactly once (the deferral-gap check
         // peeks at the next row's first glyph).
-        var lookahead: (cells: [TerminalGridCell], wrapped: Bool, mark: SemanticMark?)? =
+        var lookahead: (cells: [TerminalGridCell], wrapped: Bool, wideDeferred: Bool, mark: SemanticMark?)? =
             sourceCount > 0 ? sourceRow(0) : nil
         while i < sourceCount {
             // Extent: collect this logical line's rows, effective lengths, mark, and cursor.
@@ -1182,7 +1219,7 @@ final class TerminalScreen {
                 }
                 var eff = s.cells.count
                 if s.wrapped {
-                    eff -= wideDeferralGap(row: s.cells, next: lookahead?.cells)
+                    eff -= wideDeferralGap(row: s.cells, wideDeferred: s.wideDeferred, next: lookahead?.cells)
                 }
                 while nextAnchor < sortedAnchors.count, sortedAnchors[nextAnchor].line == i {
                     let anchor = sortedAnchors[nextAnchor]
@@ -1250,6 +1287,7 @@ final class TerminalScreen {
                     produced += rowLen
                     out.append(rowBuf)
                     outWrapped.append(outR < rowsOut - 1)
+                    outWideDeferred.append(false)
                     outMarks.append(outR == 0 ? lineMark : nil)
                 }
                 for anchor in lineAnchors {
@@ -1283,9 +1321,10 @@ final class TerminalScreen {
                 var rowBuf = Array(repeating: blank, count: nc)
                 var col = 0
                 var firstRowOfLogical = true
-                func flush(soft: Bool) {
+                func flush(soft: Bool, wideDeferred: Bool = false) {
                     out.append(rowBuf)
                     outWrapped.append(soft)
+                    outWideDeferred.append(wideDeferred)
                     outMarks.append(firstRowOfLogical ? lineMark : nil)
                     firstRowOfLogical = false
                     rowBuf = Array(repeating: blank, count: nc)
@@ -1297,7 +1336,7 @@ final class TerminalScreen {
                     let cell = joined[k]
                     if cell.width == .spacerTail { k += 1; continue }
                     let wcols = (cell.width == .wide) ? 2 : 1
-                    if col + wcols > nc { flush(soft: true) }
+                    if col + wcols > nc { flush(soft: true, wideDeferred: col < nc) }
                     if cursorInLine, k == cursorLogicalCol {
                         cursorOutRow = out.count
                         cursorOutCol = col
@@ -1328,7 +1367,7 @@ final class TerminalScreen {
         }
 
         return RewrapResult(
-            out: out, wrapped: outWrapped, marks: outMarks,
+            out: out, wrapped: outWrapped, wideDeferred: outWideDeferred, marks: outMarks,
             logicalOf: logicalOf, logicalFirstOutRow: logicalFirstOutRow,
             cursorOutRow: cursorOutRow, cursorOutCol: cursorOutCol, anchorPositions: mappedAnchors
         )
@@ -1347,13 +1386,14 @@ final class TerminalScreen {
         let cursorAbsFull = history.count + min(cursorRow, rows - 1)
         let blank = TerminalGridCell.blank
 
-        func sourceRow(_ i: Int) -> (cells: [TerminalGridCell], wrapped: Bool, mark: SemanticMark?) {
+        func sourceRow(_ i: Int) -> (cells: [TerminalGridCell], wrapped: Bool, wideDeferred: Bool, mark: SemanticMark?) {
             if i < history.count {
                 let h = history[i]
-                return (h.reflowCells, h.wrapped, h.mark)
+                return (h.reflowCells, h.wrapped, h.wideDeferred, h.mark)
             }
             let r = i - history.count
-            return (viewportRowCells(r), rowWrapped[physicalRow(r)], rowMarks[physicalRow(r)])
+            let p = physicalRow(r)
+            return (viewportRowCells(r), rowWrapped[p], rowWideDeferred[p], rowMarks[p])
         }
 
         // Gather a suffix [start, totalSrc) that begins at a hard-line boundary (so its first logical
@@ -1417,15 +1457,17 @@ final class TerminalScreen {
             sourceRow: { i in
                 if i < historyCount {
                     let h = self.history[i]
-                    return (h.reflowCells, h.wrapped, h.mark)
+                    return (h.reflowCells, h.wrapped, h.wideDeferred, h.mark)
                 }
                 let r = i - historyCount
-                return (vpRows[r], self.rowWrapped[self.physicalRow(r)], self.rowMarks[self.physicalRow(r)])
+                let p = self.physicalRow(r)
+                return (vpRows[r], self.rowWrapped[p], self.rowWideDeferred[p], self.rowMarks[p])
             },
             cursorAbsRow: cursorAbsRow, toCols: nc, anchorPositions: anchors.map(\.1)
         )
         var out = rw.out
         var outWrapped = rw.wrapped
+        var outWideDeferred = rw.wideDeferred
         var outMarks = rw.marks
         let logicalOf = rw.logicalOf
         let logicalFirstOutRow = rw.logicalFirstOutRow
@@ -1439,25 +1481,32 @@ final class TerminalScreen {
         while total - 1 > cursorOutRow, isRowBlank(out[total - 1]) { total -= 1 }
         out = Array(out.prefix(total))
         outWrapped = Array(outWrapped.prefix(total))
+        outWideDeferred = Array(outWideDeferred.prefix(total))
         outMarks = Array(outMarks.prefix(total))
 
         let viewportTop = max(0, total - nr)
         // Scrollback = rows above the viewport.
         var newHistory: [HistoryLine] = []
         if viewportTop > 0 {
-            for i in 0 ..< viewportTop { newHistory.append(historyLine(cells: out[i], wrapped: outWrapped[i], mark: outMarks[i])) }
+            for i in 0 ..< viewportTop {
+                newHistory.append(
+                    historyLine(cells: out[i], wrapped: outWrapped[i], wideDeferred: outWideDeferred[i], mark: outMarks[i])
+                )
+            }
             if maxHistoryLines > 0, newHistory.count > maxHistoryLines { newHistory.removeFirst(newHistory.count - maxHistoryLines) }
         }
         // Viewport = the next `nr` rows, blank-padded at the bottom if content is shorter.
         var newCells = [TerminalGridCell]()
         newCells.reserveCapacity(nc * nr)
         var newWrapped = [Bool](repeating: false, count: nr)
+        var newWideDeferred = [Bool](repeating: false, count: nr)
         var newMarks = [SemanticMark?](repeating: nil, count: nr)
         for r in 0 ..< nr {
             let srcIdx = viewportTop + r
             if srcIdx < total {
                 newCells.append(contentsOf: out[srcIdx])
                 newWrapped[r] = outWrapped[srcIdx]
+                newWideDeferred[r] = outWideDeferred[srcIdx]
                 newMarks[r] = outMarks[srcIdx]
             } else {
                 newCells.append(contentsOf: Array(repeating: blank, count: nc))
@@ -1475,6 +1524,7 @@ final class TerminalScreen {
         cells = newCells
         firstRow = 0
         rowWrapped = newWrapped
+        rowWideDeferred = newWideDeferred
         rowMarks = newMarks
         cols = nc
         rows = nr
@@ -1559,7 +1609,7 @@ final class TerminalScreen {
             // A wide glyph that can't fit the last column wraps — but only with DECAWM on.
             // With autowrap off (`\e[?7l`) the VT220 behavior is to write the left half at the
             // margin and pin the cursor there (truncate), never scroll; `advance(by: 2)` clamps.
-            wrapLine()
+            wrapLine(wideDeferred: true)
         }
 
         // IRM (insert mode): open `w` cells at the cursor, shifting the line's tail right, before
@@ -1587,6 +1637,7 @@ final class TerminalScreen {
         shiftCharacterAnchors(by: count)
         let rowStart = cursorRow * cols
         moveCells(dst: rowStart + cursorCol + count, src: rowStart + cursorCol, count: cols - cursorCol - count)
+        rowWideDeferred[physicalRow(cursorRow)] = false
     }
 
     /// Write a run of printable ASCII bytes (each `0x20...0x7E`, always width 1, never combining)
@@ -1636,6 +1687,7 @@ final class TerminalScreen {
                 if endCol >= cols {
                     cursorCol = cols - 1
                     pendingWrap = autowrap
+                    rowWideDeferred[physicalRow(cursorRow)] = false
                 } else {
                     cursorCol = endCol
                     pendingWrap = false
@@ -1646,6 +1698,7 @@ final class TerminalScreen {
                 // further byte overwrites the last column, so only the run's final byte survives.
                 template.codepoint = UInt32(bytes[i])
                 cells[rowBase + cols - 1] = template
+                rowWideDeferred[physicalRow(cursorRow)] = false
                 i += 1
                 pendingWrap = autowrap
                 if !autowrap, i < n {
@@ -1697,7 +1750,7 @@ final class TerminalScreen {
             if pendingWrap {
                 wrapLine()
             } else if w == 2, cursorCol >= cols - 1, autowrap {
-                wrapLine()
+                wrapLine(wideDeferred: true)
             }
             // Defensive bounds guard, matching `writeCell` / `printASCIIRun`.
             guard cursorRow >= 0, cursorRow < rows else { return }
@@ -1713,11 +1766,17 @@ final class TerminalScreen {
                     template.width = .spacerTail
                     cells[rowBase + cursorCol + 1] = template
                 }
+                if cursorCol + 1 >= cols - 1 {
+                    rowWideDeferred[physicalRow(cursorRow)] = false
+                }
                 advance(by: 2)
             } else {
                 template.codepoint = scalar
                 template.width = .normal
                 cells[rowBase + cursorCol] = template
+                if cursorCol == cols - 1 {
+                    rowWideDeferred[physicalRow(cursorRow)] = false
+                }
                 advance(by: 1)
             }
             // Mark each row we wrote dirty exactly once (the direct writes above bypass `writeCell`);
@@ -1755,6 +1814,9 @@ final class TerminalScreen {
     private func writeCell(_ cell: TerminalGridCell, at col: Int) {
         guard col >= 0, col < cols, cursorRow >= 0, cursorRow < rows else { return }
         cells[rowStart(cursorRow) + col] = cell
+        if col == cols - 1 {
+            rowWideDeferred[physicalRow(cursorRow)] = false
+        }
         markRowDirty(cursorRow)
     }
 
@@ -1834,7 +1896,7 @@ final class TerminalScreen {
             if column == cols - 1, autowrap {
                 cells[index] = .blank
                 markRowDirty(cursorRow)
-                wrapLine()
+                wrapLine(wideDeferred: true)
                 writeCell(cell, at: 0)
                 writeCell(makeCell(0, width: .spacerTail), at: 1)
                 advance(by: 2)
@@ -1842,6 +1904,9 @@ final class TerminalScreen {
             }
             cells[index] = cell
             if column + 1 < cols { cells[index + 1] = makeCell(0, width: .spacerTail) }
+            if column + 1 >= cols - 1 {
+                rowWideDeferred[physicalRow(cursorRow)] = false
+            }
             cursorCol = column
             advance(by: 2)
         } else { cells[index] = cell }
@@ -1863,11 +1928,15 @@ final class TerminalScreen {
     }
 
     /// Move to column 0 of the next line, scrolling within the region if at the bottom.
-    private func wrapLine() {
+    private func wrapLine(wideDeferred: Bool = false) {
         pendingWrap = false
         // The row we're leaving continues onto the next (a soft wrap) — record it so resize
         // reflow re-joins the logical line. `lineFeed` may scroll; `scrollUp` carries the flag.
-        if cursorRow >= 0, cursorRow < rowWrapped.count { rowWrapped[physicalRow(cursorRow)] = true }
+        if cursorRow >= 0, cursorRow < rowWrapped.count {
+            let p = physicalRow(cursorRow)
+            rowWrapped[p] = true
+            rowWideDeferred[p] = wideDeferred
+        }
         markRowDirty(cursorRow)
         cursorCol = 0
         lineFeed()
@@ -2020,7 +2089,12 @@ final class TerminalScreen {
     func screenAlignmentTest() {
         invalidateTextAnchors(from: 0, count: rows * cols + 1)
         fillCells(0, cells.count, with: TerminalGridCell(codepoint: 0x45)) // 'E'
-        for r in 0 ..< rows { rowWrapped[physicalRow(r)] = false; rowMarks[physicalRow(r)] = nil }
+        for r in 0 ..< rows {
+            let p = physicalRow(r)
+            rowWrapped[p] = false
+            rowWideDeferred[p] = false
+            rowMarks[p] = nil
+        }
         clearImages()
         scrollTop = 0
         scrollBottom = rows - 1
@@ -2127,13 +2201,18 @@ final class TerminalScreen {
         }
         if survivors > 0, scrollTop != 0 || scrollBottom != rows - 1 {
             for r in scrollTop ..< (scrollTop + survivors) {
-                rowWrapped[physicalRow(r)] = rowWrapped[physicalRow(r + count)]
-                rowMarks[physicalRow(r)] = rowMarks[physicalRow(r + count)]
+                let dst = physicalRow(r)
+                let src = physicalRow(r + count)
+                rowWrapped[dst] = rowWrapped[src]
+                rowWideDeferred[dst] = rowWideDeferred[src]
+                rowMarks[dst] = rowMarks[src]
             }
         }
         for r in (scrollTop + survivors) ... scrollBottom {
-            rowWrapped[physicalRow(r)] = false
-            rowMarks[physicalRow(r)] = nil
+            let p = physicalRow(r)
+            rowWrapped[p] = false
+            rowWideDeferred[p] = false
+            rowMarks[p] = nil
         }
         recordScroll(by: -count,
                      blankBand: (scrollTop + survivors) ..< (scrollBottom + 1),
@@ -2174,14 +2253,19 @@ final class TerminalScreen {
         if survivors > 0, !wholeViewport {
             var r = scrollBottom
             while r >= scrollTop + count {
-                rowWrapped[physicalRow(r)] = rowWrapped[physicalRow(r - count)]
-                rowMarks[physicalRow(r)] = rowMarks[physicalRow(r - count)]
+                let dst = physicalRow(r)
+                let src = physicalRow(r - count)
+                rowWrapped[dst] = rowWrapped[src]
+                rowWideDeferred[dst] = rowWideDeferred[src]
+                rowMarks[dst] = rowMarks[src]
                 r -= 1
             }
         }
         for r in scrollTop ..< (scrollTop + count) {
-            rowWrapped[physicalRow(r)] = false
-            rowMarks[physicalRow(r)] = nil
+            let p = physicalRow(r)
+            rowWrapped[p] = false
+            rowWideDeferred[p] = false
+            rowMarks[p] = nil
         }
         recordScroll(by: count,
                      blankBand: scrollTop ..< (scrollTop + count),
@@ -2238,21 +2322,41 @@ final class TerminalScreen {
         case 1:
             // Full rows above the cursor, then the cursor row up to and including the cursor.
             fillCells(0, cursorRow * cols, with: blank)
-            for r in 0 ..< cursorRow { rowWrapped[physicalRow(r)] = false; rowMarks[physicalRow(r)] = nil }
+            for r in 0 ..< cursorRow {
+                let p = physicalRow(r)
+                rowWrapped[p] = false
+                rowWideDeferred[p] = false
+                rowMarks[p] = nil
+            }
             fillCells(cursorRow * cols, min(cursorCol + 1, cols), with: blank)
+            if cursorCol >= cols - 1 {
+                rowWideDeferred[physicalRow(cursorRow)] = false
+            }
             markRowsDirty(0 ... cursorRow)
         case 2, 3:
             fillCells(0, cells.count, with: blank)
-            for r in 0 ..< rows { rowWrapped[physicalRow(r)] = false; rowMarks[physicalRow(r)] = nil }
+            for r in 0 ..< rows {
+                let p = physicalRow(r)
+                rowWrapped[p] = false
+                rowWideDeferred[p] = false
+                rowMarks[p] = nil
+            }
             clearImages()   // ED 2/3 clears the screen (and scrollback for 3) → drop images
             if mode == 3 { clearHistory(); collectClusters() }
             markFullyDirty()
         default: // 0
             // Cursor → end of its row, then every full row below in one bulk fill.
             fillCells(cursorRow * cols + cursorCol, cols - cursorCol, with: blank)
-            rowWrapped[physicalRow(cursorRow)] = false
+            let p = physicalRow(cursorRow)
+            rowWrapped[p] = false
+            rowWideDeferred[p] = false
             fillCells((cursorRow + 1) * cols, (rows - cursorRow - 1) * cols, with: blank)
-            for r in (cursorRow + 1) ..< rows { rowWrapped[physicalRow(r)] = false; rowMarks[physicalRow(r)] = nil }
+            for r in (cursorRow + 1) ..< rows {
+                let rp = physicalRow(r)
+                rowWrapped[rp] = false
+                rowWideDeferred[rp] = false
+                rowMarks[rp] = nil
+            }
             markRowsDirty(cursorRow ..< rows)
         }
         pendingWrap = false
@@ -2272,13 +2376,20 @@ final class TerminalScreen {
         switch mode {
         case 1:
             fillCells(rowStart, min(cursorCol + 1, cols), with: blank)
+            if cursorCol >= cols - 1 {
+                rowWideDeferred[physicalRow(cursorRow)] = false
+            }
         case 2:
             fillCells(rowStart, cols, with: blank)
-            rowWrapped[physicalRow(cursorRow)] = false
-            rowMarks[physicalRow(cursorRow)] = nil   // whole line cleared → no longer a prompt
+            let p = physicalRow(cursorRow)
+            rowWrapped[p] = false
+            rowWideDeferred[p] = false
+            rowMarks[p] = nil   // whole line cleared → no longer a prompt
         default:
             fillCells(rowStart + cursorCol, cols - cursorCol, with: blank)
-            rowWrapped[physicalRow(cursorRow)] = false
+            let p = physicalRow(cursorRow)
+            rowWrapped[p] = false
+            rowWideDeferred[p] = false
         }
         markRowDirty(cursorRow)
         pendingWrap = false
@@ -2293,6 +2404,7 @@ final class TerminalScreen {
         // then blank the `count` cells opened at the cursor.
         moveCells(dst: rowStart + cursorCol + count, src: rowStart + cursorCol, count: cols - cursorCol - count)
         fillCells(rowStart + cursorCol, count, with: erasedCell())
+        rowWideDeferred[physicalRow(cursorRow)] = false
         markRowDirty(cursorRow)
         pendingWrap = false
     }
@@ -2306,6 +2418,7 @@ final class TerminalScreen {
         // then blank the `count` cells freed at the end of the line.
         moveCells(dst: rowStart + cursorCol, src: rowStart + cursorCol + count, count: cols - cursorCol - count)
         fillCells(rowStart + cols - count, count, with: erasedCell())
+        rowWideDeferred[physicalRow(cursorRow)] = false
         markRowDirty(cursorRow)
         pendingWrap = false
     }
@@ -2318,6 +2431,9 @@ final class TerminalScreen {
         // loop — the last edit primitive that still looped. Byte-identical (ECH fills with the
         // background-colored `erasedCell`).
         fillCells(cursorRow * cols + cursorCol, count, with: erasedCell())
+        if cursorCol + count >= cols {
+            rowWideDeferred[physicalRow(cursorRow)] = false
+        }
         markRowDirty(cursorRow)
     }
 
@@ -2333,14 +2449,22 @@ final class TerminalScreen {
             moveCells(dst: (cursorRow + count) * cols, src: cursorRow * cols, count: survivors * cols)
             var r = scrollBottom
             while r >= cursorRow + count {
-                rowWrapped[physicalRow(r)] = rowWrapped[physicalRow(r - count)]
-                rowMarks[physicalRow(r)] = rowMarks[physicalRow(r - count)]
+                let dst = physicalRow(r)
+                let src = physicalRow(r - count)
+                rowWrapped[dst] = rowWrapped[src]
+                rowWideDeferred[dst] = rowWideDeferred[src]
+                rowMarks[dst] = rowMarks[src]
                 r -= 1
             }
         }
         // Blank the `count` inserted rows at the cursor in one bulk fill.
         fillCells(cursorRow * cols, count * cols, with: erasedCell())
-        for r in cursorRow ..< (cursorRow + count) { rowWrapped[physicalRow(r)] = false; rowMarks[physicalRow(r)] = nil }
+        for r in cursorRow ..< (cursorRow + count) {
+            let p = physicalRow(r)
+            rowWrapped[p] = false
+            rowWideDeferred[p] = false
+            rowMarks[p] = nil
+        }
         markRowsDirty(cursorRow ... scrollBottom)
         pendingWrap = false
     }
@@ -2357,15 +2481,23 @@ final class TerminalScreen {
             moveCells(dst: cursorRow * cols, src: (cursorRow + count) * cols, count: survivors * cols)
             var r = cursorRow
             while r + count <= scrollBottom {
-                rowWrapped[physicalRow(r)] = rowWrapped[physicalRow(r + count)]
-                rowMarks[physicalRow(r)] = rowMarks[physicalRow(r + count)]
+                let dst = physicalRow(r)
+                let src = physicalRow(r + count)
+                rowWrapped[dst] = rowWrapped[src]
+                rowWideDeferred[dst] = rowWideDeferred[src]
+                rowMarks[dst] = rowMarks[src]
                 r += 1
             }
         }
         // Blank the `count` rows freed at the bottom of the region in one bulk fill.
         let blankTop = scrollBottom - count + 1
         fillCells(blankTop * cols, count * cols, with: erasedCell())
-        for r in blankTop ... scrollBottom { rowWrapped[physicalRow(r)] = false; rowMarks[physicalRow(r)] = nil }
+        for r in blankTop ... scrollBottom {
+            let p = physicalRow(r)
+            rowWrapped[p] = false
+            rowWideDeferred[p] = false
+            rowMarks[p] = nil
+        }
         markRowsDirty(cursorRow ... scrollBottom)
         pendingWrap = false
     }
@@ -2538,6 +2670,7 @@ final class TerminalScreen {
         cells = Array(repeating: .blank, count: cols * rows)
         firstRow = 0
         rowWrapped = Array(repeating: false, count: rows)
+        rowWideDeferred = Array(repeating: false, count: rows)
         rowMarks = Array(repeating: nil, count: rows)
         cursorRow = 0
         cursorCol = 0
@@ -2613,6 +2746,7 @@ extension TerminalScreen {
         var pen: Pen
         var currentHyperlink: UInt32
         var rowWrapped: [Bool]
+        var rowWideDeferred: [Bool]? = nil
         var rowMarks: [SemanticMark?]
         var recordsHistory: Bool
         var savedCursor: SavedCursor?
@@ -2626,10 +2760,11 @@ extension TerminalScreen {
                 return placement
             }
         let imageIDs = Set(visible.map(\.id))
+        let snapshotCells = snapshot().cells
         return CheckpointState(
             cols: cols,
             rows: rows,
-            cells: CheckpointCells.encode(snapshot().cells),
+            cells: CheckpointCells.encode(snapshotCells),
             clusters: clusters,
             nextClusterID: nextClusterID,
             cursorRow: cursorRow,
@@ -2652,6 +2787,7 @@ extension TerminalScreen {
             pen: pen,
             currentHyperlink: currentHyperlink,
             rowWrapped: rowWrapped,
+            rowWideDeferred: rowWideDeferred,
             rowMarks: rowMarks,
             recordsHistory: recordsHistory,
             savedCursor: savedCursor
@@ -2662,6 +2798,7 @@ extension TerminalScreen {
         guard TerminalGeometry.isValid(cols: state.cols, rows: state.rows),
               state.cells.count == state.cols * state.rows * 32,
               state.tabStops.count == state.cols, state.rowWrapped.count == state.rows,
+              state.rowWideDeferred.map({ $0.count == state.rows }) ?? true,
               state.rowMarks.count == state.rows,
               (0..<state.rows).contains(state.cursorRow), (0..<state.cols).contains(state.cursorCol),
               state.scrollTop >= 0, state.scrollBottom >= state.scrollTop, state.scrollBottom < state.rows,
@@ -2708,6 +2845,7 @@ extension TerminalScreen {
         screen.pen = state.pen
         screen.currentHyperlink = state.currentHyperlink
         screen.rowWrapped = state.rowWrapped
+        screen.rowWideDeferred = state.rowWideDeferred ?? Array(repeating: false, count: state.rows)
         screen.rowMarks = state.rowMarks
         screen.savedCursor = state.savedCursor
         screen.cells = decoded

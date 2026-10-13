@@ -6,6 +6,7 @@ import HarnessTerminalRenderer
 import HarnessTheme
 import Metal
 import QuartzCore
+import UniformTypeIdentifiers
 
 extension HarnessTerminalSurfaceView {
     // MARK: - Selection & copy
@@ -297,13 +298,94 @@ extension HarnessTerminalSurfaceView {
     }
 
     /// Open a clicked link, restricted to safe schemes so terminal output can't trigger a
-    /// surprising handler (e.g. a custom app scheme) on ⌘-click. No `file:` — an OSC 8
-    /// hyperlink comes from terminal output (possibly a remote host), and opening an
-    /// arbitrary local path via NSWorkspace executes .app bundles and .command scripts.
+    /// surprising handler (e.g. a custom app scheme) on ⌘-click. Plain `file:` OSC 8 links
+    /// remain blocked; auto-detected `path:line(:col)` tokens use `harness-file://`, which
+    /// validates that the target is an existing local regular file and opens it in the user's
+    /// plain-text editor instead of LaunchServices' default execute handler.
     private func openLink(_ string: String) {
+        if let target = URLDetection.FileLocationTarget(urlString: string) {
+            let cwd = emulatorSync { $0.workingDirectory }
+            guard let fileURL = Self.resolveSafeLocalFileURL(target, workingDirectory: cwd),
+                  let editorURL = NSWorkspace.shared.urlForApplication(toOpen: .plainText) else {
+                return
+            }
+            NSWorkspace.shared.open(
+                [fileURL],
+                withApplicationAt: editorURL,
+                configuration: NSWorkspace.OpenConfiguration()
+            )
+            return
+        }
         guard let url = URL(string: string), let scheme = url.scheme?.lowercased(),
               ["http", "https", "mailto", "ftp", "ftps"].contains(scheme) else { return }
         NSWorkspace.shared.open(url)
+    }
+
+    private nonisolated static let blockedExecutableExtensions: Set<String> = [
+        "action", "app", "bin", "command", "csh", "dmg", "exe", "fish", "ksh",
+        "MSI", "msi", "mpkg", "osax", "pkg", "run", "scpt", "scptd",
+        "sh", "terminal", "tool", "workflow", "zsh",
+    ]
+
+    /// Resolves a `FileLocationTarget` to a verified local regular file URL suitable for opening
+    /// in a text editor, or `nil` if the path does not exist, escapes a relative root, or points
+    /// at a directory, bundle, package, or launchable/executable script extension.
+    public nonisolated static func resolveSafeLocalFileURL(
+        _ target: URLDetection.FileLocationTarget,
+        workingDirectory: String?
+    ) -> URL? {
+        let raw = target.path.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !raw.isEmpty, !raw.contains("\0") else { return nil }
+
+        let candidateURL: URL
+        var requiredRootURL: URL?
+        if raw.hasPrefix("~/") {
+            let expanded = (raw as NSString).expandingTildeInPath
+            candidateURL = URL(fileURLWithPath: expanded)
+        } else if raw.hasPrefix("/") {
+            candidateURL = URL(fileURLWithPath: raw)
+        } else {
+            let components = raw.split(separator: "/", omittingEmptySubsequences: false)
+            if components.contains("..") { return nil }
+            guard let workingDirectory, !workingDirectory.isEmpty else { return nil }
+            let base = Self.directoryPath(fromWorkingDirectory: workingDirectory)
+            guard base.hasPrefix("/") else { return nil }
+            let root = URL(fileURLWithPath: base, isDirectory: true)
+                .standardizedFileURL
+                .resolvingSymlinksInPath()
+            requiredRootURL = root
+            candidateURL = root.appendingPathComponent(raw)
+        }
+
+        let resolved = candidateURL.standardizedFileURL.resolvingSymlinksInPath()
+        if let root = requiredRootURL {
+            let rootPrefix = root.path.hasSuffix("/") ? root.path : root.path + "/"
+            guard resolved.path.hasPrefix(rootPrefix) else { return nil }
+        }
+
+        let ext = resolved.pathExtension.lowercased()
+        if blockedExecutableExtensions.contains(ext) {
+            return nil
+        }
+
+        guard let values = try? resolved.resourceValues(
+            forKeys: [.isRegularFileKey, .isDirectoryKey, .isPackageKey, .isApplicationKey]
+        ),
+        values.isRegularFile == true,
+        values.isDirectory != true,
+        values.isPackage != true,
+        values.isApplication != true else {
+            return nil
+        }
+
+        return resolved
+    }
+
+    private nonisolated static func directoryPath(fromWorkingDirectory raw: String) -> String {
+        if raw.hasPrefix("file://"), let url = URL(string: raw), url.isFileURL {
+            return url.path
+        }
+        return raw
     }
 
     public override func mouseDragged(with event: NSEvent) {

@@ -66,7 +66,8 @@ final class CraftSliceTests: XCTestCase {
             "scrollMultiplier", "mouseHideWhileTyping", "optionAsMeta",
             "quickTerminalEnabled", "quickTerminalHotkey", "windowPaddingBalance",
             "minimumContrast", "pasteProtection", "remoteControl", "boldIsBright",
-            "themeFit", "paneDensity", "paneHeaders", "commandFinishedThresholdSeconds",
+            "themeFit", "paneDensity", "paneHeaders", "singlePaneHeader", "chromeTextSize",
+            "lineHeight", "cellWidth", "commandFinishedThresholdSeconds",
             "experienceMode", "prefixKeyEnabled", "statusLineEnabled", "prefixKey",
         ]
         for id in required {
@@ -78,7 +79,68 @@ final class CraftSliceTests: XCTestCase {
         for kind in AgentKind.allCases {
             XCTAssertFalse(ids.contains("agentColor.\(kind.rawValue)"))
         }
-        XCTAssertTrue(DaemonSettingsControls.rows.contains { $0.key == "word-separators" })
+        let daemonControlKeys = Set(DaemonSettingsControls.rows.map(\.key))
+        XCTAssertTrue(daemonControlKeys.contains("word-separators"))
+        XCTAssertTrue(daemonControlKeys.contains("hook-shell-timeout"))
+        XCTAssertTrue(daemonControlKeys.contains("persist-scrollback"))
+        XCTAssertTrue(daemonControlKeys.contains("shell-integration"))
+        XCTAssertEqual(
+            daemonControlKeys.subtracting(["word-separators"]).subtracting(OptionStore.builtinDefaults.keys),
+            []
+        )
+    }
+
+    func testChromeTextSizeSinglePaneHeaderAndTypographySettingsRoundTrip() throws {
+        var settings = HarnessSettings(
+            fontSize: 15,
+            lineHeight: 2.5,
+            cellWidth: 0.4,
+            singlePaneHeader: false,
+            chromeTextSize: .large
+        )
+        XCTAssertEqual(settings.lineHeight, 1.6, accuracy: 0.0001)
+        XCTAssertEqual(settings.cellWidth, 0.8, accuracy: 0.0001)
+        XCTAssertEqual(settings.chromeTextSize, .large)
+        XCTAssertEqual(settings.chromeTextSize.pointDelta, 1.5, accuracy: 0.0001)
+        XCTAssertFalse(settings.showsPaneHeaders(paneCount: 1))
+        XCTAssertTrue(settings.showsPaneHeaders(paneCount: 2))
+
+        settings.paneHeaders = false
+        XCTAssertFalse(settings.showsPaneHeaders(paneCount: 2))
+
+        let encoded = try JSONEncoder().encode(settings)
+        let reloaded = try XCTUnwrap(HarnessSettings.reload(data: encoded))
+        XCTAssertEqual(reloaded.lineHeight, 1.6, accuracy: 0.0001)
+        XCTAssertEqual(reloaded.cellWidth, 0.8, accuracy: 0.0001)
+        XCTAssertFalse(reloaded.singlePaneHeader)
+        XCTAssertEqual(reloaded.chromeTextSize, .large)
+    }
+
+    func testDiagnosticsReportRedactsHomeUsernamesAndTokens() {
+        let settings = HarnessSettings(
+            fontSize: 15,
+            lineHeight: 1.1,
+            cellWidth: 1.0,
+            chromeTextSize: .large
+        )
+        let report = HarnessDiagnosticsReport(
+            osVersion: "macOS 15.4 (/Users/alice/Private/build sk-1234567890abcdef)",
+            daemonSocketPath: "/Users/alice/Library/Application Support/Harness/harness.sock",
+            daemonReachable: true,
+            sessionCount: 2,
+            windowCount: 3,
+            paneCount: 5,
+            themeName: "Harness Default",
+            settings: settings,
+            homeDirectory: "/Users/alice"
+        )
+        let formatted = report.formatted()
+        XCTAssertFalse(formatted.contains("/Users/alice"))
+        XCTAssertFalse(formatted.contains("sk-1234567890abcdef"))
+        XCTAssertTrue(formatted.contains("daemon.socket: ~/Library/Application Support/Harness/harness.sock"))
+        XCTAssertTrue(formatted.contains("[REDACTED]"))
+        XCTAssertTrue(formatted.contains("appearance.chromeTextSize: large"))
+        XCTAssertTrue(formatted.contains("line 1.10x, width 1.00x"))
     }
 
     func testDaemonSettingsCommandMatchesTheGlobalSetOption() {

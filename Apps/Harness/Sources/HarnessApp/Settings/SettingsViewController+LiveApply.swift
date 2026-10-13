@@ -228,8 +228,10 @@ extension SettingsViewController {
     func updateDependentRows() {
         updateSystemThemePickerAvailability()
         setRow(resizeOverlayPositionRow, hidden: resizeOverlaySegment.titleOfSelectedItem == "Never")
-        paneSpacingField.isEnabled = paneDensitySegment.titleOfSelectedItem != "Compact"
-        paneHeadersToggle.isEnabled = paneDensitySegment.titleOfSelectedItem != "Compact"
+        let comfortable = paneDensitySegment.titleOfSelectedItem != "Compact"
+        paneSpacingField.isEnabled = comfortable
+        paneHeadersToggle.isEnabled = comfortable
+        singlePaneHeaderToggle.isEnabled = comfortable && paneHeadersToggle.state == .on
         commandFinishedThresholdField.isEnabled = eventToggles[.commandFinished]?.state == .on
         quickTerminalHotkeyRecorder?.alphaValue = quickTerminalToggle.state == .on ? 1 : 0.45
     }
@@ -465,6 +467,8 @@ extension SettingsViewController {
         paddingYField.stringValue = String(Int(settings.windowPaddingY.rounded()))
         fontFamilyField.stringValue = settings.fontFamily
         fontSizeField.stringValue = String(Int(settings.fontSize.rounded()))
+        lineHeightField.stringValue = formatMultiplier(settings.lineHeight)
+        cellWidthField.stringValue = formatMultiplier(settings.cellWidth)
         fontFallbackField.stringValue = settings.fontFallbackFamilies.joined(separator: ", ")
         fontFeaturesField.stringValue = settings.fontFeatures.sorted { $0.key < $1.key }
             .map { "\($0.key)=\($0.value)" }.joined(separator: ", ")
@@ -511,6 +515,8 @@ extension SettingsViewController {
         themeFitToggle.state = on(settings.effectiveThemeFit(appearanceIsLight: !HarnessChrome.current.isDark))
         paneDensitySegment.selectItem(withTitle: settings.paneDensity == .compact ? "Compact" : "Comfortable")
         paneHeadersToggle.state = on(settings.paneHeaders)
+        singlePaneHeaderToggle.state = on(settings.singlePaneHeader)
+        chromeTextSizeSegment.selectItem(withTitle: settings.chromeTextSize == .large ? "Large" : "Default")
         for (event, toggle) in eventToggles {
             toggle.state = on(settings.isEventEnabled(event))
         }
@@ -528,6 +534,7 @@ extension SettingsViewController {
         paletteHexValues = HarnessSettings.normalizedPalette(settings.paletteHex)
         refreshPaletteWells()
         updateDependentRows()
+        refreshSpecimenPreview()
     }
 
     func hexString(_ color: NSColor) -> String {
@@ -632,6 +639,8 @@ extension SettingsViewController {
             syncSystemThemePickersFromSettings()
         }
         write(\.fontSize, HarnessSettings.clampedFontSize(Float(fontSizeField.stringValue) ?? 14))
+        write(\.lineHeight, HarnessSettings.clampedLineHeight(Float(lineHeightField.stringValue) ?? 1))
+        write(\.cellWidth, HarnessSettings.clampedCellWidth(Float(cellWidthField.stringValue) ?? 1))
         write(\.fontFamily, fontFamilyField.stringValue)
         write(\.fontFallbackFamilies, fontFallbackField.stringValue.split(separator: ",")
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty })
@@ -678,6 +687,8 @@ extension SettingsViewController {
         ))
         write(\.paneDensity, paneDensitySegment.titleOfSelectedItem == "Compact" ? .compact : .comfortable)
         write(\.paneHeaders, paneHeadersToggle.state == .on)
+        write(\.singlePaneHeader, singlePaneHeaderToggle.state == .on)
+        write(\.chromeTextSize, chromeTextSizeSegment.titleOfSelectedItem == "Large" ? .large : .regular)
         for (event, toggle) in eventToggles {
             SettingsEditor.setEvent(event, toggle.state == .on, on: &coordinator.settings)
         }
@@ -688,6 +699,8 @@ extension SettingsViewController {
         // reset to the persisted value the same way.
         reflectClamped(commandFinishedThresholdField, String(coordinator.settings.commandFinishedThresholdSeconds))
         reflectClamped(fontSizeField, String(format: "%.0f", coordinator.settings.fontSize))
+        reflectClamped(lineHeightField, formatMultiplier(coordinator.settings.lineHeight))
+        reflectClamped(cellWidthField, formatMultiplier(coordinator.settings.cellWidth))
         reflectClamped(paneSpacingField, String(format: "%.0f", coordinator.settings.paneSpacing))
         reflectClamped(paddingXField, String(format: "%.0f", coordinator.settings.windowPaddingX))
         reflectClamped(paddingYField, String(format: "%.0f", coordinator.settings.windowPaddingY))
@@ -700,11 +713,41 @@ extension SettingsViewController {
         coordinator.applySettingsToHosts()
         QuickTerminalController.shared.rebuildFromSettings()
         updateFontReadout()
+        refreshSpecimenPreview()
         // An appearance flip changes which theme the panes paint; re-preview it.
         if previousAppearanceMode != nextAppearanceMode {
             refreshColorPlaceholders()
             refreshPaletteWells()
         }
+    }
+
+    func refreshSpecimenPreview() {
+        let coordinator = SessionCoordinator.shared
+        let systemAppearance: HarnessSystemAppearance = HarnessChrome.current.isDark ? .dark : .light
+        specimenPreview.update(
+            themeName: coordinator.snapshot.themeName,
+            settings: coordinator.settings,
+            systemAppearance: systemAppearance
+        )
+        revertAppearanceButton.isEnabled =
+            coordinator.settings != initialSettingsSnapshot
+            || coordinator.snapshot.themeName != initialThemeSnapshot
+    }
+
+    /// Restore the theme and appearance settings captured when the Settings window opened.
+    @objc func revertAppearanceChanges() {
+        let coordinator = SessionCoordinator.shared
+        if !initialThemeSnapshot.isEmpty, coordinator.snapshot.themeName != initialThemeSnapshot {
+            coordinator.setTheme(initialThemeSnapshot)
+        }
+        coordinator.settings = initialSettingsSnapshot
+        saveSettings()
+        coordinator.applySettingsToHosts()
+        QuickTerminalController.shared.rebuildFromSettings()
+        PrefixKeymap.shared.rebuildFromSettings()
+        populateThemePopup(themePopup, selectedThemeName: coordinator.snapshot.themeName)
+        syncAppearanceControlsFromSettings()
+        refreshColorPlaceholders()
     }
 
     /// Rewrite a numeric field only when its committed text differs from the clamped setting —

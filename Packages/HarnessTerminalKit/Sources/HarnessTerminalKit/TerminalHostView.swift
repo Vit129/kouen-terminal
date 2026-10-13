@@ -76,7 +76,13 @@ public final class TerminalHostView: NSView {
     /// No Metal resources or glyph atlas are allocated for window sizing.
     public static func viewportSize(columns: Int, rows: Int, settings: HarnessSettings, scale: CGFloat) -> NSSize {
         let scale = max(1, scale)
-        let metrics = GlyphRasterizer(fontFamily: settings.fontFamily, size: CGFloat(settings.fontSize), scale: scale).metrics()
+        let metrics = GlyphRasterizer(
+            fontFamily: settings.fontFamily,
+            size: CGFloat(settings.fontSize),
+            scale: scale,
+            lineHeightMultiplier: CGFloat(settings.lineHeight),
+            cellWidthMultiplier: CGFloat(settings.cellWidth)
+        ).metrics()
         let width = max(1, (metrics.width * scale).rounded())
         let height = max(1, (metrics.height * scale).rounded())
         let padX = (CGFloat(settings.windowPaddingX) * scale).rounded()
@@ -636,7 +642,9 @@ public final class TerminalHostView: NSView {
             ),
             boldIsBright: settings.boldIsBright,
             promptGutter: settings.showPromptGutter,
-            liveResizeReflow: settings.liveResizeReflow
+            liveResizeReflow: settings.liveResizeReflow,
+            lineHeightMultiplier: CGFloat(HarnessSettings.clampedLineHeight(settings.lineHeight)),
+            cellWidthMultiplier: CGFloat(HarnessSettings.clampedCellWidth(settings.cellWidth))
         )
         // Behavior (not appearance) settings — set directly rather than bloating the appearance call.
         nativeView.scrollMultiplier = CGFloat(HarnessSettings.clampedScrollMultiplier(settings.scrollMultiplier))

@@ -20,13 +20,18 @@ extension SettingsViewController {
         self.themeRow = themeRow
         lightThemeRow = lightRow
         darkThemeRow = darkRow
-        let themeGroup = settingsGroup("Theme", [modeRow, themeRow, lightRow, darkRow])
+        let previewRow = settingsRow("Live preview", specimenPreview,
+                                     hint: "Prompt, operators, CJK, and the 16 ANSI colors.")
+        let themeGroup = settingsGroup("Theme", [modeRow, themeRow, lightRow, darkRow, previewRow],
+                                       accessory: revertAppearanceButton)
 
         let windowGroup = settingsGroup("Window", [
             settingsRow("Opacity", sliderRow(opacitySlider, opacityLabel)),
             settingsRow("Blur", sliderRow(blurSlider, blurLabel), hint: "Frosts the desktop behind the window."),
             settingsRow("Border", sliderRow(windowBorderOpacitySlider, windowBorderOpacityLabel),
                         hint: "A hairline around the window edge. 0% hides it."),
+            settingsRow("Interface text size", chromeTextSizeSegment,
+                        hint: "Larger labels in the sidebar, tab bar, status line, and Settings."),
             settingsRow("Transparent title bar", transparentTitlebarToggle),
             settingsRow("Show sidebar", sidebarVisibleToggle,
                         hint: "Sessions in a sidebar instead of tabs in the title bar. ⌘\\ switches."),
@@ -50,6 +55,8 @@ extension SettingsViewController {
                         hint: "Gap around and between panes. 0–24 pt; default \(Int(HarnessSettings.defaultPaneSpacing)). Comfortable only."),
             settingsRow("Pane headers", paneHeadersToggle,
                         hint: "Program, directory, and split buttons atop each pane. Comfortable only."),
+            settingsRow("Single-pane header", singlePaneHeaderToggle,
+                        hint: "Keep the pane header visible before a tab is split."),
             settingsRow("Padding", paddingRow, hint: "Space between the text and the pane edge."),
             settingsRow("Center the grid", paddingBalanceToggle,
                         hint: "Share leftover space evenly on every side."),
@@ -223,6 +230,8 @@ extension SettingsViewController {
         fontReadout.lineBreakMode = .byTruncatingTail
         fontReadout.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
         fontSizeField.widthAnchor.constraint(equalToConstant: Form.numberFieldWidth).isActive = true
+        lineHeightField.widthAnchor.constraint(equalToConstant: Form.numberFieldWidth).isActive = true
+        cellWidthField.widthAnchor.constraint(equalToConstant: Form.numberFieldWidth).isActive = true
         fontFallbackField.widthAnchor.constraint(equalToConstant: Form.wideControlWidth).isActive = true
         fontFeaturesField.widthAnchor.constraint(equalToConstant: Form.wideControlWidth).isActive = true
         fontFallbackField.placeholderString = "System defaults"
@@ -230,6 +239,10 @@ extension SettingsViewController {
         let fontGroup = settingsGroup("Font", [
             settingsRow("Font", hstack([fontReadout, chooseFontButton], spacing: 10)),
             settingsRow("Size", hstack([fontSizeField, unitLabel("pt")], spacing: 6), hint: "8–32 pt. ⌘+ and ⌘− change it too."),
+            settingsRow("Line height", hstack([lineHeightField, unitLabel("×")], spacing: 6),
+                        hint: "0.80–1.60× natural cell height. Default 1.00."),
+            settingsRow("Cell width", hstack([cellWidthField, unitLabel("×")], spacing: 6),
+                        hint: "0.80–1.40× natural glyph advance. Default 1.00."),
             settingsRow("Text rendering", textRenderingSegment, hint: "Crisp draws glyphs lighter, Soft heavier."),
             settingsRow("Ligatures", ligaturesToggle, hint: "Joins => != -> in fonts that have them."),
             settingsRow("Fallback fonts", fontFallbackField, hint: "Comma-separated font families, in preferred order."),
@@ -451,6 +464,9 @@ extension SettingsViewController {
                 ("Local plugins", "Review a local plugin before trusting its palette actions.", #selector(openToolPlugins)),
                 ("Remote host", "Add an SSH host using existing credentials.", #selector(openToolRemote)),
                 ("Phone or iPad", "Connection code for the private iOS companion.", #selector(openToolMobile)),
+                ("Diagnostics report",
+                 "Copy a redacted local health report with no scrollback or secrets.",
+                 #selector(copyDiagnosticsReport)),
             ]),
             group("Import", [
                 ("tmux layouts", "Preview a layout and save it without acquiring existing PTYs.", #selector(openToolTmux)),
@@ -479,6 +495,7 @@ extension SettingsViewController {
     @objc private func openToolHookPolicy() { SessionCoordinator.shared.presentHookPolicy() }
     @objc private func openToolPlugins() { PluginTrustController.review(relativeTo: view.window) }
     @objc private func openToolRemote() { RemoteHostSheet.present() }
+    @objc private func copyDiagnosticsReport() { _ = SessionCoordinator.shared.copyDiagnosticsReport() }
     @objc private func openToolMobile() { MobilePairingController.shared.present() }
     @objc private func openToolTmux() { SessionCoordinator.shared.presentTmuxImport() }
     @objc private func openToolSettingsImport() { SettingsImportController.present() }
@@ -678,7 +695,14 @@ extension SettingsViewController {
 
         let lifecycleGroup = settingsGroup("Lifecycle", [
             settingsRow("Remain on exit", advToggle("remain-on-exit"), hint: "Keep a pane on screen after its program exits."),
+            settingsRow("Persist scrollback", advToggle("persist-scrollback"),
+                        hint: "Restore pane output after the daemon restarts."),
+            settingsRow("Shell integration", advToggle("shell-integration"),
+                        hint: "Inject prompt, directory, and command tracking into shells."),
             settingsRow("Prefix repeat", hstack([advField("repeat-time", width: Form.numberFieldWidth), unitLabel("ms")], spacing: 6)),
+            settingsRow("Hook shell timeout",
+                        hstack([advField("hook-shell-timeout", width: Form.numberFieldWidth), unitLabel("seconds")], spacing: 6),
+                        hint: "Maximum runtime for hook if-shell and background run-shell commands."),
             settingsRow("History limit",
                         hstack([advField("history-limit", width: Form.wideNumberFieldWidth), unitLabel("lines")], spacing: 6),
                         hint: "The session's scrollback. The window's own is in Terminal ▸ Scrolling."),

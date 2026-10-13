@@ -305,6 +305,16 @@ enum CommandPaletteController {
             ) {
                 coordinator.reimportTerminalConfig()
             },
+            PaletteAction(
+                id: "action.copyDiagnostics",
+                title: "Copy Diagnostics Report",
+                subtitle: "Copy a redacted local health snapshot to the clipboard",
+                symbol: "stethoscope",
+                shortcut: "",
+                section: .actions
+            ) {
+                _ = coordinator.copyDiagnosticsReport()
+            },
         ])
 
         // MARK: - Navigation

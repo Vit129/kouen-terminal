@@ -188,6 +188,8 @@ public final class TerminalMetalRenderer {
         imageCacheBytes: Int = TerminalMetalRenderer.defaultImageCacheBytes,
         fontThicken: Bool = false,
         fontThickenStrength: Int = 255,
+        lineHeightMultiplier: CGFloat = 1.0,
+        cellWidthMultiplier: CGFloat = 1.0,
         colorSpace: CGColorSpace = CGColorSpace(name: CGColorSpace.sRGB)!
     ) {
         self.init(
@@ -199,6 +201,8 @@ public final class TerminalMetalRenderer {
             imageCacheBytes: imageCacheBytes,
             fontThicken: fontThicken,
             fontThickenStrength: fontThickenStrength,
+            lineHeightMultiplier: lineHeightMultiplier,
+            cellWidthMultiplier: cellWidthMultiplier,
             colorSpace: colorSpace
         )
     }
@@ -212,6 +216,8 @@ public final class TerminalMetalRenderer {
         imageCacheBytes: Int = TerminalMetalRenderer.defaultImageCacheBytes,
         fontThicken: Bool = false,
         fontThickenStrength: Int = 255,
+        lineHeightMultiplier: CGFloat = 1.0,
+        cellWidthMultiplier: CGFloat = 1.0,
         colorSpace: CGColorSpace = CGColorSpace(name: CGColorSpace.sRGB)!
     ) {
         guard let queue = device.makeCommandQueue() else { return nil }
@@ -220,6 +226,8 @@ public final class TerminalMetalRenderer {
             scale: scale,
             fontThicken: fontThicken,
             fontThickenStrength: fontThickenStrength,
+            lineHeightMultiplier: lineHeightMultiplier,
+            cellWidthMultiplier: cellWidthMultiplier,
             colorSpace: colorSpace
         )
         guard let atlas = GlyphAtlas(

@@ -21,10 +21,9 @@ PREVIEW_MATCH="$(python3 -c 'import os,re,sys; paths={sys.argv[1], os.path.realp
 pkill -f "$PREVIEW_MATCH" 2>/dev/null || true
 
 echo "Building debug preview..."
-swift build --product Harness
-swift build --product HarnessSessionHost
-swift build --product HarnessDaemon
-swift build --product harness-cli
+# Build all package targets (Harness, HarnessSessionHost, HarnessDaemon, harness-cli) in a
+# single SwiftPM + LLBuild graph pass instead of four sequential --product invocations.
+swift build
 
 BUILD_DIR="$(swift build --show-bin-path)"
 

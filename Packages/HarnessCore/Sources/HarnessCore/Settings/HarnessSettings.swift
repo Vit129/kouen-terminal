@@ -82,6 +82,19 @@ public enum OptionAsMetaMode: String, Codable, Sendable, CaseIterable {
     case rightMetaOnly = "right"
 }
 
+/// Accessible size tier for non-terminal chrome (sidebar, tab strip, status line, Settings).
+public enum ChromeTextSize: String, Codable, Sendable, CaseIterable {
+    case regular = "default"
+    case large
+
+    public var pointDelta: Double {
+        switch self {
+        case .regular: return 0
+        case .large: return 1.5
+        }
+    }
+}
+
 private enum LegacyHarnessSettingsCodingKeys: String, CodingKey {
     case tmuxControlsEnabled
     /// Removed in favor of the per-event `notificationEvents` map; still read here to migrate
@@ -96,6 +109,10 @@ public struct HarnessSettings: Codable, Sendable, Equatable {
     public var fontFamily: String
     public var fontFallbackFamilies: [String]
     public var fontFeatures: [String: Int]
+    /// Multiplier applied to the font's natural cell height (0.8…1.6; 1.0 = font metrics).
+    public var lineHeight: Float
+    /// Multiplier applied to the font's natural advance width (0.8…1.4; 1.0 = font metrics).
+    public var cellWidth: Float
     public var defaultShell: String
     public var defaultCWD: String
     public var transparentTitlebar: Bool
@@ -299,6 +316,15 @@ public struct HarnessSettings: Codable, Sendable, Equatable {
     public var paneDensity: PaneDensity
     /// A title row (icon, identity, split buttons) atop each comfortable pane.
     public var paneHeaders: Bool
+    /// Whether a single-pane tab shows its pane header when `paneHeaders` is enabled.
+    public var singlePaneHeader: Bool
+    /// Accessible size tier for window chrome (sidebar, tabs, pane headers, status bar, Settings).
+    public var chromeTextSize: ChromeTextSize
+
+    public func showsPaneHeaders(paneCount: Int) -> Bool {
+        guard paneHeaders else { return false }
+        return paneCount > 1 || singlePaneHeader
+    }
     /// The light theme Harness used to default to; a stored copy migrates to the new default once.
     static let retiredLightDefault = "Zenwritten Light"
     /// Set after the one-time light-default migration, so choosing Zenwritten Light later sticks.
@@ -368,7 +394,7 @@ public struct HarnessSettings: Codable, Sendable, Equatable {
     }
 
     private enum CodingKeys: String, CodingKey, CaseIterable {
-        case fontSize, fontFamily, fontFallbackFamilies, fontFeatures, defaultShell, defaultCWD, transparentTitlebar, sidebarVisible
+        case fontSize, fontFamily, fontFallbackFamilies, fontFeatures, lineHeight, cellWidth, defaultShell, defaultCWD, transparentTitlebar, sidebarVisible
         case showMachineIndicator, restoreWindowSize, backgroundOpacity, backgroundBlur, windowPaddingX, windowPaddingY
         case appearanceMode, systemLightThemeName, systemDarkThemeName, customBackgroundHex, customForegroundHex, customCursorHex
         case importedConfigSignature, prefixKey, scrollbackLines, cursorStyle, cursorBlink, copyOnSelect
@@ -379,7 +405,8 @@ public struct HarnessSettings: Codable, Sendable, Equatable {
         case showPromptGutter, showStatusLine, experienceMode, harnessControlsEnabled, prefixKeyEnabled, statusLineEnabled
         case resizeOverlay, resizeOverlayPosition, bellMode, scrollMultiplier, mouseHideWhileTyping, optionAsMeta
         case quickTerminalEnabled, quickTerminalHotkey, windowPaddingBalance, minimumContrast, themeFit, paneSpacing
-        case paneDensity, paneHeaders, lightDefaultMigrated, pasteProtection, commandFinishedThresholdSeconds, notificationEvents
+        case paneDensity, paneHeaders, singlePaneHeader, chromeTextSize, lightDefaultMigrated
+        case pasteProtection, commandFinishedThresholdSeconds, notificationEvents
         case boldIsBright, secureKeyboardEntry, windowInheritCWD, profiles, triggers, remoteControl
         case notificationPolicy, power, worktrees, activity, aiSummaries
     }
@@ -391,6 +418,8 @@ public struct HarnessSettings: Codable, Sendable, Equatable {
         fontFamily: String = "JetBrainsMono Nerd Font",
         fontFallbackFamilies: [String] = [],
         fontFeatures: [String: Int] = [:],
+        lineHeight: Float = 1,
+        cellWidth: Float = 1,
         defaultShell: String = ProcessInfo.processInfo.environment["SHELL"] ?? "/bin/zsh",
         defaultCWD: String = FileManager.default.homeDirectoryForCurrentUser.path,
         transparentTitlebar: Bool = true,
@@ -460,6 +489,8 @@ public struct HarnessSettings: Codable, Sendable, Equatable {
         paneSpacing: Double = HarnessSettings.defaultPaneSpacing,
         paneDensity: PaneDensity = .comfortable,
         paneHeaders: Bool = true,
+        singlePaneHeader: Bool = true,
+        chromeTextSize: ChromeTextSize = .regular,
         pasteProtection: Bool = true,
         commandFinishedThresholdSeconds: Int = 10,
         notificationEvents: [String: Bool] = [:],
@@ -479,6 +510,8 @@ public struct HarnessSettings: Codable, Sendable, Equatable {
         self.fontFamily = fontFamily
         self.fontFallbackFamilies = fontFallbackFamilies
         self.fontFeatures = fontFeatures
+        self.lineHeight = HarnessSettings.clampedLineHeight(lineHeight)
+        self.cellWidth = HarnessSettings.clampedCellWidth(cellWidth)
         self.defaultShell = defaultShell
         self.defaultCWD = defaultCWD
         self.transparentTitlebar = transparentTitlebar
@@ -544,6 +577,8 @@ public struct HarnessSettings: Codable, Sendable, Equatable {
         self.paneSpacing = Self.clampedPaneSpacing(paneSpacing)
         self.paneDensity = paneDensity
         self.paneHeaders = paneHeaders
+        self.singlePaneHeader = singlePaneHeader
+        self.chromeTextSize = chromeTextSize
         self.lightDefaultMigrated = true
         self.pasteProtection = pasteProtection
         self.commandFinishedThresholdSeconds = max(0, commandFinishedThresholdSeconds)
@@ -652,6 +687,8 @@ public struct HarnessSettings: Codable, Sendable, Equatable {
         fontFamily = imported?.fontFamily ?? defaults.fontFamily
         fontFallbackFamilies = defaults.fontFallbackFamilies
         fontFeatures = defaults.fontFeatures
+        lineHeight = defaults.lineHeight
+        cellWidth = defaults.cellWidth
         fontSize = defaults.fontSize // Harness-owned (import the face, not the size).
         windowPaddingX = imported?.windowPaddingX ?? defaults.windowPaddingX
         windowPaddingY = imported?.windowPaddingY ?? defaults.windowPaddingY
@@ -723,6 +760,8 @@ public struct HarnessSettings: Codable, Sendable, Equatable {
         fontFamily = try fields.decode(.fontFamily, \.fontFamily)
         fontFallbackFamilies = try fields.decode(.fontFallbackFamilies, \.fontFallbackFamilies)
         fontFeatures = try fields.decode(.fontFeatures, \.fontFeatures)
+        lineHeight = HarnessSettings.clampedLineHeight(try fields.decode(.lineHeight, \.lineHeight))
+        cellWidth = HarnessSettings.clampedCellWidth(try fields.decode(.cellWidth, \.cellWidth))
         defaultShell = try fields.decode(.defaultShell, \.defaultShell)
         defaultCWD = try fields.decode(.defaultCWD, \.defaultCWD)
         transparentTitlebar = try fields.decode(.transparentTitlebar, \.transparentTitlebar)
@@ -854,6 +893,8 @@ public struct HarnessSettings: Codable, Sendable, Equatable {
         paneSpacing = Self.clampedPaneSpacing(try fields.decode(.paneSpacing, \.paneSpacing))
         paneDensity = try fields.decodeEnum(.paneDensity, \.paneDensity)
         paneHeaders = try fields.decode(.paneHeaders, \.paneHeaders)
+        singlePaneHeader = try fields.decode(.singlePaneHeader, \.singlePaneHeader)
+        chromeTextSize = try fields.decodeEnum(.chromeTextSize, \.chromeTextSize)
         lightDefaultMigrated = true
         // `lightThemeName`/`darkThemeName` are no longer stored fields — the legacy pair is
         // consumed by the `appearanceMode` migration above (via LegacyHarnessSettingsCodingKeys).
@@ -904,6 +945,8 @@ public struct HarnessSettings: Codable, Sendable, Equatable {
         settings.backgroundOpacity = clampedOpacity(settings.backgroundOpacity)
         settings.backgroundBlur = clampedBlur(settings.backgroundBlur)
         settings.fontSize = clampedFontSize(settings.fontSize)
+        settings.lineHeight = clampedLineHeight(settings.lineHeight)
+        settings.cellWidth = clampedCellWidth(settings.cellWidth)
         settings.windowPaddingX = clampedPadding(settings.windowPaddingX)
         settings.windowPaddingY = clampedPadding(settings.windowPaddingY)
         return settings
@@ -956,6 +999,10 @@ public struct HarnessSettings: Codable, Sendable, Equatable {
             // or balloon the grid allocation (tiny). 8–32 matches the Cmd+/- zoom policy.
             let clampedFontSize = HarnessSettings.clampedFontSize(settings.fontSize)
             if clampedFontSize != settings.fontSize { settings.fontSize = clampedFontSize; didMutate = true }
+            let clampedLineHeight = HarnessSettings.clampedLineHeight(settings.lineHeight)
+            if clampedLineHeight != settings.lineHeight { settings.lineHeight = clampedLineHeight; didMutate = true }
+            let clampedCellWidth = HarnessSettings.clampedCellWidth(settings.cellWidth)
+            if clampedCellWidth != settings.cellWidth { settings.cellWidth = clampedCellWidth; didMutate = true }
             let clampedPaddingX = HarnessSettings.clampedPadding(settings.windowPaddingX)
             if clampedPaddingX != settings.windowPaddingX { settings.windowPaddingX = clampedPaddingX; didMutate = true }
             let clampedPaddingY = HarnessSettings.clampedPadding(settings.windowPaddingY)
@@ -1049,6 +1096,21 @@ public struct HarnessSettings: Codable, Sendable, Equatable {
     /// ≤~1 forces a multi-hundred-megabyte grid allocation. Clamp at every persistence boundary.
     public static func clampedFontSize(_ value: Float) -> Float {
         max(8, min(32, value))
+    }
+
+    public static let lineHeightRange: ClosedRange<Float> = 0.8 ... 1.6
+    public static let cellWidthRange: ClosedRange<Float> = 0.8 ... 1.4
+
+    /// Line-height multiplier bounds (0.8…1.6; 1.0 = natural font metrics).
+    public static func clampedLineHeight(_ value: Float) -> Float {
+        guard value.isFinite else { return 1 }
+        return max(lineHeightRange.lowerBound, min(lineHeightRange.upperBound, value))
+    }
+
+    /// Cell-width multiplier bounds (0.8…1.4; 1.0 = natural advance width).
+    public static func clampedCellWidth(_ value: Float) -> Float {
+        guard value.isFinite else { return 1 }
+        return max(cellWidthRange.lowerBound, min(cellWidthRange.upperBound, value))
     }
 
     /// Window padding (points) is never negative. The renderer already neutralizes negatives, so

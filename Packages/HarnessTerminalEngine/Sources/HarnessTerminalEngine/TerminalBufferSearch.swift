@@ -55,6 +55,7 @@ public enum TerminalBufferSearch {
                               lineCount: Int, clusters: [UInt32: String] = [:],
                               within scope: TerminalTextRange? = nil,
                               isWrapped: (Int) -> Bool = { _ in false },
+                              isWideDeferred: (Int) -> Bool = { _ in true },
                               cancelled: @escaping () -> Bool = { false },
                               line: (Int) -> [TerminalGridCell]) -> TerminalSearchOutcome {
         guard !query.isEmpty, lineCount > 0 else { return .matches([], limited: false) }
@@ -91,7 +92,8 @@ public enum TerminalBufferSearch {
         for index in firstLine..<lastLine {
             if cancelled() { return .cancelled }
             var cells = line(index)
-            if isWrapped(index), index + 1 < lineCount, cells.last == .blank,
+            if isWrapped(index), isWideDeferred(index), index + 1 < lineCount,
+               let last = cells.last, last.codepoint == 0, last.combining0 == 0, last.width == .normal,
                line(index + 1).first?.width == .wide { cells.removeLast() }
             let start = index == scope?.start.line ? min(cells.count, max(0, scope?.start.column ?? 0)) : 0
             let end = index == scope?.end.line ? min(cells.count, max(start, scope?.end.column ?? 0)) : cells.count

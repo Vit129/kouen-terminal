@@ -85,6 +85,26 @@ public enum SettingsPalette {
             let next = stepped == settings.fontSize ? HarnessSettings.clampedFontSize(8) : stepped
             SettingsEditor.applyFromPalette(\.fontSize, next, on: &settings)
         }
+        add(
+            "lineHeight",
+            "Line height",
+            detail: { String(format: "%.2f", $0.lineHeight) },
+            { settings in
+                let stepped = HarnessSettings.clampedLineHeight((settings.lineHeight * 20 + 1).rounded() / 20)
+                let next = stepped == settings.lineHeight ? HarnessSettings.lineHeightRange.lowerBound : stepped
+                SettingsEditor.applyFromPalette(\.lineHeight, next, on: &settings)
+            }
+        )
+        add(
+            "cellWidth",
+            "Cell width",
+            detail: { String(format: "%.2f", $0.cellWidth) },
+            { settings in
+                let stepped = HarnessSettings.clampedCellWidth((settings.cellWidth * 20 + 1).rounded() / 20)
+                let next = stepped == settings.cellWidth ? HarnessSettings.cellWidthRange.lowerBound : stepped
+                SettingsEditor.applyFromPalette(\.cellWidth, next, on: &settings)
+            }
+        )
         add("fontFamily", "Font", detail: { $0.fontFamily }) { settings in
             SettingsEditor.applyFromPalette(\.fontFamily, settings.fontFamily, on: &settings)
         }
@@ -158,6 +178,8 @@ public enum SettingsPalette {
         add("paneHeaders", "Pane headers", detail: { $0.paneHeaders ? "On" : "Off" }) { settings in
             SettingsEditor.applyFromPalette(\.paneHeaders, !settings.paneHeaders, on: &settings)
         }
+        toggle("singlePaneHeader", "Single-pane header", \.singlePaneHeader)
+        cycle("chromeTextSize", "Interface text size", ChromeTextSize.allCases, \.chromeTextSize)
         for event in NotificationEvent.allCases {
             add("notify.\(event.rawValue)", "Notify: \(event.title)", detail: { $0.isEventEnabled(event) ? "On" : "Off" }) { settings in
                 SettingsEditor.setEvent(event, !settings.isEventEnabled(event), on: &settings)

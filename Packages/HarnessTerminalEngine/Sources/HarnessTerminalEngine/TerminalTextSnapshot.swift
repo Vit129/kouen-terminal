@@ -8,26 +8,31 @@ public struct TerminalTextSnapshot: Sendable {
     public let clusters: [UInt32: String]
     private let readLine: @Sendable (Int) -> [TerminalGridCell]
     private let wraps: @Sendable (Int) -> Bool
+    private let wideDeferred: @Sendable (Int) -> Bool
 
     init(lineCount: Int, historyCount: Int, clusters: [UInt32: String],
          line: @escaping @Sendable (Int) -> [TerminalGridCell],
-         wraps: @escaping @Sendable (Int) -> Bool) {
+         wraps: @escaping @Sendable (Int) -> Bool,
+         wideDeferred: @escaping @Sendable (Int) -> Bool = { _ in true }) {
         self.lineCount = lineCount
         self.historyCount = historyCount
         self.clusters = clusters
         self.readLine = line
         self.wraps = wraps
+        self.wideDeferred = wideDeferred
     }
 
     public func line(_ index: Int) -> [TerminalGridCell] { readLine(index) }
     public func isWrapped(_ index: Int) -> Bool { wraps(index) }
+    public func isWideDeferred(_ index: Int) -> Bool { wideDeferred(index) }
 
     /// One searchable soft-wrapped line, bounded independently of retained history size.
     public func logicalText(startingAt start: Int) -> (text: TerminalMappedText, nextLine: Int) {
         var mapped = TerminalMappedText(), index = start
         while index >= 0, index < lineCount {
             var cells = line(index)
-            if isWrapped(index), index + 1 < lineCount, cells.last == .blank,
+            if isWrapped(index), isWideDeferred(index), index + 1 < lineCount,
+               let last = cells.last, last.codepoint == 0, last.combining0 == 0, last.width == .normal,
                line(index + 1).first?.width == .wide { cells.removeLast() }
             mapped.append(cells, line: index, clusters: clusters)
             index += 1

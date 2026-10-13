@@ -19,7 +19,7 @@ flowchart LR
 
 | Outcome | Owner / reservation | State | Acceptance |
 |---|---|---|---|
-| POS | Engine screen and anchor types | Verified with one known corner | Anchors follow reflow, wide glyphs, height changes and history; eviction invalidates safely. Alternate-screen shrink blanks a wide glyph cut at the margin (AlternateScreenWideResizeTests). Copy and capture share one wide-deferral rule (WideWrapCopyTests). Open: an erase of exactly the last column before a deferred wide glyph is dropped, which needs a per-row deferral flag |
+| POS | Engine screen and anchor types | Verified | Anchors follow reflow, wide glyphs, height changes and history; eviction invalidates safely. Alternate-screen shrink blanks a wide glyph cut at the margin (AlternateScreenWideResizeTests). Copy, capture, search, reflow and checkpoint restore share explicit per-row `wideDeferred` metadata (WideWrapCopyTests), preserving erased last-column cells before wide glyphs |
 | CMD | Emulator semantic regions, shell scripts and actions | Verified | Copy precise command/output, navigate failures, search command output |
 | UNI | Pinned Unicode data, segmentation, capture and overlays | Verified | Official segmentation corpus, engine feed/run parity, 2027 set/reset/query, composed-text frame parity |
 | FONT | Font resolver/rasterizer/settings | Verified with two optional-font skips | Defaults preserved; fallback and feature configuration reaches rendering |

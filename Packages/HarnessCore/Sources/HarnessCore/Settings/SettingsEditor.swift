@@ -68,5 +68,8 @@ public enum DaemonSettingsControls {
         ("pane-border-status", "Pane border labels", "pane-border-status", ["off", "top", "bottom"]),
         ("pane-border-format", "Border format", "pane-border-format", nil),
         ("word-separators", "Word separators", "word-separators", nil),
+        ("persist-scrollback", "Persist scrollback", "persist-scrollback", ["off", "on"]),
+        ("shell-integration", "Shell integration", "shell-integration", ["off", "on"]),
+        ("hook-shell-timeout", "Hook shell timeout", "hook-shell-timeout", nil),
     ]
 }

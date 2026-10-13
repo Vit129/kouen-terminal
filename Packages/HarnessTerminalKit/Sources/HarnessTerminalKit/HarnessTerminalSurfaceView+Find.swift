@@ -95,7 +95,8 @@ extension HarnessTerminalSurfaceView {
                 let result = TerminalBufferSearch.search(query: query, options: options,
                     lineCount: commandScope != nil && scope == nil ? 0 : snapshot.lineCount,
                     clusters: snapshot.clusters, within: scope,
-                    isWrapped: snapshot.isWrapped, cancelled: { cancellation.isCancelled }, line: snapshot.line)
+                    isWrapped: snapshot.isWrapped, isWideDeferred: snapshot.isWideDeferred,
+                    cancelled: { cancellation.isCancelled }, line: snapshot.line)
                 DispatchQueue.main.async { [weak self] in
                     guard let self, !cancellation.isCancelled, self.findActive else { return }
                     self.findInFlight = false

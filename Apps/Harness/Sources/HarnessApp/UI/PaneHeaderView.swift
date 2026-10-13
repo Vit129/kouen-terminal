@@ -119,6 +119,8 @@ final class PaneHeaderView: NSView, NSDraggingSource {
 
     func applyChrome() {
         let c = HarnessChrome.current
+        titleLabel.font = HarnessDesign.Typography.paneHeader
+        viewing.font = HarnessDesign.Typography.paneHeader
         // The fill is the island's call (canvas color at the paint opacity); see PaneIslandView.
         titleLabel.textColor = isFocused ? c.textPrimary : c.textSecondary
         HarnessDesign.applyChromeLabelAppearance([titleLabel], isDark: c.isDark)

@@ -192,15 +192,31 @@ struct PackedHistoryLine: Sendable {
     private let location: HistoryRowLocation
     private let columns: Int
     var wrapped: Bool
+    var wideDeferred: Bool
     var mark: SemanticMark?
 
-    init(cells: [TerminalGridCell], wrapped: Bool, mark: SemanticMark? = nil, block: PackedHistoryBlock) {
-        self = cells.withUnsafeBufferPointer { Self(cells: $0, wrapped: wrapped, mark: mark, block: block) }
+    init(
+        cells: [TerminalGridCell],
+        wrapped: Bool,
+        wideDeferred: Bool = false,
+        mark: SemanticMark? = nil,
+        block: PackedHistoryBlock
+    ) {
+        self = cells.withUnsafeBufferPointer {
+            Self(cells: $0, wrapped: wrapped, wideDeferred: wideDeferred, mark: mark, block: block)
+        }
     }
 
-    init(cells: UnsafeBufferPointer<TerminalGridCell>, wrapped: Bool, mark: SemanticMark? = nil, block: PackedHistoryBlock) {
+    init(
+        cells: UnsafeBufferPointer<TerminalGridCell>,
+        wrapped: Bool,
+        wideDeferred: Bool = false,
+        mark: SemanticMark? = nil,
+        block: PackedHistoryBlock
+    ) {
         columns = cells.count
         self.wrapped = wrapped
+        self.wideDeferred = wideDeferred
         self.mark = mark
         self.block = block
         location = block.encode(cells)

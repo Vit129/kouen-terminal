@@ -31,7 +31,7 @@ enum HarnessDesign {
             + (settings.sidebarVisible ? sidebarWidth : 0)
         let height = viewport.height + CGFloat(outer.top + card.top + card.bottom + outer.bottom)
             + (settings.sidebarVisible ? 0 : tabBarHeight)
-            + (separated && settings.paneHeaders ? paneHeaderHeight : 0) + statusHeight
+            + (separated && settings.showsPaneHeaders(paneCount: 1) ? paneHeaderHeight : 0) + statusHeight
         return NSSize(width: width, height: height)
     }
 
@@ -115,21 +115,27 @@ enum HarnessDesign {
 
     /// Semantic fonts so sizes/weights live in one place.
     enum Typography {
+        static var delta: CGFloat {
+            guard Thread.isMainThread else { return 0 }
+            return MainActor.assumeIsolated {
+                CGFloat(SessionCoordinator.shared.settings.chromeTextSize.pointDelta)
+            }
+        }
         /// The one font every primary chrome label uses — workspace name, search
         /// field, session titles, tab titles, switcher rows, the Settings row. Keeping
         /// these identical (size + weight) is what makes the sidebar and tab strip read
         /// as one consistent surface instead of a mix of sizes/weights.
-        static var sidebarLabel: NSFont { .systemFont(ofSize: 13, weight: .medium) }
+        static var sidebarLabel: NSFont { .systemFont(ofSize: 13 + delta, weight: .medium) }
         static var rowTitle: NSFont { sidebarLabel }
-        static var rowMeta: NSFont { .monospacedSystemFont(ofSize: 11, weight: .regular) }
+        static var rowMeta: NSFont { .monospacedSystemFont(ofSize: 11 + delta, weight: .regular) }
         static var tabTitle: NSFont { sidebarLabel }
         static var paneHeader: NSFont { sidebarLabel }
-        static var sectionLabel: NSFont { .systemFont(ofSize: 10.5, weight: .semibold) }
-        static var badge: NSFont { .monospacedSystemFont(ofSize: 10.5, weight: .semibold) }
-        static var kbd: NSFont { .monospacedSystemFont(ofSize: 12, weight: .semibold) }
-        static var paletteTitle: NSFont { .systemFont(ofSize: 13.5, weight: .medium) }
-        static var paletteHeader: NSFont { .systemFont(ofSize: 10, weight: .heavy) }
-        static var settingsHeading: NSFont { .systemFont(ofSize: 11, weight: .semibold) }
+        static var sectionLabel: NSFont { .systemFont(ofSize: 10.5 + delta, weight: .semibold) }
+        static var badge: NSFont { .monospacedSystemFont(ofSize: 10.5 + delta, weight: .semibold) }
+        static var kbd: NSFont { .monospacedSystemFont(ofSize: 12 + delta, weight: .semibold) }
+        static var paletteTitle: NSFont { .systemFont(ofSize: 13.5 + delta, weight: .medium) }
+        static var paletteHeader: NSFont { .systemFont(ofSize: 10 + delta, weight: .heavy) }
+        static var settingsHeading: NSFont { .systemFont(ofSize: 11 + delta, weight: .semibold) }
     }
 
     /// Drop-shadow recipe presets. Apply with `applyShadow(.elevation1, to: layer)`.

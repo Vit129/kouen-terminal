@@ -69,6 +69,8 @@ public final class GlyphRasterizer {
     private let pointSize: CGFloat
     private let fontThicken: Bool
     private let fontThickenStrength: Int
+    public let lineHeightMultiplier: CGFloat
+    public let cellWidthMultiplier: CGFloat
     private let regular: CTFont
     private let bold: CTFont
     private let italic: CTFont
@@ -119,6 +121,8 @@ public final class GlyphRasterizer {
         shapedRunCacheLimit: Int = 3_000,
         fontThicken: Bool = false,
         fontThickenStrength: Int = 255,
+        lineHeightMultiplier: CGFloat = 1.0,
+        cellWidthMultiplier: CGFloat = 1.0,
         colorSpace: CGColorSpace = CGColorSpace(name: CGColorSpace.sRGB)!
     ) {
         self.init(
@@ -127,6 +131,8 @@ public final class GlyphRasterizer {
             shapedRunCacheLimit: shapedRunCacheLimit,
             fontThicken: fontThicken,
             fontThickenStrength: fontThickenStrength,
+            lineHeightMultiplier: lineHeightMultiplier,
+            cellWidthMultiplier: cellWidthMultiplier,
             colorSpace: colorSpace
         )
     }
@@ -137,6 +143,8 @@ public final class GlyphRasterizer {
         shapedRunCacheLimit: Int = 3_000,
         fontThicken: Bool = false,
         fontThickenStrength: Int = 255,
+        lineHeightMultiplier: CGFloat = 1.0,
+        cellWidthMultiplier: CGFloat = 1.0,
         colorSpace: CGColorSpace = CGColorSpace(name: CGColorSpace.sRGB)!
     ) {
         self.scale = scale
@@ -150,6 +158,8 @@ public final class GlyphRasterizer {
         self.fontResolution = resolvedFont
         self.fontThicken = fontThicken
         self.fontThickenStrength = max(0, min(255, fontThickenStrength))
+        self.lineHeightMultiplier = lineHeightMultiplier.isFinite ? min(1.6, max(0.8, lineHeightMultiplier)) : 1.0
+        self.cellWidthMultiplier = cellWidthMultiplier.isFinite ? min(1.4, max(0.8, cellWidthMultiplier)) : 1.0
         let base = TerminalFontResolver.makeFont(from: resolvedFont)
         regular = base
         bold = Self.applyTraits(base, size: resolvedFont.pointSize, add: .traitBold)
@@ -209,7 +219,7 @@ public final class GlyphRasterizer {
     }
 
     /// Monospace cell metrics (points). Width is the advance of a representative glyph
-    /// ("M"); height is ascent + descent + leading.
+    /// ("M"); height is ascent + descent + leading, scaled by optional user multipliers.
     public func metrics() -> CellMetrics {
         let ascent = CTFontGetAscent(regular)
         let descent = CTFontGetDescent(regular)
@@ -217,11 +227,15 @@ public final class GlyphRasterizer {
         var glyph = glyphID(for: "M".unicodeScalars.first!.value, in: regular) ?? 0
         var advance = CGSize.zero
         CTFontGetAdvancesForGlyphs(regular, .horizontal, &glyph, &advance, 1)
-        let width = advance.width > 0 ? advance.width : pointSize * 0.6
+        let baseWidth = advance.width > 0 ? advance.width : pointSize * 0.6
+        let baseHeight = (ascent + descent + leading).rounded(.up)
+        let width = cellWidthMultiplier == 1 ? baseWidth : max(1, baseWidth * cellWidthMultiplier)
+        let height = lineHeightMultiplier == 1 ? baseHeight : max(1, (baseHeight * lineHeightMultiplier).rounded(.up))
+        let adjustedAscent = lineHeightMultiplier == 1 ? ascent : max(0, ascent + (height - baseHeight) * 0.5)
         return CellMetrics(
             width: width,
-            height: (ascent + descent + leading).rounded(.up),
-            ascent: ascent,
+            height: height,
+            ascent: adjustedAscent,
             descent: descent,
             leading: leading
         )

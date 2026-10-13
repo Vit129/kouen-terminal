@@ -949,6 +949,7 @@ private final class TabPillView: NSView {
     func applyChrome(isActive: Bool) {
         self.isActive = isActive
         let c = HarnessDesign.chrome
+        titleLabel.font = HarnessDesign.Typography.tabTitle
         layer?.cornerRadius = HarnessDesign.tabPillHeight / 2
 
         if isActive {
@@ -1062,6 +1063,7 @@ final class MachineIndicatorButton: NSButton {
 
     func applyChrome() {
         let c = HarnessChrome.current
+        nameLabel.font = HarnessDesign.Typography.tabTitle
         nameLabel.textColor = isRemote ? c.textPrimary : c.textSecondary
         detailLabel.textColor = connectionState == "Connected" ? c.textSecondary : c.attention
         symbol.contentTintColor = connectionState == "Connected" ? c.textSecondary : c.attention

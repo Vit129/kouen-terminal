@@ -287,6 +287,21 @@ final class EngineConformanceTests: XCTestCase {
         XCTAssertNil(URLDetection.url(in: line, at: 0), "the leading 'see' is not a URL")
     }
 
+    func testFileLocationDetectionAndRoundTrip() throws {
+        let diag = "error: Sources/HarnessApp/Main.swift:42:13: expected expression"
+        let start = diag.distance(from: diag.startIndex, to: diag.range(of: "Sources")!.lowerBound)
+        let match = try XCTUnwrap(URLDetection.fileLocation(in: diag, at: start + 5))
+        XCTAssertEqual(match.target, URLDetection.FileLocationTarget(
+            path: "Sources/HarnessApp/Main.swift",
+            line: 42,
+            column: 13
+        ))
+        let roundTrip = try XCTUnwrap(URLDetection.FileLocationTarget(urlString: match.target.urlString))
+        XCTAssertEqual(roundTrip, match.target)
+        XCTAssertEqual(URLDetection.url(in: diag, at: start + 5), match.target.urlString)
+        XCTAssertNil(URLDetection.fileLocation(in: "timestamp 12:34:56 ok", at: 12))
+    }
+
     func testSynchronizedOutputModeAndDECRQM() {
         let term = HarnessGridTerminal(cols: 20, rows: 4)!
         var responses = Data()

@@ -38,6 +38,26 @@ final class SettingsSearchTests: XCTestCase {
         assertLands(on: "Padding", pane: .appearance, query: "padding")
         assertLands(on: "Fallback fonts", pane: .terminal, query: "fallback font")
         assertLands(on: "Quiet hours and destinations", pane: .notifications, query: "quiet hours")
+        assertLands(on: "Interface text size", pane: .appearance, query: "interface text size")
+        assertLands(on: "Single-pane header", pane: .appearance, query: "single-pane header")
+        assertLands(on: "Line height", pane: .terminal, query: "line height")
+        assertLands(on: "Cell width", pane: .terminal, query: "cell width")
+        assertLands(on: "Hook shell timeout", pane: .advanced, query: "hook shell timeout")
+        assertLands(on: "Diagnostics report", pane: .tools, query: "diagnostics report")
+    }
+
+    func testBuildScriptsAndXcodeGenHelperContractRemainAligned() throws {
+        let root = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
+        let previewScript = try String(contentsOf: root.appendingPathComponent("Scripts/preview.sh"), encoding: .utf8)
+        let releaseScript = try String(contentsOf: root.appendingPathComponent("Scripts/build-release.sh"), encoding: .utf8)
+        let projectYML = try String(contentsOf: root.appendingPathComponent("project.yml"), encoding: .utf8)
+
+        XCTAssertFalse(previewScript.contains("swift build --product"), "preview.sh must build all products in one pass")
+        XCTAssertFalse(releaseScript.contains("swift build -c release --product"), "build-release.sh must build all products in one pass")
+        for helper in ["HarnessSessionHost", "HarnessDaemon", "harness-cli"] {
+            XCTAssertTrue(projectYML.contains("$(BUILT_PRODUCTS_DIR)/\(helper)"), "project.yml missing \(helper)")
+            XCTAssertTrue(previewScript.contains("$BUILD_DIR/\(helper)"), "preview.sh missing \(helper)")
+        }
     }
 
     func testTitleMatchesRankAheadOfHintMatches() {

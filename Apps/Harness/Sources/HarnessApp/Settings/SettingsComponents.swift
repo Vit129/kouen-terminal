@@ -70,10 +70,10 @@ final class SettingsFormRow: NSView {
         self.control = control
         super.init(frame: .zero)
         translatesAutoresizingMaskIntoConstraints = false
-        titleLabel.font = .systemFont(ofSize: 13)
+        titleLabel.font = .systemFont(ofSize: 13 + HarnessDesign.Typography.delta)
         titleLabel.textColor = .labelColor
         titleLabel.isSelectable = false
-        hintLabel.font = .systemFont(ofSize: 11.5)
+        hintLabel.font = .systemFont(ofSize: 11.5 + HarnessDesign.Typography.delta)
         hintLabel.textColor = .secondaryLabelColor
         hintLabel.isSelectable = false
         for label in [titleLabel, hintLabel] {
@@ -128,10 +128,22 @@ final class SettingsFormRow: NSView {
     override func layout() {
         super.layout()
         let room = max(80, min(Form.hintMaxWidth, control.frame.minX - Form.labelGap))
-        guard abs(hintLabel.preferredMaxLayoutWidth - room) > 0.5 else { return }
+        guard abs(hintLabel.preferredMaxLayoutWidth - room) > 0.5
+            || abs(titleLabel.preferredMaxLayoutWidth - room) > 0.5 else { return }
         hintLabel.preferredMaxLayoutWidth = room
         titleLabel.preferredMaxLayoutWidth = room
+        titleLabel.invalidateIntrinsicContentSize()
+        hintLabel.invalidateIntrinsicContentSize()
         super.layout()
+    }
+
+    func applyChrome() {
+        let delta = HarnessDesign.Typography.delta
+        titleLabel.font = .systemFont(ofSize: 13 + delta)
+        hintLabel.font = .systemFont(ofSize: 11.5 + delta)
+        titleLabel.invalidateIntrinsicContentSize()
+        hintLabel.invalidateIntrinsicContentSize()
+        needsLayout = true
     }
 }
 
@@ -263,6 +275,7 @@ final class SettingsSidebarButton: NSControl {
 
     func applyChrome() {
         let c = HarnessChrome.current
+        label.font = .systemFont(ofSize: 13 + HarnessDesign.Typography.delta, weight: isSelected ? .semibold : .medium)
         layer?.borderWidth = isFocused ? 2 : 0
         layer?.borderColor = c.focusRing.withAlphaComponent(0.85).cgColor
         if isSelected {
@@ -278,5 +291,109 @@ final class SettingsSidebarButton: NSControl {
             iconView.contentTintColor = c.textTertiary
             label.textColor = c.textSecondary
         }
+    }
+}
+
+/// Live theme and typography specimen card shown in Settings.
+@MainActor
+final class TerminalSpecimenPreviewView: NSView {
+    private(set) var resolvedAppearance: TerminalHostResolvedAppearance?
+    private(set) var themeName: String = ""
+    private(set) var fontFamily: String = "Menlo"
+    private(set) var fontSize: CGFloat = 13
+    private(set) var lineHeightMultiplier: CGFloat = 1.0
+    private(set) var cellWidthMultiplier: CGFloat = 1.0
+    private(set) var ligaturesEnabled: Bool = true
+    let sampleLines: [String] = [
+        "~/project main ❯ swift test",
+        "if count != 0 => ok -> [✓]",
+        "UTF-8 · 日本語 · 한글 · 🚀",
+    ]
+
+    override var isFlipped: Bool { true }
+
+    override init(frame frameRect: NSRect) {
+        super.init(frame: frameRect)
+        translatesAutoresizingMaskIntoConstraints = false
+        setAccessibilityElement(true)
+        setAccessibilityRole(.group)
+        setAccessibilityLabel("Terminal theme and font preview")
+        NSLayoutConstraint.activate([
+            widthAnchor.constraint(equalToConstant: Form.wideControlWidth),
+            heightAnchor.constraint(equalToConstant: 88),
+        ])
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) { fatalError() }
+
+    func update(themeName: String, settings: HarnessSettings, systemAppearance: HarnessSystemAppearance) {
+        self.themeName = themeName
+        self.resolvedAppearance = TerminalHostView.resolvedNativeAppearance(
+            themeName: themeName,
+            settings: settings,
+            systemAppearance: systemAppearance
+        )
+        self.fontFamily = settings.fontFamily
+        self.fontSize = CGFloat(HarnessSettings.clampedFontSize(settings.fontSize))
+        self.lineHeightMultiplier = CGFloat(HarnessSettings.clampedLineHeight(settings.lineHeight))
+        self.cellWidthMultiplier = CGFloat(HarnessSettings.clampedCellWidth(settings.cellWidth))
+        self.ligaturesEnabled = settings.ligatures
+        setAccessibilityValue("\(themeName), \(settings.fontFamily) \(Int(settings.fontSize.rounded()))pt")
+        needsDisplay = true
+    }
+
+    override func draw(_ dirtyRect: NSRect) {
+        guard let appearance = resolvedAppearance else { return }
+        let bg = NSColor.fromHex(appearance.canvasBackgroundHex) ?? .black
+        let fg = NSColor.fromHex(appearance.canvasForegroundHex) ?? .white
+        let cursor = NSColor.fromHex(appearance.cursorHex) ?? fg
+        let rect = bounds.insetBy(dx: 0.5, dy: 0.5)
+        let path = NSBezierPath(roundedRect: rect, xRadius: HarnessDesign.Radius.control, yRadius: HarnessDesign.Radius.control)
+        bg.setFill()
+        path.fill()
+        HarnessChrome.current.borderStrong.setStroke()
+        path.lineWidth = 1
+        path.stroke()
+
+        let previewSize = min(13, max(10, fontSize * 0.78))
+        let font = NSFont(name: fontFamily, size: previewSize)
+            ?? .monospacedSystemFont(ofSize: previewSize, weight: .regular)
+        let stepY = max(14, min(20, (previewSize + 3) * lineHeightMultiplier))
+        let kern = (cellWidthMultiplier - 1.0) * 4.0
+        let baseAttrs: [NSAttributedString.Key: Any] = [
+            .font: font,
+            .foregroundColor: fg,
+            .ligature: ligaturesEnabled ? 1 : 0,
+            .kern: kern,
+        ]
+        let accentGreen = paletteColor(2, in: appearance, fallback: fg)
+        let accentBlue = paletteColor(4, in: appearance, fallback: fg)
+        for (idx, line) in sampleLines.enumerated() {
+            let attr = NSMutableAttributedString(string: line, attributes: baseAttrs)
+            if idx == 0, let range = line.range(of: "~/project main") {
+                attr.addAttribute(.foregroundColor, value: accentGreen, range: NSRange(range, in: line))
+            } else if idx == 1 {
+                attr.addAttribute(.foregroundColor, value: accentBlue, range: NSRange(location: 0, length: attr.length))
+            }
+            attr.draw(at: NSPoint(x: 10, y: 8 + CGFloat(idx) * stepY))
+        }
+        cursor.setFill()
+        NSBezierPath(rect: NSRect(x: rect.maxX - 16, y: 10, width: 6, height: previewSize)).fill()
+
+        let chipY = rect.maxY - 14
+        let chipW = (rect.width - 20) / 16
+        for i in 0..<16 {
+            let color = paletteColor(i, in: appearance, fallback: fg)
+            color.setFill()
+            let chipRect = NSRect(x: 10 + CGFloat(i) * chipW, y: chipY, width: max(2, chipW - 2), height: 6)
+            NSBezierPath(roundedRect: chipRect, xRadius: 1.5, yRadius: 1.5).fill()
+        }
+    }
+
+    private func paletteColor(_ index: Int, in appearance: TerminalHostResolvedAppearance, fallback: NSColor) -> NSColor {
+        let hex = (index < appearance.outputPaletteHex.count ? appearance.outputPaletteHex[index] : nil)
+            ?? ThemeManager.defaultBaselinePaletteHex[index]
+        return NSColor.fromHex(hex) ?? fallback
     }
 }

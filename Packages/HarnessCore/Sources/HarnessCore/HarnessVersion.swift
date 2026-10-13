@@ -19,3 +19,90 @@ public enum HarnessVersion {
     public static let build = 136
     public static let protocolLevel = 2
 }
+
+/// Redacted local diagnostics snapshot for support and bug reports.
+/// Never includes terminal buffer contents, command arguments, or environment variables.
+public struct HarnessDiagnosticsReport: Equatable, Sendable {
+    public let version: String
+    public let build: Int
+    public let protocolLevel: Int
+    public let osVersion: String
+    public let daemonSocketRedactedPath: String
+    public let daemonReachable: Bool
+    public let sessionCount: Int
+    public let windowCount: Int
+    public let paneCount: Int
+    public let themeName: String
+    public let appearanceMode: String
+    public let fontSummary: String
+    public let chromeTextSize: String
+
+    public init(
+        version: String = HarnessVersion.short,
+        build: Int = HarnessVersion.build,
+        protocolLevel: Int = HarnessVersion.protocolLevel,
+        osVersion: String = ProcessInfo.processInfo.operatingSystemVersionString,
+        daemonSocketPath: String = HarnessPaths.socketURL.path,
+        daemonReachable: Bool,
+        sessionCount: Int,
+        windowCount: Int,
+        paneCount: Int,
+        themeName: String = "Harness Default",
+        settings: HarnessSettings,
+        homeDirectory: String = NSHomeDirectory()
+    ) {
+        self.version = version
+        self.build = build
+        self.protocolLevel = protocolLevel
+        self.osVersion = Self.redact(osVersion, homeDirectory: homeDirectory)
+        self.daemonSocketRedactedPath = Self.redact(daemonSocketPath, homeDirectory: homeDirectory)
+        self.daemonReachable = daemonReachable
+        self.sessionCount = max(0, sessionCount)
+        self.windowCount = max(0, windowCount)
+        self.paneCount = max(0, paneCount)
+        self.themeName = Self.redact(themeName, homeDirectory: homeDirectory)
+        self.appearanceMode = settings.appearanceMode.rawValue
+        let lh = String(format: "%.2f", HarnessSettings.clampedLineHeight(settings.lineHeight))
+        let cw = String(format: "%.2f", HarnessSettings.clampedCellWidth(settings.cellWidth))
+        let family = Self.redact(settings.fontFamily, homeDirectory: homeDirectory)
+        self.fontSummary = "\(family) \(Int(settings.fontSize.rounded()))pt (line \(lh)x, width \(cw)x)"
+        self.chromeTextSize = settings.chromeTextSize.rawValue
+    }
+
+    public static func redact(_ input: String, homeDirectory: String = NSHomeDirectory()) -> String {
+        var result = input
+        let trimmedHome = homeDirectory.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !trimmedHome.isEmpty, trimmedHome != "/" {
+            result = result.replacingOccurrences(of: trimmedHome, with: "~")
+        }
+        result = result.replacingOccurrences(
+            of: #"/(?:Users|home)/[^/\s]+"#,
+            with: "~",
+            options: .regularExpression
+        )
+        result = result.replacingOccurrences(
+            of: #"(?:sk-[A-Za-z0-9_-]{12,}|gh[pousr]_[A-Za-z0-9]{12,}|Bearer\s+[A-Za-z0-9._-]+)"#,
+            with: "[REDACTED]",
+            options: .regularExpression
+        )
+        return result
+    }
+
+    public func formatted() -> String {
+        [
+            "Harness Diagnostics Report",
+            "version: \(version) (\(build))",
+            "protocol: \(protocolLevel)",
+            "os: \(osVersion)",
+            "daemon.socket: \(daemonSocketRedactedPath)",
+            "daemon.reachable: \(daemonReachable ? "true" : "false")",
+            "workspace.sessions: \(sessionCount)",
+            "workspace.windows: \(windowCount)",
+            "workspace.panes: \(paneCount)",
+            "appearance.mode: \(appearanceMode)",
+            "appearance.theme: \(themeName)",
+            "appearance.chromeTextSize: \(chromeTextSize)",
+            "terminal.font: \(fontSummary)",
+        ].joined(separator: "\n")
+    }
+}

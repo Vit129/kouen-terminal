@@ -902,6 +902,28 @@ final class SessionCoordinator: NSObject {
     var userVariableFlushScheduled = false
     var pendingDaemonOperations: [Endpoint: Int] = [:]
     var daemonFailureRevision = 0
+
+    func diagnosticsReport() -> HarnessDiagnosticsReport {
+        let sessions = snapshot.workspaces.flatMap(\.sessions)
+        let tabs = sessions.flatMap(\.tabs)
+        let panes = tabs.flatMap { $0.rootPane.allLeaves() }
+        return HarnessDiagnosticsReport(
+            daemonReachable: FileManager.default.fileExists(atPath: HarnessPaths.socketURL.path),
+            sessionCount: sessions.count,
+            windowCount: tabs.count,
+            paneCount: panes.count,
+            themeName: snapshot.themeName,
+            settings: settings
+        )
+    }
+
+    @discardableResult
+    func copyDiagnosticsReport() -> String {
+        let text = diagnosticsReport().formatted()
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(text, forType: .string)
+        return text
+    }
 }
 
 enum HarnessPathDisplay {

@@ -236,7 +236,7 @@ final class StatusLineView: NSView {
                 attrs[.foregroundColor] = fg
                 if let bg = seg.bg { attrs[.backgroundColor] = Self.nsColor(bg, default: .clear) }
             }
-            var font = NSFont.monospacedSystemFont(ofSize: 12, weight: seg.bold ? .bold : .regular)
+            var font = NSFont.monospacedSystemFont(ofSize: 12 + HarnessDesign.Typography.delta, weight: seg.bold ? .bold : .regular)
             if seg.italic { font = NSFontManager.shared.convert(font, toHaveTrait: .italicFontMask) }
             attrs[.font] = font
             if seg.underline { attrs[.underlineStyle] = NSUnderlineStyle.single.rawValue }

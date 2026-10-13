@@ -679,6 +679,8 @@ public final class HarnessTerminalSurfaceView: NSView {
     private var fontFallbackFamilies: [String]
     private var fontFeatures: [String: Int]
     private var fontSize: CGFloat
+    private var lineHeightMultiplier: CGFloat = 1.0
+    private var cellWidthMultiplier: CGFloat = 1.0
     private var fontThicken: Bool
     private var fontThickenStrength: Int
     /// The canvas (default) background — used as the Metal clear color and (at
@@ -1491,6 +1493,8 @@ public final class HarnessTerminalSurfaceView: NSView {
         var fontFallbackFamilies: [String]
         var fontFeatures: [String: Int]
         var fontSize: CGFloat
+        var lineHeightMultiplier: CGFloat
+        var cellWidthMultiplier: CGFloat
         var vivid: Bool
         var colorRendering: TerminalColorRenderingMode?
         var colorGamut: TerminalColorGamut
@@ -1555,9 +1559,46 @@ public final class HarnessTerminalSurfaceView: NSView {
         themeFit: Bool = false,
         boldIsBright: Bool = true,
         promptGutter: Bool = false,
-        liveResizeReflow: Bool = true
+        liveResizeReflow: Bool = true,
+        lineHeightMultiplier: CGFloat = 1.0,
+        cellWidthMultiplier: CGFloat = 1.0
     ) {
-        let inputs = AppearanceInputs(fontFamily: fontFamily, fontFallbackFamilies: fontFallbackFamilies, fontFeatures: fontFeatures, fontSize: fontSize, vivid: vivid, colorRendering: colorRendering, colorGamut: colorGamut, canvasBackgroundHex: canvasBackgroundHex, canvasForegroundHex: canvasForegroundHex, cursorHex: cursorHex, outputPaletteHex: outputPaletteHex, oscPaletteHex: oscPaletteHex, canvasOpacity: canvasOpacity, cursorStyle: cursorStyle, cursorBlink: cursorBlink, paddingX: paddingX, paddingY: paddingY, paddingBalance: paddingBalance, selectionBackgroundHex: selectionBackgroundHex, selectionForegroundHex: selectionForegroundHex, cursorTextHex: cursorTextHex, copyOnSelect: copyOnSelect, pasteProtection: pasteProtection, scrollbackLines: scrollbackLines, linearBlending: linearBlending, textRendering: textRendering, ligatures: ligatures, minimumContrast: minimumContrast, themeFit: themeFit, boldIsBright: boldIsBright, promptGutter: promptGutter, liveResizeReflow: liveResizeReflow)
+        let inputs = AppearanceInputs(
+            fontFamily: fontFamily,
+            fontFallbackFamilies: fontFallbackFamilies,
+            fontFeatures: fontFeatures,
+            fontSize: fontSize,
+            lineHeightMultiplier: lineHeightMultiplier,
+            cellWidthMultiplier: cellWidthMultiplier,
+            vivid: vivid,
+            colorRendering: colorRendering,
+            colorGamut: colorGamut,
+            canvasBackgroundHex: canvasBackgroundHex,
+            canvasForegroundHex: canvasForegroundHex,
+            cursorHex: cursorHex,
+            outputPaletteHex: outputPaletteHex,
+            oscPaletteHex: oscPaletteHex,
+            canvasOpacity: canvasOpacity,
+            cursorStyle: cursorStyle,
+            cursorBlink: cursorBlink,
+            paddingX: paddingX,
+            paddingY: paddingY,
+            paddingBalance: paddingBalance,
+            selectionBackgroundHex: selectionBackgroundHex,
+            selectionForegroundHex: selectionForegroundHex,
+            cursorTextHex: cursorTextHex,
+            copyOnSelect: copyOnSelect,
+            pasteProtection: pasteProtection,
+            scrollbackLines: scrollbackLines,
+            linearBlending: linearBlending,
+            textRendering: textRendering,
+            ligatures: ligatures,
+            minimumContrast: minimumContrast,
+            themeFit: themeFit,
+            boldIsBright: boldIsBright,
+            promptGutter: promptGutter,
+            liveResizeReflow: liveResizeReflow
+        )
         guard inputs != appliedAppearance else { return }
         appliedAppearance = inputs
         liveResizeReflowEnabled = liveResizeReflow
@@ -1603,6 +1644,8 @@ public final class HarnessTerminalSurfaceView: NSView {
         self.fontFallbackFamilies = fontFallbackFamilies
         self.fontFeatures = fontFeatures
         self.fontSize = fontSize
+        self.lineHeightMultiplier = lineHeightMultiplier
+        self.cellWidthMultiplier = cellWidthMultiplier
         self.colorRendering = resolvedColorRendering
         self.colorGamut = resolvedGamut
         self.canvasBackground = bg
@@ -2064,6 +2107,8 @@ public final class HarnessTerminalSurfaceView: NSView {
             scale: scale,
             fontThicken: fontThicken,
             fontThickenStrength: fontThickenStrength,
+            lineHeightMultiplier: lineHeightMultiplier,
+            cellWidthMultiplier: cellWidthMultiplier,
             colorSpace: CGColorSpace(name: layerColorSpaceName)!
         )
         // Tell the engine the real cell pixel size so inline-image cell footprints + cursor

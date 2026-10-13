@@ -23,14 +23,10 @@ if [ "${HARNESS_CMO:-0}" = "1" ]; then
   echo "  (cross-module optimization ON — bench-gated experiment)"
   CMO_FLAGS="-Xswiftc -cross-module-optimization"
 fi
+# Build all release executables (Harness, HarnessDaemon, HarnessSessionHost, harness-cli)
+# in a single SwiftPM + LLBuild graph pass instead of four sequential --product invocations.
 # shellcheck disable=SC2086
-swift build -c release --product Harness $CMO_FLAGS
-# shellcheck disable=SC2086
-swift build -c release --product HarnessDaemon $CMO_FLAGS
-# shellcheck disable=SC2086
-swift build -c release --product HarnessSessionHost $CMO_FLAGS
-# shellcheck disable=SC2086
-swift build -c release --product harness-cli $CMO_FLAGS
+swift build -c release $CMO_FLAGS
 
 echo "Packaging Harness.app..."
 "$ROOT/Scripts/package-app.sh" release

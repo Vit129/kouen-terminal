@@ -443,7 +443,14 @@ final class ContentAreaViewController: NSViewController, TerminalTabBarDelegate 
         guard let workspace = context.workspace, let tab = context.tab else { return }
 
         let displayNode = zoomedNode(for: tab) ?? tab.rootPane
-        let density = "\(coordinator.settings.paneSpacing)|\(coordinator.settings.paneDensity.rawValue)|\(coordinator.settings.paneHeaders)|\(tabRowHidden)"
+        let settings = coordinator.settings
+        let density = [
+            "\(settings.paneSpacing)",
+            settings.paneDensity.rawValue,
+            "\(settings.paneHeaders)",
+            "\(settings.singlePaneHeader)",
+            "\(tabRowHidden)",
+        ].joined(separator: "|")
         let key = "\(density)|\(workspace.id)|\(tab.id)|\(tab.zoomedPaneID?.uuidString ?? "all")|\(paneKey(displayNode))"
         guard force || key != lastStructureKey else {
             // Same layout: only a ratio set elsewhere (`resize-pane`, Equalize Splits) can
@@ -556,7 +563,8 @@ final class PaneContainerView: NSView {
         super.init(frame: .zero)
         HarnessDesign.makeClear(self)
         let settings = SessionCoordinator.shared.settings
-        showsHeaders = separated && settings.paneHeaders
+        leaves = node.allLeaves()
+        showsHeaders = separated && settings.showsPaneHeaders(paneCount: leaves.count)
         // The root pads by half the gap; each island insets by the other half.
         let pad = ChromeLayout.containerPadding(separated: separated, padsTop: sidebarVisible, gap: settings.paneSpacing)
         // The sidebar supplies its own trailing spacing. Cancel the island's
@@ -572,7 +580,6 @@ final class PaneContainerView: NSView {
             content.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -CGFloat(pad.trailing)),
             content.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -CGFloat(pad.bottom)),
         ])
-        leaves = node.allLeaves()
         build(node: node, into: content)
         refreshHeaders()
         NotificationCenter.default.addObserver(
@@ -649,8 +656,10 @@ final class PaneContainerView: NSView {
     func refreshHeaders() {
         guard let tabID, let tab = coordinator.snapshot(for: hostOwner).workspaces.flatMap(\.sessions).flatMap(\.tabs).first(where: { $0.id == tabID }) else { return }
         let leaves = tab.rootPane.allLeaves()
+        showsHeaders = separated && coordinator.settings.showsPaneHeaders(paneCount: self.leaves.count)
         let focused = coordinator.activeSurfaceID
         for island in islands {
+            island.setShowsHeader(showsHeaders)
             guard let index = leaves.firstIndex(where: { $0.surfaceID == island.surfaceID }) else { continue }
             let identity = PaneIdentity.of(leaf: leaves[index], in: tab)
             let title: String
@@ -934,6 +943,7 @@ final class PaneIslandView: NSView {
     let surfaceID: SurfaceID
     /// Title row, present on comfortable panes when pane headers are on.
     private(set) var header: PaneHeaderView?
+    private var hostTopConstraint: NSLayoutConstraint?
 
     init(surfaceID: SurfaceID, separated: Bool, showsHeader: Bool) {
         self.separated = separated
@@ -1008,12 +1018,41 @@ final class PaneIslandView: NSView {
         return true
     }
 
+    func setShowsHeader(_ shows: Bool) {
+        let effective = separated && shows
+        if effective, header == nil {
+            let newHeader = PaneHeaderView(surfaceID: surfaceID)
+            newHeader.translatesAutoresizingMaskIntoConstraints = false
+            addSubview(newHeader)
+            NSLayoutConstraint.activate([
+                newHeader.topAnchor.constraint(equalTo: topAnchor),
+                newHeader.leadingAnchor.constraint(equalTo: leadingAnchor),
+                newHeader.trailingAnchor.constraint(equalTo: trailingAnchor),
+            ])
+            header = newHeader
+            applyChrome()
+        }
+        header?.isHidden = !effective
+        if let host = contentView {
+            hostTopConstraint?.isActive = false
+            let topConstraint = host.topAnchor.constraint(
+                equalTo: effective ? (header?.bottomAnchor ?? topAnchor) : topAnchor
+            )
+            topConstraint.isActive = true
+            hostTopConstraint = topConstraint
+        }
+    }
+
     func embed(_ host: NSView) {
         contentView = host
         host.translatesAutoresizingMaskIntoConstraints = false
         addSubview(host)
+        let topConstraint = host.topAnchor.constraint(
+            equalTo: (header != nil && header?.isHidden == false) ? (header?.bottomAnchor ?? topAnchor) : topAnchor
+        )
+        hostTopConstraint = topConstraint
         NSLayoutConstraint.activate([
-            host.topAnchor.constraint(equalTo: header?.bottomAnchor ?? topAnchor),
+            topConstraint,
             host.leadingAnchor.constraint(equalTo: leadingAnchor),
             host.trailingAnchor.constraint(equalTo: trailingAnchor),
             host.bottomAnchor.constraint(equalTo: bottomAnchor),

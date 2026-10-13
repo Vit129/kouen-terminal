@@ -12,6 +12,10 @@ final class SettingsViewController: NSViewController, NSFontChanging {
     let themePopup = HarnessSelect(frame: .zero)
     let systemLightThemePopup = HarnessSelect(frame: .zero)
     let systemDarkThemePopup = HarnessSelect(frame: .zero)
+    let specimenPreview = TerminalSpecimenPreviewView(frame: .zero)
+    let revertAppearanceButton = NSButton(title: "Revert", target: nil, action: nil)
+    private(set) var initialSettingsSnapshot = HarnessSettings()
+    private(set) var initialThemeSnapshot = ""
     var appearanceModeRow: SettingsFormRow?
     var themeRow: SettingsFormRow?
     var lightThemeRow: SettingsFormRow?
@@ -27,8 +31,10 @@ final class SettingsViewController: NSViewController, NSFontChanging {
     let machineIndicatorToggle = HarnessToggle(frame: .zero)
     let sidebarVisibleToggle = HarnessToggle(frame: .zero)
     let restoreWindowSizeToggle = HarnessToggle(frame: .zero)
+    let chromeTextSizeSegment = HarnessSegmented(frame: .zero)
     let paneDensitySegment = HarnessSegmented(frame: .zero)
     let paneHeadersToggle = HarnessToggle(frame: .zero)
+    let singlePaneHeaderToggle = HarnessToggle(frame: .zero)
     let paneSpacingField = HarnessTextField()
     let paddingXField = HarnessTextField()
     let paddingYField = HarnessTextField()
@@ -72,6 +78,8 @@ final class SettingsViewController: NSViewController, NSFontChanging {
     let prefixControlSegment = HarnessSegmented(frame: .zero)
     let statusLineControlSegment = HarnessSegmented(frame: .zero)
     let fontSizeField = HarnessTextField()
+    let lineHeightField = HarnessTextField()
+    let cellWidthField = HarnessTextField()
     let fontFallbackField = HarnessTextField()
     let fontFeaturesField = HarnessTextField()
     let fontFamilyField = NSTextField() // backing store for the chosen font (not shown)
@@ -194,6 +202,14 @@ final class SettingsViewController: NSViewController, NSFontChanging {
     private func configureControls() {
         let coordinator = SessionCoordinator.shared
         let settings = coordinator.settings
+        initialSettingsSnapshot = settings
+        initialThemeSnapshot = coordinator.snapshot.themeName
+
+        revertAppearanceButton.bezelStyle = .rounded
+        revertAppearanceButton.controlSize = .small
+        revertAppearanceButton.target = self
+        revertAppearanceButton.action = #selector(revertAppearanceChanges)
+        revertAppearanceButton.setAccessibilityLabel("Revert theme and font changes")
 
         appearanceModeSegment.setSegments(HarnessAppearanceMode.allCases.map(Self.appearanceModeTitle))
         appearanceModeSegment.selectItem(withTitle: Self.appearanceModeTitle(settings.appearanceMode))
@@ -231,6 +247,8 @@ final class SettingsViewController: NSViewController, NSFontChanging {
             (paddingXField, String(format: "%.0f", settings.windowPaddingX)),
             (paddingYField, String(format: "%.0f", settings.windowPaddingY)),
             (fontSizeField, String(format: "%.0f", settings.fontSize)),
+            (lineHeightField, formatMultiplier(settings.lineHeight)),
+            (cellWidthField, formatMultiplier(settings.cellWidth)),
             (fontFallbackField, settings.fontFallbackFamilies.joined(separator: ", ")),
             (fontFeaturesField, settings.fontFeatures.sorted { $0.key < $1.key }.map { "\($0.key)=\($0.value)" }.joined(separator: ", ")),
             (shellField, settings.defaultShell),
@@ -344,8 +362,10 @@ final class SettingsViewController: NSViewController, NSFontChanging {
         bellSegment.setSegments(["Off", "Sound", "Flash", "Both"])
         optionKeySegment.setSegments(["Characters", "Meta", "Left Meta", "Right Meta"])
         paneDensitySegment.setSegments(["Comfortable", "Compact"])
+        chromeTextSizeSegment.setSegments(["Default", "Large"])
         for segment in [cursorStyleSegment, textRenderingSegment, resizeOverlaySegment,
-                        resizeOverlayPositionSegment, bellSegment, optionKeySegment, paneDensitySegment] {
+                        resizeOverlayPositionSegment, bellSegment, optionKeySegment,
+                        paneDensitySegment, chromeTextSizeSegment] {
             segment.target = self
             segment.action = #selector(appearanceTextDidCommit)
         }
@@ -355,7 +375,8 @@ final class SettingsViewController: NSViewController, NSFontChanging {
                        ligaturesToggle, promptGutterToggle, transparentTitlebarToggle,
                        liveResizeReflowToggle, paddingBalanceToggle, mouseHideToggle, pasteProtectionToggle,
                        remoteControlToggle, boldIsBrightToggle, themeFitToggle, paneHeadersToggle,
-                       inheritCWDToggle, quickTerminalToggle, notificationSoundToggle] + Array(eventToggles.values) {
+                       singlePaneHeaderToggle, inheritCWDToggle, quickTerminalToggle,
+                       notificationSoundToggle] + Array(eventToggles.values) {
             toggle.target = self
             toggle.action = #selector(appearanceTextDidCommit)
         }
@@ -528,9 +549,10 @@ final class SettingsViewController: NSViewController, NSFontChanging {
     /// blur changes don't alter these, so they won't trigger a needless walk.
     private func chromeSignature() -> String {
         let c = HarnessChrome.current
+        let size = SessionCoordinator.shared.settings.chromeTextSize.rawValue
         return [c.terminalBackground, c.textPrimary, c.accent]
             .map(hexString)
-            .joined(separator: "|") + (c.isDark ? "·D" : "·L")
+            .joined(separator: "|") + (c.isDark ? "·D·" : "·L·") + size
     }
 
     /// Recursively re-apply `applyChrome()` to every themed control under `root`.
@@ -548,6 +570,7 @@ final class SettingsViewController: NSViewController, NSFontChanging {
             case let v as HarnessPillButton: v.applyChrome()
             case let v as KeyRecorderView: v.applyChrome()
             case let v as SettingsSidebarButton: v.applyChrome()
+            case let v as SettingsFormRow: v.applyChrome()
             default: break
             }
             reskinControls(in: sub)
@@ -1128,6 +1151,10 @@ final class SettingsViewController: NSViewController, NSFontChanging {
 
     func formatPercent(_ value: Float) -> String {
         "\(Int((value * 100).rounded()))%"
+    }
+
+    func formatMultiplier(_ value: Float) -> String {
+        String(format: "%.2f", value)
     }
 
     func formatBlur(_ value: Int) -> String {
