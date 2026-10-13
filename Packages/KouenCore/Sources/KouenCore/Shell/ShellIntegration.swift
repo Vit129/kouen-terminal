@@ -163,32 +163,28 @@ public enum ShellIntegration {
           esac
         done
         if (( rc )); then
-          /usr/bin/open -a "Google Chrome" "https://claude.ai/code" >/dev/null 2>&1 &
+          # replaced by Kouen Companion; run `kouen rc`
+          # /usr/bin/open -a "Google Chrome" "https://claude.ai/code" >/dev/null 2>&1 &
           (__kouen_next rc >/dev/null 2>&1 &)
-          if (( ${+commands[happy]} )) && [[ -f "$HOME/.happy/access.key" ]]; then HAPPY_CLAUDE_PATH="${HAPPY_CLAUDE_PATH:-${commands[claude]}}" happy claude "$@"; else __kouen_claude_next "$@"; fi
+          __kouen_claude_next "$@"
           return
         fi
         if [[ "$KOUEN_CLAUDE_SESSION_MODE" == cloud && $resume -eq 0 ]]; then
           __kouen_claude_next --cloud "$@"
         elif [[ "$KOUEN_CLAUDE_SESSION_MODE" == cloud || "$KOUEN_CLAUDE_SESSION_MODE" == remote-control ]]; then
           if [[ "$KOUEN_CLAUDE_SESSION_MODE" == remote-control ]]; then
-            /usr/bin/open -a "Google Chrome" "https://claude.ai/code" >/dev/null 2>&1 &
+            # replaced by Kouen Companion; run `kouen rc`
+            # /usr/bin/open -a "Google Chrome" "https://claude.ai/code" >/dev/null 2>&1 &
             (__kouen_next rc >/dev/null 2>&1 &)
           fi
-          if (( ${+commands[happy]} )) && [[ -f "$HOME/.happy/access.key" ]]; then
-            HAPPY_CLAUDE_PATH="${HAPPY_CLAUDE_PATH:-${commands[claude]}}" happy claude --remote-control --remote-control-session-name-prefix kouen "$@"
-          else
             __kouen_claude_next --remote-control --remote-control-session-name-prefix kouen "$@"
-          fi
-        elif [[ "$KOUEN_CLAUDE_SESSION_MODE" == happy ]] && (( ${+commands[happy]} )); then
-          HAPPY_CLAUDE_PATH="${HAPPY_CLAUDE_PATH:-${commands[claude]}}" happy claude --remote-control --remote-control-session-name-prefix kouen "$@"
         else
           __kouen_claude_next "$@"
         fi
       }
     fi
-    # Codex session mode: a `codex` typed by hand runs through Happy when $KOUEN_CODEX_SESSION_MODE is `happy` or `remote-control` with Happy logged in.
-    if [[ -n "$KOUEN" && ("$KOUEN_CODEX_SESSION_MODE" == "happy" || "$KOUEN_CODEX_SESSION_MODE" == "remote-control") && -z "$__kouen_codex_wrapped" ]]; then
+    # Codex session mode: a `codex` typed by hand gets the Companion opened when $KOUEN_CODEX_SESSION_MODE is `remote-control`.
+    if [[ -n "$KOUEN" && "$KOUEN_CODEX_SESSION_MODE" == "remote-control" && -z "$__kouen_codex_wrapped" ]]; then
       __kouen_codex_wrapped=1
       if (( ${+functions[codex]} )); then
         functions[__kouen_codex_next]=$functions[codex]
@@ -207,14 +203,15 @@ public enum ShellIntegration {
           esac
         done
         if [[ "$KOUEN_CODEX_SESSION_MODE" == "remote-control" || $rc -eq 1 ]]; then
-          /usr/bin/open -a "Google Chrome" "https://chatgpt.com" >/dev/null 2>&1 &
+          # replaced by Kouen Companion; run `kouen rc`
+          # /usr/bin/open -a "Google Chrome" "https://chatgpt.com" >/dev/null 2>&1 &
           (__kouen_next rc >/dev/null 2>&1 &)
         fi
-        if (( ${+commands[happy]} )) && [[ -f "$HOME/.happy/access.key" ]]; then happy codex "$@"; else __kouen_codex_next "$@"; fi
+        __kouen_codex_next "$@"
       }
     fi
-    # Antigravity (agy) session mode: a `agy` typed by hand gets --remote-control, or happy agy when in happy mode.
-    if [[ -n "$KOUEN" && ("$KOUEN_AGY_SESSION_MODE" == "remote-control" || "$KOUEN_AGY_SESSION_MODE" == "happy") && -z "$__kouen_agy_wrapped" ]]; then
+    # Antigravity (agy) session mode: a `agy` typed by hand gets --remote-control.
+    if [[ -n "$KOUEN" && "$KOUEN_AGY_SESSION_MODE" == "remote-control" && -z "$__kouen_agy_wrapped" ]]; then
       __kouen_agy_wrapped=1
       if (( ${+functions[agy]} )); then
         functions[__kouen_agy_next]=$functions[agy]
@@ -234,15 +231,15 @@ public enum ShellIntegration {
           esac
         done
         if [[ "$KOUEN_AGY_SESSION_MODE" == "remote-control" || $rc -eq 1 ]]; then
-          /usr/bin/open -a "Google Chrome" "https://antigravity.google.com" >/dev/null 2>&1 &
+          # replaced by Kouen Companion; run `kouen rc`
+          # /usr/bin/open -a "Google Chrome" "https://antigravity.google.com" >/dev/null 2>&1 &
           (__kouen_next rc >/dev/null 2>&1 &)
         fi
-        if (( ${+commands[happy]} )) && [[ "$KOUEN_AGY_SESSION_MODE" == "happy" ]]; then happy agy "$@"; return; fi
         if (( rc )); then __kouen_agy_next "$@"; else __kouen_agy_next --remote-control "$@"; fi
       }
     fi
-    # GitHub Copilot session mode: a `copilot` typed by hand gets --remote when in remote-control mode ($KOUEN_COPILOT_SESSION_MODE), or happy acp when happy.
-    if [[ -n "$KOUEN" && ("$KOUEN_COPILOT_SESSION_MODE" == "remote-control" || "$KOUEN_COPILOT_SESSION_MODE" == "happy") && -z "$__kouen_copilot_wrapped" ]]; then
+    # GitHub Copilot session mode: a `copilot` typed by hand gets --remote when in remote-control mode ($KOUEN_COPILOT_SESSION_MODE).
+    if [[ -n "$KOUEN" && "$KOUEN_COPILOT_SESSION_MODE" == "remote-control" && -z "$__kouen_copilot_wrapped" ]]; then
       __kouen_copilot_wrapped=1
       if (( ${+functions[copilot]} )); then
         functions[__kouen_copilot_next]=$functions[copilot]
@@ -263,7 +260,6 @@ public enum ShellIntegration {
         if [[ "$KOUEN_COPILOT_SESSION_MODE" == "remote-control" || $rc -eq 1 ]]; then
           (__kouen_next rc >/dev/null 2>&1 &)
         fi
-        if (( ${+commands[happy]} )) && [[ "$KOUEN_COPILOT_SESSION_MODE" == "happy" ]]; then happy acp -- copilot --acp "$@"; return; fi
         if (( rc )); then __kouen_copilot_next "$@"; else __kouen_copilot_next --remote "$@"; fi
       }
     fi
@@ -358,32 +354,28 @@ public enum ShellIntegration {
           esac
         done
         if (( rc )); then
-          /usr/bin/open -a "Google Chrome" "https://claude.ai/code" >/dev/null 2>&1 &
+          # replaced by Kouen Companion; run `kouen rc`
+          # /usr/bin/open -a "Google Chrome" "https://claude.ai/code" >/dev/null 2>&1 &
           (__kouen_next rc >/dev/null 2>&1 &)
-          if command -v happy >/dev/null 2>&1 && [ -f "$HOME/.happy/access.key" ]; then HAPPY_CLAUDE_PATH="${HAPPY_CLAUDE_PATH:-$(type -P claude)}" happy claude "$@"; else __kouen_claude_next "$@"; fi
+          __kouen_claude_next "$@"
           return
         fi
         if [[ "$KOUEN_CLAUDE_SESSION_MODE" == cloud && $resume -eq 0 ]]; then
           __kouen_claude_next --cloud "$@"
         elif [[ "$KOUEN_CLAUDE_SESSION_MODE" == cloud || "$KOUEN_CLAUDE_SESSION_MODE" == remote-control ]]; then
           if [[ "$KOUEN_CLAUDE_SESSION_MODE" == remote-control ]]; then
-            /usr/bin/open -a "Google Chrome" "https://claude.ai/code" >/dev/null 2>&1 &
+            # replaced by Kouen Companion; run `kouen rc`
+            # /usr/bin/open -a "Google Chrome" "https://claude.ai/code" >/dev/null 2>&1 &
             (__kouen_next rc >/dev/null 2>&1 &)
           fi
-          if command -v happy >/dev/null 2>&1 && [ -f "$HOME/.happy/access.key" ]; then
-            HAPPY_CLAUDE_PATH="${HAPPY_CLAUDE_PATH:-$(type -P claude)}" happy claude --remote-control --remote-control-session-name-prefix kouen "$@"
-          else
             __kouen_claude_next --remote-control --remote-control-session-name-prefix kouen "$@"
-          fi
-        elif [[ "$KOUEN_CLAUDE_SESSION_MODE" == happy ]] && command -v happy >/dev/null 2>&1; then
-          HAPPY_CLAUDE_PATH="${HAPPY_CLAUDE_PATH:-$(type -P claude)}" happy claude --remote-control --remote-control-session-name-prefix kouen "$@"
         else
           __kouen_claude_next "$@"
         fi
       }
     fi
-    # Codex session mode: a `codex` typed by hand runs through Happy when $KOUEN_CODEX_SESSION_MODE is `happy` or `remote-control` with Happy logged in.
-    if [ -n "$KOUEN" ] && ([ "$KOUEN_CODEX_SESSION_MODE" = "happy" ] || [ "$KOUEN_CODEX_SESSION_MODE" = "remote-control" ]) && [ -z "$__kouen_codex_wrapped" ]; then
+    # Codex session mode: a `codex` typed by hand gets the Companion opened when $KOUEN_CODEX_SESSION_MODE is `remote-control`.
+    if [ -n "$KOUEN" ] && [ "$KOUEN_CODEX_SESSION_MODE" = "remote-control" ] && [ -z "$__kouen_codex_wrapped" ]; then
       __kouen_codex_wrapped=1
       if declare -F codex >/dev/null 2>&1; then
         eval "$(declare -f codex | sed '1s/^codex /__kouen_codex_next /')"
@@ -402,14 +394,15 @@ public enum ShellIntegration {
           esac
         done
         if [[ "$KOUEN_CODEX_SESSION_MODE" == "remote-control" || $rc -eq 1 ]]; then
-          /usr/bin/open -a "Google Chrome" "https://chatgpt.com" >/dev/null 2>&1 &
+          # replaced by Kouen Companion; run `kouen rc`
+          # /usr/bin/open -a "Google Chrome" "https://chatgpt.com" >/dev/null 2>&1 &
           (__kouen_next rc >/dev/null 2>&1 &)
         fi
-        if command -v happy >/dev/null 2>&1 && [ -f "$HOME/.happy/access.key" ]; then happy codex "$@"; else __kouen_codex_next "$@"; fi
+        __kouen_codex_next "$@"
       }
     fi
-    # Antigravity (agy) session mode: a `agy` typed by hand gets --remote-control, or happy agy when in happy mode.
-    if [ -n "$KOUEN" ] && ([ "$KOUEN_AGY_SESSION_MODE" = "remote-control" ] || [ "$KOUEN_AGY_SESSION_MODE" = "happy" ]) && [ -z "$__kouen_agy_wrapped" ]; then
+    # Antigravity (agy) session mode: a `agy` typed by hand gets --remote-control.
+    if [ -n "$KOUEN" ] && [ "$KOUEN_AGY_SESSION_MODE" = "remote-control" ] && [ -z "$__kouen_agy_wrapped" ]; then
       __kouen_agy_wrapped=1
       if declare -F agy >/dev/null 2>&1; then
         eval "$(declare -f agy | sed '1s/^agy /__kouen_agy_next /')"
@@ -429,15 +422,15 @@ public enum ShellIntegration {
           esac
         done
         if [[ "$KOUEN_AGY_SESSION_MODE" == "remote-control" || $rc -eq 1 ]]; then
-          /usr/bin/open -a "Google Chrome" "https://antigravity.google.com" >/dev/null 2>&1 &
+          # replaced by Kouen Companion; run `kouen rc`
+          # /usr/bin/open -a "Google Chrome" "https://antigravity.google.com" >/dev/null 2>&1 &
           (__kouen_next rc >/dev/null 2>&1 &)
         fi
-        if command -v happy >/dev/null 2>&1 && [[ "$KOUEN_AGY_SESSION_MODE" == "happy" ]]; then happy agy "$@"; return; fi
         if (( rc )); then __kouen_agy_next "$@"; else __kouen_agy_next --remote-control "$@"; fi
       }
     fi
-    # GitHub Copilot session mode: a `copilot` typed by hand gets --remote when in remote-control mode ($KOUEN_COPILOT_SESSION_MODE), or happy acp when happy.
-    if [ -n "$KOUEN" ] && ([ "$KOUEN_COPILOT_SESSION_MODE" = "remote-control" ] || [ "$KOUEN_COPILOT_SESSION_MODE" = "happy" ]) && [ -z "$__kouen_copilot_wrapped" ]; then
+    # GitHub Copilot session mode: a `copilot` typed by hand gets --remote when in remote-control mode ($KOUEN_COPILOT_SESSION_MODE).
+    if [ -n "$KOUEN" ] && [ "$KOUEN_COPILOT_SESSION_MODE" = "remote-control" ] && [ -z "$__kouen_copilot_wrapped" ]; then
       __kouen_copilot_wrapped=1
       if declare -F copilot >/dev/null 2>&1; then
         eval "$(declare -f copilot | sed '1s/^copilot /__kouen_copilot_next /')"
@@ -458,7 +451,6 @@ public enum ShellIntegration {
         if [[ "$KOUEN_COPILOT_SESSION_MODE" == "remote-control" || $rc -eq 1 ]]; then
           (__kouen_next rc >/dev/null 2>&1 &)
         fi
-        if command -v happy >/dev/null 2>&1 && [[ "$KOUEN_COPILOT_SESSION_MODE" == "happy" ]]; then happy acp -- copilot --acp "$@"; return; fi
         if (( rc )); then __kouen_copilot_next "$@"; else __kouen_copilot_next --remote "$@"; fi
       }
     fi
@@ -557,40 +549,26 @@ public enum ShellIntegration {
                 end
             end
             if test $rc -eq 1
-                /usr/bin/open -a "Google Chrome" "https://claude.ai/code" >/dev/null 2>&1 &
+                # replaced by Kouen Companion; run `kouen rc`
+                # /usr/bin/open -a "Google Chrome" "https://claude.ai/code" >/dev/null 2>&1 &
                 __kouen_next rc >/dev/null 2>&1
-                if type -q happy; and test -f "$HOME/.happy/access.key"
-                    set -l claude_path $HAPPY_CLAUDE_PATH
-                    test -n "$claude_path"; or set claude_path (type -p claude)
-                    env HAPPY_CLAUDE_PATH=$claude_path happy claude $argv
-                else
                     __kouen_claude_next $argv
-                end
             else if test "$KOUEN_CLAUDE_SESSION_MODE" = cloud; and test $resume -eq 0
                 __kouen_claude_next --cloud $argv
             else if test "$KOUEN_CLAUDE_SESSION_MODE" = cloud; or test "$KOUEN_CLAUDE_SESSION_MODE" = remote-control
                 if test "$KOUEN_CLAUDE_SESSION_MODE" = remote-control
-                    /usr/bin/open -a "Google Chrome" "https://claude.ai/code" >/dev/null 2>&1 &
+                    # replaced by Kouen Companion; run `kouen rc`
+                    # /usr/bin/open -a "Google Chrome" "https://claude.ai/code" >/dev/null 2>&1 &
                     __kouen_next rc >/dev/null 2>&1
                 end
-                if type -q happy; and test -f "$HOME/.happy/access.key"
-                    set -l claude_path $HAPPY_CLAUDE_PATH
-                    test -n "$claude_path"; or set claude_path (type -p claude)
-                    env HAPPY_CLAUDE_PATH=$claude_path happy claude --remote-control --remote-control-session-name-prefix kouen $argv
-                else
                     __kouen_claude_next --remote-control --remote-control-session-name-prefix kouen $argv
-                end
-            else if test "$KOUEN_CLAUDE_SESSION_MODE" = happy; and type -q happy
-                set -l claude_path $HAPPY_CLAUDE_PATH
-                test -n "$claude_path"; or set claude_path (type -p claude)
-                env HAPPY_CLAUDE_PATH=$claude_path happy claude --remote-control --remote-control-session-name-prefix kouen $argv
             else
                 __kouen_claude_next $argv
             end
         end
     end
-    # Codex session mode: a `codex` typed by hand runs through Happy when $KOUEN_CODEX_SESSION_MODE is `happy` or `remote-control` with Happy logged in.
-    if set -q KOUEN; and begin test "$KOUEN_CODEX_SESSION_MODE" = happy; or test "$KOUEN_CODEX_SESSION_MODE" = remote-control; end; and not set -q __kouen_codex_wrapped
+    # Codex session mode: a `codex` typed by hand gets the Companion opened when $KOUEN_CODEX_SESSION_MODE is `remote-control`.
+    if set -q KOUEN; and begin test "$KOUEN_CODEX_SESSION_MODE" = remote-control; end; and not set -q __kouen_codex_wrapped
         set -g __kouen_codex_wrapped 1
         if functions -q codex
             functions -c codex __kouen_codex_next
@@ -614,18 +592,15 @@ public enum ShellIntegration {
                 end
             end
             if test "$KOUEN_CODEX_SESSION_MODE" = remote-control; or test $rc -eq 1
-                /usr/bin/open -a "Google Chrome" "https://chatgpt.com" >/dev/null 2>&1 &
+                # replaced by Kouen Companion; run `kouen rc`
+                # /usr/bin/open -a "Google Chrome" "https://chatgpt.com" >/dev/null 2>&1 &
                 __kouen_next rc >/dev/null 2>&1
             end
-            if type -q happy; and test -f "$HOME/.happy/access.key"
-                happy codex $argv
-            else
                 __kouen_codex_next $argv
-            end
         end
     end
-    # Antigravity (agy) session mode: a `agy` typed by hand gets --remote-control, or happy agy when in happy mode.
-    if set -q KOUEN; and begin test "$KOUEN_AGY_SESSION_MODE" = remote-control; or test "$KOUEN_AGY_SESSION_MODE" = happy; end; and not set -q __kouen_agy_wrapped
+    # Antigravity (agy) session mode: a `agy` typed by hand gets --remote-control.
+    if set -q KOUEN; and begin test "$KOUEN_AGY_SESSION_MODE" = remote-control; end; and not set -q __kouen_agy_wrapped
         set -g __kouen_agy_wrapped 1
         if functions -q agy
             functions -c agy __kouen_agy_next
@@ -650,11 +625,9 @@ public enum ShellIntegration {
                 end
             end
             if test "$KOUEN_AGY_SESSION_MODE" = remote-control; or test $rc -eq 1
-                /usr/bin/open -a "Google Chrome" "https://antigravity.google.com" >/dev/null 2>&1 &
+                # replaced by Kouen Companion; run `kouen rc`
+                # /usr/bin/open -a "Google Chrome" "https://antigravity.google.com" >/dev/null 2>&1 &
                 __kouen_next rc >/dev/null 2>&1
-            end
-            if test "$KOUEN_AGY_SESSION_MODE" = happy; and type -q happy
-                happy agy $argv; return
             end
             if test $rc -eq 1
                 __kouen_agy_next $argv
@@ -663,8 +636,8 @@ public enum ShellIntegration {
             end
         end
     end
-    # GitHub Copilot session mode: a `copilot` typed by hand gets --remote when in remote-control mode ($KOUEN_COPILOT_SESSION_MODE), or happy acp when happy.
-    if set -q KOUEN; and begin test "$KOUEN_COPILOT_SESSION_MODE" = remote-control; or test "$KOUEN_COPILOT_SESSION_MODE" = happy; end; and not set -q __kouen_copilot_wrapped
+    # GitHub Copilot session mode: a `copilot` typed by hand gets --remote when in remote-control mode ($KOUEN_COPILOT_SESSION_MODE).
+    if set -q KOUEN; and begin test "$KOUEN_COPILOT_SESSION_MODE" = remote-control; end; and not set -q __kouen_copilot_wrapped
         set -g __kouen_copilot_wrapped 1
         if functions -q copilot
             functions -c copilot __kouen_copilot_next
@@ -687,9 +660,6 @@ public enum ShellIntegration {
             end
             if test "$KOUEN_COPILOT_SESSION_MODE" = remote-control; or test $rc -eq 1
                 __kouen_next rc >/dev/null 2>&1
-            end
-            if test "$KOUEN_COPILOT_SESSION_MODE" = happy; and type -q happy
-                happy acp -- copilot --acp $argv; return
             end
             if test $rc -eq 1
                 __kouen_copilot_next $argv
