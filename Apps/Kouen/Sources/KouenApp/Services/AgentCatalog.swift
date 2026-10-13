@@ -189,7 +189,7 @@ public enum AgentCatalog {
         guard let config = agents[kind] else { return nil }
 
         let mode = KouenSettings.load().sessionMode(for: kind)
-        var parts = [AgentLaunchCommands.happyCommand(kind: kind, mode: mode) ?? config.binary]
+        var parts = [config.binary]
         parts += AgentLaunchCommands.launchFlags(kind: kind, mode: mode)
 
         let resolvedModel = model ?? config.models.first

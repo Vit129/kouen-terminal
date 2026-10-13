@@ -19,9 +19,6 @@ public struct AgentLaunchConfig: Sendable {
     public let launchFlags: [AgentSessionMode: [String]]
     public let resumeStyle: ResumeStyle
     public let appendModeFlagsOnResume: Bool
-    /// Replaces `binary` in `.happy` mode, e.g. `happy claude`. Extra args pass straight
-    /// through to the agent (`happy claude --resume <id>`). `nil` = Happy unsupported.
-    public let happyCommand: String?
 
     public init(
         binary: String,
@@ -29,8 +26,7 @@ public struct AgentLaunchConfig: Sendable {
         cloudFallback: AgentSessionMode = .local,
         launchFlags: [AgentSessionMode: [String]] = [:],
         resumeStyle: ResumeStyle = .flag("--resume"),
-        appendModeFlagsOnResume: Bool = false,
-        happyCommand: String? = nil
+        appendModeFlagsOnResume: Bool = false
     ) {
         self.binary = binary
         self.supportedModes = supportedModes
@@ -38,7 +34,6 @@ public struct AgentLaunchConfig: Sendable {
         self.launchFlags = launchFlags
         self.resumeStyle = resumeStyle
         self.appendModeFlagsOnResume = appendModeFlagsOnResume
-        self.happyCommand = happyCommand
     }
 }
 
@@ -51,46 +46,42 @@ public enum AgentLaunchCommands {
     public static let configs: [AgentKind: AgentLaunchConfig] = [
         .claudeCode: AgentLaunchConfig(
             binary: "claude",
-            supportedModes: [.local, .remoteControl, .cloud, .happy],
+            supportedModes: [.local, .remoteControl, .cloud],
             cloudFallback: .remoteControl,
             launchFlags: [
                 .cloud: ["--cloud"],
                 .remoteControl: ["--remote-control", "--remote-control-session-name-prefix", remoteControlNamePrefix]
             ],
             resumeStyle: .flag("--resume"),
-            appendModeFlagsOnResume: true,
-            happyCommand: "happy claude"
+            appendModeFlagsOnResume: true
         ),
         .antigravity: AgentLaunchConfig(
             binary: "agy",
-            supportedModes: [.local, .remoteControl, .happy],
+            supportedModes: [.local, .remoteControl],
             cloudFallback: .remoteControl,
             launchFlags: [
                 .remoteControl: ["--remote-control"]
             ],
             resumeStyle: .flag("--conversation"),
-            appendModeFlagsOnResume: true,
-            happyCommand: "happy agy"
+            appendModeFlagsOnResume: true
         ),
         .copilot: AgentLaunchConfig(
             binary: "copilot",
-            supportedModes: [.local, .remoteControl, .happy],
+            supportedModes: [.local, .remoteControl],
             cloudFallback: .remoteControl,
             launchFlags: [
                 .remoteControl: ["--remote"]
             ],
             resumeStyle: .flag("--resume"),
-            appendModeFlagsOnResume: true,
-            happyCommand: "happy acp -- copilot --acp"
+            appendModeFlagsOnResume: true
         ),
         .codex: AgentLaunchConfig(
             binary: "codex",
-            supportedModes: [.local, .remoteControl, .happy],
+            supportedModes: [.local, .remoteControl],
             cloudFallback: .remoteControl,
             launchFlags: [:],
             resumeStyle: .subcommand("resume"),
-            appendModeFlagsOnResume: false,
-            happyCommand: "happy codex"
+            appendModeFlagsOnResume: false
         ),
         .hermes: AgentLaunchConfig(
             binary: "hermes",
@@ -209,17 +200,12 @@ public enum AgentLaunchCommands {
         configs[kind]?.binary ?? kind.rawValue
     }
 
-    /// `happy <agent>` when `mode` resolves to `.happy` for this kind, else `nil`.
-    public static func happyCommand(kind: AgentKind, mode: AgentSessionMode) -> String? {
-        resolveMode(kind: kind, mode: mode) == .happy ? configs[kind]?.happyCommand : nil
-    }
-
     /// Full shell command string to start a fresh agent session.
     public static func launch(kind: AgentKind, mode: AgentSessionMode, cwd: String? = nil) -> String {
         if kind == .cursor {
             return cwd.map { "cursor \($0)" } ?? "cursor ."
         }
-        let binary = happyCommand(kind: kind, mode: mode) ?? binaryName(kind: kind)
+        let binary = binaryName(kind: kind)
         let flags = launchFlags(kind: kind, mode: mode)
         if flags.isEmpty {
             return binary
@@ -241,7 +227,7 @@ public enum AgentLaunchCommands {
         guard let config = configs[kind] else {
             return "agent --resume \(sessionID)"
         }
-        let head = config.happyCommand.flatMap { resolved == .happy ? $0 : nil } ?? config.binary
+        let head = config.binary
         var base: String
         switch config.resumeStyle {
         case .subcommand(let sub):
