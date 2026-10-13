@@ -69,3 +69,30 @@ The [GitHub release](https://github.com/robzilla1738/harness-terminal/releases/t
 retains the download, appcast and `SHA256SUMS`. The workflow retains the notarization
 receipt. Published assets and their source tag must never be replaced; recovery
 uses the existing matching appcast or a new release version.
+
+## Publication receipts
+
+- Release source: `2f843e5625086fbd33e58a724c632e47bfe66d1d`, tagged `v2.3.2`.
+- [Shipping CI](https://github.com/robzilla1738/harness-terminal/actions/runs/38366177399)
+  passed all six jobs, including the real legacy-upgrade and session-survival
+  proofs. macOS CI ran 2,543 tests: 2,482 passed, 61 skipped, no failures. Its two
+  additional skips require tmux and fish, which were available for the local run.
+- The [release workflow](https://github.com/robzilla1738/harness-terminal/actions/runs/38366241696)
+  passed, including the installed-DMG smoke test and exact live-feed comparisons.
+- An independent unauthenticated download passed 42 artifact checks: DMG integrity,
+  Developer ID signatures, stapled app and DMG tickets, Gatekeeper acceptance,
+  version/build agreement, arm64 helpers, first-party-agent exclusion, and Ed25519
+  verification of both the archive and feed using the app's public key.
+- DMG notarization request `a587720a-74c1-406e-8d7c-8bb977eeadb6` was accepted.
+  The public DMG exactly matches the workflow artifact and GitHub's asset digest.
+- Both supported appcast domains served the exact published signed feed.
+- [Website CI](https://github.com/robzilla1738/harness-website/actions/runs/38369601344)
+  passed its tests, dependency audit, production build and SEO checks. The live
+  documentation and machine-readable index identify 2.3.2; source links resolve
+  to the shipping commit. Both appcasts remained unchanged after that deployment.
+
+`Harness.dmg` is 36,456,579 bytes. Its SHA-256 is:
+
+```text
+4e230a4e142a51a160b1323b3d7b4e52421d8ca18113c2aff080d14beb99b6e2
+```
