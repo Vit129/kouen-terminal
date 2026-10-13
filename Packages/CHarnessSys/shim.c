@@ -76,6 +76,25 @@ int harness_pty_interrupt_char(int fd) {
 
 int harness_pty_signal(int fd, int sig) {
 #ifdef TIOCSIG
+#ifndef __APPLE__
+    // Linux signals without the input flush that typing the character performs. Flush first
+    // so the job's parent cannot read the stale queue between the signal and the flush.
+    // TCIFLUSH on the slave clears the line discipline's queue and the pending tty buffers;
+    // TCOFLUSH on the master reaches only the tty buffers, so it is the fallback.
+    struct termios t;
+    if (tcgetattr(fd, &t) == 0 && (t.c_lflag & NOFLSH) == 0) {
+        int peer = -1;
+#ifdef TIOCGPTPEER
+        peer = ioctl(fd, TIOCGPTPEER, O_RDWR | O_NOCTTY | O_NONBLOCK | O_CLOEXEC);
+#endif
+        if (peer >= 0) {
+            (void)tcflush(peer, TCIFLUSH);
+            close(peer);
+        } else {
+            (void)tcflush(fd, TCOFLUSH);
+        }
+    }
+#endif
     // Both Darwin and Linux take the signal number by value.
     return ioctl(fd, TIOCSIG, (void *)(intptr_t)sig);
 #else

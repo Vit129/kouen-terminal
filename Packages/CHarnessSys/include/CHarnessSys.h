@@ -30,8 +30,9 @@ int harness_set_nonblocking(int fd);
 int harness_pty_interrupt_char(int fd);
 
 // Send `sig` to the PTY's foreground process group, as typing the signal character would
-// (TIOCSIG on the master). Darwin also flushes the terminal's queued input unless NOFLSH is
-// set. Returns 0, or -1 where TIOCSIG is unavailable or fails.
+// (TIOCSIG on the master), and flush the terminal's queued input unless NOFLSH is set. Darwin
+// flushes as part of TIOCSIG; elsewhere the shim flushes first. Returns 0, or -1 where TIOCSIG
+// is unavailable or fails.
 int harness_pty_signal(int fd, int sig);
 
 // Peer UID of a connected AF_UNIX stream socket (getpeereid on Darwin, SO_PEERCRED on Linux), or -1.

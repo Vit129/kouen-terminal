@@ -104,7 +104,8 @@ def main():
             os.kill(job, 0)
             assert owner.poll() is None
             competing = subprocess.run([str(daemon)], env=environment, capture_output=True, text=True, timeout=4)
-            assert competing.returncode != 0
+            # Exit 0 so launchd's KeepAlive treats the service as satisfied instead of relaunching.
+            assert competing.returncode == 0 and "already" in competing.stderr, (competing.returncode, competing.stderr)
             assert int((root / "daemon.pid").read_text()) == owner.pid
             marker = root / "state"
             request("send", {"surfaceID": surface, "text": "printf '%s' \"$HARNESS_PROOF\" > " + shlex.quote(str(marker)) + "\n"})

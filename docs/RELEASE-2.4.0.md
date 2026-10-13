@@ -40,6 +40,12 @@ Verified on Apple silicon with macOS 27.0.1 and Swift 6.4:
   with status 0, and a stale worker socket was removed at startup.
 - Focused suites passed: daemon lifecycle (10), daemon launcher (6), launch agent
   installer (3), session-host wire (7) and live session-host signal tests (2).
+- The session-survival proof passed, including a competing start that exits cleanly
+  and leaves the owner in place.
+- In the `swift:6.0` Linux image used by CI, the headless build ran 1,972 live tests
+  with 7 skipped and no failures. This run found that Linux delivered Ctrl-C behind
+  a paste without discarding the queued input; the daemon now flushes it as typing
+  Ctrl-C would.
 
 Skips are opt-in performance benchmarks and fixtures that need tools or targets not
 configured on this machine. Automated fixtures do not replace a human check of
