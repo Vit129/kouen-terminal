@@ -105,6 +105,23 @@ New Tab Shares Branch No Worktree
     Wait For UI    1
     App Should Not Crash
 
+Branch Change In Shared Folder Is Not Isolated Unprompted
+    [Documentation]    Ask-first: two tabs share ${REPO_DIR}; one switches to a feature branch.
+    ...                Kouen must only offer isolation (notice) — no checkout in the shared
+    ...                folder, no `.kouen-worktrees` dir, HEAD stays on the feature branch.
+    ${a}=    Run CLI    new-session    --workspace    Default    --repo    ${REPO_DIR}
+    Should Be Equal As Integers    ${a.rc}    0
+    ${b}=    Run CLI    new-session    --workspace    Default    --repo    ${REPO_DIR}
+    Should Be Equal As Integers    ${b.rc}    0
+    Run Process    git    checkout    -b    robot-ask-first    cwd=${REPO_DIR}
+    # Branch probe runs every 5s; wait past two polls so an unprompted isolate would have fired.
+    Wait For UI    12
+    ${head}=    Run Process    git    rev-parse    --abbrev-ref    HEAD    cwd=${REPO_DIR}
+    Should Be Equal    ${head.stdout.strip()}    robot-ask-first
+    ${wt}=    Run Process    git    worktree    list    cwd=${REPO_DIR}
+    Should Not Contain    ${wt.stdout}    .kouen-worktrees
+    App Should Not Crash
+
 Isolate Without Branch Uses Detached HEAD
     [Documentation]    --isolate without --branch creates detached HEAD worktree
     ${result}=    Run CLI    new-session    --workspace    Default    --isolate
