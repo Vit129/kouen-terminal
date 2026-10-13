@@ -104,6 +104,12 @@ migration of those programs.
 | Logout | Survival is not guaranteed during user-session teardown | Saved state can be restored after login |
 | Sleep | Programs normally remain, but execution pauses | Wake resumes execution and output; no claim of work during sleep |
 | OS reboot | Programs end | Layout/history restoration does not restore live processes |
+| Session host receives SIGHUP | Remain. The host ignores hangups, and only SIGTERM, SIGINT or an explicit shutdown stops it | Unchanged |
+| Close a pane | The shell gets SIGTERM, then SIGKILL after the grace period, and the terminal hangs up. Ordinary background jobs end with it. Jobs detached with `nohup`, `disown` or `setsid` keep running | The pane's history follows the close policy |
+
+A resize that times out reports failure only if it never reached the terminal. When
+the size change has already started, the caller waits for it and reports the result,
+so the pane-size arbiter never disagrees with the PTY.
 
 Run `python3 Scripts/prove-session-survival.py` after building for a disposable-home
 proof. It checks an active shell, preserved environment, background job, refused

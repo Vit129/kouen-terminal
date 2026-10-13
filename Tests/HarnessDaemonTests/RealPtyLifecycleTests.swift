@@ -22,6 +22,16 @@ final class RealPtyLifecycleTests: XCTestCase {
         return pty
     }
 
+    /// A resize that commits just before the caller's deadline must report the size the PTY took.
+    func testSlowCommittedResizeReportsTheAppliedSize() throws {
+        let pty = try makePty()
+        defer { pty.close() }
+        pty.resizeCommitDelayForTesting = 1_300_000
+        XCTAssertTrue(pty.resize(rows: 31, cols: 97), "the caller gave up on a resize the PTY applied")
+        XCTAssertEqual(pty.currentSize()?.rows, 31)
+        XCTAssertEqual(pty.currentSize()?.cols, 97)
+    }
+
     func testOutputReachesSubscriberAndScrollback() throws {
         let pty = try makePty()
         defer { pty.close() }

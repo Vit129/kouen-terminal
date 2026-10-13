@@ -22,6 +22,9 @@ do {
     try "\(getpid())\n".write(to: HarnessPaths.daemonPIDURL, atomically: true, encoding: .utf8)
     _ = chmod(HarnessPaths.daemonPIDURL.path, 0o600)
     ignoreSIGPIPE()
+    // The host owns live PTYs that must outlive the terminal or app that launched it, so a hangup
+    // is not a stop request. Children still start with default dispositions (harness_reset_signals).
+    signal(SIGHUP, SIG_IGN)
     let executable = URL(fileURLWithPath: CommandLine.arguments[0]).resolvingSymlinksInPath()
     service = SessionHostService(daemonExecutable: HarnessToolLocator.companion("HarnessDaemon", to: executable))
     service.onShutdown = {

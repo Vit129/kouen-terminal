@@ -972,15 +972,31 @@ public final class RealPty: @unchecked Sendable {
         }
     }
 
+    /// A timed-out caller and the apply step race to settle the outcome. Whichever runs first
+    /// wins, so a caller never reports failure for a size the PTY actually took.
     private final class ResizeOutcome: @unchecked Sendable {
         let signal = DispatchSemaphore(value: 0)
         private let lock = NSLock()
-        private var cancelled = false, applied = false
+        private var cancelled = false, committing = false, applied = false
         func complete(_ success: Bool) { lock.lock(); applied = success; lock.unlock(); signal.signal() }
         func shouldApply() -> Bool { lock.lock(); defer { lock.unlock() }; return !cancelled }
         func result() -> Bool { lock.lock(); defer { lock.unlock() }; return applied }
-        func cancel() { lock.lock(); cancelled = true; lock.unlock() }
+        /// False once the caller gave up. After true, `cancel()` can no longer succeed.
+        func beginCommit() -> Bool {
+            lock.lock(); defer { lock.unlock() }
+            if !cancelled { committing = true }
+            return committing
+        }
+        /// False when a commit already started, so the caller must wait for its result.
+        func cancel() -> Bool {
+            lock.lock(); defer { lock.unlock() }
+            if !committing { cancelled = true }
+            return cancelled
+        }
     }
+
+    /// Test-only pause between committing to a resize and the winsize ioctl.
+    var resizeCommitDelayForTesting: useconds_t = 0
     @discardableResult
     public func resize(rows: UInt16, cols: UInt16) -> Bool {
         guard ReplaySize(sequence: 0, cols: cols, rows: rows).isValid else { return false }
@@ -1005,7 +1021,8 @@ public final class RealPty: @unchecked Sendable {
                     if unchanged { return true }
                     absorbPendingOutput(fd: descriptor, generation: requestedGeneration)
                     lifecycleLock.lock(); defer { lifecycleLock.unlock() }
-                    guard generation == requestedGeneration, !isClosed, outcome.shouldApply() else { return false }
+                    guard generation == requestedGeneration, !isClosed, outcome.beginCommit() else { return false }
+                    if resizeCommitDelayForTesting > 0 { usleep(resizeCommitDelayForTesting) }
                     scrollbackLock.lock(); defer { scrollbackLock.unlock() }
                     guard harness_pty_set_winsize(descriptor, rows, cols) == 0 else { return false }
                     if idleGrid.parked { restoreHotTailLocked() }
@@ -1026,7 +1043,10 @@ public final class RealPty: @unchecked Sendable {
         }, cancel: { outcome.complete(false) })
         inputPolicyLock.unlock()
         guard admitted else { return false }
-        guard outcome.signal.wait(timeout: .now() + 1) == .success else { outcome.cancel(); return false }
+        if outcome.signal.wait(timeout: .now() + 1) == .timedOut {
+            if outcome.cancel() { return false }
+            outcome.signal.wait()
+        }
         return outcome.result()
     }
 
