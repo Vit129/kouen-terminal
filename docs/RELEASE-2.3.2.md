@@ -41,6 +41,8 @@ Verified on Apple silicon with macOS 27.0.1 and Swift 6.4:
   postprocessing disabled, preserving its checks for all 20,000 lines and contiguous
   byte sequences. Failure diagnostics report malformed lines without overflowing
   log viewers. All 24 daemon round-trip tests passed with coverage enabled.
+- The snapshot fixture waits for asynchronous subscriber delivery before checking
+  its output. Ring insertion alone does not imply delivery has completed.
 
 A separate optimized performance run enabled the benchmarks: 51 passed, with
 three display-drawable fluidity measurements skipped. The normal-suite skips

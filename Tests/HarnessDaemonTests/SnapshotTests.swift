@@ -470,7 +470,7 @@ final class SnapshotTests: XCTestCase {
         XCTAssertTrue(waitUntil { pty.replay(fromSequence: nil).contains("tee-line") })
         XCTAssertEqual(pty.authoritativeBytesFed, before)
         XCTAssertFalse(pty.readLoopRunsAuthoritativeParser)
-        XCTAssertTrue(tee.contains("tee-line"))
+        XCTAssertTrue(waitUntil { tee.contains("tee-line") }, "subscriber delivery follows the ring write asynchronously")
 
         let captured = pty.captureFormatted(format: "text", trim: true, unwrap: false)
         XCTAssertTrue(captured.contains("tee-line"))
