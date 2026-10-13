@@ -36,6 +36,8 @@ final class WorktreeAutoIsolateService {
     private(set) var notices: [TabID: WorktreeIsolationNotice] = [:]
     /// "<tabID>|<branch>" the user dismissed — a poll must not resurrect it for the same branch.
     private var dismissed: Set<String> = []
+    /// Cheap change detector for `refreshNotices` — it now runs on every snapshot apply.
+    private var lastSignature: [String] = []
 
     private init() {}
 
@@ -53,7 +55,7 @@ final class WorktreeAutoIsolateService {
     func dismiss(tabID: TabID) {
         guard let notice = notices[tabID] else { return }
         dismissed.insert(Self.dismissKey(notice))
-        refreshNotices()
+        refreshNotices(force: true)
     }
 
     // MARK: - Decision (pure, no git, no IPC)
@@ -86,11 +88,25 @@ final class WorktreeAutoIsolateService {
     /// Recomputes every tab's notice from the snapshot. Doing the whole set (not just the tabs
     /// that changed) is what clears stale notices: branch back to main, tab closed, tab isolated,
     /// or the other sharers gone.
-    private func refreshNotices() {
+    ///
+    /// Called both on the branch-change ping AND on every snapshot apply. The ping alone is not
+    /// enough: it is posted before `updateTabGitBranch` + `syncFromDaemon` land, so the snapshot
+    /// read here still has the old branch, and opening a second tab in an already-branched
+    /// folder produces no ping at all. The signature makes the snapshot-driven call a no-op
+    /// unless a tab's cwd/branch/worktree actually changed.
+    func refreshNotices(force: Bool = false) {
         let tabs = SessionCoordinator.shared.snapshot.workspaces.flatMap { $0.sessions.flatMap(\.tabs) }
+        let signature = tabs.map { "\($0.id)|\($0.cwd)|\($0.gitBranch ?? "")|\($0.worktreePath ?? "")" }
+        guard force || signature != lastSignature else { return }
+        lastSignature = signature
+        // Resolve symlinks so `/tmp/x` and `/private/tmp/x` (what a shell's `pwd` reports) are
+        // recognised as the same folder.
+        let root: (String) -> String = {
+            URL(fileURLWithPath: KouenDesign.projectGroupRootPath(for: $0)).resolvingSymlinksInPath().path
+        }
         var next: [TabID: WorktreeIsolationNotice] = [:]
         for tab in tabs {
-            guard let notice = Self.notice(for: tab, among: tabs, projectRoot: KouenDesign.projectGroupRootPath(for:)),
+            guard let notice = Self.notice(for: tab, among: tabs, projectRoot: root),
                   !dismissed.contains(Self.dismissKey(notice))
             else { continue }
             next[tab.id] = notice
