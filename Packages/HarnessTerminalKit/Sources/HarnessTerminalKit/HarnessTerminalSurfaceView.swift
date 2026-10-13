@@ -968,6 +968,8 @@ public final class HarnessTerminalSurfaceView: NSView {
     /// The link span under the pointer while ⌘ is held: a grid row + half-open column range.
     /// Drives the underline layer and the pointing-hand cursor. nil when not hovering a link.
     private var hoveredLink: (row: Int, columns: Range<Int>)?
+    private var linkHoverProbe: (row: Int, column: Int, scrollOffset: Int, revision: UInt64)?
+    private(set) var testingLinkProbeCount = 0
     /// Underline drawn beneath the hovered link. A sublayer of the Metal layer so it composites
     /// above the terminal content without intercepting clicks (a subview would eat the ⌘-click).
     private let linkUnderlineLayer = CALayer()
@@ -1290,6 +1292,16 @@ public final class HarnessTerminalSurfaceView: NSView {
     func testingInputModes() -> TerminalModes { inputModes() }
 
     func testingPasteText(_ raw: String) { pasteText(raw) }
+
+    /// ⌘-hover the center of a grid cell. Returns false when the cell has no on-screen rect.
+    @discardableResult
+    func testingCommandHover(row: Int, column: Int) -> Bool {
+        guard let rect = cellRect(row: row, columns: column ..< column + 1) else { return false }
+        updateLinkHover(at: convert(CGPoint(x: rect.midX, y: rect.midY), to: nil), modifiers: .command)
+        return true
+    }
+
+    var testingHoveredLink: (row: Int, columns: Range<Int>)? { hoveredLink }
 
     var testingHistoryRestorePending: Bool { historyRestore != nil }
 
@@ -3989,20 +4001,24 @@ public final class HarnessTerminalSurfaceView: NSView {
     /// adjacent cells sharing its id) first, else an auto-detected URL in the row text. The row is
     /// built one character per cell so `column`/the returned range map directly to grid columns.
     private func linkRange(atRow row: Int, column col: Int) -> (url: String, columns: Range<Int>)? {
-        emulatorSync { emulator in
-            let grid = scrollOffset > 0 ? emulator.readGrid(scrollbackOffset: scrollOffset) : emulator.readGrid()
-            guard row >= 0, row < grid.rows, col >= 0, col < grid.cols else { return nil }
-            if let cell = grid.cell(row: row, col: col), cell.hyperlinkID != 0,
-               let url = emulator.hyperlinkURL(id: cell.hyperlinkID) {
+        testingLinkProbeCount += 1
+        return emulatorSync { emulator in
+            guard row >= 0, row < emulator.rows, col >= 0 else { return nil }
+            // One row, not a full viewport snapshot: this runs on every ⌘-hover cell change.
+            let top = emulator.historyCount - max(0, min(scrollOffset, emulator.historyCount))
+            let cells = emulator.bufferLine(top + row)
+            guard col < cells.count else { return nil }
+            let cell = cells[col]
+            if cell.hyperlinkID != 0, let url = emulator.hyperlinkURL(id: cell.hyperlinkID) {
                 var lo = col, hi = col
-                while lo > 0, grid.cell(row: row, col: lo - 1)?.hyperlinkID == cell.hyperlinkID { lo -= 1 }
-                while hi + 1 < grid.cols, grid.cell(row: row, col: hi + 1)?.hyperlinkID == cell.hyperlinkID { hi += 1 }
+                while lo > 0, cells[lo - 1].hyperlinkID == cell.hyperlinkID { lo -= 1 }
+                while hi + 1 < cells.count, cells[hi + 1].hyperlinkID == cell.hyperlinkID { hi += 1 }
                 return (url, lo ..< (hi + 1))
             }
             var line = ""
-            line.reserveCapacity(grid.cols)
-            for c in 0 ..< grid.cols {
-                guard let cell = grid.cell(row: row, col: c), cell.width != .spacerTail else { line.append(" "); continue }
+            line.reserveCapacity(cells.count)
+            for cell in cells {
+                guard cell.width != .spacerTail else { line.append(" "); continue }
                 line.unicodeScalars.append(cell.codepoint == 0 ? " " : (Unicode.Scalar(cell.codepoint) ?? " "))
             }
             return URLDetection.match(in: line, at: col)
@@ -4204,9 +4220,24 @@ public final class HarnessTerminalSurfaceView: NSView {
         // (⌘ can be pressed while the pointer rests over another pane).
         guard copyMode == nil, modifiers.contains(.command),
               bounds.contains(convert(locationInWindow, from: nil)),
-              let pos = cell(at: locationInWindow),
-              let link = linkRange(atRow: pos.row, column: pos.column)
+              let pos = cell(at: locationInWindow)
         else { clearLinkHover(); return }
+        // Skip the emulator round trip while the pointer stays inside the hovered link, or on
+        // a cell already probed, until the content or scroll position changes.
+        let probe = (row: pos.row, column: pos.column, scrollOffset: scrollOffset, revision: findContentRevision)
+        if let last = linkHoverProbe, last.scrollOffset == probe.scrollOffset, last.revision == probe.revision {
+            if last.row == probe.row, last.column == probe.column { return }
+            if let current = hoveredLink, current.row == pos.row, current.columns.contains(pos.column) {
+                linkHoverProbe = probe
+                return
+            }
+        }
+        guard let link = linkRange(atRow: pos.row, column: pos.column) else {
+            clearLinkHover()
+            linkHoverProbe = probe
+            return
+        }
+        linkHoverProbe = probe
         if let current = hoveredLink, current.row == pos.row, current.columns == link.columns { return }
         hoveredLink = (row: pos.row, columns: link.columns)
         refreshLinkUnderline()
@@ -4214,6 +4245,7 @@ public final class HarnessTerminalSurfaceView: NSView {
     }
 
     private func clearLinkHover() {
+        linkHoverProbe = nil
         guard hoveredLink != nil else { return }
         hoveredLink = nil
         refreshLinkUnderline()
