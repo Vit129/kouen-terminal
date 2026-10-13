@@ -8,6 +8,7 @@ final class ContentAreaViewController: NSViewController, TerminalTabBarDelegate 
     private let tabBar = TerminalTabBarView()
     private let terminalHost = NSView()
     private let tabBarDivider = KouenDesign.divider()
+    private let isolationNotice = WorktreeIsolationNoticeView()
 
     private nonisolated(unsafe) var copySelectionMonitor: Any?
     private var pasteboardCountAtMouseDown: Int = NSPasteboard.general.changeCount
@@ -49,6 +50,7 @@ final class ContentAreaViewController: NSViewController, TerminalTabBarDelegate 
         refreshTerminalHostFill()
         filePreview.refreshEditorPanelFill()
         tabBar.applyChrome()
+        isolationNotice.applyChrome()
         paneLifecycle.paneContainer?.applyChrome()
         updateTrafficLightClearance()
     }
@@ -82,8 +84,20 @@ final class ContentAreaViewController: NSViewController, TerminalTabBarDelegate 
         view.addSubview(terminalHost)
         view.addSubview(tabBar)
         view.addSubview(tabBarDivider)
+        isolationNotice.translatesAutoresizingMaskIntoConstraints = false
+        isolationNotice.isHidden = true
+        isolationNotice.onIsolate = { [weak self] in self?.isolateActiveTab() }
+        isolationNotice.onDismiss = { [weak self] in
+            guard let tabID = self?.activeTabID else { return }
+            WorktreeAutoIsolateService.shared.dismiss(tabID: tabID)
+        }
+        view.addSubview(isolationNotice)
 
         NSLayoutConstraint.activate([
+            isolationNotice.topAnchor.constraint(equalTo: tabBarDivider.bottomAnchor, constant: 8),
+            isolationNotice.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -12),
+            isolationNotice.leadingAnchor.constraint(greaterThanOrEqualTo: view.leadingAnchor, constant: 12),
+
             tabBar.topAnchor.constraint(equalTo: view.topAnchor),
             tabBar.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             tabBar.trailingAnchor.constraint(equalTo: view.trailingAnchor),
@@ -104,6 +118,10 @@ final class ContentAreaViewController: NSViewController, TerminalTabBarDelegate 
             name: NotificationBus.shared.snapshotChanged, object: nil
         )
         NotificationCenter.default.addObserver(
+            self, selector: #selector(refreshIsolationNotice),
+            name: WorktreeAutoIsolateService.noticesDidChange, object: nil
+        )
+        NotificationCenter.default.addObserver(
             self, selector: #selector(viQuitCommand(_:)),
             name: .viQuitCommand, object: nil
         )
@@ -112,6 +130,7 @@ final class ContentAreaViewController: NSViewController, TerminalTabBarDelegate 
         NotificationCenter.default.addObserver(self, selector: #selector(viFindFileCommand(_:)), name: .viFindFileCommand, object: nil)
         NotificationCenter.default.addObserver(self, selector: #selector(viNextBufferCommand(_:)), name: .viNextBufferCommand, object: nil)
         installCopySelectionToast()
+        refreshIsolationNotice()
         reloadTabBar()
         filePreview.switchToTab(tabID: SessionCoordinator.shared.snapshot.activeWorkspace?.activeTab?.id.uuidString)
         filePreview.restoreEditorState()
@@ -188,6 +207,7 @@ final class ContentAreaViewController: NSViewController, TerminalTabBarDelegate 
         let structureChanged = payload.structureChanged
         let metadataOnly = payload.metadataOnly
         filePreview.switchToTab(tabID: SessionCoordinator.shared.snapshot.activeWorkspace?.activeTab?.id.uuidString)
+        refreshIsolationNotice()
         if metadataOnly && !structureChanged {
             refreshTabBarMetadata()
             return
@@ -202,6 +222,40 @@ final class ContentAreaViewController: NSViewController, TerminalTabBarDelegate 
             filePreview.pruneFileTabManagers(keepingTabIDs: liveTabIDs)
         }
         paneLifecycle.reloadIfNeeded(force: structureChanged)
+    }
+
+    // MARK: - Worktree isolation notice
+
+    private var activeTabID: TabID? {
+        SessionCoordinator.shared.snapshot.activeWorkspace?.activeSession?.activeTab?.id
+    }
+
+    @objc private func refreshIsolationNotice() {
+        guard let tabID = activeTabID,
+              let notice = WorktreeAutoIsolateService.shared.notice(for: tabID)
+        else {
+            isolationNotice.isHidden = true
+            return
+        }
+        isolationNotice.configure(message: notice.message)
+        isolationNotice.isHidden = false
+    }
+
+    private func isolateActiveTab() {
+        guard let tabID = activeTabID else { return }
+        WorktreeAutoIsolateService.shared.isolate(tabID: tabID) { [weak self] ok in
+            guard let self else { return }
+            if ok {
+                Toast.show("✓ Isolated into its own worktree", in: self.terminalHost)
+            } else {
+                self.isolationNotice.resetAction()
+                Toast.show(
+                    "✗ Couldn't isolate — the shared folder has uncommitted changes, or this tab isn't at the repo root",
+                    in: self.terminalHost, hold: 4.0
+                )
+            }
+            self.refreshIsolationNotice()
+        }
     }
 
     // MARK: - Tab Bar
