@@ -1293,11 +1293,17 @@ public final class HarnessTerminalSurfaceView: NSView {
 
     func testingPasteText(_ raw: String) { pasteText(raw) }
 
+    /// The window-space center of a grid cell, offset by `dx`/`dy` points.
+    func testingWindowPoint(row: Int, column: Int, dx: CGFloat = 0, dy: CGFloat = 0) -> NSPoint? {
+        guard let rect = cellRect(row: row, columns: column ..< column + 1) else { return nil }
+        return convert(CGPoint(x: rect.midX + dx, y: rect.midY + dy), to: nil)
+    }
+
     /// ⌘-hover the center of a grid cell. Returns false when the cell has no on-screen rect.
     @discardableResult
     func testingCommandHover(row: Int, column: Int) -> Bool {
-        guard let rect = cellRect(row: row, columns: column ..< column + 1) else { return false }
-        updateLinkHover(at: convert(CGPoint(x: rect.midX, y: rect.midY), to: nil), modifiers: .command)
+        guard let point = testingWindowPoint(row: row, column: column) else { return false }
+        updateLinkHover(at: point, modifiers: .command)
         return true
     }
 
@@ -3897,6 +3903,42 @@ public final class HarnessTerminalSurfaceView: NSView {
         return (max(0, min(rows - 1, row)), max(0, min(columns - 1, col)))
     }
 
+    /// Whether a window-space point is over the grid itself rather than the padding around it.
+    private func isInsideGrid(_ locationInWindow: NSPoint) -> Bool {
+        guard let renderer, columns > 0, rows > 0 else { return false }
+        let scale = window?.backingScaleFactor ?? 2.0
+        let cellW = CGFloat(renderer.cellPixelWidth) / scale
+        let cellH = CGFloat(renderer.cellPixelHeight) / scale
+        let p = convert(locationInWindow, from: nil)
+        let x = p.x - gridOriginPointsX
+        let yFromTop = bounds.height - p.y - gridOriginPointsY + scrollFraction * cellH
+        return x >= 0 && yFromTop >= 0 && x < CGFloat(columns) * cellW && yFromTop < CGFloat(rows) * cellH
+    }
+
+    /// Buttons whose press landed in the padding and was not reported: their drags and release
+    /// stay local too, so the program never sees a release without its press.
+    private var unreportedMouseButtons: Set<Int> = []
+    /// Last drag position reported, deduping to one report per cell (per pixel in SGR-pixel mode,
+    /// where the program asked for that resolution).
+    private var lastReportedDrag: (x: Int, y: Int)?
+
+    /// Report a press only when it lands on the grid, not the padding around it.
+    private func reportPressIfOnGrid(_ event: NSEvent, button: MouseButton) {
+        lastReportedDrag = nil
+        guard isInsideGrid(event.locationInWindow) else {
+            unreportedMouseButtons.insert(event.buttonNumber)
+            return
+        }
+        unreportedMouseButtons.remove(event.buttonNumber)
+        reportMouse(event, button: button, kind: .press)
+    }
+
+    private func reportReleaseIfPressed(_ event: NSEvent, button: MouseButton) {
+        lastReportedDrag = nil
+        if unreportedMouseButtons.remove(event.buttonNumber) != nil { return }
+        reportMouse(event, button: button, kind: .release)
+    }
+
     /// Mouse goes to the program when it enabled tracking — unless Shift is held, which
     /// always forces local selection (the standard terminal override).
     private func isMouseReporting(_ event: NSEvent) -> Bool {
@@ -3956,7 +3998,7 @@ public final class HarnessTerminalSurfaceView: NSView {
             return
         }
         if isMouseReporting(event) {
-            reportMouse(event, button: .left, kind: .press)
+            reportPressIfOnGrid(event, button: .left)
             return
         }
         guard let pos = cell(at: event.locationInWindow) else { return }
@@ -4040,9 +4082,12 @@ public final class HarnessTerminalSurfaceView: NSView {
         if isMouseReporting(event) {
             // Only report motion when the app asked for drag / any-motion tracking.
             let modes = inputModes()
-            if modes.mouseDrag || modes.mouseAny {
-                reportMouse(event, button: .left, kind: .drag)
-            }
+            guard modes.mouseDrag || modes.mouseAny, !unreportedMouseButtons.contains(event.buttonNumber),
+                  let pos = cell(at: event.locationInWindow) else { return }
+            let at = modes.mouseSGRPixel ? textAreaPixelPosition(of: event) ?? (pos.column, pos.row) : (pos.column, pos.row)
+            if let last = lastReportedDrag, last == at { return }
+            lastReportedDrag = at
+            reportMouse(event, button: .left, kind: .drag)
             return
         }
         guard selectionAnchor != nil, let pos = cell(at: event.locationInWindow) else { return }
@@ -4053,7 +4098,7 @@ public final class HarnessTerminalSurfaceView: NSView {
     public override func mouseUp(with event: NSEvent) {
         if copyMode != nil { return }
         if isMouseReporting(event) {
-            reportMouse(event, button: .left, kind: .release)
+            reportReleaseIfPressed(event, button: .left)
             return
         }
         // A single-cell *character* click with no drag clears; a word/line click (or any drag)
@@ -4066,18 +4111,18 @@ public final class HarnessTerminalSurfaceView: NSView {
     }
 
     public override func rightMouseDown(with event: NSEvent) {
-        if isMouseReporting(event) { reportMouse(event, button: .right, kind: .press) }
+        if isMouseReporting(event) { reportPressIfOnGrid(event, button: .right) }
         else { super.rightMouseDown(with: event) }
     }
 
     public override func rightMouseUp(with event: NSEvent) {
-        if isMouseReporting(event) { reportMouse(event, button: .right, kind: .release) }
+        if isMouseReporting(event) { reportReleaseIfPressed(event, button: .right) }
         else { super.rightMouseUp(with: event) }
     }
 
     public override func otherMouseDown(with event: NSEvent) {
         if isMouseReporting(event) {
-            reportMouse(event, button: .middle, kind: .press)
+            reportPressIfOnGrid(event, button: .middle)
         } else if event.buttonNumber == 2 {
             // Middle-click pastes the current selection (the X11 primary-paste
             // convention), falling back to the clipboard. Routed through pasteText so
@@ -4092,7 +4137,7 @@ public final class HarnessTerminalSurfaceView: NSView {
     }
 
     public override func otherMouseUp(with event: NSEvent) {
-        if isMouseReporting(event) { reportMouse(event, button: .middle, kind: .release) }
+        if isMouseReporting(event) { reportReleaseIfPressed(event, button: .middle) }
         else { super.otherMouseUp(with: event) }
     }
 
@@ -4156,6 +4201,7 @@ public final class HarnessTerminalSurfaceView: NSView {
     private func reportAnyEventMotionIfArmed(_ event: NSEvent) {
         guard copyMode == nil, inputModes().mouseAny,
               !event.modifierFlags.contains(.shift) else { return }
+        guard isInsideGrid(event.locationInWindow) else { lastReportedMotionCell = nil; return }
         guard let pos = cell(at: event.locationInWindow) else { return }
         if let last = lastReportedMotionCell, last == pos { return }
         lastReportedMotionCell = pos
