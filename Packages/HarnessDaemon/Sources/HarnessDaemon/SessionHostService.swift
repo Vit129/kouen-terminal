@@ -69,6 +69,7 @@ public final class SessionHostService: @unchecked Sendable {
             legacyKeyURL: HarnessPaths.runtimeDirectory.appendingPathComponent("snapshot.key"), protection: .system())
         // The caller already owns daemon.lock and has proved any prior PID is stale.
         for path in [ownerPath, HarnessPaths.socketURL.path] { if FileManager.default.fileExists(atPath: path) { try FileManager.default.removeItem(atPath: path) } }
+        Self.removeStaleWorkerSockets()
         try ownerListener.start { [weak self] channel in
             guard let self else { channel.closeChannel(); return }
             let accepted = self.store.queue.sync { () -> Bool in
@@ -88,6 +89,18 @@ public final class SessionHostService: @unchecked Sendable {
         store.queue.sync { active = first; lastCompatible = first }
         try publicListener.start { [weak self] channel in self?.accept(channel) }
         watch(first)
+    }
+    /// Workers that crashed or were killed leave their `d-*.sock` endpoints behind. Before this
+    /// owner launches its first worker, no previous owner's worker can still be serving.
+    private static func removeStaleWorkerSockets() {
+        let directory = HarnessPaths.runtimeDirectory
+        guard let names = try? FileManager.default.contentsOfDirectory(atPath: directory.path) else { return }
+        for name in names where name.hasPrefix("d-") && name.hasSuffix(".sock") {
+            let path = directory.appendingPathComponent(name).path
+            var info = stat()
+            guard lstat(path, &info) == 0, info.st_uid == getuid(), info.st_mode & mode_t(S_IFMT) == mode_t(S_IFSOCK) else { continue }
+            _ = unlink(path)
+        }
     }
     private func launch(executable: URL, warm: Bool) throws -> Worker {
         guard executable.isFileURL, FileManager.default.isExecutableFile(atPath: executable.path) else { throw SessionHostError.refused("Candidate daemon is not an executable local file.") }

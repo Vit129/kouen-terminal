@@ -175,6 +175,12 @@ public enum LaunchAgentInstaller {
         }
         let enabled = runLaunchctl(["enable", "gui/\(getuid())/\(HarnessPaths.launchAgentLabel)"])
         guard enabled.status == 0 else { throw InstallError.launchctlFailed(enabled.status, enabled.output) }
+        if !bootstrapped {
+            // A loaded job that exited cleanly stays idle under KeepAlive; start it so launchd,
+            // not an unsupervised fallback, owns the service. Without -k a running job is untouched.
+            let started = runLaunchctl(["kickstart", "gui/\(getuid())/\(HarnessPaths.launchAgentLabel)"])
+            guard started.status == 0 else { throw InstallError.launchctlFailed(started.status, started.output) }
+        }
         return InstallReport(
             plistPath: plistURL,
             daemonPath: daemonPath,

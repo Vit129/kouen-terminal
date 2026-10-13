@@ -150,8 +150,9 @@ private func detectStaleInstance() {
     case .proceed:
         return
     case .refuse:
-        daemonLog("another HarnessDaemon (pid \(priorPID)) is already running — refusing to start")
-        exit(1)
+        // Zero, so launchd's KeepAlive treats the service as satisfied rather than relaunching.
+        daemonLog("another HarnessDaemon (pid \(priorPID)) is already running — exiting without changes")
+        exit(0)
     case .stale:
         daemonLog("removing stale PID file from pid \(priorPID)")
         removeForeignPIDFile()
@@ -192,7 +193,10 @@ nonisolated(unsafe) private var retainedParentWatch: (any DispatchSourceProtocol
 let hosted = ProcessInfo.processInfo.environment["HARNESS_SESSION_HOST_SOCKET"] != nil
 let instanceLock: DaemonInstanceLock?
 do { instanceLock = hosted ? nil : try DaemonInstanceLock() }
-catch { fputs("HarnessDaemon: cannot acquire exclusive ownership of this home (\(error)); refusing startup\n", harnessStderr); exit(1) }
+catch let error as POSIXError where error.code == .EWOULDBLOCK {
+    // A live owner holds the lock; exit zero so launchd's KeepAlive does not relaunch.
+    fputs("HarnessDaemon: another session service already owns this home; exiting without changes.\n", harnessStderr); exit(0)
+} catch { fputs("HarnessDaemon: cannot acquire exclusive ownership of this home (\(error)); refusing startup\n", harnessStderr); exit(1) }
 if !hosted { detectStaleInstance(); writePIDFile() }
 let mutationLease: DaemonMutationLease?
 if hosted {
