@@ -16,6 +16,13 @@ final class MobileBridgeAgentCommandTests: XCTestCase {
         XCTAssertNil(MobileBridgeServer.agentCommandInput(kind: "shell", value: "ls", currentMode: nil))
     }
 
+    func testAgyUsesItsOwnModelAndEffortAllowlistAndHasNoModeCycle() {
+        XCTAssertEqual(text(MobileBridgeServer.agentCommandInput(kind: "model", value: "gemini-3.8-flash", currentMode: nil, agent: .antigravity)), ["/model gemini-3.8-flash", "\r"])
+        XCTAssertNil(MobileBridgeServer.agentCommandInput(kind: "model", value: "opus", currentMode: nil, agent: .antigravity))
+        XCTAssertNil(MobileBridgeServer.agentCommandInput(kind: "effort", value: "max", currentMode: nil, agent: .antigravity))
+        XCTAssertNil(MobileBridgeServer.agentCommandInput(kind: "mode", value: "plan", currentMode: "manual", agent: .antigravity))
+    }
+
     func testModeCountsShiftTabPressesAlongTheVerifiedCycle() {
         // manual -> acceptEdits -> plan -> auto -> manual
         XCTAssertEqual(MobileBridgeServer.agentCommandInput(kind: "mode", value: "plan", currentMode: "manual")?.count, 2)
