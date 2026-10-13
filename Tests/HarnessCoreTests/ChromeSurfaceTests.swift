@@ -75,6 +75,29 @@ final class ChromeSurfaceTests: XCTestCase {
         XCTAssertTrue(ChromeContrast.meetsPill(light.activePillLabel, on: light.activePillFill))
     }
 
+    func testSecondaryInkKeepsTheDesignedStrengthWhenItAlreadyReads() {
+        let dark = ChromePaletteSpec.resolve(backgroundHex: "#000000", foregroundHex: "#ffffff")
+        XCTAssertEqual(dark.secondaryInk, 0.66, accuracy: 0.0001)
+        let raised = ChromePaletteSpec.resolve(backgroundHex: "#000000", foregroundHex: "#ffffff", increaseContrast: true)
+        XCTAssertGreaterThan(raised.tertiaryInk, dark.tertiaryInk)
+        XCTAssertGreaterThanOrEqual(raised.textTertiary.contrastRatio(against: raised.surface), ChromeContrast.increasedMinimum)
+    }
+
+    func testReduceTransparencyPaintsOpaqueWithoutRewritingTheStoredOpacity() {
+        let stored: Float = 0.63
+        let reduce = ChromeAccessibility(reduceTransparency: true)
+        for mode in [HarnessAppearanceMode.theme, .light, .macOSSystem] {
+            let paint = ChromeMaterial.paintOpacity(stored: stored, appearanceMode: mode, systemAppearance: .dark, accessibility: reduce)
+            let header = ChromeMaterial.headerFillAlpha(
+                stored: stored, appearanceMode: mode, systemAppearance: .dark, accessibility: reduce
+            )
+            XCTAssertEqual(paint, 1)
+            XCTAssertEqual(header, 1)
+        }
+        let standard = ChromeMaterial.paintOpacity(stored: stored, appearanceMode: .theme, systemAppearance: .dark)
+        XCTAssertEqual(standard, stored, accuracy: 0.0001)
+    }
+
     func testLightPaintOpacityDoesNotRewriteTheStoredDefault() {
         let stored: Float = 0.63
         XCTAssertEqual(

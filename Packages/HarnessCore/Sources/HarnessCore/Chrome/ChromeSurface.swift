@@ -56,16 +56,37 @@ public struct ChromeColor: Equatable, Sendable {
     }
 }
 
-public enum ChromeContrast {
-    public static let textMinimum = 4.5
-    public static let pillMinimum = 3.0
+/// The macOS display accommodations chrome honors. The app layer reads them from the system;
+/// the saved appearance settings stay untouched underneath.
+public struct ChromeAccessibility: Equatable, Sendable {
+    public var reduceTransparency: Bool
+    public var increaseContrast: Bool
 
-    public static func meetsText(_ foreground: ChromeColor, on surface: ChromeColor) -> Bool {
-        foreground.contrastRatio(against: surface) >= textMinimum
+    public init(reduceTransparency: Bool = false, increaseContrast: Bool = false) {
+        self.reduceTransparency = reduceTransparency
+        self.increaseContrast = increaseContrast
     }
 
-    public static func meetsPill(_ label: ChromeColor, on fill: ChromeColor) -> Bool {
-        label.contrastRatio(against: fill) >= pillMinimum
+    public static let standard = ChromeAccessibility()
+}
+
+public enum ChromeContrast {
+    public static let textMinimum = 4.5
+    /// Selected pills carry 13 pt labels, which WCAG treats as normal text, not large text.
+    public static let pillMinimum = 4.5
+    /// Increase Contrast raises every chrome text floor to the WCAG AAA ratio.
+    public static let increasedMinimum = 7.0
+
+    public static func textMinimum(increaseContrast: Bool) -> Double {
+        increaseContrast ? increasedMinimum : textMinimum
+    }
+
+    public static func meetsText(_ foreground: ChromeColor, on surface: ChromeColor, minimum: Double = textMinimum) -> Bool {
+        foreground.contrastRatio(against: surface) >= minimum
+    }
+
+    public static func meetsPill(_ label: ChromeColor, on fill: ChromeColor, minimum: Double = pillMinimum) -> Bool {
+        label.contrastRatio(against: fill) >= minimum
     }
 }
 
@@ -76,43 +97,69 @@ public struct ChromePaletteSpec: Equatable, Sendable {
     public var textPrimary: ChromeColor
     public var activePillFill: ChromeColor
     public var activePillLabel: ChromeColor
+    /// How much of `textPrimary` secondary and tertiary text carry over the surface (1 is full
+    /// primary ink). Dark chrome paints them as alpha ink, light chrome as an opaque mix.
+    public var secondaryInk: Double
+    public var tertiaryInk: Double
+    /// The text floor every ink above clears against `surface`.
+    public var textMinimum: Double
 
-    public static func resolve(backgroundHex: String, foregroundHex: String) -> ChromePaletteSpec {
+    public var textSecondary: ChromeColor { surface.mixed(toward: textPrimary, fraction: secondaryInk) }
+    public var textTertiary: ChromeColor { surface.mixed(toward: textPrimary, fraction: tertiaryInk) }
+
+    public static func resolve(backgroundHex: String, foregroundHex: String, increaseContrast: Bool = false) -> ChromePaletteSpec {
         let surface = ChromeColor(hex: backgroundHex) ?? ChromeColor(red: 0, green: 0, blue: 0)
         let authored = ChromeColor(hex: foregroundHex) ?? ChromeColor(red: 1, green: 1, blue: 1)
         let isDark = surface.perceivedBrightness < 0.5
-        let text = readableText(authored: authored, on: surface, isDark: isDark)
-        let pillFill = pillFill(surface: surface, label: text)
+        let minimum = ChromeContrast.textMinimum(increaseContrast: increaseContrast)
+        let text = readableText(authored: authored, on: surface, isDark: isDark, minimum: minimum)
+        let pillMinimum = max(ChromeContrast.pillMinimum, minimum)
+        let pillFill = pillFill(surface: surface, label: text, minimum: pillMinimum)
+        let secondary = ink(preferred: isDark ? 0.66 : 0.78, of: text, on: surface, minimum: minimum)
         return ChromePaletteSpec(
             isDark: isDark,
             surface: surface,
             textPrimary: text,
             activePillFill: pillFill,
-            activePillLabel: text
+            activePillLabel: text,
+            secondaryInk: secondary,
+            tertiaryInk: min(secondary, ink(preferred: isDark ? 0.40 : 0.60, of: text, on: surface, minimum: minimum)),
+            textMinimum: minimum
         )
+    }
+
+    /// The designed ink strength, raised in 0.02 steps only as far as the contrast floor requires.
+    private static func ink(preferred: Double, of text: ChromeColor, on surface: ChromeColor, minimum: Double) -> Double {
+        var step = Int((preferred * 50).rounded())
+        while step < 50, !ChromeContrast.meetsText(surface.mixed(toward: text, fraction: Double(step) / 50), on: surface, minimum: minimum) {
+            step += 1
+        }
+        return Double(step) / 50
     }
 
     /// A visible lift off the surface that still clears the pill contrast floor.
     /// Light surfaces use a lighter lift so a selected row is a quiet pill, not a gray slab.
-    private static func pillFill(surface: ChromeColor, label: ChromeColor) -> ChromeColor {
+    private static func pillFill(surface: ChromeColor, label: ChromeColor, minimum: Double) -> ChromeColor {
         var fraction = surface.perceivedBrightness >= 0.5 ? 0.07 : 0.14
         var candidate = surface.mixed(toward: label, fraction: fraction)
-        if ChromeContrast.meetsPill(label, on: candidate) { return candidate }
+        if ChromeContrast.meetsPill(label, on: candidate, minimum: minimum) { return candidate }
         while fraction > 0.02 {
             fraction -= 0.02
             candidate = surface.mixed(toward: label, fraction: fraction)
-            if ChromeContrast.meetsPill(label, on: candidate) { return candidate }
+            if ChromeContrast.meetsPill(label, on: candidate, minimum: minimum) { return candidate }
         }
         return surface
     }
 
-    private static func readableText(authored: ChromeColor, on surface: ChromeColor, isDark: Bool) -> ChromeColor {
-        if ChromeContrast.meetsText(authored, on: surface) { return authored }
+    private static func readableText(authored: ChromeColor, on surface: ChromeColor, isDark: Bool, minimum: Double) -> ChromeColor {
+        if ChromeContrast.meetsText(authored, on: surface, minimum: minimum) { return authored }
         let lightInk = ChromeColor(red: 1, green: 1, blue: 1)
         let darkInk = ChromeColor(hex: "#1D1D1F") ?? ChromeColor(red: 0.11, green: 0.11, blue: 0.12)
         let preferred = isDark ? lightInk : darkInk
-        if ChromeContrast.meetsText(preferred, on: surface) { return preferred }
-        return lightInk.contrastRatio(against: surface) >= darkInk.contrastRatio(against: surface) ? lightInk : darkInk
+        if ChromeContrast.meetsText(preferred, on: surface, minimum: minimum) { return preferred }
+        // Mid-tone surfaces: pure black can clear the floor where the softened dark ink cannot.
+        let black = ChromeColor(red: 0, green: 0, blue: 0)
+        return [lightInk, darkInk, black].max { $0.contrastRatio(against: surface) < $1.contrastRatio(against: surface) }!
     }
 }
 
@@ -221,8 +268,10 @@ public enum ChromeMaterial {
     public static func paintOpacity(
         stored: Float,
         appearanceMode: HarnessAppearanceMode,
-        systemAppearance: HarnessSystemAppearance
+        systemAppearance: HarnessSystemAppearance,
+        accessibility: ChromeAccessibility = .standard
     ) -> Float {
+        if accessibility.reduceTransparency { return 1 }
         let storedClamped = min(max(stored, 0), 1)
         let firmsUp = appearanceMode == .light
             || (appearanceMode == .macOSSystem && systemAppearance == .light)
@@ -235,9 +284,10 @@ public enum ChromeMaterial {
     public static func headerFillAlpha(
         stored: Float,
         appearanceMode: HarnessAppearanceMode,
-        systemAppearance: HarnessSystemAppearance
+        systemAppearance: HarnessSystemAppearance,
+        accessibility: ChromeAccessibility = .standard
     ) -> Float {
-        paintOpacity(stored: stored, appearanceMode: appearanceMode, systemAppearance: systemAppearance)
+        paintOpacity(stored: stored, appearanceMode: appearanceMode, systemAppearance: systemAppearance, accessibility: accessibility)
     }
 
     public static func headerFillIsClear(

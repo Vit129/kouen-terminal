@@ -613,7 +613,8 @@ public final class TerminalHostView: NSView {
             canvasOpacity: ChromeMaterial.paintOpacity(
                 stored: settings.backgroundOpacity,
                 appearanceMode: effectiveSettings.appearanceMode,
-                systemAppearance: Self.systemAppearance(for: effectiveAppearance)
+                systemAppearance: Self.systemAppearance(for: effectiveAppearance),
+                accessibility: .system
             ),
             cursorStyle: settings.cursorStyle,
             cursorBlink: settings.cursorBlink,

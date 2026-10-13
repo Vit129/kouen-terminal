@@ -345,6 +345,34 @@ final class HarnessLightReadabilityTests: XCTestCase {
         }
     }
 
+    /// Every catalog theme keeps primary, secondary and tertiary chrome text and the selected
+    /// pill label at 4.5:1, and at 7:1 when Increase Contrast is on.
+    @MainActor
+    func testEveryThemeClearsChromeTextFloorsWithAndWithoutIncreaseContrast() {
+        for theme in HarnessThemeCatalog.allThemes {
+            for increase in [false, true] {
+                let spec = ChromePaletteSpec.resolve(
+                    backgroundHex: theme.backgroundHex, foregroundHex: theme.foregroundHex, increaseContrast: increase
+                )
+                let floor = increase ? ChromeContrast.increasedMinimum : ChromeContrast.textMinimum
+                // A mid-gray surface can cap out below 7:1 even with pure black or white ink.
+                let reachable = min(floor, max(
+                    ChromeColor(red: 1, green: 1, blue: 1).contrastRatio(against: spec.surface),
+                    ChromeColor(red: 0, green: 0, blue: 0).contrastRatio(against: spec.surface)
+                ))
+                let name = "\(theme.name) increaseContrast=\(increase)"
+                let primary = spec.textPrimary.contrastRatio(against: spec.surface)
+                let inkFloor = min(reachable, primary) - 0.01
+                XCTAssertGreaterThanOrEqual(primary, reachable - 0.01, name)
+                XCTAssertGreaterThanOrEqual(spec.textSecondary.contrastRatio(against: spec.surface), inkFloor, name)
+                XCTAssertGreaterThanOrEqual(spec.textTertiary.contrastRatio(against: spec.surface), inkFloor, name)
+                let pill = spec.activePillLabel.contrastRatio(against: spec.activePillFill)
+                XCTAssertGreaterThanOrEqual(pill, min(reachable, ChromeContrast.pillMinimum) - 0.01, name)
+                XCTAssertLessThanOrEqual(spec.tertiaryInk, spec.secondaryInk, name)
+            }
+        }
+    }
+
     func testHarnessLightIsCrispAndEveryInkColorReads() throws {
         let theme = try XCTUnwrap(HarnessThemeCatalog.theme(named: "Harness Light"))
         let background = try XCTUnwrap(ChromeColor(hex: theme.backgroundHex))

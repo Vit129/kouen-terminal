@@ -5,6 +5,31 @@ import HarnessTerminalKit
 
 @MainActor
 final class AppearanceChromeTests: XCTestCase {
+    func testSystemAccommodationsOverrideOpacityAndContrastWithoutTouchingSettings() {
+        let settings = HarnessSettings()
+        HarnessChrome.update(
+            themeName: "Default", opacity: CGFloat(settings.backgroundOpacity), blur: settings.backgroundBlur,
+            systemAppearance: .dark, accessibility: ChromeAccessibility(reduceTransparency: true, increaseContrast: true)
+        )
+        XCTAssertEqual(HarnessChrome.paintOpacity, 1, accuracy: 0.0001, "Reduce Transparency paints opaque")
+        XCTAssertEqual(HarnessChrome.backgroundOpacity, CGFloat(settings.backgroundOpacity), accuracy: 0.0001)
+        let raised = HarnessChrome.current
+        HarnessChrome.update(themeName: "Default", opacity: CGFloat(settings.backgroundOpacity), systemAppearance: .dark)
+        let standard = HarnessChrome.current
+        XCTAssertEqual(HarnessChrome.paintOpacity, CGFloat(settings.backgroundOpacity), accuracy: 0.0001)
+        XCTAssertGreaterThan(raised.textTertiary.alphaComponent, standard.textTertiary.alphaComponent)
+        XCTAssertGreaterThan(raised.borderStrong.alphaComponent, standard.borderStrong.alphaComponent)
+    }
+
+    func testStatusDotsDifferBySymbolWhenColorIsNotEnough() {
+        XCTAssertEqual(StatusDotView.mark(for: .waiting, differentiatesWithoutColor: false), .disc)
+        XCTAssertEqual(StatusDotView.mark(for: .error, differentiatesWithoutColor: false), .disc)
+        let marks = [StatusDotView.Style.idle, .waiting, .error].map {
+            StatusDotView.mark(for: $0, differentiatesWithoutColor: true)
+        }
+        XCTAssertEqual(marks, [.disc, .ring, .square])
+    }
+
     func testChromeFollowsLightThenRestoresGraphite() {
         let settings = HarnessSettings()
         XCTAssertEqual(settings.appearanceMode, .theme)

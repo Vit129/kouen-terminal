@@ -935,7 +935,8 @@ final class SessionCoordinator: NSObject {
             systemDarkThemeName: settings.systemDarkThemeName,
             backgroundHex: settings.customBackgroundHex,
             foregroundHex: settings.customForegroundHex,
-            cursorHex: settings.customCursorHex
+            cursorHex: settings.customCursorHex,
+            accessibility: .system
         )
     }
 

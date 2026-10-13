@@ -164,7 +164,8 @@ final class ContentAreaViewController: NSViewController, TerminalTabBarDelegate 
         let opacity = CGFloat(ChromeMaterial.paintOpacity(
             stored: settings.backgroundOpacity,
             appearanceMode: settings.appearanceMode,
-            systemAppearance: HarnessChrome.systemAppearance(from: view.effectiveAppearance)
+            systemAppearance: HarnessChrome.systemAppearance(from: view.effectiveAppearance),
+            accessibility: .system
         ))
         terminalHost.layer?.backgroundColor = opacity >= 1
             ? HarnessChrome.current.terminalBackground.cgColor
@@ -1056,7 +1057,8 @@ final class PaneIslandView: NSView {
         let headerAlpha = CGFloat(ChromeMaterial.headerFillAlpha(
             stored: settings.backgroundOpacity,
             appearanceMode: settings.appearanceMode,
-            systemAppearance: appearance
+            systemAppearance: appearance,
+            accessibility: .system
         ))
         header?.applyChrome()
         header?.layer?.backgroundColor = c.terminalBackground.withAlphaComponent(headerAlpha).cgColor

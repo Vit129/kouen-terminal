@@ -939,6 +939,20 @@ final class StatusDotView: NSView {
         case agentWorking(hex: String)
     }
 
+    enum Mark: Equatable { case disc, ring, square }
+
+    /// Differentiate Without Color gives the states that only a hue told apart their own shape:
+    /// waiting is a ring and error a square, so neither reads as an idle dot.
+    static func mark(for style: Style, differentiatesWithoutColor: Bool) -> Mark {
+        guard differentiatesWithoutColor else { return .disc }
+        switch style {
+        case .waiting: return .ring
+        case .error: return .square
+        default: return .disc
+        }
+    }
+
+    private(set) var mark: Mark = .disc
     private let dot = CALayer()
     private let halo = CALayer()
     private let diameter: CGFloat
@@ -992,7 +1006,7 @@ final class StatusDotView: NSView {
             width: dotSize,
             height: dotSize
         )
-        dot.cornerRadius = dotSize / 2
+        dot.cornerRadius = mark == .square ? dotSize * 0.2 : dotSize / 2
         halo.frame = CGRect(
             x: (bounds.width - haloSize) / 2,
             y: (bounds.height - haloSize) / 2,
@@ -1016,7 +1030,16 @@ final class StatusDotView: NSView {
         case let .agent(hex): color = NSColor.fromHex(hex) ?? c.accent
         case let .agentWorking(hex): color = NSColor.fromHex(hex) ?? c.accent; working = true
         }
-        dot.backgroundColor = color.cgColor
+        let mark = Self.mark(
+            for: style, differentiatesWithoutColor: NSWorkspace.shared.accessibilityDisplayShouldDifferentiateWithoutColor
+        )
+        if mark != self.mark {
+            self.mark = mark
+            needsLayout = true
+        }
+        dot.backgroundColor = mark == .ring ? NSColor.clear.cgColor : color.cgColor
+        dot.borderColor = color.cgColor
+        dot.borderWidth = mark == .ring ? max(1.5, diameter * 0.12) : 0
         halo.backgroundColor = color.withAlphaComponent(working ? 0.30 : 0.20).cgColor
         halo.isHidden = (style == .idle)
         // Only a working agent breathes — a calm, low-amplitude pulse (the earlier 1.55×/0.45

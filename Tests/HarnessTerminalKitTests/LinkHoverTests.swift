@@ -47,6 +47,29 @@ final class LinkHoverTests: XCTestCase {
         XCTAssertEqual(view.testingHoveredLink?.columns, 0 ..< 19, "new output under a resting pointer is re-probed")
     }
 
+    /// VoiceOver asks for several attributes per action. Streaming output used to rebuild the
+    /// whole buffer for each one.
+    func testVoiceOverQueriesShareOneSnapshotWhileOutputStreams() async throws {
+        let view = HarnessTerminalSurfaceView()
+        view.testingResizeGrid(cols: 40, rows: 6)
+        view.receive("first\r\n")
+        view.testingWaitForEmulatorIdle()
+        _ = view.accessibilityValue()
+        let baseline = view.testingAccessibleRebuildCount
+        for i in 0 ..< 20 {
+            view.receive("chunk \(i)\r\n")
+            _ = view.accessibilityValue()
+            _ = view.accessibilityNumberOfCharacters()
+            _ = view.accessibilityVisibleCharacterRange()
+        }
+        XCTAssertEqual(view.testingAccessibleRebuildCount, baseline, "queries inside the cache lifetime reuse one snapshot")
+        view.testingWaitForEmulatorIdle()
+        try await Task.sleep(nanoseconds: UInt64(HarnessTerminalSurfaceView.accessibleCacheLifetime * 1_000_000_000) + 50_000_000)
+        let value = view.accessibilityValue() as? String ?? ""
+        XCTAssertTrue(value.contains("chunk 19"), "a query after the lifetime sees the latest output")
+        XCTAssertEqual(view.testingAccessibleRebuildCount, baseline + 1)
+    }
+
     func testHyperlinkSpanUsesTheScrolledRow() throws {
         let (view, window) = try makeView()
         defer { window.contentView = nil; window.close() }

@@ -19,7 +19,8 @@ struct HarnessChromePalette {
     let textSecondary: NSColor
     let textTertiary: NSColor
     let rowSelectedFill: NSColor
-    /// Solid active-pill fill. Label contrast against this fill is at least 3:1.
+    /// Solid active-pill fill. Label contrast against this fill is at least 4.5:1 (7:1 under
+    /// Increase Contrast).
     let activePillFill: NSColor
     /// Label color painted on `activePillFill`.
     let activePillLabel: NSColor
@@ -47,10 +48,14 @@ struct HarnessChromePalette {
     /// Build a palette directly from explicit hex strings (used when the user has
     /// set `background`/`foreground` in their terminal config — we want to honor
     /// the exact black-and-white look rather than a named theme's tinted palette).
-    static func from(backgroundHex: String, foregroundHex: String) -> HarnessChromePalette {
+    static func from(
+        backgroundHex: String, foregroundHex: String, accessibility: ChromeAccessibility = .standard
+    ) -> HarnessChromePalette {
         // One spec for every chrome surface. Tabs, sidebar, pane headers, and the
         // switcher read the resulting palette instead of a hardcoded dark fill.
-        let spec = ChromePaletteSpec.resolve(backgroundHex: backgroundHex, foregroundHex: foregroundHex)
+        let spec = ChromePaletteSpec.resolve(
+            backgroundHex: backgroundHex, foregroundHex: foregroundHex, increaseContrast: accessibility.increaseContrast
+        )
         let background = nsColor(spec.surface)
         let foreground = nsColor(spec.textPrimary)
         // Interface focus must remain neutral even when a terminal theme has a vivid cursor.
@@ -69,7 +74,8 @@ struct HarnessChromePalette {
             waiting: waiting,
             danger: danger,
             success: success,
-            idle: idle
+            idle: idle,
+            accessibility: accessibility
         )
     }
 
@@ -81,9 +87,12 @@ struct HarnessChromePalette {
         waiting: NSColor,
         danger: NSColor,
         success: NSColor,
-        idle: NSColor
+        idle: NSColor,
+        accessibility: ChromeAccessibility
     ) -> HarnessChromePalette {
         let isDark = spec.isDark
+        // Increase Contrast firms up hairlines and hover fills so edges stay visible.
+        let lineBoost: CGFloat = accessibility.increaseContrast ? 2.5 : 1
         // Recess the frame around the terminal, preserving the terminal's exact
         // theme colors. The same window blur remains visible through both surfaces.
         let sidebar = blend(background, toward: .black, fraction: isDark ? 0.34 : 0.035)
@@ -96,8 +105,8 @@ struct HarnessChromePalette {
             terminalBackground: background,
             sidebarBackground: sidebar,
             surfaceElevated: elevated,
-            border: foreground.withAlphaComponent(isDark ? 0.07 : 0.14),
-            borderStrong: foreground.withAlphaComponent(isDark ? 0.12 : 0.20),
+            border: foreground.withAlphaComponent((isDark ? 0.07 : 0.14) * lineBoost),
+            borderStrong: foreground.withAlphaComponent((isDark ? 0.12 : 0.20) * lineBoost),
             accent: accent,
             accentSoft: accent.withAlphaComponent(0.16),
             focusRing: accent,
@@ -106,13 +115,13 @@ struct HarnessChromePalette {
             // Light secondary and tertiary are opaque. Alpha ink on a bright, translucent
             // surface is what makes light-mode chrome type look fuzzy and washed out:
             // subpixel antialiasing fringes against clear instead of against the paper.
-            textSecondary: secondaryInk(foreground: foreground, on: background, isDark: isDark),
-            textTertiary: tertiaryInk(foreground: foreground, on: background, isDark: isDark),
+            textSecondary: ink(spec.secondaryInk, foreground: foreground, on: background, isDark: isDark),
+            textTertiary: ink(spec.tertiaryInk, foreground: foreground, on: background, isDark: isDark),
             rowSelectedFill: nsColor(spec.activePillFill),
             activePillFill: nsColor(spec.activePillFill),
             activePillLabel: nsColor(spec.activePillLabel),
-            rowHoverFill: foreground.withAlphaComponent(isDark ? 0.045 : 0.065),
-            iconHoverFill: foreground.withAlphaComponent(isDark ? 0.08 : 0.10),
+            rowHoverFill: foreground.withAlphaComponent((isDark ? 0.045 : 0.065) * lineBoost),
+            iconHoverFill: foreground.withAlphaComponent((isDark ? 0.08 : 0.10) * lineBoost),
             iconTileFill: isDark
                 ? blend(background, toward: .black, fraction: 0.35)
                 : blend(background, toward: foreground, fraction: 0.85),
@@ -128,16 +137,13 @@ struct HarnessChromePalette {
         NSColor(srgbRed: color.red, green: color.green, blue: color.blue, alpha: 1)
     }
 
-    /// Opaque mix of `foreground` toward the surface. `fraction` is how far the ink
-    /// moves toward the background (0 = full foreground).
-    private static func secondaryInk(foreground: NSColor, on background: NSColor, isDark: Bool) -> NSColor {
-        if isDark { return foreground.withAlphaComponent(0.66) }
-        return blend(foreground, toward: background, fraction: 0.22)
-    }
-
-    private static func tertiaryInk(foreground: NSColor, on background: NSColor, isDark: Bool) -> NSColor {
-        if isDark { return foreground.withAlphaComponent(0.40) }
-        return blend(foreground, toward: background, fraction: 0.40)
+    /// `strength` of the foreground over the surface (1 = full foreground), already raised to the
+    /// spec's contrast floor. Dark secondary and tertiary stay a translucent lift that settles
+    /// into the canvas. Light ones are opaque: alpha ink on a bright, translucent surface makes
+    /// type look fuzzy, because antialiasing fringes against clear instead of the paper.
+    private static func ink(_ strength: Double, foreground: NSColor, on background: NSColor, isDark: Bool) -> NSColor {
+        if isDark { return foreground.withAlphaComponent(strength) }
+        return blend(foreground, toward: background, fraction: 1 - strength)
     }
 
     private static func blend(_ base: NSColor, toward: NSColor, fraction: CGFloat) -> NSColor {
@@ -193,7 +199,8 @@ enum HarnessChrome {
         systemDarkThemeName: String? = nil,
         backgroundHex: String? = nil,
         foregroundHex: String? = nil,
-        cursorHex: String? = nil
+        cursorHex: String? = nil,
+        accessibility: ChromeAccessibility = .standard
     ) {
         // Resolve through the same single source of truth the terminal surface
         // uses, then derive a recessed frame tint from that canvas.
@@ -209,7 +216,8 @@ enum HarnessChrome {
         )
         current = HarnessChromePalette.from(
             backgroundHex: canvas.backgroundHex,
-            foregroundHex: canvas.foregroundHex
+            foregroundHex: canvas.foregroundHex,
+            accessibility: accessibility
         )
         let storedOpacity = max(0, min(1, opacity))
         backgroundOpacity = storedOpacity
@@ -217,7 +225,8 @@ enum HarnessChrome {
         paintOpacity = CGFloat(ChromeMaterial.paintOpacity(
             stored: Float(storedOpacity),
             appearanceMode: appearanceMode,
-            systemAppearance: system
+            systemAppearance: system,
+            accessibility: accessibility
         ))
         backgroundBlur = max(0, min(100, blur))
     }

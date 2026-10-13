@@ -1,4 +1,6 @@
 import AppKit
+import HarnessCore
+import HarnessTerminalKit
 
 /// Wraps the private CoreGraphics SPI that controls per-window backdrop blur —
 /// the same call Alacritty, and iTerm2 use to blur the desktop behind a
@@ -23,8 +25,13 @@ private func CGSSetWindowBackgroundBlurRadius(_ cid: Int32, _ wid: Int, _ radius
 /// Shared window-level transparency for the main window and Quick Terminal.
 @MainActor
 enum WindowAppearance {
-    static func applyTransparency(opacity: Float, blur: Int, opaqueBackground: NSColor, to window: NSWindow) {
-        let isOpaque = max(0, min(1, opacity)) >= 0.999
+    /// Reduce Transparency makes the window opaque with no blur. The saved opacity and blur
+    /// are untouched, so turning the preference off restores them.
+    static func applyTransparency(
+        opacity: Float, blur: Int, opaqueBackground: NSColor, to window: NSWindow,
+        accessibility: ChromeAccessibility = .system
+    ) {
+        let isOpaque = accessibility.reduceTransparency || max(0, min(1, opacity)) >= 0.999
         window.isOpaque = isOpaque
         window.backgroundColor = isOpaque ? opaqueBackground : .clear
 

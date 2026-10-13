@@ -71,6 +71,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 (NSApp.delegate as? AppDelegate)?.windowControllers.forEach { $0.effectiveAppearanceDidChange() }
             }
         }
+        // Reduce Transparency, Increase Contrast, and Differentiate Without Color apply live.
+        NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.accessibilityDisplayOptionsDidChangeNotification,
+            object: nil, queue: .main
+        ) { _ in
+            MainActor.assumeIsolated { SessionCoordinator.shared.applySettingsToHosts() }
+        }
         // Present banners when allowed; onboarding or Settings owns the permission prompt.
         DesktopNotifier.configurePresentation()
 

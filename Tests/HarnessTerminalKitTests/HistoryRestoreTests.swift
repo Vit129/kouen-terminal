@@ -41,8 +41,8 @@ final class HistoryRestoreTests: XCTestCase {
         view.beginHistoryRestore(screen: screen)
         await settle(view)
         XCTAssertTrue(view.testingHistoryRestorePending)
-        XCTAssertEqual(view.accessibilitySnapshot().lines.count, rows, "the screen paints with no history parsed")
-        XCTAssertTrue(view.accessibilitySnapshot().lines.contains { $0.hasPrefix("history 299") })
+        XCTAssertEqual(view.testingFreshAccessibilitySnapshot().lines.count, rows, "the screen paints with no history parsed")
+        XCTAssertTrue(view.testingFreshAccessibilitySnapshot().lines.contains { $0.hasPrefix("history 299") })
         view.testingSetSelection(anchor: (row: rows - 2, column: 0), head: (row: rows - 2, column: 10))
         let selected = view.testingSelectionText()
 
@@ -52,7 +52,7 @@ final class HistoryRestoreTests: XCTestCase {
         await settle(view)
 
         XCTAssertFalse(view.testingHistoryRestorePending)
-        let restored = view.accessibilitySnapshot()
+        let restored = view.testingFreshAccessibilitySnapshot()
         XCTAssertEqual(restored.lines, truth.captureLines(joinWrapped: false), "history, screen, and live output, once each")
         XCTAssertEqual(restored.cursorLine, truth.historyCount + truth.readGrid().cursor.row)
         XCTAssertEqual(responses.count, 1, "the live query answers once; the history's never does")
@@ -62,7 +62,8 @@ final class HistoryRestoreTests: XCTestCase {
 
         view.receive("after\r\n")
         await settle(view)
-        XCTAssertTrue(view.accessibilitySnapshot().lines.contains { $0.hasPrefix("after") }, "output goes to the swapped-in emulator")
+        let after = view.testingFreshAccessibilitySnapshot().lines
+        XCTAssertTrue(after.contains { $0.hasPrefix("after") }, "output goes to the swapped-in emulator")
     }
 
     func testRestoreAtAnotherWidthPreservesRedrawsAndLiveOutput() async {
@@ -88,7 +89,7 @@ final class HistoryRestoreTests: XCTestCase {
         view.receive(live)
         truth.feed(live)
         await settle(view)
-        XCTAssertEqual(view.accessibilitySnapshot().lines, truth.captureLines(joinWrapped: false))
+        XCTAssertEqual(view.testingFreshAccessibilitySnapshot().lines, truth.captureLines(joinWrapped: false))
         XCTAssertEqual(view.testingReadGridSnapshot().cursor, truth.readGrid().cursor)
 
     }
@@ -99,6 +100,6 @@ final class HistoryRestoreTests: XCTestCase {
         view.finishHistoryRestore()
         await settle(view)
         XCTAssertFalse(view.testingHistoryRestorePending)
-        XCTAssertTrue(view.accessibilitySnapshot().lines.first?.hasPrefix("only the screen") == true)
+        XCTAssertTrue(view.testingFreshAccessibilitySnapshot().lines.first?.hasPrefix("only the screen") == true)
     }
 }

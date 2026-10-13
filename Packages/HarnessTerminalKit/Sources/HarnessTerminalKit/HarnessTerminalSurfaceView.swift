@@ -903,6 +903,9 @@ public final class HarnessTerminalSurfaceView: NSView {
     static let findRefreshInterval: TimeInterval = 0.25
     private var findContentRevision: UInt64 = 0
     private var accessibleCache: (revision: UInt64, text: TerminalAccessibilityText, cursorLine: Int, cursorColumn: Int, history: Int)?
+    private var accessibleCacheBuiltAt: TimeInterval = 0
+    static let accessibleCacheLifetime: TimeInterval = 0.2
+    private(set) var testingAccessibleRebuildCount = 0
     private var findTargetLine: Int?
     private var findPosition: TerminalTextAnchor?
     private var findCommandScope: TerminalCommandRegion?
@@ -1662,8 +1665,22 @@ public final class HarnessTerminalSurfaceView: NSView {
         return (state.text.lines, state.cursorLine, state.cursorColumn)
     }
 
+    /// The accessibility snapshot rebuilt now, ignoring the reuse window.
+    func testingFreshAccessibilitySnapshot() -> (lines: [String], cursorLine: Int, cursorColumn: Int) {
+        accessibleCache = nil
+        return accessibilitySnapshot()
+    }
+
     func accessibleState() -> (text: TerminalAccessibilityText, cursorLine: Int, cursorColumn: Int, visible: NSRange) {
-        if accessibleCache?.revision != findContentRevision {
+        // The revision moves on every output chunk, and one VoiceOver action asks for several
+        // attributes. Rebuilding the whole buffer for each would cost O(history) per query while
+        // output streams, and could answer one action from different snapshots. A stale cache
+        // younger than `accessibleCacheLifetime` is reused instead.
+        let now = ProcessInfo.processInfo.systemUptime
+        if accessibleCache?.revision != findContentRevision,
+           accessibleCache == nil || now - accessibleCacheBuiltAt >= Self.accessibleCacheLifetime {
+            accessibleCacheBuiltAt = now
+            testingAccessibleRebuildCount += 1
             let (snapshot, cursor) = emulatorSync { ($0.textSnapshot(), $0.readGrid().cursor) }
             var mapped: [TerminalMappedText] = []
             mapped.reserveCapacity(snapshot.lineCount)

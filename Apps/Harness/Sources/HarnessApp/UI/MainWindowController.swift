@@ -26,7 +26,8 @@ final class MainWindowController: NSWindowController {
             systemDarkThemeName: SessionCoordinator.shared.settings.systemDarkThemeName,
             backgroundHex: SessionCoordinator.shared.settings.customBackgroundHex,
             foregroundHex: SessionCoordinator.shared.settings.customForegroundHex,
-            cursorHex: SessionCoordinator.shared.settings.customCursorHex
+            cursorHex: SessionCoordinator.shared.settings.customCursorHex,
+            accessibility: .system
         )
 
         let previousWindow = NSApp.orderedWindows.first { $0.contentViewController is MainSplitViewController }
