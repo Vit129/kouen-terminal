@@ -33,13 +33,24 @@ final class ProcessScanTests: XCTestCase {
     }
 
     func testPhysicalFootprintCountsTouchedMemory() throws {
-        let before = try XCTUnwrap(ProcessScan.physicalFootprint(getpid()))
         let size = 64 << 20
-        let block = UnsafeMutableRawPointer.allocate(byteCount: size, alignment: 4096)
-        defer { block.deallocate() }
-        block.initializeMemory(as: UInt8.self, repeating: 0xA5, count: size)
-        let after = try XCTUnwrap(ProcessScan.physicalFootprint(getpid()))
-        XCTAssertGreaterThan(after, before + UInt64(size / 2), "touched pages must be charged to the process")
+        // The footprint covers the whole test process, whose other threads may free memory
+        // meanwhile, and uniform pages compress under pressure. Use varied bytes and retry.
+        var charged = false
+        for _ in 0 ..< 3 where !charged {
+            let before = try XCTUnwrap(ProcessScan.physicalFootprint(getpid()))
+            let block = UnsafeMutableRawPointer.allocate(byteCount: size, alignment: 4096)
+            defer { block.deallocate() }
+            let words = block.bindMemory(to: UInt64.self, capacity: size / 8)
+            var state: UInt64 = 0x9E37_79B9_7F4A_7C15
+            for index in 0 ..< size / 8 {
+                state ^= state << 13; state ^= state >> 7; state ^= state << 17
+                words[index] = state
+            }
+            let after = try XCTUnwrap(ProcessScan.physicalFootprint(getpid()))
+            charged = after > before + UInt64(size / 2)
+        }
+        XCTAssertTrue(charged, "touched pages must be charged to the process")
         XCTAssertNil(ProcessScan.physicalFootprint(0))
     }
 }
