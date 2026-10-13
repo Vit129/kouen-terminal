@@ -826,13 +826,17 @@ public final class RealPty: @unchecked Sendable {
     ) -> (pid: pid_t, master: Int32)? {
         #if canImport(Darwin)
         let closeUpperBound = childFileDescriptorCloseUpperBound()
+        let openDescriptorList = UnsafeMutableRawPointer.allocate(byteCount: openDescriptorListBytes, alignment: 8)
+        defer { openDescriptorList.deallocate() }
         var ws = winsize(ws_row: rows, ws_col: cols, ws_xpixel: 0, ws_ypixel: 0)
         var amaster: Int32 = -1
         let pid = forkpty(&amaster, nil, nil, &ws)
         if pid < 0 { return nil }
         if pid == 0 {
             if standardInput >= 0, dup2(standardInput, STDIN_FILENO) < 0 { _exit(127) }
-            closeInheritedFileDescriptors(except: 0, upperBound: closeUpperBound)
+            if harness_close_listed_fds(3, 0, openDescriptorList, Int32(openDescriptorListBytes)) != 0 {
+                closeInheritedFileDescriptors(except: 0, upperBound: closeUpperBound)
+            }
             if let cwd { _ = chdir(cwd) }
             execveChild(argv: argv, envp: envp)
             _exit(127)
@@ -888,6 +892,10 @@ public final class RealPty: @unchecked Sendable {
         }
         return true
     }
+
+    /// Room for 4,096 open descriptors in the kernel's list. A larger table falls back to closing
+    /// every number up to the soft limit, which costs about 116 ms per spawn at 1,048,575.
+    private static let openDescriptorListBytes = 4096 * 8
 
     private static func childFileDescriptorCloseUpperBound() -> Int32 {
         #if canImport(Glibc)

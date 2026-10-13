@@ -43,13 +43,18 @@ int harness_open_pty_master(char *slave_path, size_t slave_len);
 
 // Close all file descriptors >= lowfd.  On Linux 5.9+ this uses the close_range(2) syscall
 // (atomic, faster than a loop across sysconf(_SC_OPEN_MAX) fds).  On older Linux it falls
-// back to a close(2) loop.  On Darwin/macOS this function is a no-op — callers on that
-// platform use forkpty(3) which never needs post-fork fd cleanup (the master is the only
-// inherited fd; all others are O_CLOEXEC'd in the daemon).
+// back to a close(2) loop.  On Darwin/macOS this function is a no-op. Darwin callers use
+// harness_close_listed_fds below.
 //
 // POST-FORK SAFETY: this function must be async-signal-safe.  All code paths use only
 // syscall(2), close(2), getdtablesize(2), or a simple integer loop — no malloc, no stdio.
 void harness_close_fds_from(int lowfd);
+
+// Darwin: close every open descriptor >= lowfd except `keep`, using the kernel's list of open
+// descriptors written into `buffer` (parent-allocated, `buffer_bytes` long). Returns 0, or -1 when
+// the list is unavailable or may be truncated, in which case the caller must close by number.
+// Elsewhere it always returns -1. POST-FORK SAFE.
+int harness_close_listed_fds(int lowfd, int keep, void *buffer, int buffer_bytes);
 
 // Put every signal back to its default action and unblock them all, for a child between fork and
 // exec: an ignored signal survives exec, and the daemon ignores SIGTERM/SIGINT/SIGHUP/SIGUSR1 (its
