@@ -70,6 +70,18 @@ final class LinkHoverTests: XCTestCase {
         XCTAssertEqual(view.testingAccessibleRebuildCount, baseline + 1)
     }
 
+    func testHyperlinksStayWebLinksAndRemotePanesSkipFileReferences() {
+        let view = HarnessTerminalSurfaceView()
+        view.testingResizeGrid(cols: 60, rows: 4)
+        let disguised = "harness-file://open?path=/etc/hosts&line=1"
+        view.receive("\u{1B}]8;;\(disguised)\u{1B}\\click me\u{1B}]8;;\u{1B}\\\r\nSources/App.swift:3:1 failed\r\n")
+        view.testingWaitForEmulatorIdle()
+        XCTAssertEqual(view.linkRange(atRow: 0, column: 2)?.link, .web(disguised))
+        XCTAssertEqual(view.linkRange(atRow: 1, column: 2)?.link, .file(path: "Sources/App.swift"))
+        view.opensLocalFileLinks = false
+        XCTAssertNil(view.linkRange(atRow: 1, column: 2), "a remote pane's paths name files on that machine")
+    }
+
     func testHyperlinkSpanUsesTheScrolledRow() throws {
         let (view, window) = try makeView()
         defer { window.contentView = nil; window.close() }

@@ -593,6 +593,7 @@ final class PaneContainerView: NSView {
     }
 
     @objc private func activeSurfaceDidChange() {
+        guard window != nil else { return }
         refreshHeaders()
         announceFocusedPane()
     }
@@ -937,17 +938,21 @@ final class PaneIslandView: NSView {
         revealMask.path = path
         layer?.mask = path == nil ? nil : revealMask
     }
-    private(set) weak var terminalHost: TerminalHostView?
-    private(set) weak var contentView: NSView?
+    private weak var embeddedView: NSView?
+    /// A rebuilt layout re-embeds the same host in a new island; this one then no longer owns it.
+    var contentView: NSView? { embeddedView?.superview === self ? embeddedView : nil }
+    var terminalHost: TerminalHostView? { contentView as? TerminalHostView }
     private let separated: Bool
     let surfaceID: SurfaceID
     /// Title row, present on comfortable panes when pane headers are on.
     private(set) var header: PaneHeaderView?
+    private var headerShown: Bool
     private var hostTopConstraint: NSLayoutConstraint?
 
     init(surfaceID: SurfaceID, separated: Bool, showsHeader: Bool) {
         self.separated = separated
         self.surfaceID = surfaceID
+        headerShown = separated && showsHeader
         super.init(frame: .zero)
         wantsLayer = true
         let chrome = ChromeLayout.island(separated: separated, splitRadius: Double(HarnessDesign.Radius.overlay))
@@ -960,17 +965,7 @@ final class PaneIslandView: NSView {
         // A separated island carries a hairline so it reads as a card against the
         // gutter, which is painted in the same chrome color.
         layer?.borderWidth = separated ? 1 : 0
-        if showsHeader {
-            let header = PaneHeaderView(surfaceID: surfaceID)
-            header.translatesAutoresizingMaskIntoConstraints = false
-            addSubview(header)
-            NSLayoutConstraint.activate([
-                header.topAnchor.constraint(equalTo: topAnchor),
-                header.leadingAnchor.constraint(equalTo: leadingAnchor),
-                header.trailingAnchor.constraint(equalTo: trailingAnchor),
-            ])
-            self.header = header
-        }
+        if headerShown { addHeader() }
         registerForDraggedTypes([PaneDrag.type])
         applyChrome()
     }
@@ -1018,47 +1013,50 @@ final class PaneIslandView: NSView {
         return true
     }
 
+    private func addHeader() {
+        let header = PaneHeaderView(surfaceID: surfaceID)
+        header.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(header)
+        NSLayoutConstraint.activate([
+            header.topAnchor.constraint(equalTo: topAnchor),
+            header.leadingAnchor.constraint(equalTo: leadingAnchor),
+            header.trailingAnchor.constraint(equalTo: trailingAnchor),
+        ])
+        self.header = header
+    }
+
+    /// Show or hide the title row when the pane count crosses the single-pane setting.
     func setShowsHeader(_ shows: Bool) {
         let effective = separated && shows
+        guard effective != headerShown else { return }
+        headerShown = effective
         if effective, header == nil {
-            let newHeader = PaneHeaderView(surfaceID: surfaceID)
-            newHeader.translatesAutoresizingMaskIntoConstraints = false
-            addSubview(newHeader)
-            NSLayoutConstraint.activate([
-                newHeader.topAnchor.constraint(equalTo: topAnchor),
-                newHeader.leadingAnchor.constraint(equalTo: leadingAnchor),
-                newHeader.trailingAnchor.constraint(equalTo: trailingAnchor),
-            ])
-            header = newHeader
+            addHeader()
             applyChrome()
         }
         header?.isHidden = !effective
-        if let host = contentView {
-            hostTopConstraint?.isActive = false
-            let topConstraint = host.topAnchor.constraint(
-                equalTo: effective ? (header?.bottomAnchor ?? topAnchor) : topAnchor
-            )
-            topConstraint.isActive = true
-            hostTopConstraint = topConstraint
-        }
+        if let host = contentView { pinTop(of: host) }
+    }
+
+    private func pinTop(of host: NSView) {
+        hostTopConstraint?.isActive = false
+        let anchor = headerShown ? (header?.bottomAnchor ?? topAnchor) : topAnchor
+        let constraint = host.topAnchor.constraint(equalTo: anchor)
+        constraint.isActive = true
+        hostTopConstraint = constraint
     }
 
     func embed(_ host: NSView) {
-        contentView = host
+        embeddedView = host
         host.translatesAutoresizingMaskIntoConstraints = false
         addSubview(host)
-        let topConstraint = host.topAnchor.constraint(
-            equalTo: (header != nil && header?.isHidden == false) ? (header?.bottomAnchor ?? topAnchor) : topAnchor
-        )
-        hostTopConstraint = topConstraint
+        pinTop(of: host)
         NSLayoutConstraint.activate([
-            topConstraint,
             host.leadingAnchor.constraint(equalTo: leadingAnchor),
             host.trailingAnchor.constraint(equalTo: trailingAnchor),
             host.bottomAnchor.constraint(equalTo: bottomAnchor),
         ])
         if let host = host as? TerminalHostView {
-            terminalHost = host
             let radius = ChromeLayout.island(separated: separated, splitRadius: Double(HarnessDesign.Radius.overlay)).cornerRadius
             host.applyIslandCornerRadius(CGFloat(radius))
         }

@@ -4,100 +4,60 @@ import Foundation
 /// hyperlink, so plain `https://...` output is still command-clickable.
 /// Pure and Foundation-only (uses `NSDataDetector` on Darwin), so it's unit-testable off the GUI.
 public enum URLDetection {
-    /// Parsed `path:line(:column)` token from compiler/test/grep output.
-    public struct FileLocationTarget: Equatable, Sendable {
-        public let path: String
-        public let line: Int
-        public let column: Int?
-
-        public init(path: String, line: Int, column: Int? = nil) {
-            self.path = path
-            self.line = line
-            self.column = column
-        }
-
-        public var urlString: String {
-            var components = URLComponents()
-            components.scheme = "harness-file"
-            components.host = "open"
-            var items = [
-                URLQueryItem(name: "path", value: path),
-                URLQueryItem(name: "line", value: String(line)),
-            ]
-            if let column {
-                items.append(URLQueryItem(name: "column", value: String(column)))
-            }
-            components.queryItems = items
-            return components.string ?? ""
-        }
-
-        public init?(urlString: String) {
-            guard let components = URLComponents(string: urlString),
-                  components.scheme?.lowercased() == "harness-file",
-                  components.host == "open",
-                  let items = components.queryItems,
-                  let path = items.first(where: { $0.name == "path" })?.value,
-                  !path.isEmpty,
-                  let lineText = items.first(where: { $0.name == "line" })?.value,
-                  let line = Int(lineText), line >= 1 else {
-                return nil
-            }
-            let column = items.first(where: { $0.name == "column" })?.value.flatMap(Int.init)
-            if let column, column < 1 { return nil }
-            self.init(path: path, line: line, column: column)
-        }
+    /// A link found in terminal text.
+    public enum Link: Equatable, Sendable {
+        case web(String)
+        /// A `path:line(:column)` reference from compiler, test, or grep output, with the path as
+        /// printed: absolute, `~/`, or relative to the shell's working directory.
+        case file(path: String)
     }
 
-    /// The URL covering character offset `column` in `line`, or nil. Callers should build `line`
-    /// as one character per cell (so `column` is the clicked grid column); URLs are ASCII, so wide
-    /// chars don't shift the mapping.
+    /// The web URL covering character offset `column` in `line`, or nil. Callers should build
+    /// `line` as one character per cell (so `column` is the clicked grid column); URLs are ASCII,
+    /// so wide chars don't shift the mapping.
     public static func url(in line: String, at column: Int) -> String? {
-        match(in: line, at: column)?.url
+        guard case let .web(url)? = match(in: line, at: column)?.link else { return nil }
+        return url
     }
 
-    /// As `url(in:at:)`, but also returns the matched span as a half-open column range,
-    /// so callers can underline the link on hover. `columns` uses the same one-character-
-    /// per-cell convention as the input `line`.
-    public static func match(in line: String, at column: Int) -> (url: String, columns: Range<Int>)? {
+    /// The link covering `column` and its span as a half-open column range, so callers can
+    /// underline it on hover. `columns` uses the same one-character-per-cell convention as `line`.
+    /// File references win over scheme-less web matches: the data detector reads `main.rs:10` as
+    /// `http://main.rs:10`.
+    public static func match(in line: String, at column: Int) -> (link: Link, columns: Range<Int>)? {
         guard !line.isEmpty, column >= 0 else { return nil }
+        let file = fileLocation(in: line, at: column).map { (link: Link.file(path: $0.path), columns: $0.columns) }
         #if canImport(Darwin)
         if let detector = try? NSDataDetector(types: NSTextCheckingResult.CheckingType.link.rawValue) {
             let full = NSRange(line.startIndex ..< line.endIndex, in: line)
-            var result: (url: String, columns: Range<Int>)?
+            var result: (link: Link, columns: Range<Int>)?
             detector.enumerateMatches(in: line, options: [], range: full) { match, _, stop in
                 guard let match, let r = Range(match.range, in: line) else { return }
                 let lower = line.distance(from: line.startIndex, to: r.lowerBound)
                 let upper = line.distance(from: line.startIndex, to: r.upperBound)
+                let text = line[r]
                 if column >= lower, column < upper,
+                   file == nil || text.contains("://") || text.lowercased().hasPrefix("mailto:"),
                    let scheme = match.url?.scheme?.lowercased(),
                    ["http", "https", "mailto", "ftp", "ftps"].contains(scheme) {
-                    result = (match.url?.absoluteString ?? String(line[r]), lower ..< upper)
+                    result = (.web(match.url?.absoluteString ?? String(text)), lower ..< upper)
                     stop.pointee = true
                 }
             }
             if let result { return result }
         }
-        if let fileMatch = fileLocation(in: line, at: column) {
-            return (fileMatch.target.urlString, fileMatch.columns)
-        }
-        return nil
+        return file
         #else
         // `NSDataDetector` isn't implemented in swift-corelibs-foundation (Linux). Fall back to a
         // whitespace-delimited token scan: the token covering `column` is a URL if it carries a
         // `scheme://`. Sufficient for the headless build (URL clicking is a GUI affordance).
-        if let match = tokenMatch(in: line, at: column) { return match }
-        if let fileMatch = fileLocation(in: line, at: column) {
-            return (fileMatch.target.urlString, fileMatch.columns)
-        }
-        return nil
+        if let match = tokenMatch(in: line, at: column) { return (.web(match.url), match.columns) }
+        return file
         #endif
     }
 
     /// Detects a `path:line` or `path:line:column` reference covering `column`.
-    public static func fileLocation(
-        in line: String,
-        at column: Int
-    ) -> (target: FileLocationTarget, columns: Range<Int>)? {
+    public static func fileLocation(in line: String, at column: Int) -> (path: String, columns: Range<Int>)? {
         let chars = Array(line)
         guard column >= 0, column < chars.count else { return nil }
         func isBoundary(_ c: Character) -> Bool {
@@ -113,25 +73,19 @@ public enum URLDetection {
         if hi >= lo, chars[hi] == ":" { hi -= 1 }
         guard lo <= hi, column >= lo, column <= hi else { return nil }
         let token = String(chars[lo ... hi])
-        guard let target = parseFileLocationToken(token) else { return nil }
-        return (target, lo ..< (hi + 1))
+        guard let path = filePath(inLocationToken: token) else { return nil }
+        return (path, lo ..< (hi + 1))
     }
 
-    private static func parseFileLocationToken(_ token: String) -> FileLocationTarget? {
+    /// The path of a `path:line(:column)` token, or nil when the token isn't one.
+    private static func filePath(inLocationToken token: String) -> String? {
         guard !token.contains("://") else { return nil }
         let parts = token.split(separator: ":", omittingEmptySubsequences: false)
-        guard parts.count == 2 || parts.count == 3 else { return nil }
-        let pathPart = String(parts[0])
-        guard let line = Int(parts[1]), line >= 1 else { return nil }
-        let column: Int?
-        if parts.count == 3 {
-            guard let parsedCol = Int(parts[2]), parsedCol >= 1 else { return nil }
-            column = parsedCol
-        } else {
-            column = nil
-        }
-        guard isLikelyFilePath(pathPart) else { return nil }
-        return FileLocationTarget(path: pathPart, line: line, column: column)
+        guard parts.count == 2 || parts.count == 3,
+              parts.dropFirst().allSatisfy({ Int($0).map { $0 >= 1 } ?? false })
+        else { return nil }
+        let path = String(parts[0])
+        return isLikelyFilePath(path) ? path : nil
     }
 
     private static func isLikelyFilePath(_ candidate: String) -> Bool {
@@ -149,8 +103,9 @@ public enum URLDetection {
               dot < candidate.index(before: candidate.endIndex) else {
             return false
         }
+        // A letter in the extension keeps addresses like `127.0.0.1:8080` out.
         let ext = candidate[candidate.index(after: dot)...]
-        return ext.count <= 12 && ext.allSatisfy { $0.isLetter || $0.isNumber }
+        return ext.count <= 12 && ext.allSatisfy { $0.isLetter || $0.isNumber } && ext.contains(where: \.isLetter)
     }
 
     #if !canImport(Darwin)

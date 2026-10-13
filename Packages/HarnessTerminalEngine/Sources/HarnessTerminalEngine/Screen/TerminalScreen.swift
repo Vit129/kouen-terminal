@@ -873,7 +873,7 @@ final class TerminalScreen {
         var current: [TerminalGridCell] = []
         for (idx, row) in phys.enumerated() {
             let next = idx + 1 < phys.count ? phys[idx + 1].cells : nil
-            let drop = row.wrapped ? wideDeferralGap(row: row.cells, wideDeferred: row.wideDeferred, next: next) : 0
+            let drop = row.wrapped ? Self.wideDeferralGap(row: row.cells, wideDeferred: row.wideDeferred, next: next) : 0
             let cells = drop > 0 ? Array(row.cells.dropLast(drop)) : row.cells
             current.append(contentsOf: cells)
             if !row.wrapped {
@@ -914,7 +914,7 @@ final class TerminalScreen {
         var building = false
         for (idx, row) in phys.enumerated() {
             let next = idx + 1 < phys.count ? phys[idx + 1].cells : nil
-            let drop = row.wrapped ? wideDeferralGap(row: row.cells, wideDeferred: row.wideDeferred, next: next) : 0
+            let drop = row.wrapped ? Self.wideDeferralGap(row: row.cells, wideDeferred: row.wideDeferred, next: next) : 0
             let cells = drop > 0 ? Array(row.cells.dropLast(drop)) : row.cells
             current += text(cells, trimTrailing: !row.wrapped)
             building = true
@@ -1000,7 +1000,9 @@ final class TerminalScreen {
     /// — recorded by `wideDeferred` on the row and verified against the trailing blank and next
     /// row's leading `.wide` head. Any later write or erase to the last column clears
     /// `wideDeferred`, so an ECH/EL blank at the right margin is preserved as real content.
-    private func wideDeferralGap(row: [TerminalGridCell], wideDeferred: Bool, next: [TerminalGridCell]?) -> Int {
+    static func wideDeferralGap<Row: BidirectionalCollection<TerminalGridCell>, Next: Collection<TerminalGridCell>>(
+        row: Row, wideDeferred: Bool, next: Next?
+    ) -> Int {
         guard wideDeferred, let next, let last = row.last, last.codepoint == 0, last.combining0 == 0,
               last.width == .normal else { return 0 }
         for cell in next where cell.width != .spacerTail { return cell.width == .wide ? 1 : 0 }
@@ -1011,7 +1013,7 @@ final class TerminalScreen {
     /// the same logical text that capture and reflow produce.
     func wideDeferralGap(atBufferLine index: Int) -> Int {
         guard isLineWrapped(index), index + 1 < bufferLineCount else { return 0 }
-        return wideDeferralGap(
+        return Self.wideDeferralGap(
             row: bufferLine(index),
             wideDeferred: isLineWideDeferred(index),
             next: bufferLine(index + 1)
@@ -1219,7 +1221,7 @@ final class TerminalScreen {
                 }
                 var eff = s.cells.count
                 if s.wrapped {
-                    eff -= wideDeferralGap(row: s.cells, wideDeferred: s.wideDeferred, next: lookahead?.cells)
+                    eff -= Self.wideDeferralGap(row: s.cells, wideDeferred: s.wideDeferred, next: lookahead?.cells)
                 }
                 while nextAnchor < sortedAnchors.count, sortedAnchors[nextAnchor].line == i {
                     let anchor = sortedAnchors[nextAnchor]
@@ -2845,7 +2847,16 @@ extension TerminalScreen {
         screen.pen = state.pen
         screen.currentHyperlink = state.currentHyperlink
         screen.rowWrapped = state.rowWrapped
-        screen.rowWideDeferred = state.rowWideDeferred ?? Array(repeating: false, count: state.rows)
+        // Checkpoints written before the flag existed: infer it from the gap's shape.
+        screen.rowWideDeferred = state.rowWideDeferred ?? (0 ..< state.rows).map { row in
+            guard state.rowWrapped[row], row + 1 < state.rows else { return false }
+            let cols = state.cols
+            return Self.wideDeferralGap(
+                row: decoded[row * cols ..< (row + 1) * cols],
+                wideDeferred: true,
+                next: decoded[(row + 1) * cols ..< (row + 2) * cols]
+            ) == 1
+        }
         screen.rowMarks = state.rowMarks
         screen.savedCursor = state.savedCursor
         screen.cells = decoded

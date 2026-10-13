@@ -584,6 +584,7 @@ extension SettingsViewController {
     func flushAndApply() {
         applySettingsLive()
         saveSettings()
+        refreshSpecimenPreview()
     }
 
     /// Settings window path into the shared writer. The palette calls `applyFromPalette`.
@@ -713,7 +714,6 @@ extension SettingsViewController {
         coordinator.applySettingsToHosts()
         QuickTerminalController.shared.rebuildFromSettings()
         updateFontReadout()
-        refreshSpecimenPreview()
         // An appearance flip changes which theme the panes paint; re-preview it.
         if previousAppearanceMode != nextAppearanceMode {
             refreshColorPlaceholders()
@@ -721,31 +721,31 @@ extension SettingsViewController {
         }
     }
 
+    /// The popup's theme, not `snapshot.themeName`: a pick reaches the snapshot only after the
+    /// daemon round trip.
     func refreshSpecimenPreview() {
         let coordinator = SessionCoordinator.shared
-        let systemAppearance: HarnessSystemAppearance = HarnessChrome.current.isDark ? .dark : .light
+        let themeName = themePopup.titleOfSelectedItem ?? coordinator.snapshot.themeName
         specimenPreview.update(
-            themeName: coordinator.snapshot.themeName,
+            themeName: themeName,
             settings: coordinator.settings,
-            systemAppearance: systemAppearance
+            systemAppearance: HarnessChrome.current.isDark ? .dark : .light
         )
-        revertAppearanceButton.isEnabled =
-            coordinator.settings != initialSettingsSnapshot
-            || coordinator.snapshot.themeName != initialThemeSnapshot
+        let themeChanged = !initialThemeName.isEmpty && themeName != initialThemeName
+        revertAppearanceButton.isEnabled = themeChanged || !initialThemeAndFont.matches(coordinator.settings)
     }
 
-    /// Restore the theme and appearance settings captured when the Settings window opened.
+    /// Restore the theme, colors, and font captured when the Settings window opened.
     @objc func revertAppearanceChanges() {
         let coordinator = SessionCoordinator.shared
-        if !initialThemeSnapshot.isEmpty, coordinator.snapshot.themeName != initialThemeSnapshot {
-            coordinator.setTheme(initialThemeSnapshot)
-        }
-        coordinator.settings = initialSettingsSnapshot
+        initialThemeAndFont.restore(into: &coordinator.settings)
         saveSettings()
+        if !initialThemeName.isEmpty, coordinator.snapshot.themeName != initialThemeName {
+            coordinator.setTheme(initialThemeName, seedColors: false)
+            populateThemePopup(themePopup, selectedThemeName: initialThemeName)
+        }
         coordinator.applySettingsToHosts()
         QuickTerminalController.shared.rebuildFromSettings()
-        PrefixKeymap.shared.rebuildFromSettings()
-        populateThemePopup(themePopup, selectedThemeName: coordinator.snapshot.themeName)
         syncAppearanceControlsFromSettings()
         refreshColorPlaceholders()
     }

@@ -464,10 +464,8 @@ extension SettingsViewController {
                 ("Local plugins", "Review a local plugin before trusting its palette actions.", #selector(openToolPlugins)),
                 ("Remote host", "Add an SSH host using existing credentials.", #selector(openToolRemote)),
                 ("Phone or iPad", "Connection code for the private iOS companion.", #selector(openToolMobile)),
-                ("Diagnostics report",
-                 "Copy a redacted local health report with no scrollback or secrets.",
-                 #selector(copyDiagnosticsReport)),
             ]),
+            diagnosticsGroup(),
             group("Import", [
                 ("tmux layouts", "Preview a layout and save it without acquiring existing PTYs.", #selector(openToolTmux)),
                 ("Settings and keybindings",
@@ -495,7 +493,15 @@ extension SettingsViewController {
     @objc private func openToolHookPolicy() { SessionCoordinator.shared.presentHookPolicy() }
     @objc private func openToolPlugins() { PluginTrustController.review(relativeTo: view.window) }
     @objc private func openToolRemote() { RemoteHostSheet.present() }
-    @objc private func copyDiagnosticsReport() { _ = SessionCoordinator.shared.copyDiagnosticsReport() }
+    private func diagnosticsGroup() -> NSView {
+        let button = HarnessToolPage.button("Copy", target: self, action: #selector(copyDiagnosticsReport))
+        button.setAccessibilityLabel("Copy diagnostics report")
+        return settingsGroup("Support", [
+            settingsRow("Diagnostics report", button,
+                        hint: "Copies versions, counts, and appearance settings with your home folder and secrets masked. No terminal output."),
+        ])
+    }
+    @objc private func copyDiagnosticsReport() { SessionCoordinator.shared.copyDiagnosticsReport() }
     @objc private func openToolMobile() { MobilePairingController.shared.present() }
     @objc private func openToolTmux() { SessionCoordinator.shared.presentTmuxImport() }
     @objc private func openToolSettingsImport() { SettingsImportController.present() }
@@ -695,14 +701,12 @@ extension SettingsViewController {
 
         let lifecycleGroup = settingsGroup("Lifecycle", [
             settingsRow("Remain on exit", advToggle("remain-on-exit"), hint: "Keep a pane on screen after its program exits."),
-            settingsRow("Persist scrollback", advToggle("persist-scrollback"),
-                        hint: "Restore pane output after the daemon restarts."),
             settingsRow("Shell integration", advToggle("shell-integration"),
-                        hint: "Inject prompt, directory, and command tracking into shells."),
+                        hint: "Prompt, directory, and command tracking for shells in new panes."),
             settingsRow("Prefix repeat", hstack([advField("repeat-time", width: Form.numberFieldWidth), unitLabel("ms")], spacing: 6)),
             settingsRow("Hook shell timeout",
                         hstack([advField("hook-shell-timeout", width: Form.numberFieldWidth), unitLabel("seconds")], spacing: 6),
-                        hint: "Maximum runtime for hook if-shell and background run-shell commands."),
+                        hint: "Maximum runtime for hook if-shell and background run-shell commands. 0 = no limit."),
             settingsRow("History limit",
                         hstack([advField("history-limit", width: Form.wideNumberFieldWidth), unitLabel("lines")], spacing: 6),
                         hint: "The session's scrollback. The window's own is in Terminal ▸ Scrolling."),

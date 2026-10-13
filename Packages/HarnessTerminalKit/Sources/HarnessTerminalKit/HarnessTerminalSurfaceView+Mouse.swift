@@ -223,8 +223,8 @@ extension HarnessTerminalSurfaceView {
         // ⌘-click opens an OSC 8 hyperlink or an auto-detected URL.
         // ⌘ overrides mouse reporting, the same way Shift overrides it for selection.
         if event.modifierFlags.contains(.command), let pos = cell(at: event.locationInWindow),
-           let url = linkURL(atRow: pos.row, column: pos.column) {
-            openLink(url)
+           let link = linkRange(atRow: pos.row, column: pos.column)?.link {
+            openLink(link)
             return
         }
         if isMouseReporting(event) {
@@ -264,16 +264,14 @@ extension HarnessTerminalSurfaceView {
         }
     }
 
-    /// The clickable URL at a grid cell (OSC 8 hyperlink first, else an auto-detected URL).
-    private func linkURL(atRow row: Int, column col: Int) -> String? {
-        linkRange(atRow: row, column: col)?.url
-    }
-
     /// The clickable link at a grid cell *and* its column span — an OSC 8 hyperlink (the run of
-    /// adjacent cells sharing its id) first, else an auto-detected URL in the row text. The row is
+    /// adjacent cells sharing its id) first, else a link detected in the row text. The row is
     /// built one character per cell so `column`/the returned range map directly to grid columns.
-    func linkRange(atRow row: Int, column col: Int) -> (url: String, columns: Range<Int>)? {
+    /// OSC 8 targets are always web links: the program chooses their visible text, so they never
+    /// reach the local file opener.
+    func linkRange(atRow row: Int, column col: Int) -> (link: URLDetection.Link, columns: Range<Int>)? {
         testingLinkProbeCount += 1
+        let opensFiles = opensLocalFileLinks
         return emulatorSync { emulator in
             guard row >= 0, row < emulator.rows, col >= 0 else { return nil }
             // One row, not a full viewport snapshot: this runs on every ⌘-hover cell change.
@@ -285,7 +283,7 @@ extension HarnessTerminalSurfaceView {
                 var lo = col, hi = col
                 while lo > 0, cells[lo - 1].hyperlinkID == cell.hyperlinkID { lo -= 1 }
                 while hi + 1 < cells.count, cells[hi + 1].hyperlinkID == cell.hyperlinkID { hi += 1 }
-                return (url, lo ..< (hi + 1))
+                return (.web(url), lo ..< (hi + 1))
             }
             var line = ""
             line.reserveCapacity(cells.count)
@@ -293,99 +291,46 @@ extension HarnessTerminalSurfaceView {
                 guard cell.width != .spacerTail else { line.append(" "); continue }
                 line.unicodeScalars.append(cell.codepoint == 0 ? " " : (Unicode.Scalar(cell.codepoint) ?? " "))
             }
-            return URLDetection.match(in: line, at: col)
+            guard let match = URLDetection.match(in: line, at: col) else { return nil }
+            if case .file = match.link, !opensFiles { return nil }
+            return match
         }
     }
 
-    /// Open a clicked link, restricted to safe schemes so terminal output can't trigger a
-    /// surprising handler (e.g. a custom app scheme) on ⌘-click. Plain `file:` OSC 8 links
-    /// remain blocked; auto-detected `path:line(:col)` tokens use `harness-file://`, which
-    /// validates that the target is an existing local regular file and opens it in the user's
-    /// plain-text editor instead of LaunchServices' default execute handler.
-    private func openLink(_ string: String) {
-        if let target = URLDetection.FileLocationTarget(urlString: string) {
+    /// Open a clicked link. Web links are restricted to safe schemes so terminal output can't
+    /// trigger a surprising handler (e.g. a custom app scheme) on ⌘-click. File references open
+    /// in the user's plain-text editor, never through LaunchServices' default handler, which
+    /// would run `.command` scripts and launch apps.
+    private func openLink(_ link: URLDetection.Link) {
+        switch link {
+        case let .web(string):
+            guard let url = URL(string: string), let scheme = url.scheme?.lowercased(),
+                  ["http", "https", "mailto", "ftp", "ftps"].contains(scheme) else { return }
+            NSWorkspace.shared.open(url)
+        case let .file(path):
             let cwd = emulatorSync { $0.workingDirectory }
-            guard let fileURL = Self.resolveSafeLocalFileURL(target, workingDirectory: cwd),
-                  let editorURL = NSWorkspace.shared.urlForApplication(toOpen: .plainText) else {
-                return
-            }
-            NSWorkspace.shared.open(
-                [fileURL],
-                withApplicationAt: editorURL,
-                configuration: NSWorkspace.OpenConfiguration()
-            )
-            return
+            guard let fileURL = Self.localTextFileURL(path: path, workingDirectory: cwd),
+                  let editorURL = NSWorkspace.shared.urlForApplication(toOpen: .plainText) else { return }
+            NSWorkspace.shared.open([fileURL], withApplicationAt: editorURL, configuration: NSWorkspace.OpenConfiguration())
         }
-        guard let url = URL(string: string), let scheme = url.scheme?.lowercased(),
-              ["http", "https", "mailto", "ftp", "ftps"].contains(scheme) else { return }
-        NSWorkspace.shared.open(url)
     }
 
-    private nonisolated static let blockedExecutableExtensions: Set<String> = [
-        "action", "app", "bin", "command", "csh", "dmg", "exe", "fish", "ksh",
-        "MSI", "msi", "mpkg", "osax", "pkg", "run", "scpt", "scptd",
-        "sh", "terminal", "tool", "workflow", "zsh",
-    ]
-
-    /// Resolves a `FileLocationTarget` to a verified local regular file URL suitable for opening
-    /// in a text editor, or `nil` if the path does not exist, escapes a relative root, or points
-    /// at a directory, bundle, package, or launchable/executable script extension.
-    public nonisolated static func resolveSafeLocalFileURL(
-        _ target: URLDetection.FileLocationTarget,
-        workingDirectory: String?
-    ) -> URL? {
-        let raw = target.path.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !raw.isEmpty, !raw.contains("\0") else { return nil }
-
-        let candidateURL: URL
-        var requiredRootURL: URL?
-        if raw.hasPrefix("~/") {
-            let expanded = (raw as NSString).expandingTildeInPath
-            candidateURL = URL(fileURLWithPath: expanded)
-        } else if raw.hasPrefix("/") {
-            candidateURL = URL(fileURLWithPath: raw)
+    /// The existing regular file `path` names (absolute, `~/`, or relative to `workingDirectory`),
+    /// with symlinks resolved, or nil. Directories and bundles are not regular files.
+    public nonisolated static func localTextFileURL(path: String, workingDirectory: String?) -> URL? {
+        guard !path.isEmpty, !path.contains("\0") else { return nil }
+        let url: URL
+        if path.hasPrefix("~/") {
+            url = URL(fileURLWithPath: (path as NSString).expandingTildeInPath)
+        } else if path.hasPrefix("/") {
+            url = URL(fileURLWithPath: path)
         } else {
-            let components = raw.split(separator: "/", omittingEmptySubsequences: false)
-            if components.contains("..") { return nil }
-            guard let workingDirectory, !workingDirectory.isEmpty else { return nil }
-            let base = Self.directoryPath(fromWorkingDirectory: workingDirectory)
-            guard base.hasPrefix("/") else { return nil }
-            let root = URL(fileURLWithPath: base, isDirectory: true)
-                .standardizedFileURL
-                .resolvingSymlinksInPath()
-            requiredRootURL = root
-            candidateURL = root.appendingPathComponent(raw)
+            guard let workingDirectory, workingDirectory.hasPrefix("/") else { return nil }
+            url = URL(fileURLWithPath: workingDirectory, isDirectory: true).appendingPathComponent(path)
         }
-
-        let resolved = candidateURL.standardizedFileURL.resolvingSymlinksInPath()
-        if let root = requiredRootURL {
-            let rootPrefix = root.path.hasSuffix("/") ? root.path : root.path + "/"
-            guard resolved.path.hasPrefix(rootPrefix) else { return nil }
-        }
-
-        let ext = resolved.pathExtension.lowercased()
-        if blockedExecutableExtensions.contains(ext) {
-            return nil
-        }
-
-        guard let values = try? resolved.resourceValues(
-            forKeys: [.isRegularFileKey, .isDirectoryKey, .isPackageKey, .isApplicationKey]
-        ),
-        values.isRegularFile == true,
-        values.isDirectory != true,
-        values.isPackage != true,
-        values.isApplication != true else {
-            return nil
-        }
-
+        let resolved = url.standardizedFileURL.resolvingSymlinksInPath()
+        guard (try? resolved.resourceValues(forKeys: [.isRegularFileKey]))?.isRegularFile == true else { return nil }
         return resolved
-    }
-
-    private nonisolated static func directoryPath(fromWorkingDirectory raw: String) -> String {
-        if raw.hasPrefix("file://"), let url = URL(string: raw), url.isFileURL {
-            return url.path
-        }
-        return raw
     }
 
     public override func mouseDragged(with event: NSEvent) {

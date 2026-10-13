@@ -82,8 +82,11 @@ final class CraftSliceTests: XCTestCase {
         let daemonControlKeys = Set(DaemonSettingsControls.rows.map(\.key))
         XCTAssertTrue(daemonControlKeys.contains("word-separators"))
         XCTAssertTrue(daemonControlKeys.contains("hook-shell-timeout"))
-        XCTAssertTrue(daemonControlKeys.contains("persist-scrollback"))
         XCTAssertTrue(daemonControlKeys.contains("shell-integration"))
+        XCTAssertFalse(
+            daemonControlKeys.contains("persist-scrollback"),
+            "turning it off deletes saved history; History and privacy asks first"
+        )
         XCTAssertEqual(
             daemonControlKeys.subtracting(["word-separators"]).subtracting(OptionStore.builtinDefaults.keys),
             []
@@ -114,6 +117,31 @@ final class CraftSliceTests: XCTestCase {
         XCTAssertEqual(reloaded.cellWidth, 0.8, accuracy: 0.0001)
         XCTAssertFalse(reloaded.singlePaneHeader)
         XCTAssertEqual(reloaded.chromeTextSize, .large)
+
+        var edited = try XCTUnwrap(JSONSerialization.jsonObject(with: encoded) as? [String: Any])
+        edited["lineHeight"] = 9
+        edited["cellWidth"] = 1.234
+        let handEdited = try XCTUnwrap(HarnessSettings.reload(data: JSONSerialization.data(withJSONObject: edited)))
+        XCTAssertEqual(handEdited.lineHeight, 1.6, accuracy: 0.0001, "a hand-edited file is clamped on load")
+        XCTAssertEqual(handEdited.cellWidth, 1.23, accuracy: 0.0001, "multipliers keep two decimals, as Settings shows them")
+    }
+
+    func testThemeAndFontSnapshotRestoresOnlyThoseFields() {
+        var settings = HarnessSettings(fontSize: 14, lineHeight: 1)
+        let snapshot = ThemeAndFontSnapshot(settings)
+        XCTAssertTrue(snapshot.matches(settings))
+        settings.notificationSoundEnabled.toggle()
+        XCTAssertTrue(snapshot.matches(settings), "settings outside theme and font don't count as changes")
+        settings.fontSize = 18
+        settings.lineHeight = 1.3
+        settings.customBackgroundHex = "#101010"
+        XCTAssertFalse(snapshot.matches(settings))
+        let sound = settings.notificationSoundEnabled
+        snapshot.restore(into: &settings)
+        XCTAssertTrue(snapshot.matches(settings))
+        XCTAssertEqual(settings.fontSize, 14)
+        XCTAssertNil(settings.customBackgroundHex)
+        XCTAssertEqual(settings.notificationSoundEnabled, sound, "Revert leaves other settings alone")
     }
 
     func testDiagnosticsReportRedactsHomeUsernamesAndTokens() {
@@ -126,7 +154,7 @@ final class CraftSliceTests: XCTestCase {
         let report = HarnessDiagnosticsReport(
             osVersion: "macOS 15.4 (/Users/alice/Private/build sk-1234567890abcdef)",
             daemonSocketPath: "/Users/alice/Library/Application Support/Harness/harness.sock",
-            daemonReachable: true,
+            daemonConnected: true,
             sessionCount: 2,
             windowCount: 3,
             paneCount: 5,
@@ -141,6 +169,11 @@ final class CraftSliceTests: XCTestCase {
         XCTAssertTrue(formatted.contains("[REDACTED]"))
         XCTAssertTrue(formatted.contains("appearance.chromeTextSize: large"))
         XCTAssertTrue(formatted.contains("line 1.10x, width 1.00x"))
+        XCTAssertEqual(
+            HarnessDiagnosticsReport.redact("/Users/alice/x and /Users/al/y", homeDirectory: "/Users/al"),
+            "~/x and ~/y",
+            "a shorter home never splits a longer user name"
+        )
     }
 
     func testDaemonSettingsCommandMatchesTheGlobalSetOption() {

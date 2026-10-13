@@ -131,7 +131,10 @@ public final class TerminalThumbnailView: NSView {
         guard width > 0, height > 0 else { return }
         let style = shown.style
         if cellMetrics?.font != style.font {
-            let rasterizer = GlyphRasterizer(fontFamily: style.font.family, size: style.font.size)
+            let rasterizer = GlyphRasterizer(
+                fontFamily: style.font.family, size: style.font.size,
+                lineHeightMultiplier: style.font.lineHeightMultiplier, cellWidthMultiplier: style.font.cellWidthMultiplier
+            )
             cellMetrics = (style.font, rasterizer.metrics())
         }
         guard let metrics = cellMetrics?.metrics else { return }
@@ -147,6 +150,7 @@ public final class TerminalThumbnailView: NSView {
                 fallbackFamilies: style.font.fallbackFamilies, features: style.font.features,
                 scale: scale, atlasSize: 512, imageCacheBytes: Self.imageCacheBytes,
                 fontThicken: style.font.thicken, fontThickenStrength: style.font.thickenStrength,
+                lineHeightMultiplier: style.font.lineHeightMultiplier, cellWidthMultiplier: style.font.cellWidthMultiplier,
                 colorSpace: CGColorSpace(name: style.colorSpaceName as CFString)!
             )
             rendererFont = style.font

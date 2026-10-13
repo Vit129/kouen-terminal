@@ -57,40 +57,40 @@ final class WideWrapCopyTests: XCTestCase {
         XCTAssertEqual(emulator.captureLines(joinWrapped: true, history: false).first, "abc 漢")
     }
 
-    func testSafeLocalFileLocationResolutionRejectsTraversalBundlesAndScripts() throws {
+    func testDeferralFlagClearedByEraseAndKeptThroughRestore() throws {
+        // "abc" + 漢 in 4 columns defers 漢, leaving a gap; erasing that cell makes it content.
+        assertCopyMatchesCapture("abc漢\u{1b}[1;4H\u{1b}[1X", expected: "abc 漢")
+
+        let deferred = TerminalEmulator(cols: 4, rows: 3)
+        deferred.feed("abc漢")
+        let restored = TerminalEmulator(cols: 4, rows: 3)
+        try restored.restore(deferred.checkpoint())
+        XCTAssertEqual(restored.captureLines(joinWrapped: true, history: false).first, "abc漢")
+        restored.resize(cols: 8, rows: 3)
+        XCTAssertEqual(restored.captureLines(joinWrapped: true, history: false).first, "abc漢")
+    }
+
+    func testLocalTextFileResolution() throws {
         let root = FileManager.default.temporaryDirectory
             .appendingPathComponent("harness-file-loc-\(UUID().uuidString)", isDirectory: true)
-        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        let sources = root.appendingPathComponent("Sources", isDirectory: true)
+        try FileManager.default.createDirectory(at: sources, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: root) }
+        let file = sources.appendingPathComponent("Example.swift")
+        try "let x = 1\n".write(to: file, atomically: true, encoding: .utf8)
+        try FileManager.default.createDirectory(at: root.appendingPathComponent("Fake.app"), withIntermediateDirectories: true)
+        let expected = file.standardizedFileURL.resolvingSymlinksInPath().path
 
-        let srcDir = root.appendingPathComponent("Sources", isDirectory: true)
-        try FileManager.default.createDirectory(at: srcDir, withIntermediateDirectories: true)
-        let swiftFile = srcDir.appendingPathComponent("Example.swift")
-        try "let x = 1\n".write(to: swiftFile, atomically: true, encoding: .utf8)
-
-        let scriptFile = root.appendingPathComponent("run.command")
-        try "#!/bin/sh\necho hi\n".write(to: scriptFile, atomically: true, encoding: .utf8)
-
-        let appBundle = root.appendingPathComponent("Fake.app", isDirectory: true)
-        try FileManager.default.createDirectory(at: appBundle, withIntermediateDirectories: true)
-
-        let validRelative = URLDetection.FileLocationTarget(path: "Sources/Example.swift", line: 1, column: 5)
-        let resolved = try XCTUnwrap(
-            HarnessTerminalSurfaceView.resolveSafeLocalFileURL(validRelative, workingDirectory: root.path)
-        )
-        XCTAssertEqual(resolved.path, swiftFile.standardizedFileURL.resolvingSymlinksInPath().path)
-
-        let traversal = URLDetection.FileLocationTarget(path: "../outside.txt", line: 1)
-        XCTAssertNil(HarnessTerminalSurfaceView.resolveSafeLocalFileURL(traversal, workingDirectory: srcDir.path))
-
-        let commandTarget = URLDetection.FileLocationTarget(path: "run.command", line: 1)
-        XCTAssertNil(HarnessTerminalSurfaceView.resolveSafeLocalFileURL(commandTarget, workingDirectory: root.path))
-
-        let bundleTarget = URLDetection.FileLocationTarget(path: "Fake.app", line: 1)
-        XCTAssertNil(HarnessTerminalSurfaceView.resolveSafeLocalFileURL(bundleTarget, workingDirectory: root.path))
-
-        let dirTarget = URLDetection.FileLocationTarget(path: "Sources", line: 1)
-        XCTAssertNil(HarnessTerminalSurfaceView.resolveSafeLocalFileURL(dirTarget, workingDirectory: root.path))
+        func resolve(_ path: String, in directory: URL? = root) -> String? {
+            HarnessTerminalSurfaceView.localTextFileURL(path: path, workingDirectory: directory?.path)?.path
+        }
+        XCTAssertEqual(resolve("Sources/Example.swift"), expected)
+        XCTAssertEqual(resolve("../Sources/Example.swift", in: sources), expected, "monorepo tools print parent paths")
+        XCTAssertEqual(resolve(file.path, in: nil), expected)
+        XCTAssertNil(resolve("Sources/Example.swift", in: nil), "a relative path needs a working directory")
+        XCTAssertNil(resolve("Sources"), "directories are not files")
+        XCTAssertNil(resolve("Fake.app"), "bundles are not files")
+        XCTAssertNil(resolve("Missing.swift"))
     }
 
     func testLineHeightAndCellWidthMultipliersScaleRasterizerMetrics() {
@@ -102,7 +102,11 @@ final class WideWrapCopyTests: XCTestCase {
             lineHeightMultiplier: 1.25,
             cellWidthMultiplier: 1.15
         )
-        XCTAssertGreaterThan(scaled.metrics().height, base.metrics().height)
-        XCTAssertGreaterThan(scaled.metrics().width, base.metrics().width)
+        let natural = base.metrics(), taller = scaled.metrics()
+        XCTAssertGreaterThan(taller.height, natural.height)
+        XCTAssertGreaterThan(taller.width, natural.width)
+        XCTAssertEqual(natural.linePadding, 0)
+        XCTAssertEqual(taller.linePadding, (taller.height - natural.height) / 2)
+        XCTAssertEqual(taller.ascent, natural.ascent + taller.linePadding, accuracy: 0.001, "glyphs stay centered")
     }
 }

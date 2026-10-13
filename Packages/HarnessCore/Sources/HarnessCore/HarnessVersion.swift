@@ -28,7 +28,7 @@ public struct HarnessDiagnosticsReport: Equatable, Sendable {
     public let protocolLevel: Int
     public let osVersion: String
     public let daemonSocketRedactedPath: String
-    public let daemonReachable: Bool
+    public let daemonConnected: Bool
     public let sessionCount: Int
     public let windowCount: Int
     public let paneCount: Int
@@ -43,7 +43,7 @@ public struct HarnessDiagnosticsReport: Equatable, Sendable {
         protocolLevel: Int = HarnessVersion.protocolLevel,
         osVersion: String = ProcessInfo.processInfo.operatingSystemVersionString,
         daemonSocketPath: String = HarnessPaths.socketURL.path,
-        daemonReachable: Bool,
+        daemonConnected: Bool,
         sessionCount: Int,
         windowCount: Int,
         paneCount: Int,
@@ -56,7 +56,7 @@ public struct HarnessDiagnosticsReport: Equatable, Sendable {
         self.protocolLevel = protocolLevel
         self.osVersion = Self.redact(osVersion, homeDirectory: homeDirectory)
         self.daemonSocketRedactedPath = Self.redact(daemonSocketPath, homeDirectory: homeDirectory)
-        self.daemonReachable = daemonReachable
+        self.daemonConnected = daemonConnected
         self.sessionCount = max(0, sessionCount)
         self.windowCount = max(0, windowCount)
         self.paneCount = max(0, paneCount)
@@ -71,20 +71,19 @@ public struct HarnessDiagnosticsReport: Equatable, Sendable {
 
     public static func redact(_ input: String, homeDirectory: String = NSHomeDirectory()) -> String {
         var result = input
-        let trimmedHome = homeDirectory.trimmingCharacters(in: .whitespacesAndNewlines)
-        if !trimmedHome.isEmpty, trimmedHome != "/" {
-            result = result.replacingOccurrences(of: trimmedHome, with: "~")
+        let home = homeDirectory.hasSuffix("/") ? String(homeDirectory.dropLast()) : homeDirectory
+        // Whole path components only: a home of `/Users/al` must not turn `/Users/alice` into `~ice`.
+        if !home.isEmpty {
+            result = result.replacingOccurrences(
+                of: NSRegularExpression.escapedPattern(for: home) + #"(?=/|$|\s)"#,
+                with: "~",
+                options: .regularExpression
+            )
         }
-        result = result.replacingOccurrences(
-            of: #"/(?:Users|home)/[^/\s]+"#,
-            with: "~",
-            options: .regularExpression
-        )
-        result = result.replacingOccurrences(
-            of: #"(?:sk-[A-Za-z0-9_-]{12,}|gh[pousr]_[A-Za-z0-9]{12,}|Bearer\s+[A-Za-z0-9._-]+)"#,
-            with: "[REDACTED]",
-            options: .regularExpression
-        )
+        result = result.replacingOccurrences(of: #"/(?:Users|home)/[^/\s]+"#, with: "~", options: .regularExpression)
+        for (_, pattern) in SecretPatterns.all {
+            result = result.replacingOccurrences(of: pattern, with: "[REDACTED]", options: .regularExpression)
+        }
         return result
     }
 
@@ -95,7 +94,7 @@ public struct HarnessDiagnosticsReport: Equatable, Sendable {
             "protocol: \(protocolLevel)",
             "os: \(osVersion)",
             "daemon.socket: \(daemonSocketRedactedPath)",
-            "daemon.reachable: \(daemonReachable ? "true" : "false")",
+            "daemon.connected: \(daemonConnected ? "true" : "false")",
             "workspace.sessions: \(sessionCount)",
             "workspace.windows: \(windowCount)",
             "workspace.panes: \(paneCount)",

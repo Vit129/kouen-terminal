@@ -128,22 +128,16 @@ final class SettingsFormRow: NSView {
     override func layout() {
         super.layout()
         let room = max(80, min(Form.hintMaxWidth, control.frame.minX - Form.labelGap))
-        guard abs(hintLabel.preferredMaxLayoutWidth - room) > 0.5
-            || abs(titleLabel.preferredMaxLayoutWidth - room) > 0.5 else { return }
+        guard abs(hintLabel.preferredMaxLayoutWidth - room) > 0.5 else { return }
         hintLabel.preferredMaxLayoutWidth = room
         titleLabel.preferredMaxLayoutWidth = room
-        titleLabel.invalidateIntrinsicContentSize()
-        hintLabel.invalidateIntrinsicContentSize()
         super.layout()
     }
 
     func applyChrome() {
         let delta = HarnessDesign.Typography.delta
-        titleLabel.font = .systemFont(ofSize: 13 + delta)
-        hintLabel.font = .systemFont(ofSize: 11.5 + delta)
-        titleLabel.invalidateIntrinsicContentSize()
-        hintLabel.invalidateIntrinsicContentSize()
-        needsLayout = true
+        HarnessDesign.applyChromeFont(.systemFont(ofSize: 13 + delta), to: [titleLabel])
+        HarnessDesign.applyChromeFont(.systemFont(ofSize: 11.5 + delta), to: [hintLabel])
     }
 }
 
@@ -275,7 +269,7 @@ final class SettingsSidebarButton: NSControl {
 
     func applyChrome() {
         let c = HarnessChrome.current
-        label.font = .systemFont(ofSize: 13 + HarnessDesign.Typography.delta, weight: isSelected ? .semibold : .medium)
+        HarnessDesign.applyChromeFont(.systemFont(ofSize: 13 + HarnessDesign.Typography.delta), to: [label])
         layer?.borderWidth = isFocused ? 2 : 0
         layer?.borderColor = c.focusRing.withAlphaComponent(0.85).cgColor
         if isSelected {
@@ -294,51 +288,48 @@ final class SettingsSidebarButton: NSControl {
     }
 }
 
-/// Live theme and typography specimen card shown in Settings.
+/// Live theme and typography specimen card shown in Settings. Text draws at the pane's real
+/// font, size, and cell metrics, clipped to the card.
 @MainActor
 final class TerminalSpecimenPreviewView: NSView {
-    private(set) var resolvedAppearance: TerminalHostResolvedAppearance?
-    private(set) var themeName: String = ""
-    private(set) var fontFamily: String = "Menlo"
-    private(set) var fontSize: CGFloat = 13
-    private(set) var lineHeightMultiplier: CGFloat = 1.0
-    private(set) var cellWidthMultiplier: CGFloat = 1.0
-    private(set) var ligaturesEnabled: Bool = true
-    let sampleLines: [String] = [
+    private var resolvedAppearance: TerminalHostResolvedAppearance?
+    private var font = NSFont.monospacedSystemFont(ofSize: 13, weight: .regular)
+    private var cell = NSSize(width: 8, height: 16)
+    private var linePadding: CGFloat = 0
+    private var ligaturesEnabled = true
+    private lazy var heightConstraint = heightAnchor.constraint(equalToConstant: 88)
+    private static let sampleLines = [
         "~/project main ❯ swift test",
         "if count != 0 => ok -> [✓]",
         "UTF-8 · 日本語 · 한글 · 🚀",
     ]
+    private static let inset: CGFloat = 10
+    private static let chipsHeight: CGFloat = 20
 
     override var isFlipped: Bool { true }
 
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
         translatesAutoresizingMaskIntoConstraints = false
+        clipsToBounds = true
         setAccessibilityElement(true)
         setAccessibilityRole(.group)
         setAccessibilityLabel("Terminal theme and font preview")
-        NSLayoutConstraint.activate([
-            widthAnchor.constraint(equalToConstant: Form.wideControlWidth),
-            heightAnchor.constraint(equalToConstant: 88),
-        ])
+        NSLayoutConstraint.activate([widthAnchor.constraint(equalToConstant: Form.wideControlWidth), heightConstraint])
     }
 
     @available(*, unavailable)
     required init?(coder: NSCoder) { fatalError() }
 
     func update(themeName: String, settings: HarnessSettings, systemAppearance: HarnessSystemAppearance) {
-        self.themeName = themeName
-        self.resolvedAppearance = TerminalHostView.resolvedNativeAppearance(
+        resolvedAppearance = TerminalHostView.resolvedNativeAppearance(
             themeName: themeName,
             settings: settings,
             systemAppearance: systemAppearance
         )
-        self.fontFamily = settings.fontFamily
-        self.fontSize = CGFloat(HarnessSettings.clampedFontSize(settings.fontSize))
-        self.lineHeightMultiplier = CGFloat(HarnessSettings.clampedLineHeight(settings.lineHeight))
-        self.cellWidthMultiplier = CGFloat(HarnessSettings.clampedCellWidth(settings.cellWidth))
-        self.ligaturesEnabled = settings.ligatures
+        (font, cell, linePadding) = TerminalHostView.specimenFont(settings: settings)
+        ligaturesEnabled = settings.ligatures
+        heightConstraint.constant = Self.inset * 2 + cell.height * CGFloat(Self.sampleLines.count) + Self.chipsHeight
         setAccessibilityValue("\(themeName), \(settings.fontFamily) \(Int(settings.fontSize.rounded()))pt")
         needsDisplay = true
     }
@@ -356,30 +347,28 @@ final class TerminalSpecimenPreviewView: NSView {
         path.lineWidth = 1
         path.stroke()
 
-        let previewSize = min(13, max(10, fontSize * 0.78))
-        let font = NSFont(name: fontFamily, size: previewSize)
-            ?? .monospacedSystemFont(ofSize: previewSize, weight: .regular)
-        let stepY = max(14, min(20, (previewSize + 3) * lineHeightMultiplier))
-        let kern = (cellWidthMultiplier - 1.0) * 4.0
+        // Kerning turns the font's natural advance into the pane's cell width.
+        let advance = ("M" as NSString).size(withAttributes: [.font: font]).width
         let baseAttrs: [NSAttributedString.Key: Any] = [
             .font: font,
             .foregroundColor: fg,
             .ligature: ligaturesEnabled ? 1 : 0,
-            .kern: kern,
+            .kern: cell.width - advance,
         ]
         let accentGreen = paletteColor(2, in: appearance, fallback: fg)
         let accentBlue = paletteColor(4, in: appearance, fallback: fg)
-        for (idx, line) in sampleLines.enumerated() {
+        for (idx, line) in Self.sampleLines.enumerated() {
             let attr = NSMutableAttributedString(string: line, attributes: baseAttrs)
             if idx == 0, let range = line.range(of: "~/project main") {
                 attr.addAttribute(.foregroundColor, value: accentGreen, range: NSRange(range, in: line))
             } else if idx == 1 {
                 attr.addAttribute(.foregroundColor, value: accentBlue, range: NSRange(location: 0, length: attr.length))
             }
-            attr.draw(at: NSPoint(x: 10, y: 8 + CGFloat(idx) * stepY))
+            attr.draw(at: NSPoint(x: Self.inset, y: Self.inset + CGFloat(idx) * cell.height + linePadding))
         }
         cursor.setFill()
-        NSBezierPath(rect: NSRect(x: rect.maxX - 16, y: 10, width: 6, height: previewSize)).fill()
+        let cursorColumn = CGFloat(Self.sampleLines[0].count + 1)
+        NSBezierPath(rect: NSRect(x: Self.inset + cursorColumn * cell.width, y: Self.inset, width: cell.width, height: cell.height)).fill()
 
         let chipY = rect.maxY - 14
         let chipW = (rect.width - 20) / 16

@@ -313,7 +313,7 @@ enum CommandPaletteController {
                 shortcut: "",
                 section: .actions
             ) {
-                _ = coordinator.copyDiagnosticsReport()
+                coordinator.copyDiagnosticsReport()
             },
         ])
 

@@ -114,13 +114,10 @@ enum HarnessDesign {
     }
 
     /// Semantic fonts so sizes/weights live in one place.
+    @MainActor
     enum Typography {
-        static var delta: CGFloat {
-            guard Thread.isMainThread else { return 0 }
-            return MainActor.assumeIsolated {
-                CGFloat(SessionCoordinator.shared.settings.chromeTextSize.pointDelta)
-            }
-        }
+        /// Points added by the Interface text size setting.
+        static var delta: CGFloat { CGFloat(SessionCoordinator.shared.settings.chromeTextSize.pointDelta) }
         /// The one font every primary chrome label uses — workspace name, search
         /// field, session titles, tab titles, switcher rows, the Settings row. Keeping
         /// these identical (size + weight) is what makes the sidebar and tab strip read
@@ -241,6 +238,13 @@ enum HarnessDesign {
         field.isSelectable = false
         field.maximumNumberOfLines = 1
         field.backgroundColor = .clear
+    }
+
+    /// Chrome refreshes run on hover; assigning a font invalidates the label's intrinsic size.
+    static func applyChromeFont(_ font: NSFont, to controls: [NSControl]) {
+        for control in controls where control.font != font {
+            control.font = font
+        }
     }
 
     static func applyChromeLabelAppearance(_ fields: [NSTextField], isDark: Bool) {

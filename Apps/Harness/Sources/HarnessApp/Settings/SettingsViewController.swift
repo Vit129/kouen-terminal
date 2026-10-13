@@ -14,8 +14,8 @@ final class SettingsViewController: NSViewController, NSFontChanging {
     let systemDarkThemePopup = HarnessSelect(frame: .zero)
     let specimenPreview = TerminalSpecimenPreviewView(frame: .zero)
     let revertAppearanceButton = NSButton(title: "Revert", target: nil, action: nil)
-    private(set) var initialSettingsSnapshot = HarnessSettings()
-    private(set) var initialThemeSnapshot = ""
+    private(set) var initialThemeAndFont = ThemeAndFontSnapshot(HarnessSettings())
+    private(set) var initialThemeName = ""
     var appearanceModeRow: SettingsFormRow?
     var themeRow: SettingsFormRow?
     var lightThemeRow: SettingsFormRow?
@@ -141,6 +141,8 @@ final class SettingsViewController: NSViewController, NSFontChanging {
     /// stored individually).
     private var groupSurfaces: [NSView] = []
     private var groupDividers: [NSView] = []
+    private var groupHeadings: [NSTextField] = []
+    private var groupHeadingFont: NSFont { .systemFont(ofSize: 13 + HarnessDesign.Typography.delta, weight: .semibold) }
     /// Text-link buttons (accent baked into the attributed title) re-tinted on theme change.
     var linkButtons: [NSButton] = []
     var paletteWells: [HarnessSwatchWell] = []
@@ -202,8 +204,8 @@ final class SettingsViewController: NSViewController, NSFontChanging {
     private func configureControls() {
         let coordinator = SessionCoordinator.shared
         let settings = coordinator.settings
-        initialSettingsSnapshot = settings
-        initialThemeSnapshot = coordinator.snapshot.themeName
+        initialThemeAndFont = ThemeAndFontSnapshot(settings)
+        initialThemeName = coordinator.snapshot.themeName
 
         revertAppearanceButton.bezelStyle = .rounded
         revertAppearanceButton.controlSize = .small
@@ -531,6 +533,7 @@ final class SettingsViewController: NSViewController, NSFontChanging {
             surface.layer?.borderColor = c.border.cgColor
         }
         for divider in groupDividers { divider.layer?.backgroundColor = c.border.cgColor }
+        HarnessDesign.applyChromeFont(groupHeadingFont, to: groupHeadings)
         // Re-skin every themed control. Cached pages are walked directly since only the
         // visible page is in the view tree.
         reskinControls(in: view)
@@ -541,6 +544,7 @@ final class SettingsViewController: NSViewController, NSFontChanging {
         // read from the *theme*, so without a refresh they keep showing the old appearance's
         // palette until the window reopens.
         refreshColorPlaceholders()
+        refreshSpecimenPreview()
     }
 
     private var lastChromeSignature: String?
@@ -852,9 +856,10 @@ final class SettingsViewController: NSViewController, NSFontChanging {
         let group = SettingsGroupView()
         if title != nil || accessory != nil {
             let label = NSTextField(labelWithString: title ?? "")
-            label.font = .systemFont(ofSize: 13, weight: .semibold)
+            label.font = groupHeadingFont
             label.textColor = .labelColor
             label.setAccessibilityRole(.staticText)
+            groupHeadings.append(label)
             let header = hstack(accessory.map { [label, spacer(), $0] } ?? [label], spacing: 8)
             group.addArrangedSubview(header)
             group.setCustomSpacing(HarnessDesign.Spacing.md, after: header)

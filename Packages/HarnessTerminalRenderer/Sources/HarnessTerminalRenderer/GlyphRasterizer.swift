@@ -7,18 +7,23 @@ import Foundation
 public struct CellMetrics: Equatable, Sendable {
     /// Advance width of a monospace cell.
     public let width: CGFloat
-    /// Line height (ascent + descent + leading), rounded up.
+    /// Line height (ascent + descent + leading, rounded up), times the line-height multiplier.
     public let height: CGFloat
+    /// Cell top to baseline: the font's ascent plus `linePadding`.
     public let ascent: CGFloat
     public let descent: CGFloat
     public let leading: CGFloat
+    /// Half the height the line-height multiplier adds (negative when it removes height), so
+    /// glyphs stay centered in the cell. Zero at 1.0.
+    public let linePadding: CGFloat
 
-    public init(width: CGFloat, height: CGFloat, ascent: CGFloat, descent: CGFloat, leading: CGFloat) {
+    public init(width: CGFloat, height: CGFloat, ascent: CGFloat, descent: CGFloat, leading: CGFloat, linePadding: CGFloat = 0) {
         self.width = width
         self.height = height
         self.ascent = ascent
         self.descent = descent
         self.leading = leading
+        self.linePadding = linePadding
     }
 }
 
@@ -158,8 +163,9 @@ public final class GlyphRasterizer {
         self.fontResolution = resolvedFont
         self.fontThicken = fontThicken
         self.fontThickenStrength = max(0, min(255, fontThickenStrength))
-        self.lineHeightMultiplier = lineHeightMultiplier.isFinite ? min(1.6, max(0.8, lineHeightMultiplier)) : 1.0
-        self.cellWidthMultiplier = cellWidthMultiplier.isFinite ? min(1.4, max(0.8, cellWidthMultiplier)) : 1.0
+        // Callers clamp to the settings ranges; this only rejects values no font can use.
+        self.lineHeightMultiplier = lineHeightMultiplier.isFinite && lineHeightMultiplier > 0 ? lineHeightMultiplier : 1
+        self.cellWidthMultiplier = cellWidthMultiplier.isFinite && cellWidthMultiplier > 0 ? cellWidthMultiplier : 1
         let base = TerminalFontResolver.makeFont(from: resolvedFont)
         regular = base
         bold = Self.applyTraits(base, size: resolvedFont.pointSize, add: .traitBold)
@@ -231,13 +237,14 @@ public final class GlyphRasterizer {
         let baseHeight = (ascent + descent + leading).rounded(.up)
         let width = cellWidthMultiplier == 1 ? baseWidth : max(1, baseWidth * cellWidthMultiplier)
         let height = lineHeightMultiplier == 1 ? baseHeight : max(1, (baseHeight * lineHeightMultiplier).rounded(.up))
-        let adjustedAscent = lineHeightMultiplier == 1 ? ascent : max(0, ascent + (height - baseHeight) * 0.5)
+        let padding = (height - baseHeight) / 2
         return CellMetrics(
             width: width,
             height: height,
-            ascent: adjustedAscent,
+            ascent: max(0, ascent + padding),
             descent: descent,
-            leading: leading
+            leading: leading,
+            linePadding: padding
         )
     }
 

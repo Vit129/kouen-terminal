@@ -1101,16 +1101,20 @@ public struct HarnessSettings: Codable, Sendable, Equatable {
     public static let lineHeightRange: ClosedRange<Float> = 0.8 ... 1.6
     public static let cellWidthRange: ClosedRange<Float> = 0.8 ... 1.4
 
-    /// Line-height multiplier bounds (0.8…1.6; 1.0 = natural font metrics).
+    /// Line-height multiplier bounds (0.8…1.6; 1.0 = natural font metrics), in hundredths.
     public static func clampedLineHeight(_ value: Float) -> Float {
-        guard value.isFinite else { return 1 }
-        return max(lineHeightRange.lowerBound, min(lineHeightRange.upperBound, value))
+        clampedMultiplier(value, to: lineHeightRange)
     }
 
-    /// Cell-width multiplier bounds (0.8…1.4; 1.0 = natural advance width).
+    /// Cell-width multiplier bounds (0.8…1.4; 1.0 = natural advance width), in hundredths.
     public static func clampedCellWidth(_ value: Float) -> Float {
+        clampedMultiplier(value, to: cellWidthRange)
+    }
+
+    /// Hundredths, so Settings' two-decimal field always shows the value the panes use.
+    private static func clampedMultiplier(_ value: Float, to range: ClosedRange<Float>) -> Float {
         guard value.isFinite else { return 1 }
-        return max(cellWidthRange.lowerBound, min(cellWidthRange.upperBound, value))
+        return (max(range.lowerBound, min(range.upperBound, value)) * 100).rounded() / 100
     }
 
     /// Window padding (points) is never negative. The renderer already neutralizes negatives, so

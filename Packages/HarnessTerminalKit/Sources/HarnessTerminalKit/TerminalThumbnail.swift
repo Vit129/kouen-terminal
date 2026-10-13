@@ -15,6 +15,8 @@ public struct TerminalThumbnailStyle: Sendable {
         var thickenStrength: Int
         var fallbackFamilies: [String] = []
         var features: [String: Int] = [:]
+        var lineHeightMultiplier: CGFloat = 1
+        var cellWidthMultiplier: CGFloat = 1
     }
 
     /// Builds frames in the pane's colors; the flag is reverse video (DECSCNM).

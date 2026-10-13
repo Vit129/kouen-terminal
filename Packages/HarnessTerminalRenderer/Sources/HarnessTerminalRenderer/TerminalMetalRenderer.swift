@@ -108,6 +108,8 @@ public final class TerminalMetalRenderer {
     /// and an animation's frames together.
     public static let defaultImageCacheBytes = 2 * ImageLimits.maxBytesPerScreen
     private let ascentPixels: Int
+    /// `CellMetrics.linePadding` in pixels: decorations follow the font, not the padded cell.
+    private let linePaddingPixels: Float
     /// The render-target pixel format both pipelines are built for.
     public static let pixelFormat: MTLPixelFormat = .rgba8Unorm
 
@@ -241,6 +243,7 @@ public final class TerminalMetalRenderer {
         self.cellPixelWidth = max(1, Int((metrics.width * scale).rounded()))
         self.cellPixelHeight = max(1, Int((metrics.height * scale).rounded()))
         self.ascentPixels = Int((metrics.ascent * scale).rounded())
+        self.linePaddingPixels = Float(metrics.linePadding * scale)
 
         guard let pipelines = Self.pipelines(for: device) else { return nil }
         bgPipeline = pipelines.bg
@@ -451,9 +454,11 @@ public final class TerminalMetalRenderer {
         // Decoration geometry (px): line thickness, underline baseline offset, etc. Snap to
         // whole device pixels so solid underline/strike/overline render as sharp 1–2px lines
         // instead of being AA-smeared across a half-pixel (the fuzzy-underline artifact).
-        let thickness = max(1, (Float(cellPixelHeight) / 16).rounded())
-        let underlineY = min(cellH - thickness, Float(ascentPixels) + max(1, cellH * 0.08)).rounded()
-        let strikeY = (Float(ascentPixels) * 0.65).rounded()
+        let fontH = cellH - 2 * linePaddingPixels
+        let fontAscent = Float(ascentPixels) - linePaddingPixels
+        let thickness = max(1, (fontH / 16).rounded())
+        let underlineY = min(cellH - thickness, Float(ascentPixels) + max(1, fontH * 0.08)).rounded()
+        let strikeY = (linePaddingPixels + fontAscent * 0.65).rounded()
         let overlineY = thickness
 
         let buildInstancesStart = DispatchTime.now().uptimeNanoseconds

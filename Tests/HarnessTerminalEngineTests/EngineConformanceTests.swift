@@ -287,19 +287,25 @@ final class EngineConformanceTests: XCTestCase {
         XCTAssertNil(URLDetection.url(in: line, at: 0), "the leading 'see' is not a URL")
     }
 
-    func testFileLocationDetectionAndRoundTrip() throws {
+    func testFileLocationDetection() throws {
+        func link(_ text: String, at needle: String) -> (link: URLDetection.Link, columns: Range<Int>)? {
+            let start = text.distance(from: text.startIndex, to: text.range(of: needle)!.lowerBound)
+            return URLDetection.match(in: text, at: start + 1)
+        }
         let diag = "error: Sources/HarnessApp/Main.swift:42:13: expected expression"
-        let start = diag.distance(from: diag.startIndex, to: diag.range(of: "Sources")!.lowerBound)
-        let match = try XCTUnwrap(URLDetection.fileLocation(in: diag, at: start + 5))
-        XCTAssertEqual(match.target, URLDetection.FileLocationTarget(
-            path: "Sources/HarnessApp/Main.swift",
-            line: 42,
-            column: 13
-        ))
-        let roundTrip = try XCTUnwrap(URLDetection.FileLocationTarget(urlString: match.target.urlString))
-        XCTAssertEqual(roundTrip, match.target)
-        XCTAssertEqual(URLDetection.url(in: diag, at: start + 5), match.target.urlString)
-        XCTAssertNil(URLDetection.fileLocation(in: "timestamp 12:34:56 ok", at: 12))
+        let swift = try XCTUnwrap(link(diag, at: "Sources"))
+        XCTAssertEqual(swift.link, .file(path: "Sources/HarnessApp/Main.swift"))
+        XCTAssertEqual(swift.columns, 7 ..< 42, "the span covers the line and column, not the trailing colon")
+        XCTAssertNil(URLDetection.url(in: diag, at: 10), "a file reference is not a web URL")
+
+        // The data detector reads these as web domains (`http://main.rs:10`).
+        XCTAssertEqual(link("  --> src/main.rs:10:5", at: "src")?.link, .file(path: "src/main.rs"))
+        XCTAssertEqual(link("at lib.rs:7", at: "lib")?.link, .file(path: "lib.rs"))
+        XCTAssertEqual(link("x.pl:9 died", at: "x.pl")?.link, .file(path: "x.pl"))
+
+        XCTAssertEqual(link("see https://example.com:8080/x", at: "https")?.link, .web("https://example.com:8080/x"))
+        XCTAssertNil(link("Listening on 127.0.0.1:8080", at: "127"), "addresses are not files")
+        XCTAssertNil(link("timestamp 12:34:56 ok", at: "12"))
     }
 
     func testSynchronizedOutputModeAndDECRQM() {

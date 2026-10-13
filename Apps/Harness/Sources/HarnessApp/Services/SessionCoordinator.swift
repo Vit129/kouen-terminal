@@ -908,7 +908,7 @@ final class SessionCoordinator: NSObject {
         let tabs = sessions.flatMap(\.tabs)
         let panes = tabs.flatMap { $0.rootPane.allLeaves() }
         return HarnessDiagnosticsReport(
-            daemonReachable: FileManager.default.fileExists(atPath: HarnessPaths.socketURL.path),
+            daemonConnected: localServiceReady,
             sessionCount: sessions.count,
             windowCount: tabs.count,
             paneCount: panes.count,
@@ -917,12 +917,10 @@ final class SessionCoordinator: NSObject {
         )
     }
 
-    @discardableResult
-    func copyDiagnosticsReport() -> String {
-        let text = diagnosticsReport().formatted()
+    func copyDiagnosticsReport() {
         NSPasteboard.general.clearContents()
-        NSPasteboard.general.setString(text, forType: .string)
-        return text
+        NSPasteboard.general.setString(diagnosticsReport().formatted(), forType: .string)
+        DisplayMessage.show("Diagnostics report copied")
     }
 }
 

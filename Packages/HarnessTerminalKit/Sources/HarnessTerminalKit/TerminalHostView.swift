@@ -91,6 +91,23 @@ public final class TerminalHostView: NSView {
                       height: (CGFloat(max(1, rows)) * height + 2 * padY) / scale)
     }
 
+    /// The font a pane resolves for `settings` and its cell in points, for drawing a specimen
+    /// outside a pane. `linePadding` is the space line height adds above the glyphs.
+    public static func specimenFont(settings: HarnessSettings) -> (font: NSFont, cell: NSSize, linePadding: CGFloat) {
+        let size = CGFloat(HarnessSettings.clampedFontSize(settings.fontSize))
+        let rasterizer = GlyphRasterizer(
+            fontFamily: settings.fontFamily,
+            size: size,
+            lineHeightMultiplier: CGFloat(settings.lineHeight),
+            cellWidthMultiplier: CGFloat(settings.cellWidth)
+        )
+        let metrics = rasterizer.metrics()
+        let family = rasterizer.fontResolution.effectiveFamily
+        let font = NSFontManager.shared.font(withFamily: family, traits: [], weight: 5, size: size)
+            ?? .monospacedSystemFont(ofSize: size, weight: .regular)
+        return (font, NSSize(width: metrics.width, height: metrics.height), metrics.linePadding)
+    }
+
     public let surfaceID: SurfaceID
     public weak var hostDelegate: TerminalHostDelegate?
 
@@ -312,6 +329,7 @@ public final class TerminalHostView: NSView {
             // The shell is on another Mac: a pasted image or file goes there first, and its
             // Kitty graphics can't name files on this one.
             nativeView.setReadsLocalGraphicsFiles(false)
+            nativeView.opensLocalFileLinks = false
             let client = daemonClient
             let surface = surfaceID
             nativeView.uploadForPaste = { [weak self] data, name, done in

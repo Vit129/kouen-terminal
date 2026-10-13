@@ -1,5 +1,17 @@
 import Foundation
 
+/// Credential shapes masked before terminal text leaves the machine: recordings and diagnostics.
+public enum SecretPatterns {
+    public static let all: [(reason: String, pattern: String)] = [
+        ("Provider or service key",
+         #"(?:sk-(?:proj-|ant-|or-v1-)?[A-Za-z0-9_-]{16,256}|gh[pousr]_[A-Za-z0-9]{20,256}"#
+             + #"|AIza[A-Za-z0-9_-]{20,128}|AKIA[0-9A-Z]{16})"#),
+        ("Named credential assignment",
+         #"(?i)(?:api[_-]?key|password|passwd|secret|token)[ \t]{0,32}[:=][ \t]{0,32}[\"']?[^\s\"'\x1b]{4,256}"#),
+        ("Private key block", #"-----BEGIN (?:[A-Z ]{0,24})PRIVATE KEY-----[\s\S]{1,65536}?-----END (?:[A-Z ]{0,24})PRIVATE KEY-----"#)
+    ]
+}
+
 public struct RecordingRedaction: Sendable, Identifiable {
     public var id: Int
     public var reason: String
@@ -45,13 +57,8 @@ public enum AsciicastExport {
             if let last = chunks.indices.last { chunks[last].range = chunks[last].range.lowerBound..<bytes.count }
         }
         let text = String(decoding: bytes, as: UTF8.self)
-        let patterns: [(String, String)] = [
-            ("Provider or service key", #"(?:sk-(?:proj-|ant-|or-v1-)?[A-Za-z0-9_-]{16,256}|gh[pousr]_[A-Za-z0-9]{20,256}|AIza[A-Za-z0-9_-]{20,128}|AKIA[0-9A-Z]{16})"#),
-            ("Named credential assignment", #"(?i)(?:api[_-]?key|password|passwd|secret|token)[ \t]{0,32}[:=][ \t]{0,32}[\"']?[^\s\"'\x1b]{4,256}"#),
-            ("Private key block", #"-----BEGIN (?:[A-Z ]{0,24})PRIVATE KEY-----[\s\S]{1,65536}?-----END (?:[A-Z ]{0,24})PRIVATE KEY-----"#)
-        ]
         var candidates: [RecordingRedaction] = []
-        for (reason, pattern) in patterns {
+        for (reason, pattern) in SecretPatterns.all {
             if cancelled() { throw CancellationError() }
             let regex = try NSRegularExpression(pattern: pattern)
             regex.enumerateMatches(in: text, range: NSRange(text.startIndex..., in: text)) { match, _, stop in

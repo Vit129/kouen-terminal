@@ -13,7 +13,7 @@ public struct TerminalTextSnapshot: Sendable {
     init(lineCount: Int, historyCount: Int, clusters: [UInt32: String],
          line: @escaping @Sendable (Int) -> [TerminalGridCell],
          wraps: @escaping @Sendable (Int) -> Bool,
-         wideDeferred: @escaping @Sendable (Int) -> Bool = { _ in true }) {
+         wideDeferred: @escaping @Sendable (Int) -> Bool) {
         self.lineCount = lineCount
         self.historyCount = historyCount
         self.clusters = clusters
@@ -31,9 +31,9 @@ public struct TerminalTextSnapshot: Sendable {
         var mapped = TerminalMappedText(), index = start
         while index >= 0, index < lineCount {
             var cells = line(index)
-            if isWrapped(index), isWideDeferred(index), index + 1 < lineCount,
-               let last = cells.last, last.codepoint == 0, last.combining0 == 0, last.width == .normal,
-               line(index + 1).first?.width == .wide { cells.removeLast() }
+            if isWrapped(index), isWideDeferred(index), index + 1 < lineCount {
+                cells.removeLast(TerminalScreen.wideDeferralGap(row: cells, wideDeferred: true, next: line(index + 1)))
+            }
             mapped.append(cells, line: index, clusters: clusters)
             index += 1
             if !isWrapped(index - 1) || mapped.utf16Count >= 262_144 { break }

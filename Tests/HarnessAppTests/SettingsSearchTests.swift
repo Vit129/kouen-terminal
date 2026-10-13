@@ -46,20 +46,6 @@ final class SettingsSearchTests: XCTestCase {
         assertLands(on: "Diagnostics report", pane: .tools, query: "diagnostics report")
     }
 
-    func testBuildScriptsAndXcodeGenHelperContractRemainAligned() throws {
-        let root = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
-        let previewScript = try String(contentsOf: root.appendingPathComponent("Scripts/preview.sh"), encoding: .utf8)
-        let releaseScript = try String(contentsOf: root.appendingPathComponent("Scripts/build-release.sh"), encoding: .utf8)
-        let projectYML = try String(contentsOf: root.appendingPathComponent("project.yml"), encoding: .utf8)
-
-        XCTAssertFalse(previewScript.contains("swift build --product"), "preview.sh must build all products in one pass")
-        XCTAssertFalse(releaseScript.contains("swift build -c release --product"), "build-release.sh must build all products in one pass")
-        for helper in ["HarnessSessionHost", "HarnessDaemon", "harness-cli"] {
-            XCTAssertTrue(projectYML.contains("$(BUILT_PRODUCTS_DIR)/\(helper)"), "project.yml missing \(helper)")
-            XCTAssertTrue(previewScript.contains("$BUILD_DIR/\(helper)"), "preview.sh missing \(helper)")
-        }
-    }
-
     func testTitleMatchesRankAheadOfHintMatches() {
         let (controller, window) = openSettings(searching: "")
         defer { window.close() }

@@ -45,7 +45,8 @@ final class CommandRegionTests: XCTestCase {
         terminal.feed("1234567界end")
         let snapshot = terminal.textSnapshot()
         let result = TerminalBufferSearch.search(query: "7界end", lineCount: snapshot.lineCount,
-            clusters: snapshot.clusters, isWrapped: snapshot.isWrapped, line: snapshot.line)
+            clusters: snapshot.clusters, isWrapped: snapshot.isWrapped, isWideDeferred: snapshot.isWideDeferred,
+            line: snapshot.line)
         guard case let .matches(matches, _) = result else { return XCTFail("No matches") }
         XCTAssertEqual(matches.count, 1)
         XCTAssertEqual(matches.first?.spans, [.init(bufferLine: 0, columns: 6..<7), .init(bufferLine: 1, columns: 0..<5)])

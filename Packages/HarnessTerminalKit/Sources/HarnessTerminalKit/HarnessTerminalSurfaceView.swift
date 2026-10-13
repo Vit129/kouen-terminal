@@ -604,6 +604,10 @@ public final class HarnessTerminalSurfaceView: NSView {
         emulatorSync { $0.readsGraphicsFiles = allowed }
     }
 
+    /// Whether ⌘-click opens `path:line` references on this Mac. Off for a pane whose shell runs
+    /// on another machine, where those paths name its files, not ours.
+    public var opensLocalFileLinks = true
+
     /// Whether a program may READ the system clipboard via OSC 52 (`allow-clipboard-read`).
     /// Off by default: anything running in the pane, or on a remote host, could read it.
     public var allowProgramClipboardRead = false
@@ -1779,7 +1783,11 @@ public final class HarnessTerminalSurfaceView: NSView {
             canvasBackground: canvasBackground,
             canvasForeground: canvasForeground,
             canvasOpacity: canvasOpacity,
-            font: .init(family: fontFamily, size: fontSize, thicken: fontThicken, thickenStrength: fontThickenStrength, fallbackFamilies: fontFallbackFamilies, features: fontFeatures),
+            font: .init(
+                family: fontFamily, size: fontSize, thicken: fontThicken, thickenStrength: fontThickenStrength,
+                fallbackFamilies: fontFallbackFamilies, features: fontFeatures,
+                lineHeightMultiplier: lineHeightMultiplier, cellWidthMultiplier: cellWidthMultiplier
+            ),
             gamma: glyphGamma,
             ligatures: ligaturesEnabled,
             colorSpaceName: layerColorSpaceName as String

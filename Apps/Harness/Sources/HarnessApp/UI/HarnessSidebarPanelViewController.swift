@@ -101,6 +101,7 @@ final class HarnessSidebarPanelViewController: NSViewController {
         HarnessDesign.makeClear(workspaceBar)
         HarnessDesign.makeClear(sectionHeader)
         HarnessDesign.makeClear(footer)
+        HarnessDesign.applyChromeFont(HarnessDesign.Typography.sectionLabel, to: [sectionLabel])
         sectionLabel.textColor = HarnessDesign.chrome.textSecondary
         HarnessDesign.applyChromeLabelAppearance([sectionLabel], isDark: HarnessDesign.chrome.isDark)
         workspacePill.applyChrome()
@@ -359,7 +360,7 @@ final class HarnessSidebarPanelViewController: NSViewController {
         // Typed text + placeholder share the standardized label font, and the
         // placeholder uses the same resting color as the workspace name so the two
         // header rows read as identical type.
-        searchField.font = HarnessDesign.Typography.sidebarLabel
+        HarnessDesign.applyChromeFont(HarnessDesign.Typography.sidebarLabel, to: [searchField])
         searchField.textColor = c.textPrimary
         searchIcon.contentTintColor = c.textSecondary
         searchField.placeholderAttributedString = NSAttributedString(
@@ -1335,7 +1336,7 @@ private final class WorkspaceSwitcherRow: NSView {
             : (isHovered ? c.rowHoverFill.cgColor : NSColor.clear.cgColor)
         layer?.borderWidth = 0
         icon.contentTintColor = active ? c.accent : c.textTertiary
-        titleLabel.font = HarnessDesign.Typography.sidebarLabel
+        HarnessDesign.applyChromeFont(HarnessDesign.Typography.sidebarLabel, to: [titleLabel])
         titleLabel.textColor = active ? c.activePillLabel : (isHovered ? c.textPrimary : c.textSecondary)
         HarnessDesign.applyChromeLabelAppearance([titleLabel], isDark: c.isDark)
         moreButton.contentTintColor = c.textSecondary
@@ -1474,7 +1475,7 @@ final class WorkspacePillButton: NSButton {
         layer?.backgroundColor = (isHovered ? hover : resting).cgColor
         // Resting color matches the search placeholder (textSecondary); brightens to
         // primary on hover — same resting/active rule used by every other label.
-        nameLabel.font = HarnessDesign.Typography.sidebarLabel
+        HarnessDesign.applyChromeFont(HarnessDesign.Typography.sidebarLabel, to: [nameLabel])
         nameLabel.textColor = isHovered ? c.textPrimary : c.textSecondary
         HarnessDesign.applyChromeLabelAppearance([nameLabel], isDark: c.isDark)
         icon.contentTintColor = isHovered ? c.textPrimary : c.textSecondary
