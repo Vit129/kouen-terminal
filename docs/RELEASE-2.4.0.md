@@ -60,3 +60,24 @@ and DMG, checks Gatekeeper acceptance and smoke-tests the installed DMG in an
 isolated home before publishing downloads and updating the signed feeds on both
 supported domains. Published assets and their source tag must never be replaced;
 recovery uses the existing matching appcast or a new release version.
+
+## Publication receipts
+
+- Release source: `655be5c0bf3365746d8cf13926404a55d7e37a4e`, tagged `v2.4.0`.
+- [Shipping CI](https://github.com/robzilla1738/harness-terminal/actions/runs/38483901772)
+  passed every required job, including the real legacy-upgrade and session-survival
+  proofs. macOS CI ran 2,638 tests with 61 skipped and no failures. The non-blocking
+  benchmark comparison reported shared-runner variance in both directions.
+- The [release workflow](https://github.com/robzilla1738/harness-terminal/actions/runs/38483929837)
+  passed, including the installed-DMG smoke test and the live-feed comparisons.
+- Notarization request `6d0c79cb-8e0c-448a-a1cf-fd16cef93477` for the app was accepted.
+- An independent download matched `SHA256SUMS` and GitHub's asset digest, passed
+  `hdiutil verify`, and was accepted by Gatekeeper as notarized Developer ID with
+  stapled tickets on the DMG and app. The app reports 2.4.0 (137).
+- Both supported appcast domains serve 2.4.0 (137) for the published DMG.
+
+`Harness.dmg` is 27,785,797 bytes. Its SHA-256 is:
+
+```text
+41f6ee2bec1c7cde2cea93645bead1cda9669d1ceea69fe2678d1f4ae0cebc94
+```
