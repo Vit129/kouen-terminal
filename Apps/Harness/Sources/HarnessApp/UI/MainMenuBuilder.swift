@@ -343,6 +343,9 @@ enum MainMenuBuilder {
         shortcuts.keyEquivalentModifierMask = [.command]
         shortcuts.target = MenuTarget.shared
         help.submenu?.addItem(shortcuts)
+        let keyBindings = NSMenuItem(title: "Edit Key Bindings…", action: #selector(MenuTarget.showKeyBindings), keyEquivalent: "")
+        keyBindings.target = MenuTarget.shared
+        help.submenu?.addItem(keyBindings)
         main.addItem(help)
 
         return main
@@ -714,6 +717,10 @@ final class MenuTarget: NSObject, NSMenuItemValidation, NSMenuDelegate {
 
     @objc func showShortcuts() {
         KeyboardShortcutsWindow.shared.toggle()
+    }
+
+    @objc func showKeyBindings() {
+        KeyBindingsEditorWindow.shared.show()
     }
 
     private var activityWindow: NSWindow?

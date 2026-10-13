@@ -65,6 +65,24 @@ final class PaletteShortcuts {
         return menuItem(matching: shortcut, in: NSApp.mainMenu).map { "the menu item “\($0)”" }
     }
 
+    /// Whether a no-prefix binding on `spec` would sit on the prefix key, which arms first.
+    func isPrefixKey(_ spec: KeySpec) -> Bool {
+        guard let raw = SessionCoordinator.shared.settings.effectivePrefixKey,
+              let prefix = ParsedShortcut.parse(raw) else { return false }
+        return Self.rootSpec(spec, matches: prefix)
+    }
+
+    /// The palette shortcut or menu item a no-prefix binding on `spec` would take the key from.
+    func shadowed(byRoot spec: KeySpec) -> String? {
+        if let palette = bindings.first(where: { Self.rootSpec(spec, matches: $0.shortcut) }) {
+            let title = CommandPaletteController.title(ofAction: palette.actionID) ?? palette.actionID
+            return "the palette shortcut for “\(title)”"
+        }
+        return menuShortcuts(in: NSApp.mainMenu)
+            .first { Self.rootSpec(spec, matches: $0.shortcut) }
+            .map { "the menu item “\($0.title)”" }
+    }
+
     /// Root-table specs are built from the typed character, so Shift lives in the key (`C`,
     /// `+`) rather than in the modifiers; compare on that footing.
     private static func rootSpec(_ spec: KeySpec, matches shortcut: ParsedShortcut) -> Bool {
@@ -79,17 +97,23 @@ final class PaletteShortcuts {
     }
 
     private func menuItem(matching shortcut: ParsedShortcut, in menu: NSMenu?) -> String? {
+        menuShortcuts(in: menu).first { $0.shortcut == shortcut }?.title
+    }
+
+    /// Every menu key equivalent as a chord, depth first.
+    private func menuShortcuts(in menu: NSMenu?) -> [(title: String, shortcut: ParsedShortcut)] {
+        var found: [(title: String, shortcut: ParsedShortcut)] = []
         for item in menu?.items ?? [] {
             if !item.keyEquivalent.isEmpty {
                 // An uppercase key equivalent means Shift.
                 var modifiers = item.keyEquivalentModifierMask.intersection([.command, .control, .option, .shift])
                 if item.keyEquivalent != item.keyEquivalent.lowercased() { modifiers.insert(.shift) }
-                if ShortcutRecorderSerializer.keyName(forCharacters: item.keyEquivalent.lowercased()) == shortcut.key,
-                   modifiers == shortcut.modifiers { return item.title }
+                let key = ShortcutRecorderSerializer.keyName(forCharacters: item.keyEquivalent.lowercased())
+                found.append((item.title, ParsedShortcut(modifiers: modifiers, key: key)))
             }
-            if let title = menuItem(matching: shortcut, in: item.submenu) { return title }
+            found += menuShortcuts(in: item.submenu)
         }
-        return nil
+        return found
     }
 
     private func handle(_ event: NSEvent) -> NSEvent? {

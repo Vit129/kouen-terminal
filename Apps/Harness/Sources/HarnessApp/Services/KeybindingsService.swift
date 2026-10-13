@@ -8,10 +8,26 @@ import HarnessCore
 final class KeybindingsService {
     static let shared = KeybindingsService()
 
-    private(set) var tables: KeyTableSet
+    /// Posted whenever `tables` changes: an editor edit, `bind-key`, or a reload of the file.
+    static let didChange = Notification.Name("HarnessKeybindingsDidChange")
+
+    private(set) var tables: KeyTableSet {
+        didSet {
+            if tables != oldValue { NotificationCenter.default.post(name: Self.didChange, object: self) }
+        }
+    }
 
     private init() {
         tables = KeybindingsStore.load()
+    }
+
+    /// Apply an edit and save it. Memory only changes once the file is written.
+    func edit(_ change: (inout KeyTableSet) -> Void) throws {
+        var next = tables
+        change(&next)
+        guard next != tables else { return }
+        try KeybindingsStore.save(next)
+        tables = next
     }
 
     func reload() {

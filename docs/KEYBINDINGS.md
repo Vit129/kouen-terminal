@@ -35,8 +35,8 @@ Trigger: the prefix key (default `ctrl-a`, configurable via `settings.prefixKey`
 | `z` | `zoom-pane` |
 | `Space` | `next-layout` (cycle the tab's layouts) |
 | `&` | `kill-window` |
-| `o` / `;` | `select-pane next` / `previous` |
-| `l` | `select-pane -l` (last / most-recently-active pane) |
+| `o` / `;` | `next-pane` / `previous-pane` |
+| `l` | `last-pane` (most-recently-active pane) |
 | `Left` / `Right` / `Up` / `Down` | `select-pane -L` / `-R` / `-U` / `-D` |
 | `S-Left` / `S-Right` / `S-Up` / `S-Down` | `resize-pane -L 5` / `-R 5` / `-U 3` / `-D 3` (repeatable — hold under the prefix) |
 | `q` | `display-panes` (overlay numbers; press a digit to jump) |
@@ -137,6 +137,28 @@ These are `NSMenuItem` bindings defined in `MainMenuBuilder`, not prefix-table e
 - Escape closes without executing.
 
 ## Customizing
+
+### Key Bindings editor
+
+Settings ▸ Keys ▸ Edit Key Bindings… (also Help ▸ Edit Key Bindings…) lists every binding in the
+no-prefix, prefix and copy mode tables in one searchable table:
+
+- **Change Key** (or double-click the key) records a new key for a binding.
+- **+** records a key for a new binding. Then choose or type its action below the table, using
+  the same syntax as `bind-key`.
+- **Remove** unbinds a key. A removed default stays removed across launches.
+- **Reset** puts one key back to its default. **Reset Table…** does the same for the whole table.
+
+Before a key is taken, the editor warns if it is already bound in that table, used by a palette
+shortcut or menu item, or (for no-prefix keys) has no ⌃, ⌥ or ⌘, so typing it would no longer
+reach the terminal. Press Return to take the key anyway. The prefix key, and `:` after the
+prefix, can't be bound. Edits save to `keybindings.json` and take effect on the next keystroke.
+Menu shortcuts are fixed. Palette shortcuts are set from the palette (right-click ▸ Change Shortcut…).
+
+When one key has several owners, the first match runs: the prefix key, then the no-prefix
+table, then palette shortcuts, then menu items. The prefix table applies only after the prefix.
+
+### From the command line
 
 ```bash
 # Prefix then d detaches (keys are bound in the prefix table by default)

@@ -90,6 +90,12 @@ public struct KeyTable: Codable, Sendable, Equatable {
         }
     }
 
+    /// Drop a binding without leaving a tombstone, for specs no default would bring back.
+    public mutating func forget(spec: KeySpec) {
+        bindings.removeAll { $0.spec == spec }
+        disabledSpecs.removeAll { $0 == spec }
+    }
+
     // Tolerant decode so older keybindings.json files (no `disabledSpecs`) still load.
     enum CodingKeys: String, CodingKey { case id, bindings, disabledSpecs }
 

@@ -943,10 +943,16 @@ final class SettingsViewController: NSViewController, NSFontChanging {
             settingsRow("Hotkey", quickTerminalHotkeyRecorder),
         ])
 
+        let editor = makeRoundedButton("Edit Key Bindings…", action: #selector(showKeyBindingsEditor))
+        let editorFooter = settingsFooterAction(editor, caption: "Change, add, or reset prefix, no-prefix, and copy mode keys.")
         let shortcuts = makeRoundedButton("Keyboard Shortcuts…", action: #selector(showKeyboardShortcuts))
         let footer = settingsFooterAction(shortcuts, caption: "Every shortcut, menu key, and binding in one list (⌘/).")
 
-        return page("Keys", [keyboardGroup, quickTerminalGroup, footer])
+        return page("Keys", [keyboardGroup, quickTerminalGroup, editorFooter, footer])
+    }
+
+    @objc private func showKeyBindingsEditor() {
+        KeyBindingsEditorWindow.shared.show()
     }
 
     @objc private func showKeyboardShortcuts() {

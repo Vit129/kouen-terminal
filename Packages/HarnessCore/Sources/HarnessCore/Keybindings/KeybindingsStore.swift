@@ -24,11 +24,13 @@ public enum KeybindingsStore {
             HarnessPaths.backupCorruptFile(at: fileURL, label: "Harness")
             return defaults
         }
-        // Merge: stored tables win for any spec they explicitly define, but
-        // defaults fill in unset spec slots and unset tables. Removing an
-        // entry from the file = falling back to default — EXCEPT specs the
-        // user explicitly unbound (tombstoned via `unbind-key`), which must
-        // not resurrect on reload.
+        return merge(stored: stored, defaults: defaults)
+    }
+
+    /// Stored tables win for any spec they explicitly define, but defaults fill in unset spec
+    /// slots and unset tables. Removing an entry from the file falls back to the default,
+    /// EXCEPT specs the user explicitly unbound (tombstoned), which must not resurrect.
+    public static func merge(stored: KeyTableSet, defaults: KeyTableSet = .defaults) -> KeyTableSet {
         var merged = stored
         for defaultTable in defaults.tableList {
             if var existing = merged.table(defaultTable.id) {

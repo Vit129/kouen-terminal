@@ -159,6 +159,20 @@ public indirect enum Command: Codable, Sendable, Equatable {
         /// The caller's active pane — `swap-pane -s X` with no `-t` (tmux: the
         /// source swaps with the *current* pane).
         case current
+
+        /// The flag `CommandParser` reads back as this target, with a leading space.
+        var parserFlag: String {
+            switch self {
+            case .left: return " -L"
+            case .right: return " -R"
+            case .up: return " -U"
+            case .down: return " -D"
+            case .last: return " -l"
+            case .next: return " -t :.+"
+            case .previous: return " -t :.-"
+            case .current: return ""
+            }
+        }
     }
 
     public enum ChooseScope: String, Codable, Sendable, Equatable {
@@ -185,9 +199,12 @@ extension Command {
         case let .splitWindow(direction): return "split-window -\(direction == .horizontal ? "v" : "h")"
         case .killPane: return "kill-pane"
         case .zoomPane: return "zoom-pane"
-        case let .selectPane(target): return "select-pane \(target.rawValue)"
+        case .selectPane(.next): return "next-pane"
+        case .selectPane(.previous): return "previous-pane"
+        case .selectPane(.last): return "last-pane"
+        case let .selectPane(target): return "select-pane\(target.parserFlag)"
         case let .swapPane(target, source):
-            return "swap-pane\(source.map { " -s \($0.raw)" } ?? "") \(target.rawValue)"
+            return "swap-pane\(source.map { " -s \($0.raw)" } ?? "")\(target.parserFlag)"
         case let .resizePane(direction, amount): return "resize-pane -\(direction.rawValue.prefix(1).uppercased()) \(amount)"
         case let .markPane(set): return set ? "select-pane -m" : "select-pane -M"
         case let .joinPane(direction): return "join-pane -\(direction == .horizontal ? "v" : "h")"
