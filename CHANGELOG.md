@@ -21,7 +21,6 @@ has a matching `vX.Y.Z` tag and a signed, notarized DMG on
 - Fall back to the page's agent hint when the detector reports an unsupported kind ([`78f61b5`](https://github.com/Vit129/kouen-terminal/commit/78f61b57e0f3f5411ec861c3a1c3edc506d3ac62))
 - Drop Claude harness plumbing, show agy tool-only replies, survive agy db writes ([`2fb464d`](https://github.com/Vit129/kouen-terminal/commit/2fb464dc7488de00d71405cdaa20c163781c7619))
 
-
 ## [4.21.5] - 2026-10-12
 
 ### Added
