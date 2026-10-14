@@ -34,6 +34,11 @@ final class MobileBridgeContractTests: XCTestCase {
         XCTAssertTrue(MobileBridgeServer.embeddedPageHTML.contains("[hidden]{display:none !important}"))
     }
 
+    func testPageCSSIncludesTheTextWrapRules() {
+        XCTAssertTrue(MobileBridgeServer.embeddedPageHTML.contains(".bot{overflow-wrap:anywhere}"))
+        XCTAssertFalse(MobileBridgeServer.embeddedPageHTML.contains("textWrapCSS"))
+    }
+
     func testDraftPRAckJSONShapeMatchesClientExpectations() throws {
         let ack = MobileBridgeServer.DraftPRAck(url: "https://github.com/Vit129/kouen-terminal/pull/88", number: 88)
         let data = try JSONEncoder().encode(ack)
