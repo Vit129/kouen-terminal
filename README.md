@@ -15,12 +15,11 @@ are listed in the [changelog](CHANGELOG.md) and [GitHub Releases](https://github
 
 ## Download
 
-**Harness 2.4** adds a live Appearance preview, interface text size, line height and
-cell width controls, ⌘-click file references, and a key binding editor. Updates settle
-cleanly: background services stop without crashing, launchd no longer relaunches a
-duplicate service, and coding-tool icons sit on dark tiles again. It also fixes a sidebar
-crash with split panes and keeps wide characters aligned through resizing.
-See [release validation](docs/RELEASE-2.4.0.md), [terminal quality](docs/TERMINAL-QUALITY.md),
+**Harness 2.4.1** fixes stalls when moving and rapidly resizing terminal windows,
+and keeps the host icon, name and arrow together in a native macOS control. It includes
+2.4's live Appearance preview, interface text size, terminal spacing controls,
+⌘-click file references, and key binding editor.
+See [release validation](docs/RELEASE-2.4.1.md), [terminal quality](docs/TERMINAL-QUALITY.md),
 the [changelog](CHANGELOG.md), and [performance results](docs/SCORECARD.md) for behavior,
 measured results, and verification limits.
 

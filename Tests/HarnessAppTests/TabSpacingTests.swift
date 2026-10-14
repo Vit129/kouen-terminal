@@ -40,12 +40,16 @@ final class TabSpacingTests: XCTestCase {
                 XCTAssertEqual(indicator.isRemote, owner != DaemonSidebar.localID)
                 XCTAssertEqual(indicator.compact, width < 720)
                 if !indicator.compact && !indicator.isRemote {
-                    indicator.layoutSubtreeIfNeeded()
-                    let label = try XCTUnwrap(indicator.subviews.compactMap { $0 as? NSTextField }.first { $0.stringValue == "This Mac" })
-                    XCTAssertGreaterThanOrEqual(label.frame.width, label.intrinsicContentSize.width)
+                    XCTAssertEqual(indicator.attributedTitle.string, "This Mac")
+                    XCTAssertGreaterThanOrEqual(indicator.frame.width, indicator.intrinsicContentSize.width)
                 }
+                XCTAssertEqual(indicator.frame.midY, bar.sessionsAnchor.frame.midY, accuracy: 0.001)
+                XCTAssertEqual(bar.sessionsAnchor.frame.minX - indicator.frame.maxX,
+                               HarnessDesign.Spacing.lg, accuracy: 0.001)
                 let pills = bar.subviews.filter { $0.accessibilityRole() == .radioButton && !$0.isHidden }
                 XCTAssertFalse(pills.isEmpty)
+                XCTAssertEqual(try XCTUnwrap(pills.first).frame.minX - bar.sessionsAnchor.frame.maxX,
+                               HarnessDesign.Spacing.lg, accuracy: 0.001)
                 for pill in pills {
                     XCTAssertGreaterThan(pill.frame.minX, indicator.frame.maxX)
                     XCTAssertLessThanOrEqual(pill.frame.maxX, width - 40)

@@ -10,25 +10,21 @@ It runs on the `macos-26` runner with Xcode 26.6, the same runner and pinned
 `XCODE_VERSION` as CI, so a release is built by the toolchain CI tested. Bump
 `XCODE_VERSION` in `release.yml` and `ci.yml` together.
 
-## Harness 2.4.0 (137)
+## Harness 2.4.1 (138)
 
-This release adds appearance, typography, file-link and key binding controls, and
-makes app updates settle cleanly: helpers stop without crashing, a duplicate start
-exits successfully so launchd stops relaunching it, and stale worker sockets are
-removed. Public protocol 2 and the session-host protocol are unchanged, so an
-update from 2.3.2 replaces the application daemon without interrupting shells. The
-first-party coding agent remains in local development and is excluded from this
-release's source, app, CLI and documentation. Existing integrations with installed
-coding tools remain available.
+This patch keeps window movement and rapid resizing responsive by moving live-resize
+rendering off the main thread. It also groups the host icon, name and arrow in a
+native macOS menu control with consistent titlebar spacing. Protocols and checkpoint
+formats are unchanged.
 
-See the [changelog](../CHANGELOG.md), [release validation](RELEASE-2.4.0.md), and
-[terminal quality](TERMINAL-QUALITY.md). Version declarations and generated update
-notes move together. Push the shipping commit to start CI, then run the release workflow with
-`tag=v2.4.0` and `deploy_appcast=true`. The app and DMG must pass signing,
-notarization and smoke testing before publication. The release build can run
-alongside CI, but draft creation requires successful main-branch CI for the exact
-source commit. The workflow verifies the
-public download before updating either live appcast domain.
+See the [changelog](../CHANGELOG.md), [release validation](RELEASE-2.4.1.md), and
+[resize investigation](window-resize-stalls-2026-10-13.md). Version declarations and
+generated update notes move together. Push the shipping commit to start CI, then run
+the release workflow with `tag=v2.4.1` and `deploy_appcast=true`. The app and DMG must
+pass signing, notarization and smoke testing before publication. The release build
+can run alongside CI, but draft creation requires successful main-branch CI for the
+exact source commit. The workflow verifies the public download before updating
+either live appcast domain.
 
 ## One-time GitHub setup
 

@@ -88,7 +88,8 @@ extension HarnessTerminalSurfaceView {
                 guard let self else { return }
                 MainActor.assumeIsolated {
                     self.textBlinkHidden.toggle()
-                    self.renderExecutor?.sync { $0.textBlinkHidden = self.textBlinkHidden }
+                    let hidden = self.textBlinkHidden
+                    self.renderExecutor?.async { $0.textBlinkHidden = hidden }
                     self.scheduleRender()
                 }
             }
@@ -99,7 +100,7 @@ extension HarnessTerminalSurfaceView {
             textBlinkTimer = nil
             if textBlinkHidden {
                 textBlinkHidden = false
-                renderExecutor?.sync { $0.textBlinkHidden = false }
+                renderExecutor?.async { $0.textBlinkHidden = false }
                 scheduleRender()
             }
         }

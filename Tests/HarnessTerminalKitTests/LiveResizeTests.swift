@@ -3,13 +3,105 @@ import Metal
 import XCTest
 @testable import HarnessTerminalKit
 
-/// Headless coverage of the glitchless live-resize behavior: the layer's transaction-present
-/// mode is owned by the NSView live-resize lifecycle, the grid origin freezes for the duration
-/// of a drag (no per-pixel shimmer), and the debounced grid+PTY commit flushes the moment the
-/// drag ends instead of waiting out the coalescing delay.
+/// Resize lifecycle, asynchronous presentation, and final grid/PTY convergence.
 @MainActor
 final class LiveResizeTests: XCTestCase {
-    func testTransactionRepaintSupersedesAnEarlierEncodeCompletion() throws {
+    func testResizeReturnsWhileRenderQueueIsBlocked() throws {
+        try assertResizeReturnsWhileBlocked { view, block in
+            view.testingBlockDrawableQueue(block)
+        }
+    }
+
+    func testResizeReturnsWhileDrawableAcquisitionIsBlocked() throws {
+        try assertResizeReturnsWhileBlocked { view, block in
+            view.testingDrawableAcquisitionQueue.async(execute: block)
+        }
+    }
+
+    func testResizeWithoutCachedFrameReturnsWhileParserIsBlocked() throws {
+        try assertResizeReturnsWhileBlocked { view, block in
+            view.lastPresentedResult = nil
+            view.emulatorState.async { _ in block() }
+        }
+    }
+
+    private func assertResizeReturnsWhileBlocked(
+        _ enqueue: (HarnessTerminalSurfaceView, @escaping @Sendable () -> Void) -> Void,
+        file: StaticString = #filePath, line: UInt = #line
+    ) throws {
+        guard MTLCreateSystemDefaultDevice() != nil else { throw XCTSkip("Metal unavailable") }
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 400, height: 300),
+                              styleMask: [.titled, .resizable], backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        defer { window.contentView = nil }
+        let view = try makeHostedView(in: window)
+        view.testingSetLiveResizeReflow(true)
+        _ = try XCTUnwrap(view.testingLastPresentedFrame)
+
+        let entered = DispatchSemaphore(value: 0)
+        let release = DispatchSemaphore(value: 0)
+        let finished = DispatchSemaphore(value: 0)
+        enqueue(view) {
+            entered.signal()
+            // A finite gate turns a synchronous regression into a failure, not a hung test.
+            _ = release.wait(timeout: .now() + 2)
+            finished.signal()
+        }
+        XCTAssertEqual(entered.wait(timeout: .now() + 2), .success)
+        defer { release.signal() }
+
+        view.viewWillStartLiveResize()
+        for width in [440.0, 380.0, 470.0, 400.0] {
+            window.setContentSize(NSSize(width: width, height: 300))
+            view.layout()
+        }
+        // Also exercise the settled commit's cache invalidation while parsing is busy.
+        window.setContentSize(NSSize(width: 420, height: 300))
+        view.viewDidEndLiveResize()
+        XCTAssertEqual(finished.wait(timeout: .now()), .timedOut,
+                       "resize callbacks must return before the worker is released", file: file, line: line)
+        release.signal()
+        drainRenderPipeline(view)
+        XCTAssertEqual(view.testingReadGridSnapshot().cols, view.testingGridSize.cols)
+        XCTAssertEqual(view.testingLastPresentedFrame?.columns, view.testingGridSize.cols)
+    }
+
+    func testQueuedPreviewCannotRestoreIntermediateWidthAfterRelease() throws {
+        guard MTLCreateSystemDefaultDevice() != nil else { throw XCTSkip("Metal unavailable") }
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 400, height: 300),
+                              styleMask: [.titled, .resizable], backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        defer { window.contentView = nil }
+        let view = try makeHostedView(in: window)
+        let original = view.testingGridSize
+        let release = DispatchSemaphore(value: 0)
+        view.testingDrawableAcquisitionQueue.async { _ = release.wait(timeout: .now() + 2) }
+        defer { release.signal() }
+
+        view.viewWillStartLiveResize()
+        window.setContentSize(NSSize(width: 470, height: 300))
+        view.layout()
+        view.testingWaitForEmulatorIdle()
+        let queued = expectation(description: "preview waiting for drawable")
+        DispatchQueue.main.async { queued.fulfill() }
+        wait(for: [queued], timeout: 2)
+        let preview = try XCTUnwrap(view.pendingDrawableFrame)
+        XCTAssertNotNil(preview.resizePreviewToken)
+        XCTAssertNotEqual(preview.frame.columns, original.cols)
+
+        window.setContentSize(NSSize(width: 400, height: 300))
+        view.viewDidEndLiveResize()
+        release.signal()
+        drainRenderPipeline(view)
+        XCTAssertEqual(view.testingGridSize.cols, original.cols)
+        XCTAssertEqual(view.testingLastPresentedFrame?.columns, original.cols)
+        // Even a late replay with the same render generation must be rejected by its token.
+        view.enqueueDrawableFrame(preview)
+        XCTAssertNil(view.pendingDrawableFrame)
+        XCTAssertFalse(view.testingDrawableRequestInFlight)
+    }
+
+    func testResizeRepaintDoesNotReplaceNewerOutputInFlight() throws {
         guard MTLCreateSystemDefaultDevice() != nil else { throw XCTSkip("Metal unavailable") }
         let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 640, height: 480),
                               styleMask: [.titled, .resizable], backing: .buffered, defer: false)
@@ -20,7 +112,7 @@ final class LiveResizeTests: XCTestCase {
         view.testingWaitForEmulatorIdle()
         view.testingForceRender()
         drainRenderPipeline(view)
-        let cached = try XCTUnwrap(view.testingLastPresentedFrame)
+        _ = try XCTUnwrap(view.testingLastPresentedFrame)
 
         let gate = DispatchSemaphore(value: 0)
         view.testingBlockDrawableQueue { gate.wait() }
@@ -35,23 +127,13 @@ final class LiveResizeTests: XCTestCase {
         wait(for: [acquired], timeout: 2)
         XCTAssertTrue(view.testingDrawableRequestInFlight)
 
-        // Joining the encode queues its completion on main without delivering it. The
-        // transaction repaint must rebuild cached cells, then reject that older completion.
-        gate.signal()
-        _ = view.testingLastRenderStats
         view.viewWillStartLiveResize()
         defer { view.viewDidEndLiveResize() }
-        CATransaction.begin()
         XCTAssertTrue(view.testingRepaintLastFrame())
-        CATransaction.commit()
-        XCTAssertEqual(view.testingLastPresentedDamage?.full, true,
-                       "the transaction must revalidate every row after joining a newer encode")
-        XCTAssertEqual(view.testingLastRenderStats?.encodedRows, 1,
-                       "the changed first row must be rebuilt; unchanged rows may pass content-key salvage")
-        XCTAssertEqual(view.testingLastRenderStats?.reusedRows, cached.rows - 1)
+        gate.signal()
         drainRenderPipeline(view)
-        XCTAssertEqual(view.testingLastPresentedFrame?.cells, cached.cells,
-                       "an older completion must not overwrite the transaction's submitted frame")
+        XCTAssertEqual(view.testingLastPresentedFrame?.cells.first?.codepoint, 100,
+                       "a cached resize repaint must not replace the newer 'different output' frame")
         XCTAssertTrue(view.testingRepaintCacheCoherent)
     }
 
@@ -144,13 +226,15 @@ final class LiveResizeTests: XCTestCase {
         XCTAssertEqual(votes, 0)
     }
 
-    func testLiveResizeLifecycleTogglesTransactionPresentMode() {
+    func testLiveResizeLifecycleKeepsPresentationAsynchronous() {
         let view = HarnessTerminalSurfaceView()
         XCTAssertFalse(view.testingPresentsWithTransaction)
         view.viewWillStartLiveResize()
-        XCTAssertTrue(view.testingPresentsWithTransaction)
+        XCTAssertTrue(view.testingLiveResizeActive)
+        XCTAssertFalse(view.testingPresentsWithTransaction)
         view.viewDidEndLiveResize()
         XCTAssertFalse(view.testingPresentsWithTransaction)
+        XCTAssertFalse(view.testingLiveResizeActive)
     }
 
     func testLiveResizeFreezesOriginOnlyAfterFirstLayout() {
@@ -194,7 +278,7 @@ final class LiveResizeTests: XCTestCase {
         // ESCAPE-HATCH path (real-time reflow off): a stationary >60ms hold mid-drag lets the
         // debounce elapse. The commit must re-arm, not fire: a mid-drag commit bumps the generation
         // (dropping the in-flight preview) but its authoritative re-present defers while the layer
-        // is in transaction mode — with the mouse still, the screen would freeze on a
+        // is in live resize — with the mouse still, the screen would freeze on a
         // stale-generation frame until the next pointer move. (With real-time reflow on, the live
         // path commits here instead — see testCommitFiresLiveAtBoundaryWithReflowOn.)
         let view = HarnessTerminalSurfaceView()
@@ -212,7 +296,7 @@ final class LiveResizeTests: XCTestCase {
         XCTAssertEqual(resizes, 0, "no mid-drag SIGWINCH")
         XCTAssertTrue(view.testingHasPendingResizeCommit, "the commit re-armed for the next window")
 
-        view.viewDidEndLiveResize() // flush: transaction mode is off, the commit lands once
+        view.viewDidEndLiveResize() // flush: live resize has ended, the commit lands once
         XCTAssertEqual(view.testingGridSize.cols, 100)
         XCTAssertEqual(resizes, 1, "exactly one SIGWINCH, at release")
     }
@@ -425,13 +509,14 @@ final class LiveResizeTests: XCTestCase {
     func testDetachMidDragUnwindsLiveResizeState() {
         // A view can leave the window mid-drag (tab close / pane remount) and AppKit does not
         // guarantee viewDidEndLiveResize. The instance is cached and re-hosted, so the teardown
-        // hook must unwind the transaction-present latch, the frozen origin, and the pending
+        // hook must unwind the live-resize flag, the frozen origin, and the pending
         // commit — otherwise every later present pays the synchronous path outside any resize.
         let view = HarnessTerminalSurfaceView()
         view.testingMarkGridSized()
         view.viewWillStartLiveResize()
         view.testingScheduleResizeCommit(cols: 120, rows: 40)
-        XCTAssertTrue(view.testingPresentsWithTransaction)
+        XCTAssertTrue(view.testingLiveResizeActive)
+        XCTAssertFalse(view.testingPresentsWithTransaction)
         XCTAssertNotNil(view.testingLiveResizeFrozenOrigin)
         XCTAssertTrue(view.testingHasPendingResizeCommit)
 
@@ -486,7 +571,7 @@ final class LiveResizeTests: XCTestCase {
 
     // MARK: - Window-hosted routing (real Metal renderer; skips when unavailable)
 
-    func testWindowHostedLiveResizeRoutesPresentsThroughTransactionSyncPath() throws {
+    func testWindowHostedLiveResizeKeepsPresentsAsynchronous() throws {
         guard MTLCreateSystemDefaultDevice() != nil else { throw XCTSkip("No Metal device available") }
         let window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 400, height: 300),
@@ -509,10 +594,9 @@ final class LiveResizeTests: XCTestCase {
 
         view.viewWillStartLiveResize()
         XCTAssertTrue(view.testingRepaintLastFrame(), "present should succeed during live resize")
-        XCTAssertGreaterThan(
-            view.testingLastPresentScheduleNanos, 0,
-            "live-resize presents must take the transaction-synchronized path"
-        )
+        drainRenderPipeline(view)
+        XCTAssertEqual(view.testingLastPresentScheduleNanos, 0,
+                       "live resize must not wait for GPU scheduling on main")
 
         // The REAL updateGridSize must hold the frozen origin across a sub-cell window growth.
         let frozen = view.testingOriginOffset
@@ -529,6 +613,7 @@ final class LiveResizeTests: XCTestCase {
             XCTAssertEqual(view.testingLastPresentScheduleNanos, 0, "post-drag presents return to async")
         }
         XCTAssertFalse(view.testingPresentsWithTransaction)
+        XCTAssertFalse(view.testingLiveResizeActive)
     }
 
     // MARK: - Near-free drag repaints (row-cache reuse under the frozen origin)
@@ -576,6 +661,7 @@ final class LiveResizeTests: XCTestCase {
         window.setFrame(frame, display: false)
         view.needsLayout = true
         view.layoutSubtreeIfNeeded()
+        drainRenderPipeline(view)
         guard let stats = view.testingLastRenderStats else { throw XCTSkip("present dropped") }
         XCTAssertEqual(stats.encodedRows, 0, "sub-cell drag tick must reuse every row")
         XCTAssertEqual(stats.reusedRows, rows)
@@ -586,6 +672,7 @@ final class LiveResizeTests: XCTestCase {
         window.setFrame(frame, display: false)
         view.needsLayout = true
         view.layoutSubtreeIfNeeded()
+        drainRenderPipeline(view)
         guard let second = view.testingLastRenderStats else { throw XCTSkip("present dropped") }
         XCTAssertEqual(second.encodedRows, 0)
         XCTAssertEqual(second.instanceUploadBytes, 0, "steady-state drag ticks bind the uploaded cache zero-copy")
@@ -599,6 +686,7 @@ final class LiveResizeTests: XCTestCase {
         let hop = expectation(description: "preview main hop drained")
         DispatchQueue.main.async { hop.fulfill() }
         wait(for: [hop], timeout: 2)
+        drainRenderPipeline(view)
     }
 
 
@@ -633,10 +721,8 @@ final class LiveResizeTests: XCTestCase {
         window.setFrame(frame, display: false)
         view.needsLayout = true
         view.layoutSubtreeIfNeeded()
-        guard let boundaryTick = view.testingLastRenderStats else { throw XCTSkip("present dropped") }
-        XCTAssertEqual(boundaryTick.encodedRows, 0,
-                       "the boundary tick itself re-presents the cached frame — main pays no rebuild")
-        XCTAssertEqual(boundaryTick.cells, before.cells, "still the old-wrap frame on this tick")
+        XCTAssertEqual(view.testingLastPresentedFrame?.cells.count, before.cells,
+                       "layout leaves the cached frame in place until async work completes")
 
         // The async preview lands: stash (coherence break) + immediate repaint through the
         // cache-populating full path — the one rebuild this geometry change pays. Setup proved
@@ -665,6 +751,7 @@ final class LiveResizeTests: XCTestCase {
         window.setFrame(frame, display: false)
         view.needsLayout = true
         view.layoutSubtreeIfNeeded()
+        drainRenderPipeline(view)
         guard let reuse = view.testingLastRenderStats else { return XCTFail("present dropped") }
         XCTAssertEqual(reuse.encodedRows, 0, "the tick after the rebuild reuses every row")
     }
@@ -750,10 +837,7 @@ final class LiveResizeTests: XCTestCase {
         window.setFrame(frame, display: false)
         view.needsLayout = true
         view.layoutSubtreeIfNeeded()
-        guard let boundaryTick = view.testingLastRenderStats else { throw XCTSkip("present dropped") }
-        XCTAssertEqual(boundaryTick.encodedRows, 0,
-                       "boundary tick under load re-presents the cached frame without touching the queue")
-        XCTAssertEqual(boundaryTick.cells, before.cells)
+        XCTAssertEqual(view.testingLastPresentedFrame?.cells.count, before.cells)
 
         // Once the parse + preview drain, the re-wrapped preview presents (the old code SKIPPED
         // the preview entirely when the parser was busy — re-wrap under load is the upgrade).
@@ -973,7 +1057,7 @@ final class LiveResizeTests: XCTestCase {
     func testLiveReflowCommitsGridAndPresentsMidDrag() throws {
         // End-to-end with a real renderer: a boundary crossing during a drag commits the
         // authoritative grid + SIGWINCH and presents the reflowed frame through the
-        // transaction-synchronized path — all WITHOUT a viewDidEndLiveResize.
+        // asynchronous render pipeline — all WITHOUT a viewDidEndLiveResize.
         guard MTLCreateSystemDefaultDevice() != nil else { throw XCTSkip("No Metal device available") }
         let window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 400, height: 300),
@@ -1004,14 +1088,10 @@ final class LiveResizeTests: XCTestCase {
         XCTAssertFalse(resizes.isEmpty, "a PTY SIGWINCH fired mid-drag, not at release")
         XCTAssertEqual(resizes.last?.0, view.testingGridSize.cols, "the vote matches the live grid width")
 
-        // Drain the off-main authoritative reflow + its explicit-transaction present hop.
-        view.testingWaitForEmulatorIdle()
-        let hop = expectation(description: "live reflow present hop")
-        DispatchQueue.main.async { hop.fulfill() }
-        wait(for: [hop], timeout: 2)
+        drainRenderPipeline(view)
         if let stats = view.testingLastRenderStats {
-            XCTAssertGreaterThan(stats.presentScheduleNanos, 0,
-                                 "the mid-drag present takes the transaction-synchronized path")
+            XCTAssertEqual(stats.presentScheduleNanos, 0,
+                           "mid-drag presentation must stay asynchronous")
         }
     }
 
@@ -1054,7 +1134,7 @@ final class LiveResizeTests: XCTestCase {
 
     func testMidDragOutputPresentsLiveWithReflowOn() throws {
         // The fluidity contract: with real-time reflow ON (the default), PTY output arriving
-        // mid-drag presents through the scheduler's async path inside an explicit transaction —
+        // mid-drag presents through the asynchronous drawable pipeline —
         // streaming content, SIGWINCH redraws, and keystroke echo keep moving while the pointer
         // is held still, instead of freezing until the next cell-boundary commit. (The reflow-off
         // escape hatch keeps the legacy defer-to-release contract —
@@ -1086,10 +1166,10 @@ final class LiveResizeTests: XCTestCase {
         // Drive the display tick (the production cadence path — the headless link doesn't fire):
         // mid-drag with real-time reflow ON it must run the async render, not the legacy defer.
         XCTAssertTrue(view.testingSchedulerTick(), "the tick must run the async render path mid-drag")
-        drainPreviewHop(view) // the off-main build's main hop → the explicit-transaction present
+        drainPreviewHop(view) // the off-main build's main hop → the asynchronous present
         XCTAssertGreaterThan(presents, 0, "mid-drag output must present live under real-time reflow")
-        XCTAssertGreaterThan(view.testingLastPresentScheduleNanos, 0,
-                             "the mid-drag output present takes the transaction-synchronized path")
+        XCTAssertEqual(view.testingLastPresentScheduleNanos, 0,
+                       "mid-drag output must not wait for GPU scheduling")
     }
 
     func testTokenSupersededCommitBuildStillAppliesResize() throws {
@@ -1133,9 +1213,6 @@ final class LiveResizeTests: XCTestCase {
         // token and the first staged write is overwritten before any build reads it, so the
         // intermediate width is never reflowed. The drag-end settle then converges the emulator
         // on the real-bounds size with nothing left staged.
-        // (The gate parks only ASYNC work: a parked-queue test must not drive any main-side
-        // path that syncs the emulator queue — commitGridSize's generation bump does — or the
-        // test deadlocks itself; live commits deliberately avoid every queue-sync.)
         guard MTLCreateSystemDefaultDevice() != nil else { throw XCTSkip("No Metal device available") }
         let window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 400, height: 300),

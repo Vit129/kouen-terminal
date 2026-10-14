@@ -12,7 +12,7 @@ import QuartzCore
 private typealias RGBColor = HarnessTheme.RGBColor
 
 /// QuartzCore supports drawable acquisition on a rendering thread. This one-shot handoff
-/// writes on drawableQueue, then is read only by its queued main-thread completion.
+/// writes on the acquisition queue, then is read only by its queued main-thread completion.
 private final class SurfaceDrawableRequest: @unchecked Sendable {
     let layer: CAMetalLayer
     var drawable: CAMetalDrawable?
@@ -34,7 +34,7 @@ private final class SurfaceDrawableRequest: @unchecked Sendable {
 }
 
 /// All mutable atlas, instance-cache and upload state belongs to this serial queue.
-/// Layout joins it only for the transaction-synchronized resize path.
+/// AppKit layout never joins this queue.
 final class SurfaceRenderExecutor: @unchecked Sendable {
     let queue: DispatchQueue
     private let renderer: TerminalMetalRenderer
@@ -53,13 +53,6 @@ final class SurfaceRenderExecutor: @unchecked Sendable {
         // pool may otherwise retain completed frame resources across many work items.
         queue.async { [self] in autoreleasepool { body(renderer) } }
     }
-
-    @MainActor func withTransactionOwnership<T>(_ body: (TerminalMetalRenderer) -> T) -> T {
-        // Main is the sole submitter. Draining its earlier jobs transfers ownership for this
-        // call; no later job can be submitted before the current AppKit transaction returns.
-        queue.sync {}
-        return autoreleasepool { body(renderer) }
-    }
 }
 
 private struct SurfacePresentConfiguration: Sendable {
@@ -69,7 +62,6 @@ private struct SurfacePresentConfiguration: Sendable {
     var ligatures: Bool
     var fractionPx: Float
     var clipRows: Int?
-    var synchronizedWithTransaction: Bool
 }
 
 private enum SurfacePresentAttempt: Sendable { case presented, nilDrawable, encodeFailure }
@@ -113,6 +105,8 @@ private struct SurfaceFrameBuildConfiguration: Sendable {
 
 struct SurfaceFrameBuildResult: Sendable {
     var generation: UInt64
+    // A preview may outlive its drag while waiting for a drawable or render completion.
+    var resizePreviewToken: UInt64?
     var frame: TerminalFrame
     var damage: TerminalDamage?
     /// Non-zero for a pure scrollback scroll. The renderer rotates its row cache by this
@@ -342,7 +336,8 @@ final class SurfaceEmulatorState: @unchecked Sendable {
     }
 
     func resetPlainFrame() {
-        sync { _ in
+        // Order invalidation before subsequent builds without waiting for parsing or reflow.
+        async { [self] _ in
             lastPlainFrame = nil
             lastViewportFrame = nil
             lastOverlayKeys = [:]
@@ -640,7 +635,7 @@ public final class HarnessTerminalSurfaceView: NSView {
     /// new drawable size WITHOUT touching the emulator serial queue (which, during heavy output, is
     /// busy parsing). During a drag the grid content is unchanged — reflow + SIGWINCH is debounced
     /// to drag-end (`scheduleResizeCommit`) — so stretching the last frame is exactly correct and
-    /// never blocks main behind the parser. Main-thread only (written in `presentBuiltFrame`).
+    /// never blocks main behind the parser. Main-thread only (written in `finishPresentation`).
     // Renderer mutation/encoding is serialized independently of potentially stalled acquisition.
     private let drawableQueue = DispatchQueue(label: "com.robert.harness.drawable", qos: .userInteractive)
     private let drawableAcquisitionQueues = (0..<2).map {
@@ -675,6 +670,7 @@ public final class HarnessTerminalSurfaceView: NSView {
     /// `configureAppearance(liveResizeReflow:)`; the escape-hatch setting defaults it on. When
     /// false the surface keeps the legacy defer-to-release behavior.
     private var liveResizeReflowEnabled = true
+    private var liveResizeActive = false
     /// The (cols, rows) last handed to the PTY via `onResize`, so a mid-drag commit only fires a
     /// `SIGWINCH` when the cell count actually changed from the last one sent (a within-column drag
     /// frame sends nothing). Reset at drag end so the next drag starts fresh.
@@ -1351,8 +1347,9 @@ public final class HarnessTerminalSurfaceView: NSView {
         (fontThicken, fontThickenStrength)
     }
 
-    // Live-resize seams (glitchless-resize behavior is asserted headlessly: no window, no Metal).
+    // Live-resize lifecycle seams.
     var testingPresentsWithTransaction: Bool { metalLayer.presentsWithTransaction }
+    var testingLiveResizeActive: Bool { liveResizeActive }
     var testingLiveResizeFrozenOrigin: (x: Int, y: Int)? { liveResizeFrozenOrigin }
     var testingGridSize: (cols: Int, rows: Int) { (columns, rows) }
     var testingHasPendingResizeCommit: Bool { resizeCommitWork != nil }
@@ -1857,9 +1854,8 @@ public final class HarnessTerminalSurfaceView: NSView {
         // scans out. Kept in lockstep with the renderer's `maxFramesInFlight` (also 2) so the in-flight
         // semaphore and the drawable pool advertise the same depth — a deeper semaphore would just
         // block on `nextDrawable()` anyway. Keep `allowsNextDrawableTimeout` on (the default): both
-        // regular presents acquire drawables on the render queue; transaction-mode resize
-        // acquires on main. A timeout bounds compositor stalls; failed acquisition uses
-        // an exponential retry deadline instead of waking at display rate.
+        // ordinary and resize presents acquire drawables off main. A timeout bounds compositor
+        // stalls; failed acquisition uses an exponential retry deadline instead of display rate.
         metalLayer.maximumDrawableCount = 2
         metalLayer.allowsNextDrawableTimeout = true
         // Pin the grid to the top-left so any sub-cell remainder from flooring rows/cols
@@ -2210,16 +2206,9 @@ public final class HarnessTerminalSurfaceView: NSView {
             renderExecutor?.async { $0.textBlinkHidden = false }
             stopDisplayLink()
             releaseDrawablePool()
-            // A view can leave the window MID-DRAG (tab close / pane remount during a live
-            // resize) and AppKit does not guarantee `viewDidEndLiveResize` then. This instance
-            // is cached and re-hosted (`TerminalPaneRegistry`), so unwind the live-resize state
-            // here too — a latched `presentsWithTransaction` would route every later present
-            // through the synchronous (main-blocking) path outside any resize, and a stale
-            // frozen origin would mis-anchor the next layout. The pending commit is cancelled,
-            // not flushed: re-attach runs `layout()`, which re-schedules a commit if the size
-            // really differs.
-            metalLayer.presentsWithTransaction = false
-            metalLayer.maximumDrawableCount = 2 // unwind the drag-scoped third drawable too
+            // Cached views can detach mid-drag without an end callback. Reset the lifecycle
+            // so reattaching cannot retain a frozen origin or defer commits indefinitely.
+            liveResizeActive = false
             liveResizeFrozenOrigin = nil
             resizeCommitWork?.cancel()
             resizeCommitWork = nil
@@ -2319,26 +2308,10 @@ public final class HarnessTerminalSurfaceView: NSView {
         scheduleRender()
     }
 
-    /// Glitchless live resize (Hume's technique). While the user drags the window
-    /// edge, the layer presents *with* the Core Animation transaction: every present becomes
-    /// commit → `waitUntilScheduled()` → `drawable.present()` (see the renderer's
-    /// `synchronizedWithTransaction`), so the terminal frame and the window's new frame land in
-    /// the SAME transaction — content stays latched to the edge instead of lagging it by 1–2
-    /// vsyncs (the judder the async present produces). The mode lives exactly as long as the
-    /// drag: outside it, the async present path keeps its latency profile.
-    /// `allowsNextDrawableTimeout` deliberately stays on (see `configureLayer`): a nil drawable
-    /// mid-drag skips one transaction's present and self-heals on the next layout — preferable
-    /// to an unbounded main-thread wait if the GPU wedges.
+    // Keep window interaction independent of drawable availability and GPU backpressure.
     public override func viewWillStartLiveResize() {
         super.viewWillStartLiveResize()
-        metalLayer.presentsWithTransaction = true
-        // Transaction-mode presents hand their drawable to the window server until the CA commit
-        // completes, so with the steady-state pool of 2 (kept for keystroke echo latency) the
-        // next drag tick parks in `nextDrawable()` for most of a frame (measured p50 ~12ms on
-        // 120Hz hardware). A third drawable for the duration of the drag keeps one free while two
-        // ride their transactions; the in-flight semaphore stays at 2 — GPU completion is not the
-        // bottleneck here (semaphoreWait measured 0), the held presents are.
-        metalLayer.maximumDrawableCount = 3
+        liveResizeActive = true
         // Anchor the grid for the whole drag; re-centered once in `viewDidEndLiveResize`.
         // Before the first real layout there's no meaningful origin to freeze — leave nil so
         // `updateGridSize` computes normally.
@@ -2347,14 +2320,9 @@ public final class HarnessTerminalSurfaceView: NSView {
 
     public override func viewDidEndLiveResize() {
         super.viewDidEndLiveResize()
-        metalLayer.presentsWithTransaction = false
-        metalLayer.maximumDrawableCount = 2 // restore the low-latency echo pool (see configureLayer)
-        // Invalidate any in-flight preview build UNCONDITIONALLY. A live commit's generation bump
-        // usually covers this, but a drag that returns to its ORIGINAL size commits nothing (no
-        // bump, previewCols still holds the last intermediate target) — a slow build for that
-        // intermediate width landing after release would pass every guard and stash a wrong-width
-        // frame. Advancing the preview token + clearing the target makes both the on-queue skip and
-        // the hop guards drop it.
+        liveResizeActive = false
+        // A return to the original size need not commit a new grid. Still invalidate previews
+        // waiting for their build, drawable, or render completion so none can restore stale geometry.
         _ = emulatorState.claimPreviewToken()
         previewCols = 0; previewRows = 0
         // Unfreeze and recompute geometry/origin for the SETTLED size. With live reflow on this is
@@ -2365,7 +2333,7 @@ public final class HarnessTerminalSurfaceView: NSView {
         liveResizeFrozenOrigin = nil
         updateGridSize()
         // Flush any pending grid+PTY commit NOW: the size is settled the moment the drag ends and
-        // transaction mode is off, so it lands immediately instead of waiting out the coalescing
+        // commits are allowed, so it lands immediately instead of waiting out the coalescing
         // delay (which exists only for *animated* resizes — sidebar slides, tiling). `perform` runs
         // it synchronously; `cancel` stops the queued asyncAfter copy from re-running it (and
         // `commitGridSize` is idempotent via its cols/rows guard anyway). Ordered AFTER
@@ -2375,37 +2343,25 @@ public final class HarnessTerminalSurfaceView: NSView {
             work.perform()
             work.cancel()
         }
-        if !repaintLastFrame() { scheduleRender() }
+        // Even a return to the original size must replace any intermediate preview.
+        renderNowOffMain()
     }
 
     public override func viewWillDraw() {
         super.viewWillDraw()
-        guard lastPresentedResult != nil, !scheduler.isOccluded, !metalLayer.presentsWithTransaction else { return }
+        guard lastPresentedResult != nil, !scheduler.isOccluded, !liveResizeActive else { return }
         if !repaintLastFrame() { scheduleRender() }
     }
 
     public override func layout() {
         super.layout()
         guard window != nil, !isHiddenOrHasHiddenAncestor, !drawablePoolReleased else { return }
-        // Resize the drawable and repaint in the SAME turn, with implicit animations off, so a
-        // resize never shows a stale frame stretched to the new bounds (the flicker).
         CATransaction.begin()
         CATransaction.setDisableActions(true)
         installIslandCornerMask()
-        let needsFirstPaint = !hasSizedGrid
         updateGridSize()
-        if needsFirstPaint {
-            // First real layout: `updateGridSize` already committed the grid; build + present the
-            // true frame synchronously so the terminal opens correct with no flash.
-            scheduler.forceRender()
-        } else if !repaintLastFrame() {
-            // Resize/animation storm: re-present the cached frame at the new size — no emulator-queue
-            // access, so a window drag never blocks on the output parser (the jank source). Fresh
-            // output still lands between layout frames via the async display-link path. Fall back to
-            // a full synchronous build only when there's no valid cached frame (e.g. generation just
-            // changed via a font/theme/reflow invalidation).
-            scheduler.forceRender()
-        }
+        // A missing/stale cached frame must not make layout wait for parsing or reflow.
+        if !repaintLastFrame() { renderNowOffMain() }
         CATransaction.commit()
     }
 
@@ -2466,7 +2422,7 @@ public final class HarnessTerminalSurfaceView: NSView {
             // Live HUD tick: the integer cols/rows only change at cell boundaries (the drawable
             // resizes smoothly every frame), so this fires exactly when the displayed size ticks.
             onGridSizeWillChange?(newCols, newRows, false)
-            if liveResizeReflowEnabled, metalLayer.presentsWithTransaction {
+            if liveResizeReflowEnabled, liveResizeActive {
                 // Real-time live resize : commit the authoritative reflow + PTY
                 // SIGWINCH at THIS cell boundary so the running program redraws during the drag,
                 // not on release. The reflow runs off-main and coalesces latest-wins, so a fast
@@ -2549,13 +2505,8 @@ public final class HarnessTerminalSurfaceView: NSView {
     /// preview (or `repaintLastFrame`) already covers the interim until the authoritative frame lands.
     private func commitGridSize(cols: Int, rows newRows: Int) {
         resizeCommitWork = nil
-        // Never commit MID-DRAG (a stationary >60ms hold lets the debounce elapse): the commit
-        // bumps the generation — dropping the in-flight preview — but its authoritative re-present
-        // (`renderNowOffMain`) defers while the layer presents with the transaction, and with the
-        // mouse still no further layout runs: the screen would freeze on a stale-generation frame
-        // until the next pointer move. Re-arm instead; `viewDidEndLiveResize` clears the mode
-        // FIRST and then flushes, so the commit lands exactly once at release.
-        if metalLayer.presentsWithTransaction {
+        // The deferred-reflow mode commits only at release, even if the pointer stops.
+        if liveResizeActive {
             scheduleResizeCommit(cols: cols, rows: newRows)
             return
         }
@@ -2606,10 +2557,7 @@ public final class HarnessTerminalSurfaceView: NSView {
     /// - The cross-process PTY vote (`onResize` → daemon ioctl → child `SIGWINCH`) fires only when
     ///   the cell count changed from `lastSentPTYSize`, so a within-column drag frame sends nothing.
     ///
-    /// The rebuilt frame presents inside an explicit `CATransaction` (`flushTransaction`) so a
-    /// completion landing while the mouse is held *still* (no layout pass to ride) still flushes —
-    /// see `presentWithinExplicitTransaction`. Called only while `presentsWithTransaction` (a real
-    /// drag) and `liveResizeReflowEnabled`; `updateGridSize` gates both.
+    /// Rendering stays asynchronous even while the pointer is held still.
     private func requestLiveResizeCommit(cols: Int, rows newRows: Int) {
         guard cols != columns || newRows != rows else { return }
         let localOnly: Bool
@@ -2625,15 +2573,8 @@ public final class HarnessTerminalSurfaceView: NSView {
         }
         columns = cols
         rows = newRows
-        // DELIBERATELY no `renderGeneration` bump here. A bump would make `layout()`'s
-        // `repaintLastFrame` decline (generation mismatch) and fall to the SYNCHRONOUS `forceRender`,
-        // whose `state.sync` would block main behind the in-flight O(history) reflow on the emulator
-        // queue — the exact stall the off-main pipeline exists to avoid. Instead the builder-reuse
-        // cache is cleared ON the queue right after the resize applies (see `applyPendingResize` at
-        // the top of `renderNowOffMain`'s build), and the renderer's row cache auto-invalidates on the
-        // dimension change. So between this commit and the authoritative frame landing, layout keeps
-        // stretching the cached frame (the same near-free sub-cell repaint), and FIFO queue + main
-        // ordering guarantees the latest target's reflow is the one that presents last.
+        // Keep the previous frame available until the authoritative reflow lands. The worker
+        // resets its build cache when it applies the resize; renderer keys track the new grid.
         // PTY SIGWINCH, coalesced caller-side to distinct cell counts (the daemon does not dedupe).
         if !localOnly, lastSentPTYSize?.cols != cols || lastSentPTYSize?.rows != newRows {
             lastSentPTYSize = (cols, newRows)
@@ -2643,33 +2584,17 @@ public final class HarnessTerminalSurfaceView: NSView {
         // fresh re-wrap for this width and a stale in-flight preview can't match `previewCols`.
         previewCols = 0; previewRows = 0
         // Stage the reflow target on the queue (whichever build runs next materializes it — see
-        // `pendingResize`) and present the result within an explicit CA transaction.
+        // `pendingResize`) and submit it through the asynchronous render pipeline.
         historyRestore?.resize(cols: cols, rows: newRows, localOnly: localOnly)
         emulatorState.setPendingResize((cols, newRows), localOnly: localOnly)
-        renderNowOffMain(flushTransaction: true)
-    }
-
-    /// Run `body` (which presents a transaction-synchronized frame) inside an explicit Core
-    /// Animation transaction. With `presentsWithTransaction = true` a `drawable.present()` reaches
-    /// the glass only when the enclosing transaction commits; during a live drag the only
-    /// transactions are AppKit's per-frame `layout()` passes, so an off-main reflow completing while
-    /// the pointer is held still would otherwise never flush (a frozen screen until the next pointer
-    /// move). Wrapping the present in our own begin/commit flushes it immediately — the same
-    /// mechanism `layout()` relies on (`CATransaction` at the resize site), driven from a completion
-    /// handler. A no-op shape outside transaction mode (an explicit transaction around a normal
-    /// async present is harmless), so the end-of-drag settle can share the path.
-    private func presentWithinExplicitTransaction(_ body: () -> Void) {
-        CATransaction.begin()
-        CATransaction.setDisableActions(true)
-        body()
-        CATransaction.commit()
+        renderNowOffMain()
     }
 
     /// Mark the surface dirty and ensure the display link is running to present it. Every code path
     /// that changes what's on screen (PTY output, blink, focus, selection, copy mode, IME, …) funnels
     /// here, so a burst coalesces to one present at the next display tick instead of one async render
-    /// per call. Before the view is in a window (no link yet) this is just the dirty mark; the first
-    /// `viewDidMoveToWindow`/`commitGridSize` paints via the synchronous force path.
+    /// per call. Before the view is in a window (no link yet) this is just the dirty mark;
+    /// layout/commitGridSize schedules the first asynchronous frame.
     func scheduleRender() {
         scheduler.markDirty()
         wakeDisplayLink()
@@ -2749,28 +2674,15 @@ public final class HarnessTerminalSurfaceView: NSView {
         renderNowOffMain()
     }
 
-    /// Force path builds the current frame before returning. Actual transaction-mode resize
-    /// submits inline; ordinary first paint/settle uses the bounded off-main drawable pipeline.
+    /// Explicit forces may build synchronously outside live resize; submission stays off main.
     private func renderNowSynchronous() {
-        renderNowOffMain(synchronous: true)
+        renderNowOffMain(synchronous: !liveResizeActive)
     }
 
-    private func renderNowOffMain(
-        synchronous: Bool = false,
-        flushTransaction: Bool = false
-    ) {
+    private func renderNowOffMain(synchronous: Bool = false) {
         guard !isHiddenOrHasHiddenAncestor else { return }
-        // Live-drag hold for the scheduler's async entry — ESCAPE HATCH ONLY. With real-time
-        // reflow off, the drag's contract is defer-to-release: the grid stays at its pre-drag
-        // size while the re-wrap PREVIEW (a different cell count) owns the glass, so an output
-        // build presenting the old-size grid mid-drag would visibly fight the preview's frame.
-        // With real-time reflow ON (the default), boundary commits keep the real grid current,
-        // so output builds present the same size the drag shows — they flow live (each present
-        // flushes its own explicit CATransaction below), which is what keeps streaming output,
-        // SIGWINCH redraws, and keystroke echo moving DURING the drag instead of one boundary
-        // behind. The synchronous (layout/forceRender) entry always presents — it is a drag
-        // present source; a live-resize commit (`flushTransaction`) likewise.
-        if !synchronous, !flushTransaction, metalLayer.presentsWithTransaction, !liveResizeReflowEnabled {
+        // With reflow disabled the preview owns the drag's geometry. Output resumes at release.
+        if !synchronous, liveResizeActive, !liveResizeReflowEnabled {
             scheduler.markDirty()
             return
         }
@@ -3020,14 +2932,13 @@ public final class HarnessTerminalSurfaceView: NSView {
 
         let token = state.claimFrameToken()
         if synchronous {
-            // Build in queue order; only a real transaction-mode resize acquires on main.
+            // Explicit force callers need a built frame before returning.
             let result = state.sync { emulator in
                 FrameSignposter.shared.interval("frameBuild") { build(emulator) }
             }
             applyPendingMainHop()
-            presentBuiltFrame(result)
+            enqueueDrawableFrame(result)
         } else {
-            let flush = flushTransaction
             state.async { [weak self] emulator in
                 // Latest-wins coalescing: if a newer build is already queued behind this one, skip —
                 // it will consume the damage this one would have (no rows lost), so a burst of marks
@@ -3045,22 +2956,12 @@ public final class HarnessTerminalSurfaceView: NSView {
                         self.pendingDrawableNeedsFullDamage = true
                         self.lastPresentedResultIsRendererCoherent = false
                         if self.pendingDrawableFrame == nil, !self.drawableRequestInFlight {
-                            // A synchronous transaction may already have submitted its successor.
+                            // A forced build may already have submitted its successor.
                             self.scheduleRender()
                         }
                         return
                     }
-                    // Any present landing while the layer is in transaction mode flushes its own
-                    // explicit CATransaction: a live-resize commit by contract, and an un-gated
-                    // mid-drag output build because the mouse may be held still (no layout pass
-                    // to carry a transaction-mode present to the glass). Checked at LANDING time —
-                    // a build that outlives the drag presents normally (the wrap is a harmless
-                    // no-op shape either way, see `presentWithinExplicitTransaction`).
-                    if flush || self.metalLayer.presentsWithTransaction {
-                        self.presentWithinExplicitTransaction { self.presentBuiltFrame(result) }
-                    } else {
-                        self.enqueueDrawableFrame(result)
-                    }
+                    self.enqueueDrawableFrame(result)
                 }
             }
         }
@@ -3069,9 +2970,9 @@ public final class HarnessTerminalSurfaceView: NSView {
     /// Keep a single drawable wait off main, with at most one latest pending frame. Replacing
     /// a built frame invalidates damage reuse because the parser has already consumed its damage.
     /// This preserves display synchronization without parking input, output delivery or AppKit
-    /// behind the compositor's next refresh. Live resize retains its explicit transaction path.
+    /// behind the compositor's next refresh, including during live resize.
     func enqueueDrawableFrame(_ result: SurfaceFrameBuildResult) {
-        guard renderGeneration == result.generation, window != nil, !drawablePoolReleased,
+        guard isCurrentFrame(result), window != nil, !drawablePoolReleased,
               !isHiddenOrHasHiddenAncestor, renderExecutor != nil else { return }
         if pendingDrawableFrame != nil { pendingDrawableNeedsFullDamage = true }
         pendingDrawableFrame = result
@@ -3105,7 +3006,7 @@ public final class HarnessTerminalSurfaceView: NSView {
                 if let latest = self.lastPresentedResult,
                    latest.generation == pending.generation,
                    latest.frame.columns == pending.frame.columns, latest.frame.rows == pending.frame.rows,
-                   latest.outputGeneration > pending.outputGeneration {
+                   latest.outputGeneration > pending.outputGeneration, self.isCurrentFrame(latest) {
                     // A cached repaint queued during a newer encode must reuse that completed
                     // output, rather than restore the older content on its next drawable.
                     pending = latest
@@ -3118,30 +3019,31 @@ public final class HarnessTerminalSurfaceView: NSView {
                     self.lastPresentedResultIsRendererCoherent = false
                 }
                 self.pendingDrawableNeedsFullDamage = false
-                guard let drawable = request.drawable,
-                      drawable.texture.width == Int(self.metalLayer.drawableSize.width),
-                      drawable.texture.height == Int(self.metalLayer.drawableSize.height) else {
-                    executor.sync { $0.invalidateRowReuseCache() }
+                guard let drawable = request.drawable else {
+                    executor.async { $0.invalidateRowReuseCache() }
                     self.drawableRequestInFlight = false
                     self.lastPresentedResultIsRendererCoherent = false
                     self.deferDrawableRetry()
                     return
                 }
-                if self.metalLayer.presentsWithTransaction {
+                guard drawable.texture.width == Int(self.metalLayer.drawableSize.width),
+                      drawable.texture.height == Int(self.metalLayer.drawableSize.height) else {
+                    // Resizing can obsolete a successful acquisition. Keep the latest frame
+                    // and acquire the new geometry without waiting for another output event.
                     self.drawableRequestInFlight = false
-                    self.presentWithinExplicitTransaction {
-                        self.presentBuiltFrame(pending, drawable: drawable, drawableWaitNanos: request.waitNanos)
-                    }
-                } else {
-                    self.presentOffMain(pending, request: request, executor: executor)
+                    self.pendingDrawableFrame = pending
+                    self.pendingDrawableNeedsFullDamage = true
+                    self.startDrawableRequest()
+                    return
                 }
+                self.presentOffMain(pending, request: request, executor: executor)
             }
         }
     }
 
     private func presentOffMain(_ result: SurfaceFrameBuildResult, request: SurfaceDrawableRequest,
                                 executor: SurfaceRenderExecutor) {
-        guard result.generation == renderGeneration, renderExecutor === executor,
+        guard isCurrentFrame(result), renderExecutor === executor,
               let configuration = presentConfiguration(for: result) else {
             drawableRequestInFlight = false
             startDrawableRequest()
@@ -3166,33 +3068,21 @@ public final class HarnessTerminalSurfaceView: NSView {
         }
     }
 
-    /// Accept a built frame. Ordinary frames submit through bounded off-main acquisition;
-    /// actual transaction-mode resize submits inline. Completion handles transient failures.
-    private func presentBuiltFrame(
-        _ result: SurfaceFrameBuildResult, drawable: CAMetalDrawable? = nil, drawableWaitNanos: UInt64 = 0
-    ) {
-        guard renderGeneration == result.generation, window != nil, !drawablePoolReleased,
-              !isHiddenOrHasHiddenAncestor, let executor = renderExecutor else { return }
-        if !metalLayer.presentsWithTransaction {
-            enqueueDrawableFrame(result)
-            return
-        }
-        // A synchronous layout/resize frame supersedes any older frame waiting for a drawable.
-        if pendingDrawableFrame != nil || pendingDrawableNeedsFullDamage {
-            pendingDrawableFrame = nil
-            pendingDrawableNeedsFullDamage = false
-            executor.sync { $0.invalidateRowReuseCache() }
-        }
-        nextPresentationID &+= 1
-        let outcome = presentTransactionFrame(result, damage: result.damage, scrollShift: result.scrollShift, drawable: drawable, acquiredWaitNanos: drawableWaitNanos)
-        let stats = executor.sync { $0.stats }
-        if outcome != .presented { executor.sync { $0.invalidateRowReuseCache() } }
-        finishPresentation(result, outcome: outcome, stats: stats, id: nextPresentationID)
+    private func isCurrentFrame(_ result: SurfaceFrameBuildResult) -> Bool {
+        result.generation == renderGeneration
+            && (result.resizePreviewToken.map { emulatorState.isLatestPreviewToken($0) } ?? true)
     }
 
     private func finishPresentation(_ result: SurfaceFrameBuildResult, outcome: PresentAttempt,
                                     stats: TerminalRenderStats, id: UInt64) {
-        guard result.generation == renderGeneration, id >= completedPresentationID else { return }
+        guard id >= completedPresentationID else { return }
+        guard isCurrentFrame(result) else {
+            // An obsolete preview may already have encoded. Its rows no longer match the
+            // cached frame, so the next submission must revalidate them.
+            lastPresentedResultIsRendererCoherent = false
+            pendingDrawableNeedsFullDamage = true
+            return
+        }
         completedPresentationID = id
         if outcome == .presented {
             cancelDrawableRetry()
@@ -3240,33 +3130,8 @@ public final class HarnessTerminalSurfaceView: NSView {
             gamma: glyphGamma, ligatures: ligaturesEnabled,
             fractionPx: canTranslate && scrollFraction > 0
                 ? Float((scrollFraction * CGFloat(renderer.cellPixelHeight)).rounded()) : 0,
-            clipRows: result.hasPeekRow ? result.frame.rows - 1 : nil,
-            synchronizedWithTransaction: metalLayer.presentsWithTransaction
+            clipRows: result.hasPeekRow ? result.frame.rows - 1 : nil
         )
-    }
-
-    /// Submit within the current AppKit transaction. Only actual transaction-mode resize
-    /// enters this main-thread acquisition path; ordinary force/repaint stays off main.
-    private func presentTransactionFrame(
-        _ result: SurfaceFrameBuildResult, damage: TerminalDamage?, scrollShift: Int = 0,
-        drawable acquiredDrawable: CAMetalDrawable? = nil, acquiredWaitNanos: UInt64 = 0
-    ) -> PresentAttempt {
-        guard window != nil, !drawablePoolReleased, !isHiddenOrHasHiddenAncestor,
-              let executor = renderExecutor, let configuration = presentConfiguration(for: result)
-        else { return .encodeFailure }
-        return autoreleasepool {
-            let start = DispatchTime.now().uptimeNanoseconds
-            let drawable = acquiredDrawable ?? metalLayer.nextDrawable()
-            let wait = acquiredDrawable == nil
-                ? DispatchTime.now().uptimeNanoseconds &- start : acquiredWaitNanos
-            var frame = result
-            frame.damage = damage
-            frame.scrollShift = scrollShift
-            return executor.withTransactionOwnership { renderer in
-                Self.encodePresentation(frame, configuration: configuration, renderer: renderer,
-                                        drawable: drawable, waitNanos: wait)
-            }
-        }
     }
 
     private nonisolated static func encodePresentation(
@@ -3285,8 +3150,7 @@ public final class HarnessTerminalSurfaceView: NSView {
                 scrollFractionPx: configuration.fractionPx,
                 smoothScrollClipRows: configuration.clipRows,
                 frameBuildNanos: result.frameBuildNanos,
-                animatingImages: result.nextAnimationFrame != nil,
-                synchronizedWithTransaction: configuration.synchronizedWithTransaction
+                animatingImages: result.nextAnimationFrame != nil
             )
             return presented ? .presented : .encodeFailure
         }
@@ -3325,27 +3189,13 @@ public final class HarnessTerminalSurfaceView: NSView {
         )
     }
 
-    /// Re-present the last built frame at the *current* drawable size with no emulator-queue access
-    /// — the smooth-resize fast path. Used by `layout()` during a live drag/animation: the grid
-    /// hasn't reflowed yet (deferred to drag-end), so the cached frame is still the correct content;
-    /// we just need to redraw it into the freshly-resized drawable. Returns whether a repaint
-    /// was accepted (ordinary mode) or submitted (transaction mode). Without a valid cached
-    /// frame, the caller builds a current frame before scheduling its submission.
-    ///
-    /// Damage selection is the per-tick cost lever. Under the drag-frozen origin every row-cache
-    /// key (cols/rows/origin/atlas) is stable, so when the cache verifiably holds this exact
-    /// frame's rows (`lastPresentedResultIsRendererCoherent`) an EMPTY damage reuses every row —
-    /// `encodedRows == 0`, zero-copy instance bind, only the viewport uniform changes. When it
-    /// doesn't (preview reflow replaced the frame, a drop wiped the cache), a `full` damage pays
-    /// one rebuild *through the cache-populating path* so the very next tick is free again —
-    /// unlike `damage: nil`, which rebuilds AND leaves the cache empty, making every sub-cell drag
-    /// tick a full re-encode (the pre-#57 resize-lag source). Image frames take the same two
-    /// paths — image quads draw outside the cell instance buffers, so they never gate reuse.
+    /// Queue the cached frame at the current drawable size while a fresh build is pending.
+    /// Empty damage reuses coherent rows; a changed preview or dropped frame rebuilds them.
     @discardableResult
     func repaintLastFrame() -> Bool {
         guard let result = lastPresentedResult,
               result.generation == renderGeneration,
-              window != nil, let executor = renderExecutor else { return false }
+              window != nil, renderExecutor != nil else { return false }
         let damage: TerminalDamage?
         if lastPresentedResultIsRendererCoherent, !drawableRequestInFlight,
            !pendingDrawableNeedsFullDamage {
@@ -3353,54 +3203,20 @@ public final class HarnessTerminalSurfaceView: NSView {
         } else {
             damage = TerminalDamage(full: true)
         }
-        if !metalLayer.presentsWithTransaction {
-            // Layout repaints must not replace a newer output frame already awaiting a drawable.
-            if pendingDrawableFrame == nil {
-                var repaint = result
-                repaint.damage = damage
-                repaint.scrollShift = 0
-                enqueueDrawableFrame(repaint)
-            }
-            return true
-        }
-        // Joining an older encode can enqueue its main completion during this transaction.
-        // The repaint owns a later submission ID so that completion cannot restore stale
-        // frame metadata or cache coherence after the newer transaction has submitted.
-        nextPresentationID &+= 1
-        let presentationID = nextPresentationID
-        let didPresent = presentTransactionFrame(result, damage: damage) == .presented
-        if didPresent {
+        // Layout repaints must not replace a newer output frame already awaiting a drawable.
+        if pendingDrawableFrame == nil {
             var repaint = result
             repaint.damage = damage
             repaint.scrollShift = 0
             repaint.frameBuildNanos = 0
-            finishPresentation(repaint, outcome: .presented, stats: executor.sync { $0.stats },
-                               id: presentationID)
+            enqueueDrawableFrame(repaint)
         }
-        return didPresent
+        return true
     }
 
-    /// Build a live re-wrap preview of the viewport at the current drag target `nc × nr` and present
-    /// it, so the drag shows the content *re-wrapped to the new width* rather than the old grid
-    /// revealed/clipped. Pure: reads the emulator via `previewViewportReflow` (O(visible),
-    /// non-mutating) and never reflows history or sends `SIGWINCH` (both deferred to
-    /// `commitGridSize`), so the shell's width belief never desyncs from the display. Skipped when an
-    /// overlay the preview can't represent is active (scrollback, selection, IME pre-edit, find, copy
-    /// mode) or on the alternate screen — `repaintLastFrame` then keeps re-presenting the cached frame.
-    ///
-    /// The build runs **async on the emulator queue** (latest-wins token, the `renderNowOffMain`
-    /// coalescing pattern): a boundary-crossing tick never parks main on the queue — not behind an
-    /// in-flight parse under heavy output (the old `pendingFeed.isBusy` skip dodged that but still
-    /// paid the full build wall when idle), and not even for the build itself. While the build is in
-    /// flight, `layout()` keeps re-presenting the last cached frame at the new drawable size, so the
-    /// drag never drops a frame; the re-wrapped content lands on the next main hop via
-    /// `presentResizePreview`. A fast drag's boundary builds coalesce to the freshest `nc × nr`.
-    ///
-    /// DELIBERATE TRADE: the boundary tick shows ≤1 frame of the previous column count's wrap at
-    /// the new drawable size before the re-wrap lands (the old synchronous code showed the re-wrap
-    /// same-tick but stalled main for the reflow+build — a blown frame budget on big grids, and it
-    /// SKIPPED the re-wrap entirely under parser load). Frame pacing wins over single-frame wrap
-    /// fidelity; under load the async path is strictly better (stale wrap either way, no stall).
+    /// Build an O(visible) preview without changing history or PTY size. Keep the cached frame
+    /// visible until the worker finishes, and coalesce superseded targets before building.
+    /// Overlays and alternate-screen programs use their authoritative frames instead.
     private func updateResizePreview(cols nc: Int, rows nr: Int) {
         guard scrollOffset == 0, copyMode == nil, selectionAnchor == nil,
               markedText.isEmpty, !findActive else { return }
@@ -3443,15 +3259,7 @@ public final class HarnessTerminalSurfaceView: NSView {
         }
     }
 
-    /// Main-hop landing for an async preview build. Drops a stale preview outright rather than
-    /// stashing it: an async build can land after the drag moved to a different cell target, or
-    /// after the settled commit bumped the generation — stashing a frame for the wrong grid would
-    /// re-present mis-wrapped content on every subsequent sub-cell repaint. A current preview is
-    /// stashed exactly like the old synchronous path (coherence broken: the renderer cache still
-    /// holds the previous frame's rows) and accepted for repaint — the submission pays the one
-    /// cache-populating rebuild per geometry change, and the tick after it is free again.
-    /// Returns whether the preview was accepted (stashed + repaint attempted) — false = dropped
-    /// as stale. The Bool is for tests pinning the guards; production callers ignore it.
+    /// Reject superseded geometry before putting the preview in the bounded drawable pipeline.
     @discardableResult
     private func presentResizePreview(
         _ result: SurfaceFrameBuildResult, cols: Int, rows: Int, token: UInt64
@@ -3462,13 +3270,10 @@ public final class HarnessTerminalSurfaceView: NSView {
               scrollOffset == 0, copyMode == nil, selectionAnchor == nil,
               markedText.isEmpty, !findActive,                // overlays may change during the build
               window != nil else { return false }
-        lastPresentedResult = result
-        // The preview replaced the frame WITHOUT a present: the renderer cache still holds the
-        // previous frame's rows, so the repaint below takes the cache-populating full path.
-        lastPresentedResultIsRendererCoherent = false
-        // Present now (sanctioned drag path: the same `repaintLastFrame` that `layout()` drives);
-        // when no drawable is free this turn, the next layout pass repaints it instead.
-        if !repaintLastFrame() { needsLayout = true }
+        var preview = result
+        preview.resizePreviewToken = token
+        preview.damage = TerminalDamage(full: true)
+        enqueueDrawableFrame(preview)
         return true
     }
 

@@ -8,6 +8,13 @@ has a matching `vX.Y.Z` tag and a signed, notarized DMG on
 
 ## [Unreleased]
 
+## [2.4.1] - 2026-10-13
+
+### Fixed
+
+- Moving and quickly resizing terminal windows stays responsive while rendering catches up. Live resize no longer waits for the GPU or terminal rendering queues on the main thread, and outdated resize previews are discarded.
+- The host selector uses a native macOS menu control. Its icon, host name, and arrow stay together, centered vertically with even spacing between neighboring titlebar controls.
+
 ## [2.4.0] - 2026-10-13
 
 ### Added

@@ -81,16 +81,18 @@ final class TerminalTabBarView: NSView {
     }
 
     /// Leading x of the first pill: the sessions glyph, then the same gap again.
-    private var machineWidth: CGFloat { bounds.width < 720 ? controlSize : (machineButton.isRemote ? 172 : 110) }
+    private var machineWidth: CGFloat {
+        bounds.width < 720 ? controlSize : min(172, max(controlSize, ceil(machineButton.intrinsicContentSize.width)))
+    }
     private var showsMachine: Bool { SessionCoordinator.shared.settings.showMachineIndicator }
     // The traffic-light clearance already includes a gap; don't add it a second time.
     private var controlsLeft: CGFloat { max(controlGap, leadingInset) }
-    private var sessionsButtonX: CGFloat { controlsLeft + (showsMachine ? machineWidth + HarnessDesign.Spacing.md : 0) }
+    private var sessionsButtonX: CGFloat { controlsLeft + (showsMachine ? machineWidth + controlGap : 0) }
 
     func updateMachine(owner: String) {
-        let wasRemote = machineButton.isRemote
+        let previousWidth = machineWidth
         machineButton.update(owner: owner)
-        if wasRemote != machineButton.isRemote { needsLayout = true }
+        if machineWidth != previousWidth { needsLayout = true }
     }
     private var contentLeft: CGFloat { sessionsButtonX + controlSize + controlGap }
 
@@ -335,7 +337,7 @@ final class TerminalTabBarView: NSView {
         super.layout()
         let buttonY = rowCenterY - controlSize / 2
         machineButton.compact = bounds.width < 720
-        machineButton.frame = NSRect(x: controlsLeft, y: rowCenterY - 17, width: machineWidth, height: 34)
+        machineButton.frame = NSRect(x: controlsLeft, y: buttonY, width: machineWidth, height: controlSize)
         sessionsButton.frame = NSRect(
             x: sessionsButtonX,
             y: buttonY,
@@ -1003,44 +1005,36 @@ private final class TabPillView: NSView {
 
 /// One window's machine identity. Opening its menu never performs discovery or a network request.
 @MainActor
-final class MachineIndicatorButton: NSButton {
-    private let symbol = NSImageView()
-    private let nameLabel = NSTextField(labelWithString: "")
-    private let detailLabel = NSTextField(labelWithString: "")
+final class MachineIndicatorButton: NSPopUpButton, NSMenuDelegate {
+    private let identityItem = NSMenuItem(title: "", action: nil, keyEquivalent: "")
     private var owner = DaemonSidebar.localID
     private var address = ""
     private var connectionState = "Connected"
     private var hasIdentity = false
     private var connecting: Set<String> = []
-    var compact = false { didSet { if oldValue != compact { needsLayout = true } } }
+    var compact = false {
+        didSet { if oldValue != compact { applyChrome() } }
+    }
     var isRemote: Bool { owner != DaemonSidebar.localID }
 
     override init(frame: NSRect) {
-        super.init(frame: frame)
-        title = ""
+        super.init(frame: frame, pullsDown: true)
+        usesItemFromMenu = false
         isBordered = false
-        setButtonType(.momentaryChange)
-        target = self
-        action = #selector(showMachines)
-        wantsLayer = true
-        layer?.cornerRadius = HarnessDesign.Radius.control
-        nameLabel.font = HarnessDesign.Typography.tabTitle
-        detailLabel.font = .systemFont(ofSize: 10, weight: .regular)
-        for label in [nameLabel, detailLabel] {
-            label.lineBreakMode = .byTruncatingMiddle
-            HarnessDesign.prepareChromeLabel(label)
-        }
-        for child in [symbol, nameLabel, detailLabel] {
-            child.setAccessibilityElement(false)
-            addSubview(child)
-        }
+        alignment = .center
+        imageHugsTitle = true
+        imagePosition = .imageLeading
+        preferredEdge = .minY
+        cell?.lineBreakMode = .byTruncatingMiddle
+        menu = NSMenu(title: "Machines")
+        menu?.delegate = self
+        (cell as? NSPopUpButtonCell)?.menuItem = identityItem
         update(owner: DaemonSidebar.localID)
     }
 
     @available(*, unavailable)
     required init?(coder: NSCoder) { fatalError() }
     override var mouseDownCanMoveWindow: Bool { false }
-    override func hitTest(_ point: NSPoint) -> NSView? { super.hitTest(point) == nil ? nil : self }
 
     func update(owner: String) {
         let nextState = SessionCoordinator.shared.connectionDescription(for: owner)
@@ -1051,39 +1045,36 @@ final class MachineIndicatorButton: NSButton {
             address = isRemote ? (RemoteHostsService.shared.hosts().first { $0.name == owner }?.sshTarget ?? owner) : ""
         }
         connectionState = nextState
-        nameLabel.stringValue = isRemote ? owner : "This Mac"
-        detailLabel.stringValue = connectionState == "Connected" ? address : connectionState
-        symbol.image = NSImage(systemSymbolName: isRemote ? "globe" : "laptopcomputer", accessibilityDescription: nil)?
-            .withSymbolConfiguration(.init(pointSize: 14, weight: .regular))
-        toolTip = ([nameLabel.stringValue, address, isRemote ? connectionState : "Local terminal"].filter { !$0.isEmpty }).joined(separator: " · ") + " — Switch machine"
+        identityItem.image = NSImage(systemSymbolName: isRemote ? "globe" : "laptopcomputer", accessibilityDescription: nil)?
+            .withSymbolConfiguration(.init(pointSize: HarnessDesign.chromeIconPointSize, weight: .regular))
+        let name = isRemote ? owner : "This Mac"
+        toolTip = [name, address, isRemote ? connectionState : "Local terminal"]
+            .filter { !$0.isEmpty }.joined(separator: " · ") + " — Switch machine"
         setAccessibilityLabel(toolTip)
         applyChrome()
-        needsLayout = true
     }
 
     func applyChrome() {
         let c = HarnessChrome.current
-        HarnessDesign.applyChromeFont(HarnessDesign.Typography.tabTitle, to: [nameLabel])
-        nameLabel.textColor = isRemote ? c.textPrimary : c.textSecondary
-        detailLabel.textColor = connectionState == "Connected" ? c.textSecondary : c.attention
-        symbol.contentTintColor = connectionState == "Connected" ? c.textSecondary : c.attention
-        HarnessDesign.applyChromeLabelAppearance([nameLabel, detailLabel], isDark: c.isDark)
+        font = HarnessDesign.Typography.tabTitle
+        contentTintColor = connectionState == "Connected" ? c.textSecondary : c.attention
+        imagePosition = compact ? .imageOnly : .imageLeading
+        (cell as? NSPopUpButtonCell)?.arrowPosition = compact ? .noArrow : .arrowAtCenter
+        identityItem.title = compact ? "" : (isRemote ? owner : "This Mac")
+        identityItem.attributedTitle = NSAttributedString(string: identityItem.title, attributes: [
+            .font: HarnessDesign.Typography.tabTitle,
+            .foregroundColor: isRemote ? c.textPrimary : c.textSecondary,
+        ])
+        // A separate display item lets AppKit size the host without measuring the long menu rows.
+        (cell as? NSPopUpButtonCell)?.menuItem = identityItem
+        invalidateIntrinsicContentSize()
+        needsDisplay = true
     }
 
-    override func layout() {
-        super.layout()
-        let twoLines = isRemote && !compact
-        nameLabel.isHidden = compact
-        detailLabel.isHidden = !twoLines
-        symbol.frame = NSRect(x: 5, y: bounds.midY - 9, width: 18, height: 18)
-        let width = max(0, bounds.width - 31)
-        nameLabel.frame = NSRect(x: 27, y: twoLines ? bounds.midY : bounds.midY - 8, width: width, height: 16)
-        detailLabel.frame = NSRect(x: 27, y: bounds.midY - 13, width: width, height: 12)
-        HarnessDesign.alignChromeText([nameLabel, detailLabel], in: self)
-    }
-
-    @objc private func showMachines() {
-        let menu = NSMenu(title: "Machines")
+    func menuNeedsUpdate(_ menu: NSMenu) {
+        menu.removeAllItems()
+        // AppKit reserves the first pull-down item for the button's hidden menu title.
+        menu.addItem(NSMenuItem(title: "", action: nil, keyEquivalent: ""))
         func add(_ title: String, owner: String) {
             let item = NSMenuItem(title: title, action: #selector(selectMachine(_:)), keyEquivalent: "")
             item.target = self
@@ -1112,7 +1103,6 @@ final class MachineIndicatorButton: NSButton {
         let addHost = NSMenuItem(title: "Add Remote Host…", action: #selector(MenuTarget.addRemoteHost), keyEquivalent: "")
         addHost.target = MenuTarget.shared
         menu.addItem(addHost)
-        menu.popUp(positioning: nil, at: NSPoint(x: 0, y: 0), in: self)
     }
 
     @objc private func showSessions() {
