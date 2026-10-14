@@ -160,7 +160,7 @@ if [ -n "$KOUEN" ] && [ "$KOUEN_HERMES_SESSION_MODE" = "remote-control" ] && [ -
   }
 fi
 # Kouen CLI wrapper: `kouen` delegates to `kouen-cli` (`kouen rc` opens the Companion).
-if [ -n "$KOUEN" ] && [ -z "$__kouen_cli_wrapped" ]; then
+if [ -z "$__kouen_cli_wrapped" ]; then
   __kouen_cli_wrapped=1
   if declare -F kouen >/dev/null 2>&1; then
     eval "$(declare -f kouen | sed '1s/^kouen /__kouen_next /')"

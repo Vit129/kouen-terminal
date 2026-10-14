@@ -191,7 +191,7 @@ if set -q KOUEN; and test "$KOUEN_HERMES_SESSION_MODE" = remote-control; and not
     end
 end
 # Kouen CLI wrapper: `kouen` delegates to `kouen-cli` (`kouen rc` opens the Companion).
-if set -q KOUEN; and not set -q __kouen_cli_wrapped
+if not set -q __kouen_cli_wrapped
     set -g __kouen_cli_wrapped 1
     if functions -q kouen
         functions -c kouen __kouen_next

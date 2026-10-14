@@ -47,11 +47,11 @@ public final class MobileBridgeServer: @unchecked Sendable {
     /// flooding/slow mobile peer can't stall the GUI's PTY relay. Serial (not concurrent):
     /// per-connection frame ordering is load-bearing (control-vs-input demux, PTY byte
     /// order), and one serial queue preserves it without per-connection locking.
-    private let bridgeQueue = DispatchQueue(label: "com.vit129.kouen.mobile-bridge")
-    private var listeners: [NWListener] = []
+    let bridgeQueue = DispatchQueue(label: "com.vit129.kouen.mobile-bridge")
+    var listeners: [NWListener] = []
     var store: PairedDeviceStore?
-    private let liveConnectionsLock = NSLock()
-    private var liveConnections: [String: NWConnection] = [:]
+    let liveConnectionsLock = NSLock()
+    var liveConnections: [String: NWConnection] = [:]
     /// Retained from `start()` so the receive loop can log a lockout (P37 A1) from off the
     /// pairing-loop thread. Set once, before any connection is accepted.
     var log: (@Sendable (String) -> Void)?
@@ -61,8 +61,8 @@ public final class MobileBridgeServer: @unchecked Sendable {
     /// instead of a QR that could never work (the silent-port-squat failure W1 already hit).
     /// Own lock (not `liveConnectionsLock`): touched from listener state callbacks on
     /// `bridgeQueue` AND from IPC reads on the daemon queue.
-    private let wsReadyLock = NSLock()
-    private var wsReadyHosts: Set<String> = []
+    let wsReadyLock = NSLock()
+    var wsReadyHosts: Set<String> = []
 
     /// Lets `start()`/`stop()` be called repeatedly on the same instance — the daemon now
     /// owns one `MobileBridgeServer` for its whole lifetime and starts/stops it in place from
@@ -71,18 +71,18 @@ public final class MobileBridgeServer: @unchecked Sendable {
     /// token rotations, since its sleep can no longer just run forever.
     private let lifecycleLock = NSLock()
     private var _isRunning = false
-    private var isRunning: Bool {
+    var isRunning: Bool {
         get { lifecycleLock.lock(); defer { lifecycleLock.unlock() }; return _isRunning }
         set { lifecycleLock.lock(); _isRunning = newValue; lifecycleLock.unlock() }
     }
 
-    private func setWSListener(host: String, ready: Bool) {
+    func setWSListener(host: String, ready: Bool) {
         wsReadyLock.lock()
         if ready { wsReadyHosts.insert(host) } else { wsReadyHosts.remove(host) }
         wsReadyLock.unlock()
     }
 
-    private var anyWSListenerReady: Bool {
+    var anyWSListenerReady: Bool {
         wsReadyLock.lock()
         defer { wsReadyLock.unlock() }
         return !wsReadyHosts.isEmpty
@@ -124,7 +124,7 @@ public final class MobileBridgeServer: @unchecked Sendable {
     /// WS upgrade handshake, browser `onopen`, and the client's first token frame can all
     /// complete, unlike the page listener's window (which only starts once TCP is already
     /// `.ready`, and needs just one more simple GET+response over an already-warm path).
-    private let preAuthTimeout: TimeInterval = 15
+    let preAuthTimeout: TimeInterval = 15
 
     /// No longer bound to one surface (see the session-switcher design) — a redeemed
     /// token grants the whole daemon; the client picks/spawns a session afterward. Carries
@@ -1457,7 +1457,7 @@ public final class MobileBridgeServer: @unchecked Sendable {
     /// a WS upgrade. `leftover` carries any bytes read past the blank line terminating the
     /// headers into the WS frame buffer, in case a client pipelines its first frame before
     /// waiting for the 101 response (real browsers don't, but nothing forbids it).
-    private func readRequestHeader(connection: NWConnection, state: ConnectionState, buffer: Data, pageResponse: Data) {
+    func readRequestHeader(connection: NWConnection, state: ConnectionState, buffer: Data, pageResponse: Data) {
         connection.receive(minimumIncompleteLength: 1, maximumLength: 8192) { [weak self] data, _, _, error in
             guard let self else { return }
             if error != nil { connection.cancel(); return }
@@ -1654,130 +1654,56 @@ public final class MobileBridgeServer: @unchecked Sendable {
         return lines.joined(separator: "\n")
     }
 
-    /// Intel Homebrew, Apple Silicon Homebrew, then the CLI bundled in the App Store / standalone app.
-    static let tailscalePath: String = [
-        "/usr/local/bin/tailscale",
-        "/opt/homebrew/bin/tailscale",
-        "/Applications/Tailscale.app/Contents/MacOS/Tailscale",
-    ].first { FileManager.default.isExecutableFile(atPath: $0) } ?? "/usr/local/bin/tailscale"
-
-    /// Best-effort Tailscale IPv4 for the QR's URL; nil if Tailscale isn't installed/up.
-    private func detectTailscaleHost() -> String? {
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: Self.tailscalePath)
-        process.arguments = ["ip", "-4"]
-        let pipe = Pipe()
-        process.standardOutput = pipe
-        process.standardError = Pipe()
-        do {
-            try process.run()
-            process.waitUntilExit()
-            let output = String(data: pipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8)?
-                .trimmingCharacters(in: .whitespacesAndNewlines)
-            if let output, !output.isEmpty { return output }
-        } catch {}
-        return nil
-    }
-
-    /// Best-effort Tailscale MagicDNS name (e.g. `mac-name.tailXXXX.ts.net`) for the QR's
-    /// URL; nil if Tailscale isn't installed/up or MagicDNS is off. Used ONLY for the
-    /// pairing URL's host — listener binds still use `detectTailscaleHost()`'s raw IP,
-    /// since `NWListener` needs a literal address to bind, not a hostname.
-    ///
-    /// Real-device debugging lead (Agy second opinion, P37): iOS WebKit may treat a
-    /// programmatic `new WebSocket("ws://100.x.y.z/...")` to a raw CGNAT-range IP as an
-    /// insecure/local-network request and silently block it, while the SAME top-level
-    /// `http://` page navigation (user-gesture, not JS-initiated) is allowed — matching every
-    /// symptom seen so far (page always loads, the WS upgrade is received server-side and
-    /// answered, yet the client still reports `onerror`). A named host is reportedly treated
-    /// more permissively. This is unverified until tested against a real failing device.
-    private func detectTailscaleMagicDNSName() -> String? {
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: Self.tailscalePath)
-        process.arguments = ["status", "--json"]
-        let pipe = Pipe()
-        process.standardOutput = pipe
-        process.standardError = Pipe()
-        do {
-            try process.run()
-            process.waitUntilExit()
-            let data = pipe.fileHandleForReading.readDataToEndOfFile()
-            guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-                  let selfPeer = json["Self"] as? [String: Any],
-                  var dnsName = selfPeer["DNSName"] as? String,
-                  !dnsName.isEmpty
-            else { return nil }
-            if dnsName.hasSuffix(".") { dnsName.removeLast() }
-            return dnsName
-        } catch {}
-        return nil
-    }
-
-    public static func buildPairingURL(
-        host: String,
-        pageURLPort: Int,
-        wsPort: UInt16,
-        token: String,
-        magicDNSName: String? = nil,
-        isServeActive: Bool = false
-    ) -> String {
-        if isServeActive, let dns = magicDNSName, !dns.isEmpty {
-            return "https://\(dns)/?token=\(token)"
-        }
-        return "http://\(host):\(pageURLPort)/?token=\(token)&wsport=\(wsPort)"
-    }
-
-    public static func isTailscaleServeConfigured(port: Int) -> Bool {
-        let res = runProcess(
-            executableURL: URL(fileURLWithPath: Self.tailscalePath),
-            arguments: ["serve", "status", "--json"],
-            timeoutSeconds: 5
-        )
-        return res.status == 0 && serveStatusProxiesPort(res.stdout, port: port)
-    }
-
-    /// Pure: true only when `tailscale serve status --json` has a web handler proxying to the
-    /// bridge's own port. Any other serve config (a different app's port) must not flip the
-    /// QR to an https:// URL that lands on someone else's server.
-    static func serveStatusProxiesPort(_ statusJSON: String, port: Int) -> Bool {
-        guard let data = statusJSON.data(using: .utf8),
-              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let web = json["Web"] as? [String: Any] else { return false }
-        let targets = ["127.0.0.1:\(port)", "localhost:\(port)"]
-        for case let site as [String: Any] in web.values {
-            for case let handler as [String: Any] in (site["Handlers"] as? [String: Any] ?? [:]).values {
-                guard let proxy = handler["Proxy"] as? String else { continue }
-                if proxy == "\(port)" || targets.contains(where: { proxy.hasSuffix($0) || proxy.contains($0 + "/") }) {
-                    return true
-                }
-            }
-        }
-        return false
-    }
-
     /// Generates a fresh pairing token, prints its QR, and waits it out before generating
     /// the next one — runs on a background thread until `stop()` flips `isRunning` false.
-    /// No longer needs an interactive console prompt (the old "pick a session" step): since
-    /// a token now grants the whole daemon rather than one surface, there's nothing left to
-    /// ask the operator to choose. This also lifts the earlier "must run in a real foreground
-    /// terminal" constraint.
-    private func runPairingLoop(
+    /// Dynamically re-checks Tailscale and Tailscale Serve if they were not online at launch.
+    func runPairingLoop(
         wsPort: UInt16,
         pageURLPort: Int,
         tailscaleHost: String?,
         magicDNSName: String?,
         log: @escaping @Sendable (String) -> Void
     ) {
-        let host = tailscaleHost ?? "127.0.0.1"
-        let serveActive = magicDNSName != nil && Self.isTailscaleServeConfigured(port: pageURLPort)
-        if tailscaleHost == nil {
+        var currentTailscaleHost = tailscaleHost
+        var currentMagicDNSName = magicDNSName
+        var serveActive = currentMagicDNSName != nil && Self.isTailscaleServeConfigured(port: pageURLPort)
+        if currentTailscaleHost == nil {
             log("mobile bridge: Tailscale IP not detected — QR will use loopback (same-Mac testing only)")
         } else if !serveActive {
             log("mobile bridge: Tailscale Serve HTTPS not detected — run 'tailscale serve --bg \(pageURLPort)' to enable HTTPS for PWA installation")
         }
         var notReadyTicks = 0
         var warnedNoListener = false
+        var dynamicCheckCounter = 0
         while isRunning {
+            // Periodic dynamic re-check (every ~2 seconds = 8 ticks of 0.25s) if Tailscale was not detected at launch
+            dynamicCheckCounter += 1
+            if dynamicCheckCounter >= 8 {
+                dynamicCheckCounter = 0
+                if currentTailscaleHost == nil {
+                    if let detectedIP = detectTailscaleHost() {
+                        if let port = NWEndpoint.Port(rawValue: UInt16(clamping: pageURLPort)) {
+                            bindUnifiedListener(bindHost: detectedIP, port: port, log: log)
+                        }
+                        currentTailscaleHost = detectedIP
+                        currentMagicDNSName = detectTailscaleMagicDNSName()
+                        serveActive = currentMagicDNSName != nil && Self.isTailscaleServeConfigured(port: pageURLPort)
+                        log("mobile bridge: Tailscale detected (\(detectedIP)) — bound listener and updated pairing host")
+                    }
+                } else {
+                    if currentMagicDNSName == nil {
+                        currentMagicDNSName = detectTailscaleMagicDNSName()
+                        if currentMagicDNSName != nil {
+                            log("mobile bridge: Tailscale MagicDNS detected (\(currentMagicDNSName!))")
+                        }
+                    }
+                    if !serveActive && currentMagicDNSName != nil && Self.isTailscaleServeConfigured(port: pageURLPort) {
+                        serveActive = true
+                        log("mobile bridge: Tailscale Serve HTTPS detected — switched pairing URL to HTTPS")
+                    }
+                }
+            }
+
             guard anyWSListenerReady else {
                 notReadyTicks += 1
                 if notReadyTicks >= 8 && !warnedNoListener {
@@ -1791,12 +1717,13 @@ public final class MobileBridgeServer: @unchecked Sendable {
             notReadyTicks = 0
             warnedNoListener = false
             let token = String(format: "%06d", Int.random(in: 0..<1_000_000))
+            let host = currentMagicDNSName ?? currentTailscaleHost ?? "127.0.0.1"
             let url = Self.buildPairingURL(
                 host: host,
                 pageURLPort: pageURLPort,
                 wsPort: wsPort,
                 token: token,
-                magicDNSName: magicDNSName,
+                magicDNSName: currentMagicDNSName,
                 isServeActive: serveActive
             )
             pairingBox.current = PendingPairing(token: token, url: url, expiresAt: Date().addingTimeInterval(pairingLifetime))
@@ -3081,100 +3008,6 @@ public final class MobileBridgeServer: @unchecked Sendable {
         }
     }
 
-    /// One listener per bind host, serving both the plain page and the WS bridge on the
-    /// SAME port (see the framing section's doc comment above `webSocketGUID` for why: a
-    /// real phone could reach the page's port over Tailscale but never a second, WS-only
-    /// port on the same host/interface, with Tailscale ACLs confirmed wide open — the only
-    /// way to remove that unexplained difference was removing the second port).
-    private func makeUnifiedListener(bindHost: String, port: NWEndpoint.Port) throws -> NWListener {
-        let parameters = NWParameters.tcp
-        // The port lives in `requiredLocalEndpoint` already — passing `on: port` too
-        // (the two-argument initializer) makes NWListener bind twice and fail with
-        // EINVAL. Bind exclusively through the endpoint.
-        parameters.requiredLocalEndpoint = NWEndpoint.hostPort(host: NWEndpoint.Host(bindHost), port: port)
-        // Without this, binding the SAME port on two different local addresses (loopback
-        // + the Tailscale interface) from two listeners in one process fails with
-        // EADDRINUSE — Network.framework's own port bookkeeping, not a real conflict
-        // (confirmed: freeing the first listener immediately frees the port for reuse).
-        parameters.allowLocalEndpointReuse = true
-        let listener = try NWListener(using: parameters)
-        let body = Data(Self.embeddedPageHTML.utf8)
-        let pageResponse = Data("""
-        HTTP/1.1 200 OK\r
-        Content-Type: text/html; charset=utf-8\r
-        Content-Length: \(body.count)\r
-        Connection: close\r
-        \r
-
-        """.utf8) + body
-        listener.newConnectionHandler = { [weak self] connection in
-            guard let self else { return }
-            self.log?("mobile bridge: connection accepted from \(connection.endpoint)")
-            let state = ConnectionState()
-            connection.stateUpdateHandler = { [weak self] connState in
-                switch connState {
-                case .cancelled, .failed:
-                    if case let .failed(error) = connState {
-                        self?.log?("mobile bridge: connection from \(connection.endpoint) failed: \(error)")
-                    } else {
-                        self?.log?("mobile bridge: connection from \(connection.endpoint) cancelled — authorized=\(state.authorized) pageServed=\(state.pageServed) deviceID=\(state.deviceID ?? "nil")")
-                    }
-                    state.subscription?.cancel()
-                    state.subscription = nil
-                    state.transcriptTimer = nil
-                    // Connection is going away for good (unlike a per-attach detach), so the
-                    // whole-connection session-list subscription dies with it too.
-                    state.snapshotSubscription?.cancel()
-                    state.snapshotSubscription = nil
-                    // Found via code review: iOS Safari drops the WS on screen-lock/backgrounding
-                    // (the existing `reconnectIfDropped` client logic exists exactly because of
-                    // this), and each reconnect that navigates again opens a brand-new
-                    // `BrowserPaneView` on the Mac (`browserPaneID` lives on `ConnectionState`,
-                    // not across connections) — without this, the old pane from every dropped
-                    // connection just accumulates, never closed. Best-effort, off `controlQueue`
-                    // so a slow/hung GUI can't stall this teardown handler for other connections.
-                    if let browserPaneID = state.browserPaneID {
-                        state.controlQueue.async {
-                            _ = try? DaemonClient().request(.browserClose(paneID: browserPaneID), timeout: 5)
-                        }
-                    }
-                    // Only drops the *live* entry — the device stays paired (persists
-                    // in PairedDeviceStore) so a reconnect doesn't need a fresh QR scan.
-                    //
-                    // Found via Agy + Opus verification: this used to remove the map entry
-                    // unconditionally. If `registerLive` had already replaced it with a NEWER
-                    // connection for the same deviceID (see its comment), this teardown firing
-                    // for the OLDER connection would delete the newer entry out from under it —
-                    // the revocation-bypass bug. `NWConnection` is a class, so identity (`===`)
-                    // is exactly "is this still the connection I registered", not just "same id".
-                    if let deviceID = state.deviceID {
-                        self?.liveConnectionsLock.lock()
-                        if Self.shouldRemoveLiveEntry(current: self?.liveConnections[deviceID], torndown: connection) {
-                            self?.liveConnections.removeValue(forKey: deviceID)
-                        }
-                        self?.liveConnectionsLock.unlock()
-                    }
-                default: break
-                }
-            }
-            connection.start(queue: self.bridgeQueue)
-            self.readRequestHeader(connection: connection, state: state, buffer: Data(), pageResponse: pageResponse)
-            // Found via Agy + Opus verification (originally on the WS-only listener; still
-            // applies here unchanged): a peer that completes the TCP handshake and then just
-            // sits there — never finishing its HTTP request, or completing a WS upgrade and
-            // then sending nothing, not even a pairing token — held the connection/fd open
-            // forever. One watchdog now covers both cases: `pageServed` for the plain-HTTP
-            // path, `authorized` for the WS path: once either fires, the peer got a real
-            // response; if neither did within the window, it's a stall.
-            self.bridgeQueue.asyncAfter(deadline: .now() + self.preAuthTimeout) { [weak self] in
-                guard !state.authorized, !state.pageServed else { return }
-                self?.log?("mobile bridge: pre-auth watchdog firing for \(connection.endpoint) — no auth/page-serve within \(self?.preAuthTimeout ?? -1)s, cancelling")
-                connection.cancel()
-            }
-        }
-        return listener
-    }
-
     /// Starts the bridge bound to loopback + (if detected) the Tailscale interface, and the
     /// pairing loop on a background thread. Safe to call again after `stop()` — the Settings
     /// toggle now starts/stops this in place rather than restarting the daemon.
@@ -3219,28 +3052,7 @@ public final class MobileBridgeServer: @unchecked Sendable {
         // Tailscale IP, never an all-interfaces address (see `allowedBindHosts`).
         let bindHosts = Self.allowedBindHosts(tailscaleIP: tailscaleHost)
         for host in bindHosts {
-            do {
-                let listener = try makeUnifiedListener(bindHost: host, port: port)
-                listener.stateUpdateHandler = { [weak self] state in
-                    switch state {
-                    case .ready:
-                        self?.setWSListener(host: host, ready: true)
-                    case .failed(let error):
-                        // A squatted port surfaces HERE (bind errors don't throw above with
-                        // `allowLocalEndpointReuse`) — mark the host down so the pairing URL
-                        // is withheld and the Settings panel shows the failure (R4).
-                        log("mobile bridge: listener on \(host) failed: \(error)")
-                        self?.setWSListener(host: host, ready: false)
-                    case .cancelled:
-                        self?.setWSListener(host: host, ready: false)
-                    default: break
-                    }
-                }
-                listener.start(queue: bridgeQueue)
-                listeners.append(listener)
-            } catch {
-                log("mobile bridge: failed to bind on \(host):\(pageURLPort): \(error)")
-            }
+            bindUnifiedListener(bindHost: host, port: port, log: log)
         }
         log("mobile bridge: listening on \(bindHosts.map { "\($0):\(pageURLPort)" }.joined(separator: ", "))")
 
@@ -3274,23 +3086,6 @@ public final class MobileBridgeServer: @unchecked Sendable {
         connections.forEach { $0.cancel() }
         pairingBox.clear()
         log?("mobile bridge: stopped")
-    }
-
-    /// P37 bind-scope invariant (security-critical, plan risk R6): the bridge has NO TLS. Its
-    /// only wire encryption is WireGuard (the Tailscale interface); the loopback interface never
-    /// leaves the machine. So it may bind ONLY `127.0.0.1` and a detected Tailscale IP — NEVER an
-    /// all-interfaces host (`0.0.0.0` / `::`) or an empty host, which would expose the plaintext
-    /// bridge to the whole LAN. Pure + static so `MobileBridgeBindScopeTests` can assert this can
-    /// never regress. A malformed/empty/non-Tailscale detected IP is dropped, not bound: the
-    /// `100.64.0.0/10` (`100.`) prefix is Tailscale's CGNAT range, a second guard against a
-    /// spoofed `tailscale ip` returning something routable.
-    static func allowedBindHosts(tailscaleIP: String?) -> [String] {
-        var hosts = ["127.0.0.1"]
-        if let ip = tailscaleIP?.trimmingCharacters(in: .whitespacesAndNewlines),
-           !ip.isEmpty, ip != "0.0.0.0", ip != "::", ip.hasPrefix("100.") {
-            hosts.append(ip)
-        }
-        return hosts
     }
 
     /// P37 B1: current pairing state for the in-app QR panel, read over IPC. `url` is the
