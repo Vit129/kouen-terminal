@@ -28,20 +28,33 @@ final class WorktreeMCPIPCDaemonTests: XCTestCase {
         try? FileManager.default.removeItem(at: root)
     }
 
+    /// Explicit creation must give the worktree its own deps: the project's `setupScript` runs
+    /// inside the new worktree (CASE-041 — never a symlinked node_modules).
+    func testWorktreeCreateRunsSetupScriptInsideNewWorktree() throws {
+        try #"{"setupScript": "touch setup-ran"}"#.write(
+            toFile: repoPath + "/kouen.json", atomically: true, encoding: .utf8
+        )
+        let registry = SurfaceRegistry()
+        guard case let .worktreePath(created) = registry.handle(.worktreeCreate(
+            repoPath: repoPath, sessionID: "setup-test", branch: "feat-setup", baseRef: nil
+        )), let path = created else {
+            return XCTFail("Expected .worktreePath from worktreeCreate")
+        }
+        let marker = path + "/setup-ran"
+        let deadline = Date().addingTimeInterval(5)
+        while !FileManager.default.fileExists(atPath: marker), Date() < deadline {
+            Thread.sleep(forTimeInterval: 0.05)
+        }
+        XCTAssertTrue(FileManager.default.fileExists(atPath: marker), "setupScript did not run in the worktree")
+    }
+
     func testCreateListRemoveRoundTripViaIPC() throws {
         let registry = SurfaceRegistry()
 
-        guard case let .error(msg) = registry.handle(.worktreeCreate(
+        guard case let .worktreePath(created) = registry.handle(.worktreeCreate(
             repoPath: repoPath, sessionID: "mcp-test", branch: "feat-mcp", baseRef: nil
-        )) else {
-            return XCTFail("Expected .error from disabled worktreeCreate")
-        }
-        XCTAssertTrue(msg.contains("disabled"))
-
-        guard let path = WorktreeManager().create(
-            repoPath: repoPath, sessionID: "mcp-test", branch: "feat-mcp", baseRef: nil
-        ) else {
-            return XCTFail("Expected WorktreeManager().create to succeed")
+        )), let path = created else {
+            return XCTFail("Expected .worktreePath from worktreeCreate")
         }
         XCTAssertTrue(FileManager.default.fileExists(atPath: path))
 
