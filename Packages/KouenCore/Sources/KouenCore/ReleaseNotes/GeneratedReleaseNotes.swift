@@ -1,26 +1,23 @@
-// Generated from the CHANGELOG.md [4.21.6] block by Scripts/generate-release-notes.swift.
+// Generated from the CHANGELOG.md [4.21.7] block by Scripts/generate-release-notes.swift.
 // DO NOT EDIT BY HAND — regenerate in release prep after updating CHANGELOG.md:
 //   swift Scripts/generate-release-notes.swift
 // Drift guards: ReleaseNotesGuardTests (version + changelog digest), package-app.sh.
 
 extension ReleaseNotes {
     public static let current = ReleaseNotes(
-        version: "4.21.6",
-        changelogDigest: "43649eca05cb7602",
+        version: "4.21.7",
+        changelogDigest: "cbfcf0683f5f7ebb",
         sections: [
             Section(title: "Added", items: [
-                "Companion chat UI — image chips, model/mode meta, agent commands from the phone (8f7f13b)",
-                "Model/effort picker for agy and keep the Companion on the open session across reloads (c735460)",
-                "Read agy's model list from agy models instead of a hand-copied one (d4e1db1)",
+                "Ask before isolating a tab instead of moving the shared folder (47a7bf6)",
+            ]),
+            Section(title: "Changed", items: [
+                "Split MobileBridgeServer so connection, text wrap and per-agent model/effort are findable on their own (6d6e45b)",
             ]),
             Section(title: "Fixed", items: [
-                "Give the preview daemon its own Companion port so it doesn't collide with installed Kouen (535885a)",
-                "Drop TUI spinner/border redraw frames from the Companion feed (b1843fa)",
-                "Preview daemon picks Companion port 8081 itself, however it was started (064bc4d)",
-                "Key Companion credentials by host:port and drop rejected ones so the QR can pair (06ffbcd)",
-                "Agy model switch when the detector misses the pane; keep Claude transcripts on in preview (68eefa2)",
-                "Fall back to the page's agent hint when the detector reports an unsupported kind (78f61b5)",
-                "Drop Claude harness plumbing, show agy tool-only replies, survive agy db writes (2fb464d)",
+                "Re-enable IPC worktreeCreate and run setupScript in each new worktree (7161134)",
+                "Recompute isolation notices on snapshot apply, not only on the branch ping (114e856)",
+                "Separate connecting logic and dynamically discover tailscale (b4e5c80)",
             ]),
         ]
     )

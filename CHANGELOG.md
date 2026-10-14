@@ -5,6 +5,20 @@ All notable changes to Kouen are documented here. The format is based on
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Each released version
 has a matching `vX.Y.Z` tag and a signed, notarized DMG on
 [GitHub Releases](https://github.com/Vit129/kouen-terminal/releases).
+## [4.21.7] - 2026-10-14
+
+### Added
+- Ask before isolating a tab instead of moving the shared folder ([`47a7bf6`](https://github.com/Vit129/kouen-terminal/commit/47a7bf687e0b87cb8178e7ce6a3be180b4711dcd))
+
+### Changed
+- Split MobileBridgeServer so connection, text wrap and per-agent model/effort are findable on their own ([`6d6e45b`](https://github.com/Vit129/kouen-terminal/commit/6d6e45b86704996d57d7dff57241011bc8b08dc0))
+
+### Fixed
+- Re-enable IPC worktreeCreate and run setupScript in each new worktree ([`7161134`](https://github.com/Vit129/kouen-terminal/commit/716113407d4ba80ab999d7f8c39e33a0c6279649))
+- Recompute isolation notices on snapshot apply, not only on the branch ping ([`114e856`](https://github.com/Vit129/kouen-terminal/commit/114e8560e4865a78f88df9c6dde2c7e0236c1be8))
+- Separate connecting logic and dynamically discover tailscale ([`b4e5c80`](https://github.com/Vit129/kouen-terminal/commit/b4e5c801206a4b4c2ee501ec27947e3023983bc6))
+
+
 ## [4.21.6] - 2026-10-13
 
 ### Added
