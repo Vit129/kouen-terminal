@@ -71,11 +71,10 @@ public struct WorktreeManager: Sendable {
     /// same `.git` object store — cheap isolation without a full clone.
     ///
     /// ## Three callers trigger this (search for `.create(`):
-    /// 1. `WorktreeAutoIsolateService.isolate(...)` — REACTIVE. Fires when a tab's git branch
-    ///    changes to a non-default branch (not main/master/develop). Passes `branch: nil` →
-    ///    a `--detach` worktree pinned to `baseRef` (the branch tip), then `cd`s the tab's
-    ///    shell into it. This is what silently moves an agent into `.kouen-worktrees/<branch>-N`
-    ///    mid-session; the `-N` suffix is appended when a worktree for that branch already exists.
+    /// 1. `WorktreeAutoIsolateService.isolate(tabID:)` — USER-TRIGGERED. A branch change only
+    ///    shows a notice; this runs when the user clicks "Isolate into worktree". Checks the
+    ///    existing branch out in a worktree (`checkoutExisting: true`) after freeing it in the
+    ///    shared tree, then `cd`s that one tab in.
     /// 2. `SessionLifecycleService.addAgentTask(...)` — EXPLICIT. User creates a named task;
     ///    passes `branch: <sanitized-task-name>` → a `-b <branch>` worktree (creates the branch).
     /// 3. `SurfaceRegistry` `.worktreeCreate` IPC — passthrough for daemon clients, forwarding
