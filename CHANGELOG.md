@@ -18,7 +18,6 @@ has a matching `vX.Y.Z` tag and a signed, notarized DMG on
 - Recompute isolation notices on snapshot apply, not only on the branch ping ([`114e856`](https://github.com/Vit129/kouen-terminal/commit/114e8560e4865a78f88df9c6dde2c7e0236c1be8))
 - Separate connecting logic and dynamically discover tailscale ([`b4e5c80`](https://github.com/Vit129/kouen-terminal/commit/b4e5c801206a4b4c2ee501ec27947e3023983bc6))
 
-
 ## [4.21.6] - 2026-10-13
 
 ### Added
