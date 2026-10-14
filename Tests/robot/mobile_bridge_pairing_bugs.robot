@@ -29,6 +29,7 @@ Library          Process
 *** Variables ***
 ${ROOT}            ${CURDIR}/../..
 ${MOBILE_BRIDGE}   ${ROOT}/Packages/KouenDaemon/Sources/KouenDaemon/MobileBridgeServer.swift
+${MOBILE_BRIDGE_CONN}    ${ROOT}/Packages/KouenDaemon/Sources/KouenDaemon/MobileBridgeServer+Connection.swift
 
 *** Test Cases ***
 Bug 1 - Rotation Grace Slot Keeps The Previous Token Redeemable
@@ -79,8 +80,8 @@ Bug 2 - Reject Path Closes Gracefully With Policy-Violation Code 1008
     [Documentation]    rejectAndClose() must send a real WS close frame (opcode 0x8) carrying the
     ...                RFC 6455 status 1008 (Policy Violation, big-endian 0x03 0xF0) so the browser
     ...                fires a clean onclose instead of onerror.
-    ${content}=    Get File    ${MOBILE_BRIDGE}
-    Should Contain    ${content}    private func rejectAndClose(_ json: String, on connection: NWConnection)
+    ${content}=    Get File    ${MOBILE_BRIDGE_CONN}
+    Should Contain    ${content}    func rejectAndClose(_ json: String, on connection: NWConnection)
     ...    msg=the single graceful-reject helper must exist
     Should Contain    ${content}    Data([0x03, 0xF0])
     ...    msg=the close frame must carry status code 1008 (0x03 0xF0), not an empty/no-code close
