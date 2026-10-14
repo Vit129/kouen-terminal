@@ -33,9 +33,21 @@ final class LiveResizeTests: XCTestCase {
         let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 400, height: 300),
                               styleMask: [.titled, .resizable], backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false
-        defer { window.contentView = nil }
+        defer { window.contentView = nil; window.close() }
         let view = try makeHostedView(in: window)
         view.testingSetLiveResizeReflow(true)
+        if view.testingLastPresentedFrame == nil {
+            // A hosted runner can temporarily exhaust its drawable pool. Queue drainage alone
+            // does not imply a presentation when acquisition scheduled a deferred retry.
+            let presented = expectation(description: "initial frame presented before blocking the worker")
+            var fulfilled = false
+            view.onRenderStats = { _ in
+                if !fulfilled { fulfilled = true; presented.fulfill() }
+            }
+            view.testingForceRender()
+            wait(for: [presented], timeout: 5)
+            view.onRenderStats = nil
+        }
         _ = try XCTUnwrap(view.testingLastPresentedFrame)
 
         let entered = DispatchSemaphore(value: 0)
