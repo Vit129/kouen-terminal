@@ -185,8 +185,8 @@
     "semantic_hash": ""
   },
   "Apps/Kouen/Sources/KouenApp/Services/SessionLifecycleService.swift": {
-    "mtime": 1791450254.549458,
-    "ast_hash": "707a46224ff46f325e8b21600a4a9e0d",
+    "mtime": 1791981678.436503,
+    "ast_hash": "6b6cfe8152383ff2f6778f1a8d57beee",
     "semantic_hash": ""
   },
   "Apps/Kouen/Sources/KouenApp/Services/SnapshotCoalescer.swift": {
@@ -250,8 +250,8 @@
     "semantic_hash": ""
   },
   "Apps/Kouen/Sources/KouenApp/Services/WorktreeAutoIsolateService.swift": {
-    "mtime": 1791520453.7222373,
-    "ast_hash": "8dfd3956f95c0705009819204435f6c1",
+    "mtime": 1791981678.436946,
+    "ast_hash": "d9ae33166336c9eab16f133e137294ac",
     "semantic_hash": ""
   },
   "Apps/Kouen/Sources/KouenApp/Services/ZombieHoldRegistry.swift": {
@@ -335,8 +335,8 @@
     "semantic_hash": ""
   },
   "Apps/Kouen/Sources/KouenApp/UI/Chrome/ContentAreaViewController.swift": {
-    "mtime": 1789659297.4995406,
-    "ast_hash": "8fbb94eeeaba29f746f98a37ba6c28d4",
+    "mtime": 1791981678.4374425,
+    "ast_hash": "4941d5c9519061251c70724a01a3e204",
     "semantic_hash": ""
   },
   "Apps/Kouen/Sources/KouenApp/UI/Chrome/FilePreviewCoordinator.swift": {
@@ -1095,8 +1095,8 @@
     "semantic_hash": ""
   },
   "Packages/KouenCore/Sources/KouenCore/Shell/ShellIntegration.swift": {
-    "mtime": 1791868883.7255838,
-    "ast_hash": "2db91b722de7e6915dcf1c4d7829157e",
+    "mtime": 1791988716.9719636,
+    "ast_hash": "1e4933dbaf7372b232c5d00d4461f1f2",
     "semantic_hash": ""
   },
   "Packages/KouenCore/Sources/KouenCore/Tasks/TaskStore.swift": {
@@ -1120,8 +1120,8 @@
     "semantic_hash": ""
   },
   "Packages/KouenCore/Sources/KouenCore/Worktree/WorktreeManager.swift": {
-    "mtime": 1791520453.7282443,
-    "ast_hash": "1ad0f0d9fc198a7dbc1a7122840f6e2e",
+    "mtime": 1791981678.4384854,
+    "ast_hash": "91f96dc3f22aaff6946fcc632bc6d52f",
     "semantic_hash": ""
   },
   "Packages/KouenDaemon/Sources/KouenDaemon/AgentScanner.swift": {
@@ -1165,8 +1165,8 @@
     "semantic_hash": ""
   },
   "Packages/KouenDaemon/Sources/KouenDaemon/MobileBridgeServer.swift": {
-    "mtime": 1791979635.5996227,
-    "ast_hash": "dc242a64febdda871455c758ed493a21",
+    "mtime": 1791989101.085588,
+    "ast_hash": "daa09f54c01565cc418c08ab494510e6",
     "semantic_hash": ""
   },
   "Packages/KouenDaemon/Sources/KouenDaemon/PairedDeviceStore.swift": {
@@ -1185,8 +1185,8 @@
     "semantic_hash": ""
   },
   "Packages/KouenDaemon/Sources/KouenDaemon/SurfaceRegistry.swift": {
-    "mtime": 1791540191.1094565,
-    "ast_hash": "968b29270a34dae0eb55341be48c456d",
+    "mtime": 1791981678.4395502,
+    "ast_hash": "0dca4bb086f056dc72eaa031e60b0ba6",
     "semantic_hash": ""
   },
   "Packages/KouenDaemon/Sources/KouenDaemon/VersionBannerState.swift": {
@@ -1490,8 +1490,8 @@
     "semantic_hash": ""
   },
   "Packages/KouenSettings/Sources/KouenSettings/ProjectConfig.swift": {
-    "mtime": 1785510867.583266,
-    "ast_hash": "a8732b8cff54ae74c5ed956250d36f7d",
+    "mtime": 1791981678.4401124,
+    "ast_hash": "2c491258477933f654ec80a4324aa0bf",
     "semantic_hash": ""
   },
   "Packages/KouenSettings/Sources/KouenSettings/ShellRCWiring.swift": {
@@ -2660,8 +2660,8 @@
     "semantic_hash": ""
   },
   "Tests/KouenDaemonTests/MobileBridgePairingTests.swift": {
-    "mtime": 1790260895.135548,
-    "ast_hash": "b4ff9a121e0653ff5cffd2db22c484de",
+    "mtime": 1791988687.1465497,
+    "ast_hash": "156a183408dc9b4eae2e1dc118a67396",
     "semantic_hash": ""
   },
   "Tests/KouenDaemonTests/MobileBridgeSpawnTests.swift": {
@@ -2740,8 +2740,8 @@
     "semantic_hash": ""
   },
   "Tests/KouenDaemonTests/WorktreeMCPIPCDaemonTests.swift": {
-    "mtime": 1789717683.0543976,
-    "ast_hash": "ce359c2bad34774296df8e0dfdf19e2c",
+    "mtime": 1791981678.4407787,
+    "ast_hash": "3c592dab9a0237dc82d2a7ad9cedd0d9",
     "semantic_hash": ""
   },
   "Tests/KouenMCPTests/KouenBrowserToolsTests.swift": {
@@ -2830,8 +2830,8 @@
     "semantic_hash": ""
   },
   "Tests/KouenRobotTests/suites/worktree_isolation.robot": {
-    "mtime": 1785510867.652142,
-    "ast_hash": "122a5dda1a8212fdd2bb9f768d3d7bdc",
+    "mtime": 1791981678.4414065,
+    "ast_hash": "0a47066212dd377ac06d932dd51bd2a3",
     "semantic_hash": ""
   },
   "Tests/KouenRobotTests/suites/worktree_isolation_cli.robot": {
@@ -3330,13 +3330,13 @@
     "semantic_hash": ""
   },
   "docs/shell-integration/kouen.bash": {
-    "mtime": 1791868883.7488005,
-    "ast_hash": "aa6ebe3fe19ef25db91510b46d161ab5",
+    "mtime": 1791988744.2220457,
+    "ast_hash": "bb2e00e3f40bfd689c0f759913c9b746",
     "semantic_hash": ""
   },
   "docs/shell-integration/kouen.fish": {
-    "mtime": 1791868883.7496784,
-    "ast_hash": "be7ae4c6307d76cde1473895b95fd6db",
+    "mtime": 1791988754.59176,
+    "ast_hash": "a22bc58ee263f6fd8ce4e7ef0a5a08e1",
     "semantic_hash": ""
   },
   "project.yml": {
@@ -3350,7 +3350,7 @@
     "semantic_hash": ""
   },
   "AGENTS.md": {
-    "mtime": 1791980338.7984893,
+    "mtime": 1791981678.435944,
     "ast_hash": "aa2332bb9716f8556976339bfca9c2c3",
     "semantic_hash": ""
   },
@@ -3570,8 +3570,8 @@
     "semantic_hash": ""
   },
   "Tests/robot/worktree_auto_isolate_wiring.robot": {
-    "mtime": 1785510867.6746302,
-    "ast_hash": "9eacde05c1b7bd85ef0e176c560f26d8",
+    "mtime": 1791981678.4417763,
+    "ast_hash": "77f7add1a4bc9057d75818bc447c9aba",
     "semantic_hash": ""
   },
   "Tests/KouenCoreTests/MCPConfigWriterTOMLTests.swift": {
@@ -4602,6 +4602,26 @@
   "Packages/KouenDaemon/Sources/KouenDaemon/MobileBridgeTextWrap.swift": {
     "mtime": 1791979635.6003351,
     "ast_hash": "090cfde641022aba6301dcc3dba969fa",
+    "semantic_hash": ""
+  },
+  "Apps/Kouen/Sources/KouenApp/UI/Chrome/WorktreeIsolationNoticeView.swift": {
+    "mtime": 1791981678.4378872,
+    "ast_hash": "3edd32035b184125da1ba5bb693cd104",
+    "semantic_hash": ""
+  },
+  "Packages/KouenDaemon/Sources/KouenDaemon/MobileBridgeServer+Connecting.swift": {
+    "mtime": 1791988531.9342766,
+    "ast_hash": "d0fb7d8d8cc96474e10037abf57b9ef7",
+    "semantic_hash": ""
+  },
+  "Tests/KouenAppTests/WorktreeAutoIsolateServiceTests.swift": {
+    "mtime": 1791981678.4403958,
+    "ast_hash": "3df359f4ad108e35b7e002cf5d132c18",
+    "semantic_hash": ""
+  },
+  "docs/research/worktree-ownership.md": {
+    "mtime": 1791981678.4420784,
+    "ast_hash": "fca5408c5c1175e2eaf6d26839e9151c",
     "semantic_hash": ""
   }
 }
