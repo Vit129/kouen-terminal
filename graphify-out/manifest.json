@@ -970,8 +970,8 @@
     "semantic_hash": ""
   },
   "Packages/KouenCore/Sources/KouenCore/KouenVersion.swift": {
-    "mtime": 1791882874.3586154,
-    "ast_hash": "962fff383bd3fbf684a9f6b340fd6a82",
+    "mtime": 1791989999.8836732,
+    "ast_hash": "fa2b6b67cbd430615f85e070773d9c83",
     "semantic_hash": ""
   },
   "Packages/KouenCore/Sources/KouenCore/Layouts/LayoutTemplate.swift": {
@@ -1060,8 +1060,8 @@
     "semantic_hash": ""
   },
   "Packages/KouenCore/Sources/KouenCore/ReleaseNotes/GeneratedReleaseNotes.swift": {
-    "mtime": 1791882876.1370687,
-    "ast_hash": "b93a4a59faf76e420f66fc0170ceca23",
+    "mtime": 1791990004.232696,
+    "ast_hash": "9b54fe1aa8789a7dbd4d8b820b747be2",
     "semantic_hash": ""
   },
   "Packages/KouenCore/Sources/KouenCore/ReleaseNotes/ReleaseNotes.swift": {
@@ -1095,7 +1095,7 @@
     "semantic_hash": ""
   },
   "Packages/KouenCore/Sources/KouenCore/Shell/ShellIntegration.swift": {
-    "mtime": 1791988716.9719636,
+    "mtime": 1791989583.6807733,
     "ast_hash": "1e4933dbaf7372b232c5d00d4461f1f2",
     "semantic_hash": ""
   },
@@ -1165,7 +1165,7 @@
     "semantic_hash": ""
   },
   "Packages/KouenDaemon/Sources/KouenDaemon/MobileBridgeServer.swift": {
-    "mtime": 1791989101.085588,
+    "mtime": 1791989583.6818733,
     "ast_hash": "daa09f54c01565cc418c08ab494510e6",
     "semantic_hash": ""
   },
@@ -2660,7 +2660,7 @@
     "semantic_hash": ""
   },
   "Tests/KouenDaemonTests/MobileBridgePairingTests.swift": {
-    "mtime": 1791988687.1465497,
+    "mtime": 1791989583.6827805,
     "ast_hash": "156a183408dc9b4eae2e1dc118a67396",
     "semantic_hash": ""
   },
@@ -3330,12 +3330,12 @@
     "semantic_hash": ""
   },
   "docs/shell-integration/kouen.bash": {
-    "mtime": 1791988744.2220457,
+    "mtime": 1791989583.6835139,
     "ast_hash": "bb2e00e3f40bfd689c0f759913c9b746",
     "semantic_hash": ""
   },
   "docs/shell-integration/kouen.fish": {
-    "mtime": 1791988754.59176,
+    "mtime": 1791989583.6840963,
     "ast_hash": "a22bc58ee263f6fd8ce4e7ef0a5a08e1",
     "semantic_hash": ""
   },
@@ -4610,7 +4610,7 @@
     "semantic_hash": ""
   },
   "Packages/KouenDaemon/Sources/KouenDaemon/MobileBridgeServer+Connecting.swift": {
-    "mtime": 1791988531.9342766,
+    "mtime": 1791989583.6811724,
     "ast_hash": "d0fb7d8d8cc96474e10037abf57b9ef7",
     "semantic_hash": ""
   },
