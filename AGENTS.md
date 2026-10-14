@@ -33,7 +33,7 @@ mcp__graphify__get_node      # explain concept/symbol
 ```
 
 ```bash
-graphify update . && ~/.claude/scripts/generate-graph-summary.sh .  # rebuild index (CLI)
+graphify update .  # rebuild index + GRAPH_SUMMARY.md (CLI)
 ```
 
 ## graphify
