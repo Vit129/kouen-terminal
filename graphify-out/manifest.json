@@ -1165,7 +1165,7 @@
     "semantic_hash": ""
   },
   "Packages/KouenDaemon/Sources/KouenDaemon/MobileBridgeServer.swift": {
-    "mtime": 1791943322.6826584,
+    "mtime": 1791979635.5996227,
     "ast_hash": "dc242a64febdda871455c758ed493a21",
     "semantic_hash": ""
   },
@@ -3110,7 +3110,7 @@
     "semantic_hash": ""
   },
   "Tests/robot/mobile_bridge_pairing_bugs.robot": {
-    "mtime": 1791943344.4584274,
+    "mtime": 1791979635.6023197,
     "ast_hash": "94db160cb8d471987190a1d406ba6368",
     "semantic_hash": ""
   },
@@ -3350,8 +3350,8 @@
     "semantic_hash": ""
   },
   "AGENTS.md": {
-    "mtime": 1791641771.1458364,
-    "ast_hash": "a26e8e44650d811498fe17dc990cd5b1",
+    "mtime": 1791980338.7984893,
+    "ast_hash": "aa2332bb9716f8556976339bfca9c2c3",
     "semantic_hash": ""
   },
   "Apps/Kouen/Resources/Fonts/SymbolsNerdFont-LICENSE.txt": {
@@ -4545,7 +4545,7 @@
     "semantic_hash": ""
   },
   "Tests/KouenDaemonTests/MobileBridgeContractTests.swift": {
-    "mtime": 1791943463.138603,
+    "mtime": 1791979635.6010199,
     "ast_hash": "1f201c4cd784e26281eae95c56a7d3f3",
     "semantic_hash": ""
   },
@@ -4580,27 +4580,27 @@
     "semantic_hash": ""
   },
   "Packages/KouenDaemon/Sources/KouenDaemon/MobileBridgeAgentCommands+Agy.swift": {
-    "mtime": 1791942962.3340101,
+    "mtime": 1791979635.5939472,
     "ast_hash": "01245dd4150e8681412c138cb046f30a",
     "semantic_hash": ""
   },
   "Packages/KouenDaemon/Sources/KouenDaemon/MobileBridgeAgentCommands+Claude.swift": {
-    "mtime": 1791942962.3338718,
+    "mtime": 1791979635.5943353,
     "ast_hash": "cbc053c60d8920adc6afd829eaf692a8",
     "semantic_hash": ""
   },
   "Packages/KouenDaemon/Sources/KouenDaemon/MobileBridgeAgentCommands.swift": {
-    "mtime": 1791942969.6061516,
+    "mtime": 1791979635.5960667,
     "ast_hash": "db526928a4d87a7f5e00c1508cacbbcb",
     "semantic_hash": ""
   },
   "Packages/KouenDaemon/Sources/KouenDaemon/MobileBridgeServer+Connection.swift": {
-    "mtime": 1791943322.6604104,
+    "mtime": 1791979635.597655,
     "ast_hash": "55c51f07c0da671f99a353b63be97559",
     "semantic_hash": ""
   },
   "Packages/KouenDaemon/Sources/KouenDaemon/MobileBridgeTextWrap.swift": {
-    "mtime": 1791942939.9907503,
+    "mtime": 1791979635.6003351,
     "ast_hash": "090cfde641022aba6301dcc3dba969fa",
     "semantic_hash": ""
   }
