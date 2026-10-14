@@ -41,7 +41,7 @@ public final class MobileBridgeServer: @unchecked Sendable {
     // fix the bug without weakening the shoulder-surf expiry (a truly old QR still dies). The
     // A1 lockout (5 attempts/window) stays the only real brute-force constraint.
     private let pairingLifetime: TimeInterval = 120
-    private let pairingBox: PairingBox
+    let pairingBox: PairingBox
     /// P37 A3: one dedicated serial queue for every listener accept AND every connection's
     /// send/receive callbacks — moves the whole bridge off the daemon's `.main` queue so a
     /// flooding/slow mobile peer can't stall the GUI's PTY relay. Serial (not concurrent):
@@ -49,12 +49,12 @@ public final class MobileBridgeServer: @unchecked Sendable {
     /// order), and one serial queue preserves it without per-connection locking.
     private let bridgeQueue = DispatchQueue(label: "com.vit129.kouen.mobile-bridge")
     private var listeners: [NWListener] = []
-    private var store: PairedDeviceStore?
+    var store: PairedDeviceStore?
     private let liveConnectionsLock = NSLock()
     private var liveConnections: [String: NWConnection] = [:]
     /// Retained from `start()` so the receive loop can log a lockout (P37 A1) from off the
     /// pairing-loop thread. Set once, before any connection is accepted.
-    private var log: (@Sendable (String) -> Void)?
+    var log: (@Sendable (String) -> Void)?
     /// P37 B2 (plan risk R4): bind hosts whose WS listener is currently `.ready`, keyed by
     /// host so a late `.failed` only clears its own entry. When this is empty the pairing URL
     /// is withheld from `currentPairingInfo` — the Settings panel then shows "not listening"
@@ -113,7 +113,7 @@ public final class MobileBridgeServer: @unchecked Sendable {
     /// current pairing window before the bridge refuses further token auth until the next
     /// token rotates. Device re-auth (`{deviceAuth}`) is unaffected — a returning device
     /// still reconnects during a lockout.
-    private let maxTokenAttempts = 5
+    let maxTokenAttempts = 5
 
     /// Slowloris guard for both listeners (page + WS) — a peer that never sends its first
     /// byte (page: the GET line; WS: the connection is created and this starts counting
@@ -224,7 +224,7 @@ public final class MobileBridgeServer: @unchecked Sendable {
 
     /// `@unchecked Sendable` with an explicit lock: mutated both from the WS receive chain
     /// (listener queue) and the background queue performing (blocking) daemon calls.
-    private final class ConnectionState: @unchecked Sendable {
+    final class ConnectionState: @unchecked Sendable {
         private let lock = NSLock()
         private var _authorized = false
         private var _surfaceID: String?
@@ -390,7 +390,7 @@ public final class MobileBridgeServer: @unchecked Sendable {
         .stage{height:100%}
       }
       header.bar{display:flex;align-items:center;gap:10px;padding:14px 16px 10px;border-bottom:1px solid var(--line)}
-      header.bar h2{font-size:17px;margin:0;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+      header.bar h2{font-size:17px;margin:0;flex:1;min-width:0;overflow:hidden}
       .sub{color:var(--muted);font-size:12px;font-family:var(--f-mono)}
       button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
       button:focus-visible,textarea:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
@@ -412,8 +412,8 @@ public final class MobileBridgeServer: @unchecked Sendable {
       .dot.run{background:var(--run);box-shadow:0 0 0 4px var(--accent-soft)}
       .dot.wait{background:var(--warn);box-shadow:0 0 0 4px var(--warn-soft)}
       .dot.idle{background:var(--idle)}
-      .sess .name{font-weight:700;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-      .sess .meta{grid-column:2;color:var(--muted);font-size:12px;font-family:var(--f-mono);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+      .sess .name{font-weight:700;min-width:0;overflow:hidden}
+      .sess .meta{grid-column:2;color:var(--muted);font-size:12px;font-family:var(--f-mono);min-width:0;overflow:hidden}
       .pill{font-size:11px;font-weight:700;padding:2px 8px;border-radius:999px;letter-spacing:.03em;grid-row:span 2}
       .pill.wait{background:var(--warn-soft);color:var(--warn)}
       .pill.run{background:var(--accent-soft);color:var(--accent)}
@@ -424,8 +424,8 @@ public final class MobileBridgeServer: @unchecked Sendable {
       /* Chat */
       .out{padding:14px 16px 20px;display:flex;flex-direction:column;gap:12px}
       .msg{min-width:0}
-      .msg.user{align-self:flex-end;background:var(--accent);color:var(--accent-ink);padding:9px 13px;border-radius:16px 16px 4px 16px;max-width:85%;white-space:pre-wrap;overflow-wrap:anywhere}
-      .bot{min-width:0;font-size:15px;line-height:1.55;overflow-wrap:anywhere}
+      .msg.user{align-self:flex-end;background:var(--accent);color:var(--accent-ink);padding:9px 13px;border-radius:16px 16px 4px 16px;max-width:85%}
+      .bot{min-width:0;font-size:15px;line-height:1.55}
       .bot p{margin:0 0 8px}
       .bot p:last-child,.bot ul:last-child,.bot ol:last-child{margin-bottom:0}
       .bot ul,.bot ol{margin:0 0 8px;padding-left:20px}
@@ -444,7 +444,7 @@ public final class MobileBridgeServer: @unchecked Sendable {
       .tools{display:flex;flex-direction:column;gap:2px}
       .tool{font-family:var(--f-mono);font-size:12px;color:var(--muted);display:flex;gap:8px;align-items:baseline;min-width:0}
       .tool b{color:var(--ink);font-weight:600;flex:none}
-      .tool span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+      .tool span{min-width:0;overflow:hidden}
       .toolsum{font-family:var(--f-mono);font-size:12px;color:var(--muted);text-align:left;padding:4px 0}
       .img{align-self:flex-end;border-radius:12px;border:1px solid var(--line);background:linear-gradient(135deg,var(--code-bg),var(--accent-soft));padding:10px 16px;font-size:12px;color:var(--muted);font-family:var(--f-mono)}
       .working{font-size:13px;color:var(--muted);display:flex;gap:8px;align-items:center}
@@ -463,7 +463,7 @@ public final class MobileBridgeServer: @unchecked Sendable {
       .card .ic{width:30px;height:30px;border-radius:8px;background:var(--code-bg);display:grid;place-items:center;font-family:var(--f-mono);font-size:13px;flex:none}
       .card .tx{flex:1;min-width:0}
       .card .tx b{display:block;font-size:14px}
-      .card .tx span{font-size:12px;color:var(--muted);font-family:var(--f-mono);display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+      .card .tx span{font-size:12px;color:var(--muted);font-family:var(--f-mono);display:block;overflow:hidden}
       .card .go{color:var(--accent);font-weight:700;font-size:13px}
 
       /* Diff */
@@ -471,11 +471,11 @@ public final class MobileBridgeServer: @unchecked Sendable {
       .file{border-bottom:1px solid var(--line)}
       .file summary{list-style:none;display:flex;gap:8px;align-items:center;padding:12px 16px;cursor:pointer}
       .file summary::-webkit-details-marker{display:none}
-      .file .path{font-family:var(--f-mono);font-size:13px;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;direction:rtl;text-align:left}
-      .stat{font-family:var(--f-mono);font-size:12px;white-space:nowrap}
+      .file .path{font-family:var(--f-mono);font-size:13px;flex:1;min-width:0;overflow:hidden;direction:rtl;text-align:left}
+      .stat{font-family:var(--f-mono);font-size:12px}
       .stat .a{color:var(--add-ink)} .stat .d{color:var(--del-ink)}
       .hunk{font-family:var(--f-mono);font-size:12px;line-height:1.55;overflow-x:auto;background:var(--code-bg)}
-      .hunk div{padding:0 12px;white-space:pre}
+      .hunk div{padding:0 12px}
       .hunk .h{color:var(--muted);padding-block:4px}
       .hunk .add{background:var(--add);color:var(--add-ink)}
       .hunk .del{background:var(--del);color:var(--del-ink)}
@@ -483,9 +483,9 @@ public final class MobileBridgeServer: @unchecked Sendable {
 
       /* Preview */
       .pv-src{display:flex;gap:6px;padding:10px 16px;overflow-x:auto}
-      .chip{padding:6px 12px;border-radius:999px;border:1px solid var(--line);font-size:13px;white-space:nowrap}
+      .chip{padding:6px 12px;border-radius:999px;border:1px solid var(--line);font-size:13px}
       .chip[aria-pressed="true"]{background:var(--ink);color:var(--surface);border-color:var(--ink)}
-      .urlbar{margin:0 16px;font-family:var(--f-mono);font-size:12px;color:var(--muted);background:var(--code-bg);border-radius:8px;padding:6px 10px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+      .urlbar{margin:0 16px;font-family:var(--f-mono);font-size:12px;color:var(--muted);background:var(--code-bg);border-radius:8px;padding:6px 10px;overflow:hidden}
       .mock{margin:10px 16px 16px;border:1px solid var(--line);border-radius:12px;overflow:hidden;background:var(--bg)}
       .mock .hero{padding:22px 16px;background:var(--accent);color:var(--accent-ink)}
       .mock .hero b{display:block;font-size:20px}
@@ -498,7 +498,7 @@ public final class MobileBridgeServer: @unchecked Sendable {
       .send{background:var(--accent);color:var(--accent-ink);border-radius:12px;width:40px;height:40px;font-size:18px}
       .send.stopping{background:var(--del);color:var(--del-ink);font-size:14px}
       .ctl{display:flex;gap:6px;align-items:center;overflow-x:auto;padding:2px 0}
-      .chipbtn{display:inline-flex;align-items:center;gap:5px;border:1px solid var(--line);border-radius:999px;padding:5px 11px;font-size:13px;white-space:nowrap;min-height:32px}
+      .chipbtn{display:inline-flex;align-items:center;gap:5px;border:1px solid var(--line);border-radius:999px;padding:5px 11px;font-size:13px;min-height:32px}
       .chipbtn:hover{background:var(--accent-soft)}
       .chipbtn:disabled{opacity:.6;cursor:default}
       .chipbtn .k{color:var(--muted)}
@@ -535,7 +535,8 @@ public final class MobileBridgeServer: @unchecked Sendable {
       .menu button:disabled{opacity:.4}
 
       .toast{position:absolute;left:16px;right:16px;bottom:96px;background:var(--ink);color:var(--surface);border-radius:12px;padding:10px 14px;font-size:14px;display:flex;justify-content:space-between;gap:10px;z-index:10}
-      .toast span:last-child{font-family:var(--f-mono);font-size:12px;opacity:.8;white-space:nowrap}
+      .toast span:last-child{font-family:var(--f-mono);font-size:12px;opacity:.8}
+        \#(textWrapCSS)
       </style>
     </head>
     <body>
@@ -1813,7 +1814,7 @@ public final class MobileBridgeServer: @unchecked Sendable {
 
     // MARK: - Control protocol (client -> bridge, TEXT/JSON)
 
-    private struct ControlMessage: Decodable {
+    struct ControlMessage: Decodable {
         var attach: String?
         var detach: Bool?
         var spawn: SpawnPayload?
@@ -1970,7 +1971,7 @@ public final class MobileBridgeServer: @unchecked Sendable {
     }
     /// Handed to the client exactly once, right after a fresh token pairing succeeds, so it
     /// can `localStorage` these and reconnect without another QR scan.
-    private struct DeviceCredentials: Encodable {
+    struct DeviceCredentials: Encodable {
         struct Cred: Encodable { var id: String; var secret: String }
         var deviceCredentials: Cred
     }
@@ -1978,7 +1979,7 @@ public final class MobileBridgeServer: @unchecked Sendable {
     /// 32 random bytes as 64 lowercase hex chars — the per-device re-auth secret. 256 bits of
     /// entropy makes the secret (unlike the 6-digit token) infeasible to guess, so device
     /// re-auth needs no rate limit of its own.
-    private static func randomSecretHex() -> String {
+    static func randomSecretHex() -> String {
         var rng = SystemRandomNumberGenerator()
         return (0..<32).map { _ in String(format: "%02x", Int(rng.next() as UInt8)) }.joined()
     }
@@ -1994,7 +1995,7 @@ public final class MobileBridgeServer: @unchecked Sendable {
     /// connection before replacing it, closing that bypass. Cancelling fires the OLD
     /// connection's own teardown in `makeListener`'s `stateUpdateHandler`, which now checks
     /// identity (`===`) before removing — so it can't delete the entry we're about to set here.
-    private func registerLive(_ connection: NWConnection, deviceID: String) {
+    func registerLive(_ connection: NWConnection, deviceID: String) {
         liveConnectionsLock.lock()
         let previous = liveConnections[deviceID]
         liveConnections[deviceID] = connection
@@ -2007,7 +2008,7 @@ public final class MobileBridgeServer: @unchecked Sendable {
     /// Returns the paired device id when `text` is a valid `{deviceAuth}` for a known,
     /// non-revoked device; nil otherwise (unknown/legacy/mismatched secret, or not deviceAuth
     /// JSON at all — the caller then tries the token path).
-    private func authorizeReturningDevice(_ text: String) -> String? {
+    func authorizeReturningDevice(_ text: String) -> String? {
         guard let data = text.data(using: .utf8),
               let envelope = try? JSONDecoder().decode(DeviceAuthEnvelope.self, from: data),
               let auth = envelope.deviceAuth,
@@ -2016,158 +2017,7 @@ public final class MobileBridgeServer: @unchecked Sendable {
         return auth.id
     }
 
-    // MARK: - Manual WebSocket framing (RFC 6455)
-    //
-    // Was `NWProtocolWebSocket` (Network.framework's built-in WS support) until a real phone
-    // could reach the page-serving port (8080) over Tailscale but never the separate WS port
-    // (7777) — same host, same interface, only the port differed in reachability, with
-    // Tailscale ACLs confirmed wide open (`dst:["*"]`). The only way to remove that unexplained
-    // difference was to stop needing a second port at all: this bridge now upgrades to WS on
-    // the SAME listener/port that already serves the page, which meant reimplementing the
-    // handshake and frame (de)coding by hand instead of relying on Network.framework's
-    // automatic WS protocol negotiation (which only applies per-listener, not per-connection).
-
-    private static let webSocketGUID = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
-
-    /// RFC 6455 §1.3: accept value is base64(SHA-1(key + the fixed GUID)). Every real WS
-    /// client computes the same thing to verify the server actually understood the upgrade.
-    private static func webSocketAcceptValue(for key: String) -> String {
-        let hash = Insecure.SHA1.hash(data: Data((key + webSocketGUID).utf8))
-        return Data(hash).base64EncodedString()
-    }
-
-    /// Server-to-client frames are never masked (RFC 6455 §5.1: only client-to-server frames
-    /// are). Single-frame (FIN=1) only — this bridge never needs to fragment its own writes,
-    /// every payload here fits comfortably under the 64-bit length encoding's practical range.
-    private static func encodeWSFrame(opcode: UInt8, payload: Data) -> Data {
-        var frame = Data([0x80 | opcode])
-        let len = payload.count
-        if len <= 125 {
-            frame.append(UInt8(len))
-        } else if len <= 0xFFFF {
-            frame.append(126)
-            frame.append(UInt8((len >> 8) & 0xFF))
-            frame.append(UInt8(len & 0xFF))
-        } else {
-            frame.append(127)
-            for shift in stride(from: 56, through: 0, by: -8) {
-                frame.append(UInt8((len >> shift) & 0xFF))
-            }
-        }
-        frame.append(payload)
-        return frame
-    }
-
-    struct DecodedWSFrame {
-        let fin: Bool
-        let opcode: UInt8
-        let payload: Data
-    }
-
-    enum WSFrameParseResult {
-        /// Not enough bytes yet for even the length header — normal, keep accumulating.
-        case incomplete
-        /// The frame's declared length exceeds `maxWSFrameBytes` — same bound
-        /// `NWProtocolWebSocket.Options.maximumMessageSize` used to enforce (P37 A1:
-        /// bounding what an unauthenticated peer can make the daemon buffer/decode).
-        /// Distinct from `.incomplete` so the caller cancels instead of waiting forever
-        /// for bytes that would only make the buffer bigger, never valid.
-        case oversized
-        case frame(DecodedWSFrame, consumed: Int)
-    }
-
-    /// Parses at most one WS frame from the front of `buffer`. Client frames are ALWAYS
-    /// masked (RFC 6455 §5.3); unmasking happens here so callers only ever see plaintext
-    /// payloads.
-    static func parseOneWSFrame(_ buffer: Data) -> WSFrameParseResult {
-        guard buffer.count >= 2 else { return .incomplete }
-        let start = buffer.startIndex
-        let b0 = buffer[start]
-        let b1 = buffer[start + 1]
-        let fin = (b0 & 0x80) != 0
-        let opcode = b0 & 0x0F
-        let masked = (b1 & 0x80) != 0
-        let lengthByte = Int(b1 & 0x7F)
-        var offset = 2
-        let payloadLen: Int
-        if lengthByte == 126 {
-            guard buffer.count >= offset + 2 else { return .incomplete }
-            payloadLen = Int(buffer[start + offset]) << 8 | Int(buffer[start + offset + 1])
-            offset += 2
-        } else if lengthByte == 127 {
-            guard buffer.count >= offset + 8 else { return .incomplete }
-            var len = 0
-            for i in 0..<8 { len = (len << 8) | Int(buffer[start + offset + i]) }
-            payloadLen = len
-            offset += 8
-        } else {
-            payloadLen = lengthByte
-        }
-        guard payloadLen <= maxWSFrameBytes else { return .oversized }
-        var maskKey: [UInt8] = []
-        if masked {
-            guard buffer.count >= offset + 4 else { return .incomplete }
-            maskKey = Array(buffer[(start + offset)..<(start + offset + 4)])
-            offset += 4
-        }
-        guard buffer.count >= offset + payloadLen else { return .incomplete }
-        var payload = Data(buffer[(start + offset)..<(start + offset + payloadLen)])
-        if masked {
-            for i in 0..<payload.count {
-                payload[payload.startIndex + i] ^= maskKey[i % 4]
-            }
-        }
-        return .frame(DecodedWSFrame(fin: fin, opcode: opcode, payload: payload), consumed: offset + payloadLen)
-    }
-
-    private func sendText(_ text: String, on connection: NWConnection, completion: @escaping @Sendable () -> Void = {}) {
-        connection.send(content: Self.encodeWSFrame(opcode: 0x1, payload: Data(text.utf8)), completion: .contentProcessed { _ in completion() })
-    }
-
-    /// Sends a JSON error message, then closes with a real WS close frame instead of an
-    /// abrupt `connection.cancel()`. Found via real-device debugging (P37): an abrupt
-    /// `cancel()` right after the error text tears down the TCP connection without a WS
-    /// closing handshake, which browsers treat as an *abnormal* closure — `ws.onerror` fires
-    /// (showing this bridge's generic "WebSocket error…" banner) regardless of whether the
-    /// error text already arrived, clobbering the specific reason the server just sent. A
-    /// graceful close (opcode 0x8) makes the closure clean, so only `onclose` fires and the
-    /// `{"error":...}` message the client already received stays on screen.
-    private func rejectAndClose(_ json: String, on connection: NWConnection) {
-        // RFC 6455 §5.5.1: a close frame's payload, if present, starts with a 2-byte
-        // big-endian status code. 1008 = Policy Violation — the standard code for "the
-        // server understood you, but won't accept this" (as opposed to 1006/no-code, which
-        // reads as a generic/unexplained drop). The client's `onclose` also already gets the
-        // JSON error text above, but a real close code makes this inspectable even from
-        // outside this app (e.g. Safari Web Inspector's Network tab).
-        let closeFrame = Data([0x03, 0xF0]) // 1008 as UInt16 big-endian
-        sendText(json, on: connection) {
-            connection.send(content: Self.encodeWSFrame(opcode: 0x8, payload: closeFrame), completion: .contentProcessed { _ in
-                connection.cancel()
-            })
-        }
-    }
-
-    private func sendBinary(_ data: Data, on connection: NWConnection, state: ConnectionState? = nil) {
-        let count = data.count
-        if let state, !state.canSend(bytes: count) {
-            // Never drop bytes mid-stream: the phone's emulator would desync (half an escape
-            // sequence, missing redraws). Drop the stalled client instead; on reconnect it
-            // re-attaches and gets a clean scrollback replay.
-            connection.cancel()
-            return
-        }
-        let frame = Self.encodeWSFrame(opcode: 0x2, payload: data)
-        connection.send(content: frame, completion: .contentProcessed { [weak state] _ in
-            state?.didCompleteSend(bytes: count)
-        })
-    }
-
-    private func sendJSON<T: Encodable>(_ value: T, on connection: NWConnection) {
-        guard let json = try? JSONEncoder().encode(value) else { return }
-        sendText(String(decoding: json, as: UTF8.self), on: connection)
-    }
-
-    private func sendSessionList(on connection: NWConnection) {
+    func sendSessionList(on connection: NWConnection) {
         let client = DaemonClient()
         guard let response = try? client.request(.listSurfaces), case let .surfaces(surfaces) = response else {
             sendText(#"{"sessions":[]}"#, on: connection)
@@ -2215,7 +2065,7 @@ public final class MobileBridgeServer: @unchecked Sendable {
     /// subscription's own dedicated queue (see `DaemonSubscription`), not `bridgeQueue` — calling
     /// `sendSessionList` from there is the same off-queue `NWConnection.send` pattern `handleAttach`
     /// already relies on for `onData`/`onReplay`.
-    private func startSessionListSubscription(on connection: NWConnection, state: ConnectionState) {
+    func startSessionListSubscription(on connection: NWConnection, state: ConnectionState) {
         let client = DaemonClient()
         state.snapshotSubscription = try? client.subscribeSnapshot(
             label: Self.clientLabel,
@@ -3126,63 +2976,6 @@ public final class MobileBridgeServer: @unchecked Sendable {
         }
     }
 
-    /// Claude Code's `Shift+Tab` cycle order, verified in a live TTY (claude 2.1.296): manual,
-    /// acceptEdits, plan, auto, then back to manual. `bypassPermissions` is not in the cycle.
-    static let modeCycle = ["manual", "acceptEdits", "plan", "auto"]
-    static let commandModels: Set<String> = ["opus", "sonnet", "haiku", "fable"]
-    static let commandEfforts: Set<String> = ["low", "medium", "high", "xhigh", "max"]
-    /// Claude takes family aliases, which always resolve to that family's newest model — so this
-    /// list only changes when a whole new family ships. agy's list comes from `AgyModelCatalog`.
-
-    /// Chunks to type for an agent command, or nil when the request is not allowlisted. Pure so it is
-    /// unit-testable; `currentMode` is the mode last read from the transcript (a cycle needs a start).
-    /// `agyCatalog` is what `agy models` reported (nil = unavailable, so nothing is allowed for agy).
-    static func agentCommandInput(kind: String, value: String, currentMode: String?, agent: AgentKind = .claudeCode,
-                                  agyCatalog: AgyModelCatalog.Catalog? = nil) -> [Data]? {
-        let agy = agent == .antigravity
-        let models = agy ? Set((agyCatalog?.models ?? []).map { $0[0] }) : commandModels
-        let efforts = agy ? Set(agyCatalog?.efforts ?? []) : commandEfforts
-        switch kind {
-        case "model" where models.contains(value):
-            return [Data("/model \(value)".utf8), Data("\r".utf8)]
-        case "effort" where efforts.contains(value):
-            return [Data("/effort \(value)".utf8), Data("\r".utf8)]
-        case "mode" where !agy:
-            guard let from = currentMode.flatMap(modeCycle.firstIndex(of:)),
-                  let to = modeCycle.firstIndex(of: value) else { return nil }
-            let presses = (to - from + modeCycle.count) % modeCycle.count
-            return Array(repeating: Data([0x1b, 0x5b, 0x5a]), count: presses)
-        default:
-            return nil
-        }
-    }
-
-    private func handleAgentCommand(_ cmd: ControlMessage.AgentCommandRequest, connection: NWConnection, state: ConnectionState) {
-        guard let surfaceID = state.surfaceID, let subscription = state.subscription else {
-            sendText(#"{"error":"not attached to a session — go back and reopen it"}"#, on: connection)
-            return
-        }
-        let supported: Set<AgentKind> = [.claudeCode, .antigravity]
-        let detected = AgentDetector.snapshot(forSurfaceKey: surfaceID)?.kind
-        let hinted = cmd.agent.flatMap(AgentKind.init(rawValue:))
-        guard let kind = [detected, hinted].compactMap({ $0 }).first(where: supported.contains) else {
-            sendText(#"{"error":"model and effort can only be changed on a Claude or agy session (detected: \#(detected?.rawValue ?? "none"))"}"#, on: connection)
-            return
-        }
-        let catalog = kind == .antigravity ? AgyModelCatalog.current() : nil
-        guard let chunks = Self.agentCommandInput(kind: cmd.kind, value: cmd.value, currentMode: state.agentMode, agent: kind, agyCatalog: catalog) else {
-            sendText(#"{"error":"unsupported agent command"}"#, on: connection)
-            return
-        }
-        // Text and Enter go as separate writes (as a human types); the TUI treats one burst as a paste.
-        for chunk in chunks {
-            _ = subscription.sendInput(chunk, surfaceID: surfaceID)
-            Thread.sleep(forTimeInterval: 0.15)
-        }
-        if cmd.kind == "mode" { state.agentMode = cmd.value }
-        sendText(#"{"ok":"agentCommand"}"#, on: connection)
-    }
-
     private func handleStop(connection: NWConnection, state: ConnectionState) {
         guard let surfaceID = state.surfaceID, let subscription = state.subscription else {
             sendText(#"{"error":"no active session attached to stop"}"#, on: connection)
@@ -3192,7 +2985,7 @@ public final class MobileBridgeServer: @unchecked Sendable {
         sendText(#"{"ok":"stopped"}"#, on: connection)
     }
 
-    private func handleControlMessage(_ text: String, connection: NWConnection, state: ConnectionState) {
+    func handleControlMessage(_ text: String, connection: NWConnection, state: ConnectionState) {
         guard let data = text.data(using: .utf8),
               let message = try? JSONDecoder().decode(ControlMessage.self, from: data)
         else {
@@ -3287,177 +3080,6 @@ public final class MobileBridgeServer: @unchecked Sendable {
             sendText(#"{"error":"unrecognized control message"}"#, on: connection)
         }
     }
-
-    /// Reads raw bytes and hands them to `drainFrames` — replaces the old
-    /// `connection.receiveMessage` + `NWProtocolWebSocket.Metadata` pair now that WS framing
-    /// is decoded by hand (see the framing section above for why).
-    private func receiveLoop(_ connection: NWConnection, state: ConnectionState) {
-        connection.receive(minimumIncompleteLength: 1, maximumLength: 64 * 1024) { [weak self] data, _, _, error in
-            guard let self else { return }
-            if error != nil {
-                state.subscription?.cancel()
-                state.snapshotSubscription?.cancel()
-                state.transcriptTimer = nil
-                return
-            }
-            if let data { state.frameBuffer.append(data) }
-            self.drainFrames(connection, state: state)
-        }
-    }
-
-    /// Parses as many complete frames as `state.frameBuffer` currently holds, dispatching
-    /// each in turn, then re-arms `receiveLoop` once only an incomplete trailing frame (or
-    /// nothing) remains — so several frames arriving in one TCP read (coalesced keystrokes,
-    /// DERP-relay batching) are all processed before waiting on the network again.
-    private func drainFrames(_ connection: NWConnection, state: ConnectionState) {
-        while true {
-            switch Self.parseOneWSFrame(state.frameBuffer) {
-            case .incomplete:
-                receiveLoop(connection, state: state)
-                return
-            case .oversized:
-                // Graceful close (P37 Phase D2), not the abrupt `connection.cancel()` this used
-                // to be — that tears down the TCP connection without a WS closing handshake,
-                // which browsers treat as an unexplained abnormal closure (`ws.onerror` with no
-                // reason) instead of surfacing this specific error. Same reasoning `rejectAndClose`
-                // already documents for the auth-failure paths; this was the one place that still
-                // used the abrupt form.
-                rejectAndClose(#"{"error":"message too large"}"#, on: connection)
-                return
-            case let .frame(frame, consumed):
-                state.frameBuffer.removeFirst(consumed)
-                if !handleFrame(frame, connection: connection, state: state) { return }
-            }
-        }
-    }
-
-    /// Handles one decoded frame. Returns `true` to keep draining `state.frameBuffer` /
-    /// re-arm `receiveLoop`, `false` when this frame already ended the connection (close,
-    /// or an auth failure that cancels after its error message flushes).
-    private func handleFrame(_ frame: DecodedWSFrame, connection: NWConnection, state: ConnectionState) -> Bool {
-        // Temporary diagnostic (P37 real-device WS debugging): first-ever frame log per
-        // connection — everything up to "switching to frame mode" is proven to work on a
-        // real failing attempt, but there is zero visibility into whether the client sends
-        // anything at all afterward. This fills that gap.
-        if !state.loggedFirstFrame {
-            state.loggedFirstFrame = true
-            log?("mobile bridge: first frame from \(connection.endpoint) — opcode=\(frame.opcode) fin=\(frame.fin) bytes=\(frame.payload.count)")
-        }
-        switch frame.opcode {
-        case 0x9: // ping — mirror `NWProtocolWebSocket.Options.autoReplyPing`'s old behavior
-            connection.send(content: Self.encodeWSFrame(opcode: 0xA, payload: frame.payload), completion: .contentProcessed { _ in })
-            return true
-        case 0xA: // pong — nothing to do
-            return true
-        case 0x8: // close
-            connection.send(content: Self.encodeWSFrame(opcode: 0x8, payload: Data()), completion: .contentProcessed { _ in
-                connection.cancel()
-            })
-            return false
-        default:
-            break
-        }
-
-        let opcode: UInt8
-        let payload: Data
-        if frame.opcode == 0x0 {
-            // Continuation — accumulate; only dispatch once FIN arrives.
-            guard let fragOpcode = state.fragmentedOpcode else { return true } // stray continuation, ignore
-            state.fragmentedPayload.append(frame.payload)
-            guard frame.fin else { return true }
-            opcode = fragOpcode
-            payload = state.fragmentedPayload
-            state.fragmentedOpcode = nil
-            state.fragmentedPayload = Data()
-        } else if !frame.fin {
-            // Start of a fragmented message — stash and wait for continuations.
-            state.fragmentedOpcode = frame.opcode
-            state.fragmentedPayload = frame.payload
-            return true
-        } else {
-            opcode = frame.opcode
-            payload = frame.payload
-        }
-
-        let isText = opcode == 0x1
-        let data = payload
-
-        if !state.authorized {
-            guard isText, let text = String(data: data, encoding: .utf8) else {
-                rejectAndClose(#"{"error":"invalid or expired pairing token"}"#, on: connection)
-                return false
-            }
-            // Returning device (`{deviceAuth}`) is checked FIRST and is exempt from the
-            // token lockout below — a phone that paired earlier reconnects with no QR
-            // scan even while a brute-forcer has the token path locked out.
-            if let deviceID = authorizeReturningDevice(text) {
-                state.authorized = true
-                state.deviceID = deviceID
-                registerLive(connection, deviceID: deviceID)
-                sendSessionList(on: connection)
-                startSessionListSubscription(on: connection, state: state)
-                return true
-            }
-            // New pairing via the rotating 6-digit token. Refuse once the window's
-            // attempt budget (P37 A1) is spent — released only when the token rotates.
-            guard !pairingBox.isLockedOut else {
-                log?("mobile bridge: token rejected for \(connection.endpoint) — locked out")
-                rejectAndClose(#"{"error":"too many attempts — wait for the next pairing code"}"#, on: connection)
-                return false
-            }
-            // Accepts the current token OR the just-rotated-out previous token within its
-            // grace window (see `PairingBox.check` — fixes the proven rotation-boundary bug
-            // where a phone's page-URL token had already rotated out by connect time).
-            let check = pairingBox.check(text)
-            guard check == .accepted else {
-                let reason: String
-                switch check {
-                case .expired: reason = "expired — token rotated past even the grace window"
-                case .mismatch: reason = "mismatch"
-                case .noActivePairing: reason = "no active pairing"
-                case .accepted: reason = "" // unreachable (guarded above)
-                }
-                log?("mobile bridge: token rejected for \(connection.endpoint) — \(reason) (received \(text.count) chars)")
-                if pairingBox.recordFailure() {
-                    log?("mobile bridge: pairing locked out after \(maxTokenAttempts) failed token attempts — resets on next token rotation")
-                }
-                rejectAndClose(#"{"error":"invalid or expired pairing token"}"#, on: connection)
-                return false
-            }
-            // Fresh pairing: mint the device id + re-auth secret, persist it, and hand the
-            // client its credentials (once) BEFORE the sessions push, so the page can store
-            // them and skip the token on its next connect.
-            let deviceID = UUID().uuidString
-            let secret = Self.randomSecretHex()
-            state.authorized = true
-            state.deviceID = deviceID
-            store?.register(id: deviceID, label: "Mobile device (\(deviceID.prefix(8)))", secret: secret)
-            registerLive(connection, deviceID: deviceID)
-            sendJSON(DeviceCredentials(deviceCredentials: .init(id: deviceID, secret: secret)), on: connection)
-            sendSessionList(on: connection)
-            startSessionListSubscription(on: connection, state: state)
-            return true
-        }
-
-        if isText, let text = String(data: data, encoding: .utf8) {
-            handleControlMessage(text, connection: connection, state: state)
-        } else if let surfaceID = state.surfaceID, let subscription = state.subscription {
-            _ = subscription.sendInput(data, surfaceID: surfaceID)
-        }
-        return true
-    }
-
-    /// Was sized against `NWProtocolWebSocket.Options.maximumMessageSize`; now enforced by
-    /// hand in `parseOneWSFrame`. Raised from the original 64 KiB (P37 Phase D2): an
-    /// `attachFile` payload is base64 (~33% overhead) over up to `maxFileReadBytes` (5 MiB) of
-    /// raw file content, so the JSON envelope carrying it can reach ~7 MiB — 8 MiB leaves
-    /// headroom above that without being unbounded. An inbound frame has no cap BEFORE
-    /// authentication either (hit by the raw token compare and `authorizeReturningDevice`'s
-    /// JSON decode), so this is also the most an unauthenticated peer can make the daemon
-    /// buffer per connection — accepted the same way the rest of this bridge already accepts
-    /// loopback+Tailscale as the trust boundary (see the plan doc's R6 note), not the raw
-    /// internet.
-    private static let maxWSFrameBytes = 8 * 1024 * 1024
 
     /// One listener per bind host, serving both the plain page and the WS bridge on the
     /// SAME port (see the framing section's doc comment above `webSocketGUID` for why: a
