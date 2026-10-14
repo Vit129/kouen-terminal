@@ -36,18 +36,7 @@ final class LiveResizeTests: XCTestCase {
         defer { window.contentView = nil; window.close() }
         let view = try makeHostedView(in: window)
         view.testingSetLiveResizeReflow(true)
-        if view.testingLastPresentedFrame == nil {
-            // A hosted runner can temporarily exhaust its drawable pool. Queue drainage alone
-            // does not imply a presentation when acquisition scheduled a deferred retry.
-            let presented = expectation(description: "initial frame presented before blocking the worker")
-            var fulfilled = false
-            view.onRenderStats = { _ in
-                if !fulfilled { fulfilled = true; presented.fulfill() }
-            }
-            view.testingForceRender()
-            wait(for: [presented], timeout: 5)
-            view.onRenderStats = nil
-        }
+        waitForCurrentFrame(view)
         _ = try XCTUnwrap(view.testingLastPresentedFrame)
 
         let entered = DispatchSemaphore(value: 0)
@@ -75,7 +64,31 @@ final class LiveResizeTests: XCTestCase {
         release.signal()
         drainRenderPipeline(view)
         XCTAssertEqual(view.testingReadGridSnapshot().cols, view.testingGridSize.cols)
+        waitForCurrentFrame(view)
         XCTAssertEqual(view.testingLastPresentedFrame?.columns, view.testingGridSize.cols)
+    }
+
+    private func waitForCurrentFrame(_ view: HarnessTerminalSurfaceView) {
+        let columns = view.testingGridSize.cols
+        if view.testingLastPresentedFrame?.columns == columns { return }
+        let presented = expectation(description: "current grid presented")
+        var fulfilled = false
+        view.onRenderStats = { _ in
+            if !fulfilled, view.testingLastPresentedFrame?.columns == columns {
+                fulfilled = true
+                presented.fulfill()
+            }
+        }
+        // A drained queue can still have a deferred retry after a missing drawable. Hidden
+        // test windows do not receive display ticks, so drive retries until a frame presents.
+        let retry = Timer.scheduledTimer(withTimeInterval: 0.05, repeats: true) { _ in
+            MainActor.assumeIsolated {
+                if !view.testingDrawableRequestInFlight { view.testingForceRender() }
+            }
+        }
+        defer { retry.invalidate(); view.onRenderStats = nil }
+        view.testingForceRender()
+        wait(for: [presented], timeout: 5)
     }
 
     func testQueuedPreviewCannotRestoreIntermediateWidthAfterRelease() throws {
