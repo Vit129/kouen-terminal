@@ -166,7 +166,7 @@ if [[ -n "$KOUEN" && "$KOUEN_HERMES_SESSION_MODE" == "remote-control" && -z "$__
   }
 fi
 # Kouen CLI wrapper: `kouen` delegates to `kouen-cli` (`kouen rc` opens the Companion).
-if [[ -n "$KOUEN" && -z "$__kouen_cli_wrapped" ]]; then
+if [[ -z "$__kouen_cli_wrapped" ]]; then
   __kouen_cli_wrapped=1
   if (( ${+functions[kouen]} )); then
     functions[__kouen_next]=$functions[kouen]
