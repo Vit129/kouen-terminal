@@ -81,10 +81,11 @@ final class LiveResizeTests: XCTestCase {
         }
         // A drained queue can still have a deferred retry after a missing drawable. Hidden
         // test windows do not receive display ticks, so drive retries until a frame presents.
+        let retryFrame: @MainActor @Sendable () -> Void = {
+            if !view.testingDrawableRequestInFlight { view.testingForceRender() }
+        }
         let retry = Timer.scheduledTimer(withTimeInterval: 0.05, repeats: true) { _ in
-            MainActor.assumeIsolated {
-                if !view.testingDrawableRequestInFlight { view.testingForceRender() }
-            }
+            MainActor.assumeIsolated { retryFrame() }
         }
         defer { retry.invalidate(); view.onRenderStats = nil }
         view.testingForceRender()
