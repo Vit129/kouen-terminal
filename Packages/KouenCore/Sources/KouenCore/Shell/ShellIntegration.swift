@@ -284,7 +284,7 @@ public enum ShellIntegration {
       }
     fi
     # Kouen CLI wrapper: `kouen` delegates to `kouen-cli` (`kouen rc` opens the Companion).
-    if [[ -z "$__kouen_cli_wrapped" ]]; then
+    if [[ -n "$KOUEN" && -z "$__kouen_cli_wrapped" ]]; then
       __kouen_cli_wrapped=1
       if (( ${+functions[kouen]} )); then
         functions[__kouen_next]=$functions[kouen]
@@ -475,7 +475,7 @@ public enum ShellIntegration {
       }
     fi
     # Kouen CLI wrapper: `kouen` delegates to `kouen-cli` (`kouen rc` opens the Companion).
-    if [ -z "$__kouen_cli_wrapped" ]; then
+    if [ -n "$KOUEN" ] && [ -z "$__kouen_cli_wrapped" ]; then
       __kouen_cli_wrapped=1
       if declare -F kouen >/dev/null 2>&1; then
         eval "$(declare -f kouen | sed '1s/^kouen /__kouen_next /')"
@@ -691,7 +691,7 @@ public enum ShellIntegration {
         end
     end
     # Kouen CLI wrapper: `kouen` delegates to `kouen-cli` (`kouen rc` opens the Companion).
-    if not set -q __kouen_cli_wrapped
+    if set -q KOUEN; and not set -q __kouen_cli_wrapped
         set -g __kouen_cli_wrapped 1
         if functions -q kouen
             functions -c kouen __kouen_next
