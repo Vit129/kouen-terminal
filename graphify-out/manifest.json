@@ -1095,7 +1095,7 @@
     "semantic_hash": ""
   },
   "Packages/KouenCore/Sources/KouenCore/Shell/ShellIntegration.swift": {
-    "mtime": 1792028985.696154,
+    "mtime": 1792029521.6533728,
     "ast_hash": "2db91b722de7e6915dcf1c4d7829157e",
     "semantic_hash": ""
   },
@@ -1165,8 +1165,8 @@
     "semantic_hash": ""
   },
   "Packages/KouenDaemon/Sources/KouenDaemon/MobileBridgeServer.swift": {
-    "mtime": 1792029053.3057902,
-    "ast_hash": "b92e2b7c9bbbb4a407053b40c45047f0",
+    "mtime": 1792061206.962677,
+    "ast_hash": "563af1a3e8968ec4741f908931077b5f",
     "semantic_hash": ""
   },
   "Packages/KouenDaemon/Sources/KouenDaemon/PairedDeviceStore.swift": {
@@ -1200,8 +1200,8 @@
     "semantic_hash": ""
   },
   "Packages/KouenDaemon/Sources/KouenDaemonMain/main.swift": {
-    "mtime": 1791870928.3648405,
-    "ast_hash": "aff02655a97d18c00c397e53455fff10",
+    "mtime": 1792061257.600919,
+    "ast_hash": "ce30f21a38a2f85d9b550d3ff27cd18e",
     "semantic_hash": ""
   },
   "Packages/KouenIPC/Sources/KouenIPC/AgentNotification.swift": {
@@ -2660,7 +2660,7 @@
     "semantic_hash": ""
   },
   "Tests/KouenDaemonTests/MobileBridgePairingTests.swift": {
-    "mtime": 1792028572.078745,
+    "mtime": 1792029521.6604378,
     "ast_hash": "e841e671b1ae9105d6dcb5029a652875",
     "semantic_hash": ""
   },
@@ -3330,12 +3330,12 @@
     "semantic_hash": ""
   },
   "docs/shell-integration/kouen.bash": {
-    "mtime": 1792028985.6958818,
+    "mtime": 1792029521.6643164,
     "ast_hash": "aa6ebe3fe19ef25db91510b46d161ab5",
     "semantic_hash": ""
   },
   "docs/shell-integration/kouen.fish": {
-    "mtime": 1792028985.6956062,
+    "mtime": 1792029521.666434,
     "ast_hash": "be7ae4c6307d76cde1473895b95fd6db",
     "semantic_hash": ""
   },
@@ -4545,8 +4545,8 @@
     "semantic_hash": ""
   },
   "Tests/KouenDaemonTests/MobileBridgeContractTests.swift": {
-    "mtime": 1791979635.6010199,
-    "ast_hash": "1f201c4cd784e26281eae95c56a7d3f3",
+    "mtime": 1792061112.6334376,
+    "ast_hash": "8b664826ca6850676f03c9933ab27bbe",
     "semantic_hash": ""
   },
   "Tools/kouen/Sources/KouenCLI/KouenCLI+RC.swift": {
@@ -4610,7 +4610,7 @@
     "semantic_hash": ""
   },
   "Packages/KouenDaemon/Sources/KouenDaemon/MobileBridgeServer+Connecting.swift": {
-    "mtime": 1792029035.7589054,
+    "mtime": 1792029521.6557128,
     "ast_hash": "a95801184c1da8dd6ec43808c10eb416",
     "semantic_hash": ""
   },
@@ -4622,6 +4622,16 @@
   "docs/research/worktree-ownership.md": {
     "mtime": 1791981678.4420784,
     "ast_hash": "fca5408c5c1175e2eaf6d26839e9151c",
+    "semantic_hash": ""
+  },
+  "Packages/KouenDaemon/Sources/KouenDaemon/FDWatchdog.swift": {
+    "mtime": 1792061245.7108188,
+    "ast_hash": "5037be605d14574ee578e2f1ccbf1317",
+    "semantic_hash": ""
+  },
+  "Tests/KouenDaemonTests/FDWatchdogTests.swift": {
+    "mtime": 1792061257.6232276,
+    "ast_hash": "e85194d5477945bd2e252a7215dacf5d",
     "semantic_hash": ""
   }
 }
