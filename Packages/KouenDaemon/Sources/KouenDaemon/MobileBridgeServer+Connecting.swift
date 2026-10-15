@@ -230,10 +230,20 @@ extension MobileBridgeServer {
             defer { listenersLock.unlock() }
             guard isRunning else { return }
             listener.start(queue: bridgeQueue)
-            listeners.append(listener)
+            listeners.append((bindHost, listener))
         } catch {
             log("mobile bridge: failed to bind on \(bindHost):\(port.rawValue): \(error)")
         }
+    }
+
+    /// Drops the listener for a Tailscale IP that went away (re-login, new node key), so the
+    /// stale bind doesn't keep `anyWSListenerReady` true for a host the QR no longer names.
+    func cancelListener(bindHost: String) {
+        listenersLock.lock()
+        let gone = listeners.filter { $0.host == bindHost }
+        listeners.removeAll { $0.host == bindHost }
+        listenersLock.unlock()
+        gone.forEach { $0.listener.cancel() }
     }
 }
 #endif
