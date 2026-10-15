@@ -2610,6 +2610,8 @@ public final class MobileBridgeServer: @unchecked Sendable {
             try process.run()
         } catch {
             // `run()` failed, so Process never closed the parent's write ends either.
+            outPipe.fileHandleForReading.readabilityHandler = nil
+            errPipe.fileHandleForReading.readabilityHandler = nil
             try? outPipe.fileHandleForWriting.close()
             try? errPipe.fileHandleForWriting.close()
             return ProcessRunResult(status: -1, stdout: "", stderr: error.localizedDescription, timedOut: false)
