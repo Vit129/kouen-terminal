@@ -211,6 +211,12 @@ final class MobileBridgePairingTests: XCTestCase {
             MobileBridgeServer.allowedBindHosts(tailscaleIP: " 100.64.0.7\n"),
             ["127.0.0.1", "100.64.0.7"], "detected IP arrives with tool whitespace"
         )
+        // The invariant proper: wildcard, empty, and non-Tailscale (routable LAN) addresses
+        // must all be dropped — the bridge has no TLS; only loopback + WireGuard may carry it.
+        XCTAssertEqual(MobileBridgeServer.allowedBindHosts(tailscaleIP: "0.0.0.0"), ["127.0.0.1"])
+        XCTAssertEqual(MobileBridgeServer.allowedBindHosts(tailscaleIP: "::"), ["127.0.0.1"])
+        XCTAssertEqual(MobileBridgeServer.allowedBindHosts(tailscaleIP: ""), ["127.0.0.1"])
+        XCTAssertEqual(MobileBridgeServer.allowedBindHosts(tailscaleIP: "192.168.1.20"), ["127.0.0.1"])
         // Error messages returned from failed tailscale CLI calls must be dropped
         let cliError = "The Tailscale CLI failed to start: The operation couldn’t be completed. (Tailscale.CLIError error 1.)"
         XCTAssertEqual(MobileBridgeServer.allowedBindHosts(tailscaleIP: cliError), ["127.0.0.1"])
