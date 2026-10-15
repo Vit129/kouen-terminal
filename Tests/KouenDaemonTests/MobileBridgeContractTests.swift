@@ -150,6 +150,19 @@ final class MobileBridgeContractTests: XCTestCase {
         XCTAssertFalse(res.timedOut)
     }
 
+    /// `runPairingLoop` calls `runProcess` from one never-ending GCD block, so its autorelease
+    /// pool never drains: pipe fds must be closed by `runProcess` itself, not by deallocation.
+    /// Leaked 4 fds per Tailscale re-check (30s) until the daemon hit EMFILE (2026-10-15).
+    func testRunProcessClosesPipeFDsWithoutAutoreleaseDrain() throws {
+        func openFDs() throws -> Int { try FileManager.default.contentsOfDirectory(atPath: "/dev/fd").count }
+        let before = try openFDs()
+        for _ in 0..<50 {
+            _ = MobileBridgeServer.runProcess(
+                executableURL: URL(fileURLWithPath: "/bin/echo"), arguments: ["x"], timeoutSeconds: 5)
+        }
+        XCTAssertLessThan(try openFDs() - before, 10, "runProcess leaked pipe fds")
+    }
+
     func testRunProcessTimeoutKillsSubprocess() {
         let start = Date()
         let res = MobileBridgeServer.runProcess(

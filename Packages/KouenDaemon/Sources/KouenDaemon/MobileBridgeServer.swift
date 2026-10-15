@@ -1717,8 +1717,10 @@ public final class MobileBridgeServer: @unchecked Sendable {
             }
             return changed
         }
+        // Each re-check spawns `tailscale` subprocesses; this loop never returns, so drain
+        // their autoreleased objects per call instead of never.
         while isRunning {
-            _ = recheckTailscale()
+            _ = autoreleasepool(invoking: recheckTailscale)
 
             guard anyWSListenerReady else {
                 notReadyTicks += 1
@@ -1751,7 +1753,7 @@ public final class MobileBridgeServer: @unchecked Sendable {
             while slept < pairingLifetime && isRunning {
                 Thread.sleep(forTimeInterval: 0.25)
                 slept += 0.25
-                if recheckTailscale() { break }
+                if autoreleasepool(invoking: recheckTailscale) { break }
             }
         }
     }
@@ -2597,11 +2599,19 @@ public final class MobileBridgeServer: @unchecked Sendable {
         defer {
             outPipe.fileHandleForReading.readabilityHandler = nil
             errPipe.fileHandleForReading.readabilityHandler = nil
+            // Close explicitly: callers like `runPairingLoop` run inside one never-ending GCD
+            // block whose autorelease pool never drains, so waiting for dealloc leaked 2 fds
+            // per call until the daemon hit EMFILE.
+            try? outPipe.fileHandleForReading.close()
+            try? errPipe.fileHandleForReading.close()
         }
 
         do {
             try process.run()
         } catch {
+            // `run()` failed, so Process never closed the parent's write ends either.
+            try? outPipe.fileHandleForWriting.close()
+            try? errPipe.fileHandleForWriting.close()
             return ProcessRunResult(status: -1, stdout: "", stderr: error.localizedDescription, timedOut: false)
         }
 
