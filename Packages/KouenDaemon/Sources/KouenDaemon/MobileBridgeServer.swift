@@ -49,6 +49,9 @@ public final class MobileBridgeServer: @unchecked Sendable {
     /// order), and one serial queue preserves it without per-connection locking.
     let bridgeQueue = DispatchQueue(label: "com.vit129.kouen.mobile-bridge")
     var listeners: [NWListener] = []
+    /// `listeners` is appended from `start()` AND from the pairing loop (Tailscale coming up
+    /// late), and drained by `stop()` on the caller's thread — all three race without this.
+    let listenersLock = NSLock()
     var store: PairedDeviceStore?
     let liveConnectionsLock = NSLock()
     var liveConnections: [String: NWConnection] = [:]
@@ -1674,35 +1677,43 @@ public final class MobileBridgeServer: @unchecked Sendable {
         }
         var notReadyTicks = 0
         var warnedNoListener = false
-        var dynamicCheckCounter = 0
-        while isRunning {
-            // Periodic dynamic re-check (every ~2 seconds = 8 ticks of 0.25s) if Tailscale was not detected at launch
-            dynamicCheckCounter += 1
-            if dynamicCheckCounter >= 8 {
-                dynamicCheckCounter = 0
-                if currentTailscaleHost == nil {
-                    if let detectedIP = detectTailscaleHost() {
-                        if let port = NWEndpoint.Port(rawValue: UInt16(clamping: pageURLPort)) {
-                            bindUnifiedListener(bindHost: detectedIP, port: port, log: log)
-                        }
-                        currentTailscaleHost = detectedIP
-                        currentMagicDNSName = detectTailscaleMagicDNSName()
-                        serveActive = currentMagicDNSName != nil && Self.isTailscaleServeConfigured(port: pageURLPort)
-                        log("mobile bridge: Tailscale detected (\(detectedIP)) — bound listener and updated pairing host")
+        // Wall-clock, not a tick counter: once a token is minted the loop sits in the 120s
+        // sleep below, so a per-iteration counter only fired every ~16 minutes.
+        var lastRecheck = Date()
+        // True when the pairing host/scheme changed, so the live QR must be re-minted.
+        func recheckTailscale() -> Bool {
+            guard Date().timeIntervalSince(lastRecheck) >= 2 else { return false }
+            lastRecheck = Date()
+            // ponytail: Serve is only re-probed while not active, and an IP change after
+            // detection is not followed — restart the bridge to pick those up.
+            if currentTailscaleHost == nil {
+                if let detectedIP = detectTailscaleHost() {
+                    if let port = NWEndpoint.Port(rawValue: UInt16(clamping: pageURLPort)) {
+                        bindUnifiedListener(bindHost: detectedIP, port: port, log: log)
                     }
-                } else {
-                    if currentMagicDNSName == nil {
-                        currentMagicDNSName = detectTailscaleMagicDNSName()
-                        if currentMagicDNSName != nil {
-                            log("mobile bridge: Tailscale MagicDNS detected (\(currentMagicDNSName!))")
-                        }
-                    }
-                    if !serveActive && currentMagicDNSName != nil && Self.isTailscaleServeConfigured(port: pageURLPort) {
-                        serveActive = true
-                        log("mobile bridge: Tailscale Serve HTTPS detected — switched pairing URL to HTTPS")
-                    }
+                    currentTailscaleHost = detectedIP
+                    currentMagicDNSName = detectTailscaleMagicDNSName()
+                    serveActive = currentMagicDNSName != nil && Self.isTailscaleServeConfigured(port: pageURLPort)
+                    log("mobile bridge: Tailscale detected (\(detectedIP)) — bound listener and updated pairing host")
+                    return true
                 }
+                return false
             }
+            var changed = false
+            if currentMagicDNSName == nil, let dns = detectTailscaleMagicDNSName() {
+                currentMagicDNSName = dns
+                changed = true
+                log("mobile bridge: Tailscale MagicDNS detected (\(dns))")
+            }
+            if !serveActive && currentMagicDNSName != nil && Self.isTailscaleServeConfigured(port: pageURLPort) {
+                serveActive = true
+                changed = true
+                log("mobile bridge: Tailscale Serve HTTPS detected — switched pairing URL to HTTPS")
+            }
+                return changed
+        }
+        while isRunning {
+            _ = recheckTailscale()
 
             guard anyWSListenerReady else {
                 notReadyTicks += 1
@@ -1735,6 +1746,7 @@ public final class MobileBridgeServer: @unchecked Sendable {
             while slept < pairingLifetime && isRunning {
                 Thread.sleep(forTimeInterval: 0.25)
                 slept += 0.25
+                if recheckTailscale() { break }
             }
         }
     }
@@ -3074,8 +3086,10 @@ public final class MobileBridgeServer: @unchecked Sendable {
     public func stop() {
         guard isRunning else { return }
         isRunning = false
+        listenersLock.lock()
         listeners.forEach { $0.cancel() }
         listeners.removeAll()
+        listenersLock.unlock()
         wsReadyLock.lock()
         wsReadyHosts.removeAll()
         wsReadyLock.unlock()
