@@ -52,9 +52,13 @@ public enum ListeningPortScanner {
         let stdoutPipe = Pipe()
         process.standardOutput = stdoutPipe
         process.standardError = FileHandle.nullDevice
+        // Closed explicitly: the daemon calls this from a timer every 5-30s, and relying on
+        // dealloc is how runProcess leaked pipe fds into EMFILE (see FDWatchdog).
+        defer { try? stdoutPipe.fileHandleForReading.close() }
         do {
             try process.run()
         } catch {
+            try? stdoutPipe.fileHandleForWriting.close()
             return [:]
         }
         let data = stdoutPipe.fileHandleForReading.readDataToEndOfFile()
