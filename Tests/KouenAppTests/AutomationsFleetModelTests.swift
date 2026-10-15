@@ -28,4 +28,35 @@ final class AutomationsFleetModelTests: XCTestCase {
         let result = AutomationsFleetModel.resolveProjectRoot(from: scriptPath)
         XCTAssertEqual(result, tmp.path)
     }
+
+    /// Every runner resolves to its repo, not `~`: bash -c "<x>.sh >> log", node <x>.js,
+    /// python3 <x>.py --flag, and npm with only a WorkingDirectory.
+    func testLocateJobResolvesRepoForAnyRunner() throws {
+        let tmp = FileManager.default.temporaryDirectory
+            .appendingPathComponent("AutomationsFleetModelTests-\(UUID().uuidString)")
+        let scripts = tmp.appendingPathComponent("scripts")
+        try FileManager.default.createDirectory(at: scripts, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: tmp.appendingPathComponent(".git"), withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: tmp) }
+        for name in ["run.sh", "proxy.js", "report.py"] {
+            FileManager.default.createFile(atPath: scripts.appendingPathComponent(name).path, contents: Data())
+        }
+        let log = tmp.appendingPathComponent("logs/x.log").path
+        FileManager.default.createFile(atPath: log, contents: Data())
+        let s = scripts.path
+
+        let bash = AutomationsFleetModel.locateJob(programArgs: ["/bin/bash", "-c", "\(s)/run.sh >> \(log) 2>&1"], workingDirectory: nil)
+        XCTAssertEqual(bash.script, "\(s)/run.sh"); XCTAssertEqual(bash.repo, tmp.path)
+        let node = AutomationsFleetModel.locateJob(programArgs: ["/usr/local/bin/node", "\(s)/proxy.js"], workingDirectory: nil)
+        XCTAssertEqual(node.script, "\(s)/proxy.js"); XCTAssertEqual(node.repo, tmp.path)
+        let py = AutomationsFleetModel.locateJob(programArgs: ["/usr/bin/python3", "\(s)/report.py", "--auto"], workingDirectory: nil)
+        XCTAssertEqual(py.script, "\(s)/report.py"); XCTAssertEqual(py.repo, tmp.path)
+        let npm = AutomationsFleetModel.locateJob(programArgs: ["/usr/local/bin/npm", "run", "backup"], workingDirectory: s)
+        XCTAssertNil(npm.script); XCTAssertEqual(npm.repo, tmp.path)
+        // a log inside the repo after `>>` is never taken as the script
+        let onlyLog = AutomationsFleetModel.locateJob(programArgs: ["/bin/bash", "-c", "echo hi >> \(log)"], workingDirectory: nil)
+        XCTAssertNil(onlyLog.script)
+        XCTAssertEqual(AutomationsFleetModel.locateJob(programArgs: ["/usr/bin/true"], workingDirectory: nil).repo,
+                       FileManager.default.homeDirectoryForCurrentUser.path)
+    }
 }
