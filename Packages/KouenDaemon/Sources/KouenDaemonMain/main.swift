@@ -103,6 +103,9 @@ private func installSignalHandlers(server: DaemonServer, shutdown: @escaping @Se
 /// DispatchSource holders must outlive their registration; the array keeps them alive.
 nonisolated(unsafe) private var signalSources: [DispatchSourceSignal] = []
 
+/// Logs an early warning when open fds approach the limit (see `FDWatchdog`).
+private let fdWatchdog = FDWatchdog()
+
 /// Retained for the daemon's lifetime — see the assignment site for why a bare
 /// temporary would silently break every closure inside it.
 #if canImport(Network)
@@ -180,6 +183,7 @@ do {
     AgentScanner.shared.start(registry: server.registry)
     AutomationScheduler.shared.start(registry: server.registry)
     AgentRemoteControlDaemonService.shared.startConfiguredDaemons(log: daemonLog)
+    fdWatchdog.start(log: daemonLog)
     daemonLog("KouenDaemon ready (socket=\(KouenPaths.socketURL.path))")
 
     // P25 W1 slice 1: opt-in mobile WS bridge. Unavailable on the Linux headless build
