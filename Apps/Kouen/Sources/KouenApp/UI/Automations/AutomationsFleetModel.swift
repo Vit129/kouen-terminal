@@ -291,19 +291,18 @@ final class AutomationsFleetModel {
             let programArgs = (plist["ProgramArguments"] as? [String]) ?? []
             let commandString = programArgs.joined(separator: " ")
 
-            // `... >> /path/to/log 2>&1` — the convention every one of this user's own
-            // LaunchAgents uses for its output.
+            // Log: `... >> /path/to/log 2>&1` inside the command, else the plist's own
+            // StandardOutPath / StandardErrorPath.
             var logPath: String? = nil
             if let range = commandString.range(of: ">> ") {
                 logPath = commandString[range.upperBound...].split(separator: " ").first.map(String.init)
             }
+            logPath = logPath ?? (plist["StandardOutPath"] as? String) ?? (plist["StandardErrorPath"] as? String)
 
-            // The script path is usually not its own ProgramArguments element — every one of
-            // this user's LaunchAgents invokes `/bin/bash -c "<script>.sh >> <log> 2>&1"` as
-            // ONE compound string, so `programArgs.first(hasSuffix: ".sh")` never matches
-            // (that whole element ends in "2>&1", not ".sh") — split on whitespace instead.
-            let scriptPath = commandString.split(separator: " ").first(where: { $0.hasSuffix(".sh") }).map(String.init)
-            let repoPath = Self.resolveProjectRoot(from: scriptPath)
+            // Any runner (bash -c "<x>.sh >> log", node <x>.js, python3 <x>.py, npm run with a
+            // WorkingDirectory, a .command file...): see `locateJob`.
+            let (scriptPath, repoPath) = Self.locateJob(programArgs: programArgs,
+                                                        workingDirectory: plist["WorkingDirectory"] as? String)
 
             var kind: AgentKind
             if label.hasPrefix("com.claude.") { kind = .claudeCode }
@@ -424,6 +423,48 @@ final class AutomationsFleetModel {
             }
         }
         return result
+    }
+
+    /// Finds the script a LaunchAgent runs and the repo it belongs to, whatever the runner.
+    /// Tokens come from every ProgramArguments element split on whitespace (a `bash -c` string
+    /// holds the whole command), skipping redirect targets. The script is the first absolute
+    /// (or `~/`-relative) token naming an existing file inside a git repo — interpreters such
+    /// as `/usr/bin/python3` or `~/.volta/bin/node` never are. With none, `WorkingDirectory`
+    /// anchors the repo search; with neither, home.
+    nonisolated static func locateJob(programArgs: [String], workingDirectory: String?) -> (script: String?, repo: String) {
+        let home = FileManager.default.homeDirectoryForCurrentUser.path
+        let fm = FileManager.default
+        var tokens: [String] = []
+        var skipNext = false
+        for raw in programArgs.flatMap({ $0.split(separator: " ").map(String.init) }) {
+            if skipNext { skipNext = false; continue }
+            if [">>", ">", "2>", "2>>", "&>", "<"].contains(raw) { skipNext = true; continue }
+            var t = raw.trimmingCharacters(in: CharacterSet(charactersIn: "\"'"))
+            if t.hasPrefix("~/") { t = home + t.dropFirst(1) }
+            if t.hasPrefix("$HOME/") { t = home + t.dropFirst(5) }
+            tokens.append(t)
+        }
+        for t in tokens where (t as NSString).isAbsolutePath {
+            var isDir: ObjCBool = false
+            guard fm.fileExists(atPath: t, isDirectory: &isDir), !isDir.boolValue else { continue }
+            if let root = gitRoot(startingAt: (t as NSString).deletingLastPathComponent) { return (t, root) }
+        }
+        if let wd = workingDirectory, (wd as NSString).isAbsolutePath {
+            return (nil, gitRoot(startingAt: wd) ?? wd)
+        }
+        return (nil, home)
+    }
+
+    nonisolated private static func gitRoot(startingAt start: String) -> String? {
+        let fm = FileManager.default
+        var candidate = start
+        while candidate.count > 1 {
+            if fm.fileExists(atPath: (candidate as NSString).appendingPathComponent(".git")) { return candidate }
+            let parent = (candidate as NSString).deletingLastPathComponent
+            if parent == candidate { break }
+            candidate = parent
+        }
+        return nil
     }
 
     /// Walks upward from `scriptPath`'s containing directory looking for `.git`. With no
