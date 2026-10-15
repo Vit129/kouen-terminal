@@ -1095,8 +1095,8 @@
     "semantic_hash": ""
   },
   "Packages/KouenCore/Sources/KouenCore/Shell/ShellIntegration.swift": {
-    "mtime": 1791989583.6807733,
-    "ast_hash": "1e4933dbaf7372b232c5d00d4461f1f2",
+    "mtime": 1792028985.696154,
+    "ast_hash": "2db91b722de7e6915dcf1c4d7829157e",
     "semantic_hash": ""
   },
   "Packages/KouenCore/Sources/KouenCore/Tasks/TaskStore.swift": {
@@ -1165,8 +1165,8 @@
     "semantic_hash": ""
   },
   "Packages/KouenDaemon/Sources/KouenDaemon/MobileBridgeServer.swift": {
-    "mtime": 1791989583.6818733,
-    "ast_hash": "daa09f54c01565cc418c08ab494510e6",
+    "mtime": 1792029053.3057902,
+    "ast_hash": "b92e2b7c9bbbb4a407053b40c45047f0",
     "semantic_hash": ""
   },
   "Packages/KouenDaemon/Sources/KouenDaemon/PairedDeviceStore.swift": {
@@ -2660,8 +2660,8 @@
     "semantic_hash": ""
   },
   "Tests/KouenDaemonTests/MobileBridgePairingTests.swift": {
-    "mtime": 1791989583.6827805,
-    "ast_hash": "156a183408dc9b4eae2e1dc118a67396",
+    "mtime": 1792028572.078745,
+    "ast_hash": "e841e671b1ae9105d6dcb5029a652875",
     "semantic_hash": ""
   },
   "Tests/KouenDaemonTests/MobileBridgeSpawnTests.swift": {
@@ -3330,13 +3330,13 @@
     "semantic_hash": ""
   },
   "docs/shell-integration/kouen.bash": {
-    "mtime": 1791989583.6835139,
-    "ast_hash": "bb2e00e3f40bfd689c0f759913c9b746",
+    "mtime": 1792028985.6958818,
+    "ast_hash": "aa6ebe3fe19ef25db91510b46d161ab5",
     "semantic_hash": ""
   },
   "docs/shell-integration/kouen.fish": {
-    "mtime": 1791989583.6840963,
-    "ast_hash": "a22bc58ee263f6fd8ce4e7ef0a5a08e1",
+    "mtime": 1792028985.6956062,
+    "ast_hash": "be7ae4c6307d76cde1473895b95fd6db",
     "semantic_hash": ""
   },
   "project.yml": {
@@ -4610,8 +4610,8 @@
     "semantic_hash": ""
   },
   "Packages/KouenDaemon/Sources/KouenDaemon/MobileBridgeServer+Connecting.swift": {
-    "mtime": 1791989583.6811724,
-    "ast_hash": "d0fb7d8d8cc96474e10037abf57b9ef7",
+    "mtime": 1792029035.7589054,
+    "ast_hash": "a95801184c1da8dd6ec43808c10eb416",
     "semantic_hash": ""
   },
   "Tests/KouenAppTests/WorktreeAutoIsolateServiceTests.swift": {
