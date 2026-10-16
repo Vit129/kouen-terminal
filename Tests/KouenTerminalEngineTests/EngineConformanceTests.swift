@@ -304,6 +304,18 @@ final class EngineConformanceTests: XCTestCase {
         XCTAssertEqual(match?.columns, 4 ..< 13)
     }
 
+    func testDetectFilePathStandaloneViewerExtensions() {
+        // Bare filenames (no slash) are only clickable when the extension is known.
+        for name in ["sync.gs", "port.xlsx", "old.xls", "photo.heic", "photo.heif", "shot.raw",
+                     "shot.dng", "shot.cr2", "shot.cr3", "shot.nef", "shot.arw", "shot.raf",
+                     "shot.orf", "shot.rw2", "a.docx", "a.pptx", "a.key", "a.epub", "a.jsonl", "a.ipynb",
+                     "a.mdx", "a.tex", "a.xcconfig", "a.pbxproj", "a.ps1", "a.tf", "a.prisma", "a.ics", "a.vtt", "data.csv", "doc.pdf", "img.png", "img.jpg", "img.jpeg"] {
+            let line = "open \(name) now"
+            let match = URLDetection.detectFilePath(in: line, at: 5)
+            XCTAssertEqual(match?.url, name, name)
+        }
+    }
+
     func testDetectFilePathWithLineAndColumn() {
         let line = "Error in notes.markdown:14:2"
         let col = line.distance(from: line.startIndex, to: line.range(of: "notes")!.lowerBound)
