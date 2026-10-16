@@ -75,14 +75,16 @@ final class FileEditorViewQuickLookRoutingTests: XCTestCase {
 
     func testQuickLookExtensionGroups() {
         let ql = ["xlsx", "xls", "pdf", "png", "jpg", "jpeg", "heif", "heic",
-                  "raw", "dng", "cr2", "cr3", "nef", "arw", "raf", "orf", "rw2", "XLSX", "PNG"]
+                  "raw", "dng", "cr2", "cr3", "nef", "arw", "raf", "orf", "rw2", "XLSX", "PNG", "doc", "docx", "ppt", "pptx", "pages", "key", "epub"]
         for ext in ql {
             XCTAssertTrue(FileViewRouting.usesQuickLook(ext: ext), ".\(ext) must use Quick Look")
         }
     }
 
     func testTextExtensionsNeverUseQuickLook() {
-        for ext in ["gs", "csv", "swift", "js", "json", "md", "txt", "ts"] {
+        for ext in ["gs", "csv", "swift", "js", "json", "md", "txt", "ts", "jsonl", "ndjson", "ipynb", "mdx", "tex",
+                    "bib", "xcconfig", "entitlements", "strings", "storyboard", "xib", "pbxproj", "ps1",
+                    "bat", "hs", "ex", "jl", "sol", "tf", "hcl", "prisma", "astro", "ics", "vcf", "srt", "vtt", "gpx", "kml"] {
             XCTAssertFalse(FileViewRouting.usesQuickLook(ext: ext), ".\(ext) must open in the text editor")
         }
     }

@@ -13,6 +13,7 @@ enum FileViewRouting {
     private static let explicitQuickLook: Set<String> = [
         "raw", "heif", "heic", "dng", "cr2", "cr3", "nef", "arw", "raf", "orf", "rw2",
         "rtf", "rtfd", "doc", "docx", "pages", "key", "keynote", "numbers", "xls", "xlsx",
+        "ppt", "pptx", "epub",
     ]
 
     static func usesQuickLook(ext rawExt: String) -> Bool {

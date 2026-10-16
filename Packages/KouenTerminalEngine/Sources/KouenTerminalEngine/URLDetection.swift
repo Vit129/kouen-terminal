@@ -64,16 +64,19 @@ public enum URLDetection {
     /// Known file extensions recognized for standalone filenames without directory slashes.
     public static let knownFileExtensions: Set<String> = [
         // Docs & Markdown
-        "md", "markdown", "mdown", "mkd", "txt", "text", "rst", "adoc", "pdf", "rtf",
+        "md", "markdown", "mdown", "mkd", "txt", "text", "rst", "adoc", "pdf", "rtf", "mdx", "tex", "bib",
+        "doc", "docx", "ppt", "pptx", "pages", "key", "epub",
         // Code & Scripts
         "swift", "c", "h", "cpp", "hpp", "cc", "cxx", "m", "mm", "rs", "go", "py",
         "js", "mjs", "cjs", "jsx", "ts", "mts", "cts", "tsx", "rb", "php", "sh",
         "bash", "zsh", "fish", "pl", "lua", "r", "dart", "cs", "fs", "zig", "nim",
         "vue", "svelte", "java", "kt", "kts", "scala", "asm", "s", "wasm", "gs",
+        "ps1", "bat", "hs", "ex", "exs", "erl", "clj", "jl", "sol", "elm", "ml", "tf", "hcl", "prisma", "astro",
+        "xcconfig", "entitlements", "strings", "storyboard", "xib", "pbxproj",
         // Config, Data & Web
         "json", "jsonc", "json5", "yaml", "yml", "toml", "xml", "plist", "csv", "tsv",
         "sql", "graphql", "gql", "ini", "conf", "config", "env", "properties", "lock", "log",
-        "xlsx", "xls", "numbers",
+        "xlsx", "xls", "numbers", "jsonl", "ndjson", "ipynb", "ics", "vcf", "srt", "vtt", "gpx", "kml",
         "html", "htm", "css", "scss", "sass", "less",
         // Diagrams & Media
         "mermaid", "mmd", "svg", "png", "jpg", "jpeg", "gif", "webp", "ico", "heic", "heif", "tiff", "tif",
