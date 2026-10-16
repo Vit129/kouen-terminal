@@ -70,4 +70,33 @@ final class FileEditorViewQuickLookRoutingTests: XCTestCase {
         XCTAssertTrue(view.isShowingMarkdownPreview, ".md must still default to preview, not inherit .swift's edit mode")
         XCTAssertFalse(view.isShowingSyntaxView)
     }
+
+    // MARK: - Extension routing (shared by FileEditorView and FileViewerViewController)
+
+    func testQuickLookExtensionGroups() {
+        let ql = ["xlsx", "xls", "pdf", "png", "jpg", "jpeg", "heif", "heic",
+                  "raw", "dng", "cr2", "cr3", "nef", "arw", "raf", "orf", "rw2", "XLSX", "PNG"]
+        for ext in ql {
+            XCTAssertTrue(FileViewRouting.usesQuickLook(ext: ext), ".\(ext) must use Quick Look")
+        }
+    }
+
+    func testTextExtensionsNeverUseQuickLook() {
+        for ext in ["gs", "csv", "swift", "js", "json", "md", "txt", "ts"] {
+            XCTAssertFalse(FileViewRouting.usesQuickLook(ext: ext), ".\(ext) must open in the text editor")
+        }
+    }
+
+    func testGSAndCSVOpenInSyntaxView() {
+        for name in ["Code.gs", "data.csv"] {
+            let view = FileEditorView(frame: NSRect(x: 0, y: 0, width: 400, height: 400))
+            view.load(path: writeFile(named: name, contents: "function a() {}\n1,2,3"))
+            XCTAssertTrue(view.isShowingSyntaxView, "\(name) must show the text editor")
+            XCTAssertFalse(view.isShowingQuickLook, "\(name) must not use Quick Look")
+        }
+    }
+
+    func testGSIsHighlightedAsJavaScript() {
+        XCTAssertEqual(MarkdownPreviewView.language(forFile: URL(fileURLWithPath: "/tmp/Code.gs")), "javascript")
+    }
 }
