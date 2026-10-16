@@ -69,13 +69,15 @@ public enum URLDetection {
         "swift", "c", "h", "cpp", "hpp", "cc", "cxx", "m", "mm", "rs", "go", "py",
         "js", "mjs", "cjs", "jsx", "ts", "mts", "cts", "tsx", "rb", "php", "sh",
         "bash", "zsh", "fish", "pl", "lua", "r", "dart", "cs", "fs", "zig", "nim",
-        "vue", "svelte", "java", "kt", "kts", "scala", "asm", "s", "wasm",
+        "vue", "svelte", "java", "kt", "kts", "scala", "asm", "s", "wasm", "gs",
         // Config, Data & Web
         "json", "jsonc", "json5", "yaml", "yml", "toml", "xml", "plist", "csv", "tsv",
         "sql", "graphql", "gql", "ini", "conf", "config", "env", "properties", "lock", "log",
+        "xlsx", "xls", "numbers",
         "html", "htm", "css", "scss", "sass", "less",
         // Diagrams & Media
-        "mermaid", "mmd", "svg", "png", "jpg", "jpeg", "gif", "webp", "ico",
+        "mermaid", "mmd", "svg", "png", "jpg", "jpeg", "gif", "webp", "ico", "heic", "heif", "tiff", "tif",
+        "raw", "dng", "cr2", "cr3", "nef", "arw", "raf", "orf", "rw2",
         // Build & Package
         "diff", "patch", "podspec", "dockerfile", "cmake", "gradle", "proto", "mod", "sum"
     ]
