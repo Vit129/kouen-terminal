@@ -92,7 +92,7 @@ final class MarkdownPreviewView: NSView, WKNavigationDelegate {
         // Swift / Apple
         "swift": "swift", "m": "objectivec", "mm": "objectivec",
         // Web & Script
-        "js": "javascript", "mjs": "javascript", "cjs": "javascript", "jsx": "javascript",
+        "js": "javascript", "gs": "javascript", "mjs": "javascript", "cjs": "javascript", "jsx": "javascript",
         "ts": "typescript", "mts": "typescript", "cts": "typescript", "tsx": "typescript",
         "html": "xml", "htm": "xml", "xml": "xml", "svg": "xml", "plist": "xml",
         "css": "css", "scss": "scss", "sass": "scss", "less": "less",
