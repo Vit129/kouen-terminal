@@ -62,7 +62,7 @@ final class FileViewerViewController: NSViewController {
             self.load(path: cleanPath)
         }
 
-        if Self.quickLookExtensions.contains(ext) {
+        if FileViewRouting.usesQuickLook(ext: ext) || Self.quickLookExtensions.contains(ext) {
             showQuickLook(url)
             return
         }
@@ -411,10 +411,6 @@ final class FileViewerViewController: NSViewController {
         if let data = try? Data(contentsOf: file),
            let list = try? JSONDecoder().decode([String].self, from: data),
            !list.isEmpty { return Set(list) }
-        return [
-            "png", "jpg", "jpeg", "gif", "webp", "svg", "ico", "bmp", "tiff", "heic",
-            "pdf", "rtf", "rtfd", "doc", "docx", "pages", "key", "keynote", "numbers",
-            "csv", "xls", "xlsx",
-        ]
+        return []
     }
 }
