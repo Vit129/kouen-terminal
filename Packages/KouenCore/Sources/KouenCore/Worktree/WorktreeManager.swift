@@ -70,14 +70,10 @@ public struct WorktreeManager: Sendable {
     /// checkout. A git worktree gives each session its own checked-out directory sharing the
     /// same `.git` object store — cheap isolation without a full clone.
     ///
-    /// ## Three callers trigger this (search for `.create(`):
-    /// 1. `WorktreeAutoIsolateService.isolate(tabID:)` — USER-TRIGGERED. A branch change only
-    ///    shows a notice; this runs when the user clicks "Isolate into worktree". Checks the
-    ///    existing branch out in a worktree (`checkoutExisting: true`) after freeing it in the
-    ///    shared tree, then `cd`s that one tab in.
-    /// 2. `SessionLifecycleService.addAgentTask(...)` — EXPLICIT. User creates a named task;
+    /// ## Two callers trigger this (search for `.create(`):
+    /// 1. `SessionLifecycleService.addAgentTask(...)` — EXPLICIT. User creates a named task;
     ///    passes `branch: <sanitized-task-name>` → a `-b <branch>` worktree (creates the branch).
-    /// 3. `SurfaceRegistry` `.worktreeCreate` IPC — passthrough for daemon clients, forwarding
+    /// 2. `SurfaceRegistry` `.worktreeCreate` IPC — passthrough for daemon clients, forwarding
     ///    whatever `branch`/`baseRef` the caller supplied.
     ///
     /// ## Branch vs detached
@@ -92,10 +88,9 @@ public struct WorktreeManager: Sendable {
     ///   - branch: Branch to create+checkout. If nil, detached HEAD (no new branch).
     ///   - baseRef: The ref to branch/detach from (e.g. "origin/main"). Defaults to current HEAD.
     ///   - checkoutExisting: When `branch` is non-nil, checks out an EXISTING local branch
-    ///     (`git worktree add <path> <branch>`, no `-b`) instead of creating a new one. Used by
-    ///     `WorktreeAutoIsolateService.isolate()` (P47), where the branch already exists — it's
-    ///     the branch a tab was already on when the switch was detected — so `-b` would always
-    ///     fail with "branch already exists". Ignored when `branch` is nil.
+    ///     (`git worktree add <path> <branch>`, no `-b`) instead of creating a new one, for a branch
+    ///     that already exists (`-b` would fail with "branch already exists"). Ignored when
+    ///     `branch` is nil.
     /// - Returns: The absolute path to the new worktree, or nil if `git worktree add` failed.
     public func create(
         repoPath: String,

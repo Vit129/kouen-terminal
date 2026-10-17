@@ -187,9 +187,11 @@ public enum AntigravitySessionLocator {
         }
         #endif
 
-        // When a specific surface cwd was requested, never fall back to an unrelated project session
-        if standardizedCwd != nil {
-            return nil
+        // The agy CLI keeps no conversation_summaries.db, so nothing records a conversation's
+        // workspace: match the newest transcript whose most-mentioned project root is this cwd.
+        if let stdCwd = standardizedCwd {
+            if FileManager.default.fileExists(atPath: dbURL.path) { return nil }
+            return newestConversation(in: brainDir, dominatedBy: stdCwd)
         }
 
         // Fallback only when surfaceCwd was nil: directory mtime walk in brainDir
@@ -206,6 +208,42 @@ public enum AntigravitySessionLocator {
             }
         }
         return latestFolder
+    }
+
+    /// ponytail: a heuristic (path mentions in the transcript), checked over the 10 newest
+    /// conversations; replace with agy's own workspace record if the CLI ever writes one.
+    static func newestConversation(in brainDir: URL, dominatedBy stdCwd: String) -> String? {
+        guard let folders = try? FileManager.default.contentsOfDirectory(atPath: brainDir.path) else { return nil }
+        let dated: [(id: String, url: URL, mtime: Date)] = folders.compactMap { id in
+            guard !id.hasPrefix(".") else { return nil }
+            let url = brainDir.appendingPathComponent(id).appendingPathComponent(".system_generated/logs/transcript.jsonl")
+            guard let mtime = (try? url.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate else { return nil }
+            return (id, url, mtime)
+        }
+        for candidate in dated.sorted(by: { $0.mtime > $1.mtime }).prefix(10) {
+            // agy reads its own skills/config under ~/.gemini in every conversation; that is not a workspace.
+            let ignore = stdCwd.contains("/.gemini") ? nil : "/.gemini"
+            guard let text = try? String(contentsOf: candidate.url, encoding: .utf8),
+                  let root = dominantProjectRoot(in: text, ignoringSuffix: ignore) else { continue }
+            if root == stdCwd || stdCwd.hasPrefix(root + "/") || root.hasPrefix(stdCwd + "/") {
+                return candidate.id
+            }
+        }
+        return nil
+    }
+
+    /// The most-mentioned project root (`~/Git/<group>/<repo>` or a `~/.<dir>`) in `text`.
+    static func dominantProjectRoot(in text: String, ignoringSuffix ignore: String? = nil) -> String? {
+        guard let regex = try? NSRegularExpression(
+            pattern: #"/(?:Users|home)/[^/"\\\s]+/(?:Git/[^/"\\\s]+/[^/"\\\s]+|\.[A-Za-z0-9_-]+)"#) else { return nil }
+        var counts: [String: Int] = [:]
+        let ns = text as NSString
+        for match in regex.matches(in: text, range: NSRange(location: 0, length: ns.length)) {
+            let root = ns.substring(with: match.range)
+            if let ignore, root.hasSuffix(ignore) { continue }
+            counts[root, default: 0] += 1
+        }
+        return counts.max { $0.value < $1.value }?.key
     }
 
     /// Checks if a JSON workspace_uris string matches target stdCwd on exact path boundary.

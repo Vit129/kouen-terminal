@@ -11,19 +11,19 @@
 // monogram. Hermes's official mark is a detailed portrait that turns to mush at icon size,
 // so it intentionally uses the monogram instead of a vector silhouette.
 // Do not hand-edit path data — regenerate from the source SVGs.
-import CoreGraphics
+import Foundation
 
 /// One brand icon as raw SVG geometry: a viewBox and its subpath `d` strings,
 /// rendered to a `CGPath` by `SVGPathParser` and tinted at draw time.
-struct AgentVectorIcon {
-    let viewBox: CGSize
-    let evenOdd: Bool
-    let subpaths: [String]
+public struct AgentVectorIcon: Sendable {
+    public let viewBox: CGSize
+    public let evenOdd: Bool
+    public let subpaths: [String]
 }
 
-enum AgentIconArt {
+public enum AgentIconArt {
     /// Keyed by `AgentKind.rawValue`. Agents without a brand mark fall back to a monogram.
-    static let icons: [String: AgentVectorIcon] = [
+    public static let icons: [String: AgentVectorIcon] = [
         "codex": AgentVectorIcon(
             viewBox: CGSize(width: 24, height: 24),
             evenOdd: true,

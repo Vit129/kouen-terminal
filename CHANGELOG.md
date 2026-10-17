@@ -5,6 +5,18 @@ All notable changes to Kouen are documented here. The format is based on
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Each released version
 has a matching `vX.Y.Z` tag and a signed, notarized DMG on
 [GitHub Releases](https://github.com/Vit129/kouen-terminal/releases).
+## [4.21.9] - 2026-10-17
+
+### Added
+- Black theme and the sidebar's real agent brand icons ([`136b230`](https://github.com/Vit129/kouen-terminal/commit/136b23040de1126c50a3cfe9f329aa65f985da91))
+- Remove the "Isolate into worktree" banner ([`7884b58`](https://github.com/Vit129/kouen-terminal/commit/7884b585e68a8e61fcc3ac9b7cec438cab208b08))
+
+### Fixed
+- Show agy CLI transcript and stop breaking Thai text on the phone ([`68c4c8b`](https://github.com/Vit129/kouen-terminal/commit/68c4c8b918c3015c05ca0150cfb187700d0d29d2))
+- Print a loopback pairing URL for opening the page on the Mac itself ([`2b7f3e4`](https://github.com/Vit129/kouen-terminal/commit/2b7f3e423bee8b9b1f2582b02706eb565096dc76))
+- Ping the socket so a dead iOS connection reconnects on return ([`7f894aa`](https://github.com/Vit129/kouen-terminal/commit/7f894aa26b25a4953bb51f32d0d78d0e6a31a010))
+
+
 ## [4.21.8] - 2026-10-17
 
 ### Added

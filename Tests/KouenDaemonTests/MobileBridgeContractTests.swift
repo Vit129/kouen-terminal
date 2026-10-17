@@ -30,12 +30,34 @@ final class MobileBridgeContractTests: XCTestCase {
         XCTAssertEqual(items[1]["id"] as? String, "a#1")
     }
 
+    // The page's liveness check: `{"ping":N}` must decode (else the daemon answers
+    // "unrecognized control message" and every ping times out into a reconnect loop).
+    func testPingControlMessageDecodesAndPageAnswersPong() throws {
+        let msg = try JSONDecoder().decode(MobileBridgeServer.ControlMessage.self, from: Data(#"{"ping":7}"#.utf8))
+        XCTAssertEqual(msg.ping, 7)
+        XCTAssertNil(msg.attach)
+        XCTAssertTrue(MobileBridgeServer.embeddedPageHTML.contains("if (msg.pong !== undefined) { onPong(); return; }"))
+    }
+
     func testPageCSSKeepsHiddenElementsHidden() {
         XCTAssertTrue(MobileBridgeServer.embeddedPageHTML.contains("[hidden]{display:none !important}"))
     }
 
+    func testPageCarriesTheSidebarBrandIconsAndTints() throws {
+        let page = MobileBridgeServer.embeddedPageHTML
+        XCTAssertTrue(page.contains("const AGENT_ICONS = {"))
+        let json = MobileBridgeServer.agentIconsJS.dropFirst("const AGENT_ICONS = ".count).dropLast()
+        let map = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(json.utf8)) as? [String: [String: String]])
+        for kind in ["claude-code", "codex", "antigravity", "copilot"] {
+            XCTAssertTrue(map[kind]?["svg"]?.hasPrefix("<svg viewBox=") == true, kind)
+        }
+        XCTAssertEqual(map["antigravity"]?["c"], "#3186ff")
+        XCTAssertNil(map["generic"]?["svg"])
+        XCTAssertTrue(page.contains("--bg:#000000"))
+    }
+
     func testPageCSSIncludesTheTextWrapRules() {
-        XCTAssertTrue(MobileBridgeServer.embeddedPageHTML.contains(".bot{overflow-wrap:anywhere}"))
+        XCTAssertTrue(MobileBridgeServer.embeddedPageHTML.contains(".msg,.bot,.tool,.ask{overflow-wrap:break-word"))
         XCTAssertFalse(MobileBridgeServer.embeddedPageHTML.contains("textWrapCSS"))
     }
 
