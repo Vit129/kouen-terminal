@@ -1793,6 +1793,12 @@ public final class MobileBridgeServer: @unchecked Sendable {
             print("\nScan with your iPhone's Camera app — valid \(Int(pairingLifetime))s, grants access to every session on this Mac:\n")
             print(qrAsciiArt(for: url) ?? "(QR generation failed — open this URL manually)")
             print("\n\(url)\n")
+            // A Mac can't open TCP to its own Tailscale IP (ping works, connect times out), so the
+            // phone URL above never loads on this Mac; give the loopback one too (same token).
+            if host != "127.0.0.1" || serveActive {
+                let local = Self.buildPairingURL(host: "127.0.0.1", pageURLPort: pageURLPort, wsPort: wsPort, token: token)
+                print("On this Mac: \(local)\n")
+            }
             fflush(stdout)
             var slept: TimeInterval = 0
             while slept < pairingLifetime && isRunning {
