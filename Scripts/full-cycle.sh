@@ -123,9 +123,11 @@ fi
 git_dir="$(git rev-parse --git-dir)"
 prior_branch="$(git branch --show-current)"
 cpm_args=()
-if [[ -n "$COMMIT_MSG" ]]; then
-  cpm_args+=("-m" "$COMMIT_MSG")
+if [[ -z "$COMMIT_MSG" ]]; then
+  ver="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' Apps/Kouen/Sources/KouenApp/Resources/Info.plist 2>/dev/null || true)"
+  COMMIT_MSG="chore(release): bump version (v${ver:-unknown})"
 fi
+cpm_args+=("-m" "$COMMIT_MSG")
 if [[ "$AUTO_YES" -eq 1 ]]; then
   cpm_args+=("-y")
 fi
