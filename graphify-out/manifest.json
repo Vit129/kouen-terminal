@@ -970,7 +970,7 @@
     "semantic_hash": ""
   },
   "Packages/KouenCore/Sources/KouenCore/KouenVersion.swift": {
-    "mtime": 1791989999.8836732,
+    "mtime": 1792223772.037355,
     "ast_hash": "fa2b6b67cbd430615f85e070773d9c83",
     "semantic_hash": ""
   },
@@ -1060,7 +1060,7 @@
     "semantic_hash": ""
   },
   "Packages/KouenCore/Sources/KouenCore/ReleaseNotes/GeneratedReleaseNotes.swift": {
-    "mtime": 1791990004.232696,
+    "mtime": 1792223772.03754,
     "ast_hash": "9b54fe1aa8789a7dbd4d8b820b747be2",
     "semantic_hash": ""
   },
@@ -1875,8 +1875,8 @@
     "semantic_hash": ""
   },
   "Scripts/commit-push-merge.sh": {
-    "mtime": 1791781729.9197319,
-    "ast_hash": "443dff47f7257ada011c5c219e56e9f8",
+    "mtime": 1792223813.4619396,
+    "ast_hash": "b77655f8018e807b75c91e4d143a5a55",
     "semantic_hash": ""
   },
   "Scripts/completions/kouen-cli.fish": {
@@ -1895,8 +1895,8 @@
     "semantic_hash": ""
   },
   "Scripts/full-cycle.sh": {
-    "mtime": 1791781729.9200523,
-    "ast_hash": "5a5d07c567b25dd30b3bf3c94d464777",
+    "mtime": 1792223836.4317534,
+    "ast_hash": "db26ecba106834a0415bc1e0b5d8867d",
     "semantic_hash": ""
   },
   "Scripts/generate-app-icon.sh": {
@@ -1955,8 +1955,8 @@
     "semantic_hash": ""
   },
   "Scripts/prepare-release.sh": {
-    "mtime": 1791540191.1100636,
-    "ast_hash": "4c3844755c406b377c86c9a3dee68230",
+    "mtime": 1792223824.5719872,
+    "ast_hash": "dd3571de645a44519dce4ced61427443",
     "semantic_hash": ""
   },
   "Scripts/preview.sh": {
@@ -1980,8 +1980,8 @@
     "semantic_hash": ""
   },
   "Scripts/start.mjs": {
-    "mtime": 1790147091.12582,
-    "ast_hash": "0366bbee5ead499dfaabed8468849688",
+    "mtime": 1792223248.703972,
+    "ast_hash": "a35f5ed0667ad29202be8d6e8a131149",
     "semantic_hash": ""
   },
   "Scripts/start.sh": {
@@ -4085,8 +4085,8 @@
     "semantic_hash": ""
   },
   "rules/build-release.md": {
-    "mtime": 1789615220.7447257,
-    "ast_hash": "a117ecb73cc8600ba81f629f535cea07",
+    "mtime": 1792223322.2800555,
+    "ast_hash": "32e2585a3185e58662cf2548b66b7f6b",
     "semantic_hash": ""
   },
   "rules/concurrency.md": {
