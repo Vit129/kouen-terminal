@@ -118,6 +118,38 @@ async function selectWithReadline(options) {
   });
 }
 
+function printHelp(options) {
+  console.log(`
+🚀 Kouen Build & Release
+
+Usage:
+  Scripts/start.sh [choice] [bump] [options]
+  make start [choice] [bump] [options]
+
+Choices:
+  1, commit-push-merge, commit   Commit and push changes via PR/merge
+  2, preview, dev                Preview build — isolated dev/test app
+  3, full-cycle, release         Full cycle: build → bump → commit+push → install
+
+Direct Bump Shortcuts (runs full-cycle):
+  patch                          Full cycle with patch bump
+  minor                          Full cycle with minor bump
+  major                          Full cycle with major bump
+  skip, --no-bump                Full cycle keeping current version
+
+Options & AI / Non-interactive Flags:
+  -m, --message <msg>            Commit message (or set COMMIT_MESSAGE="...")
+  -y, --yes                      Non-interactive: skip prompts, auto-accept defaults
+  -h, --help                     Show this help
+
+Examples:
+  make start 1 -m "feat(history): add usage view"
+  make start patch -m "fix: resolve memory leak"
+  make start 3 minor -y
+  make start preview
+`);
+}
+
 async function main() {
   try {
     const options = [
@@ -135,24 +167,97 @@ async function main() {
       }
     ];
 
-    // Direct argument: `node start.mjs 1`, `node start.mjs preview`, or `make start patch`
-    const arg = process.argv[2];
-    let choice;
-    let bumpArg = process.argv[3];
-    if (arg) {
-      const byNumber = { '1': 'commit-push-merge', '2': 'preview', '3': 'full-cycle' };
-      const byName = { 'commit-push-merge': 'commit-push-merge', 'preview': 'preview', 'full-cycle': 'full-cycle' };
-      const bumpDirect = { 'patch': 'patch', 'minor': 'minor', 'major': 'major', 'skip': '--no-bump', '--no-bump': '--no-bump' };
-      if (bumpDirect[arg]) {
-        choice = 'full-cycle';
-        bumpArg = bumpDirect[arg];
+    const byNumber = { '1': 'commit-push-merge', '2': 'preview', '3': 'full-cycle' };
+    const byName = {
+      'commit-push-merge': 'commit-push-merge',
+      'commit': 'commit-push-merge',
+      'push': 'commit-push-merge',
+      'preview': 'preview',
+      'dev': 'preview',
+      'full-cycle': 'full-cycle',
+      'release': 'full-cycle'
+    };
+    const bumpDirect = {
+      'patch': 'patch',
+      'minor': 'minor',
+      'major': 'major',
+      'skip': '--no-bump',
+      '--no-bump': '--no-bump'
+    };
+
+    let choice = process.env.START_CHOICE || process.env.CHOICE || null;
+    let bumpArg = null;
+    let commitMessage = process.env.COMMIT_MESSAGE || null;
+    let autoYes = Boolean(process.env.AUTO_YES || process.env.CI || process.env.NON_INTERACTIVE);
+
+    const rawArgs = process.argv.slice(2);
+    const positionalArgs = [];
+
+    for (let i = 0; i < rawArgs.length; i++) {
+      const a = rawArgs[i];
+      if (a === '-h' || a === '--help' || a === 'help') {
+        printHelp(options);
+        process.exit(0);
+      } else if (a === '-y' || a === '--yes' || a === '--non-interactive') {
+        autoYes = true;
+      } else if (a === '-m' || a === '--message') {
+        commitMessage = rawArgs[++i] || '';
+      } else if (a.startsWith('--message=')) {
+        commitMessage = a.slice('--message='.length);
+      } else if (a.startsWith('-m=')) {
+        commitMessage = a.slice('-m='.length);
+      } else if (a === '--no-bump' || a === '--skip') {
+        bumpArg = '--no-bump';
       } else {
-        choice = byNumber[arg] || byName[arg];
+        positionalArgs.push(a);
       }
-      if (!choice) { console.error(`❌ Unknown option: ${arg}`); process.exit(1); }
-      console.log(`\n✅ Selected: ${options.find(o => o.value === choice)?.display}\n`);
-    } else {
+    }
+
+    // Process positional arguments
+    for (const pos of positionalArgs) {
+      if (!choice) {
+        if (bumpDirect[pos]) {
+          choice = 'full-cycle';
+          bumpArg = bumpDirect[pos];
+        } else if (byNumber[pos] || byName[pos]) {
+          choice = byNumber[pos] || byName[pos];
+        } else {
+          // If message not set, this could be a commit message or invalid choice
+          console.error(`❌ Unknown option: ${pos}`);
+          printHelp(options);
+          process.exit(1);
+        }
+      } else if (choice === 'full-cycle' && !bumpArg) {
+        if (bumpDirect[pos]) {
+          bumpArg = bumpDirect[pos];
+        } else if (['1', '2', '3', '4'].includes(pos)) {
+          const bumpMap = { '1': 'patch', '2': 'minor', '3': 'major', '4': '--no-bump' };
+          bumpArg = bumpMap[pos];
+        } else if (!commitMessage) {
+          commitMessage = pos;
+        }
+      } else if (!commitMessage) {
+        commitMessage = pos;
+      }
+    }
+
+    if (!choice) {
+      if (!process.stdin.isTTY) {
+        console.error('\n🚀 Kouen Build & Release (Non-interactive / AI mode)');
+        console.error(`Current Version: v${currentVersion} (build ${currentBuild})\n`);
+        console.error('No interactive TTY detected. Specify options via arguments or environment:');
+        console.error('  make start 1 [-m "commit message"]               # Commit + Push + Merge');
+        console.error('  make start 2                                    # Preview build');
+        console.error('  make start 3 [patch|minor|major|skip] [-m "msg"] # Full cycle');
+        console.error('  make start patch [-m "commit message"]           # Shortcut for patch full-cycle');
+        console.error('\nOr pass variables:');
+        console.error('  COMMIT_MESSAGE="feat: ..." make start 1');
+        console.error('  make start 1 msg="feat: ..."\n');
+        process.exit(1);
+      }
       choice = await selectWithArrows(options);
+    } else {
+      console.log(`\n✅ Selected: ${options.find(o => o.value === choice)?.display || choice}\n`);
     }
 
     // Refresh the knowledge graph before any option that actually commits/releases
@@ -174,7 +279,14 @@ async function main() {
     }
 
     if (choice === 'commit-push-merge') {
-      await runCommand('Scripts/commit-push-merge.sh', []);
+      const cpmArgs = [];
+      if (commitMessage) {
+        cpmArgs.push('-m', commitMessage);
+      }
+      if (autoYes) {
+        cpmArgs.push('-y');
+      }
+      await runCommand('Scripts/commit-push-merge.sh', cpmArgs);
     } else if (choice === 'preview') {
       await runCommand('make', ['preview-stop']).catch(() => {});
       await runCommand('make', ['preview-clean']);
@@ -186,22 +298,23 @@ async function main() {
         { display: '3) major  — breaking changes', value: 'major' },
         { display: '4) skip   — keep current version', value: '--no-bump' },
       ];
-      let bump;
-      bumpArg = bumpArg || process.argv[3];
-      if (bumpArg) {
-        const byNumber = { '1': 'patch', '2': 'minor', '3': 'major', '4': '--no-bump' };
-        const byName = { 'patch': 'patch', 'minor': 'minor', 'major': 'major', 'skip': '--no-bump', '--no-bump': '--no-bump' };
-        bump = byNumber[bumpArg] || byName[bumpArg];
-        if (!bump) {
-          console.error(`❌ Unknown bump option: ${bumpArg}`);
-          process.exit(1);
+      let bump = bumpArg;
+      if (!bump) {
+        if (!process.stdin.isTTY || autoYes) {
+          console.log('No TTY available / auto-yes mode: defaulting to patch bump.');
+          bump = 'patch';
+        } else {
+          console.log('\nVersion bump?');
+          bump = await selectWithArrows(bumpOptions);
         }
-        console.log(`\n✅ Selected bump: ${bumpOptions.find(o => o.value === bump)?.display || bump}\n`);
-      } else {
-        console.log('\nVersion bump?');
-        bump = await selectWithArrows(bumpOptions);
       }
       const bumpArgs = bump === '--no-bump' ? ['--no-bump'] : [bump];
+      if (commitMessage) {
+        bumpArgs.push('-m', commitMessage);
+      }
+      if (autoYes) {
+        bumpArgs.push('-y');
+      }
       await runCommand('Scripts/full-cycle.sh', bumpArgs);
     }
   } catch (err) {

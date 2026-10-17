@@ -10,11 +10,41 @@
 # - Otherwise opens (or reuses) a PR into main, merges it, then deletes
 #   the branch.
 #
-# Usage: Scripts/commit-push-merge.sh
+# Usage: Scripts/commit-push-merge.sh [-m <message>] [-y|--yes] [<message>]
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
+
+msg="${COMMIT_MESSAGE:-}"
+auto_yes=0
+
+while (($#)); do
+  case "$1" in
+    -m|--message)
+      msg="${2:?Missing value for -m/--message}"
+      shift 2
+      ;;
+    --message=*)
+      msg="${1#*=}"
+      shift
+      ;;
+    -y|--yes)
+      auto_yes=1
+      shift
+      ;;
+    -h|--help)
+      echo "Usage: Scripts/commit-push-merge.sh [-m <message>] [-y|--yes] [<message>]"
+      exit 0
+      ;;
+    *)
+      if [[ -z "$msg" ]]; then
+        msg="$1"
+      fi
+      shift
+      ;;
+  esac
+done
 
 if [[ -n "$(git status --porcelain)" ]]; then
   echo ""
@@ -23,9 +53,21 @@ if [[ -n "$(git status --porcelain)" ]]; then
   echo "Conventional commit format: <type>(<scope>): <summary>"
   echo "  types: feat, fix, refactor, chore, docs, test, perf, build, ci"
   echo ""
-  msg="${COMMIT_MESSAGE:-${1:-}}"
   if [[ -z "$msg" ]]; then
-    read -erp "Commit message: " msg
+    if [[ -t 0 ]]; then
+      read -erp "Commit message: " msg
+    else
+      # Non-interactive / AI mode fallback:
+      # If Info.plist is modified/staged, this is a version bump commit
+      if git diff --cached --name-only | grep -q "Info.plist" || git diff --name-only | grep -q "Info.plist"; then
+        ver="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' Apps/Kouen/Sources/KouenApp/Resources/Info.plist 2>/dev/null || true)"
+        msg="chore(release): bump version (v${ver:-unknown})"
+        echo "Non-interactive / AI mode: auto-generated commit message: $msg"
+      else
+        echo "❌ Empty commit message — in non-interactive/AI mode, provide a message via -m \"<msg>\" or COMMIT_MESSAGE=\"<msg>\"." >&2
+        exit 1
+      fi
+    fi
   fi
   if [[ -z "$msg" ]]; then
     echo "Empty commit message — aborting." >&2
