@@ -30,6 +30,15 @@ final class MobileBridgeContractTests: XCTestCase {
         XCTAssertEqual(items[1]["id"] as? String, "a#1")
     }
 
+    // The page's liveness check: `{"ping":N}` must decode (else the daemon answers
+    // "unrecognized control message" and every ping times out into a reconnect loop).
+    func testPingControlMessageDecodesAndPageAnswersPong() throws {
+        let msg = try JSONDecoder().decode(MobileBridgeServer.ControlMessage.self, from: Data(#"{"ping":7}"#.utf8))
+        XCTAssertEqual(msg.ping, 7)
+        XCTAssertNil(msg.attach)
+        XCTAssertTrue(MobileBridgeServer.embeddedPageHTML.contains("if (msg.pong !== undefined) { onPong(); return; }"))
+    }
+
     func testPageCSSKeepsHiddenElementsHidden() {
         XCTAssertTrue(MobileBridgeServer.embeddedPageHTML.contains("[hidden]{display:none !important}"))
     }
