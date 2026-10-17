@@ -81,10 +81,22 @@ enum FuzzyPathResolver {
             .map(\.candidate)
     }
 
-    static func resolve(query: String, root: String, limit: Int = 10, fileManager: FileManager = .default) -> FuzzyPathResolution {
+    static func resolve(
+        query: String, root: String, limit: Int = 10,
+        otherRoots: [String] = UserDefaults.standard.stringArray(forKey: "RecentProjectPaths") ?? [],
+        fileManager: FileManager = .default
+    ) -> FuzzyPathResolution {
         // Absolute path that exists on disk → skip fuzzy scan entirely
         if query.hasPrefix("/"), fileManager.fileExists(atPath: query) { return .unique(query) }
-        return resolve(query: query, ranked: FileFuzzyMatcher.rank(query: query, candidates: scanFiles(root: root, fileManager: fileManager), limit: limit))
+        let local = resolve(query: query, ranked: FileFuzzyMatcher.rank(query: query, candidates: scanFiles(root: root, fileManager: fileManager), limit: limit))
+        guard local == .none else { return local }
+        // Nothing in this project: try the other recent projects, so a file named in another
+        // repo (e.g. a central notes repo) still opens.
+        // ponytail: scans each recent project in full on a miss; fine for the 10 recents kept.
+        // Upgrade: a per-root file index if misses get slow.
+        let others = otherRoots.filter { $0 != root && !root.hasPrefix($0 + "/") }
+        return resolve(query: query, ranked: FileFuzzyMatcher.rank(
+            query: query, candidates: others.flatMap { scanFiles(root: $0, fileManager: fileManager) }, limit: limit))
     }
 
     static func resolve(query: String, ranked: [(candidate: String, score: Int)]) -> FuzzyPathResolution {

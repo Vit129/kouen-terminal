@@ -112,6 +112,26 @@ public enum URLDetection {
 
     /// Detects if the text at `column` in `line` is a file path (absolute, relative, or recognized filename).
     /// Handles single-quoted or double-quoted paths with spaces, and unquoted delimited tokens.
+    /// A path the terminal soft-wrapped across rows: when the clicked row's text runs into its
+    /// left/right edge and the neighbouring row continues with no space, the rows are joined and
+    /// the path detected on the joined text. `columns` is clipped to the clicked row.
+    /// ponytail: guesses the wrap from "no space at the seam"; two hard lines that happen to
+    /// touch the edge get joined too. Upgrade: expose the engine's per-row wrap flag in the snapshot.
+    public static func detectWrappedFilePath(prev: String?, line: String, next: String?, at column: Int) -> (url: String, columns: Range<Int>)? {
+        func joins(_ a: String?, _ b: String?) -> Bool {
+            guard let a, let b, let last = a.last, let first = b.first else { return false }
+            return !last.isWhitespace && !first.isWhitespace
+        }
+        let before = joins(prev, line) ? prev! : ""
+        let after = joins(line, next) ? next! : ""
+        guard !before.isEmpty || !after.isEmpty,
+              let match = detectFilePath(in: before + line + after, at: before.count + column) else { return nil }
+        let lo = max(match.columns.lowerBound - before.count, 0)
+        let hi = min(match.columns.upperBound - before.count, line.count)
+        guard lo < hi else { return nil }
+        return (match.url, lo ..< hi)
+    }
+
     public static func detectFilePath(in line: String, at column: Int) -> (url: String, columns: Range<Int>)? {
         let chars = Array(line)
         guard !line.isEmpty, column >= 0, column < chars.count else { return nil }
