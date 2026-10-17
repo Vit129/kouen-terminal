@@ -25,7 +25,6 @@ has a matching `vX.Y.Z` tag and a signed, notarized DMG on
 - Cmd+click opens bare .gs/xlsx/heic/RAW filenames — extension was missing from the link allowlist ([`6b3064f`](https://github.com/Vit129/kouen-terminal/commit/6b3064fd8674f4731c17cdf3da07b8f773739b56))
 - Handle graphify refresh before rebase and auto-default build/commit in release ([`5f6394b`](https://github.com/Vit129/kouen-terminal/commit/5f6394b9bc83ea17a07e4fe7431b80cd9e9dfefc))
 
-
 ## [4.21.7] - 2026-10-14
 
 ### Added
