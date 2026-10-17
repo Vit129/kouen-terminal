@@ -20,8 +20,8 @@
     "semantic_hash": ""
   },
   "Apps/Kouen/Sources/KouenApp/AppDelegate.swift": {
-    "mtime": 1791540191.1061673,
-    "ast_hash": "3df441884b73939fa1e2184cc4358247",
+    "mtime": 1792244383.8224332,
+    "ast_hash": "75e11fb6d6e83e8a3147628147c537f0",
     "semantic_hash": ""
   },
   "Apps/Kouen/Sources/KouenApp/Scripting/PluginLoader.swift": {
@@ -249,11 +249,6 @@
     "ast_hash": "9927f6629c96539d5215ed56ddd7e496",
     "semantic_hash": ""
   },
-  "Apps/Kouen/Sources/KouenApp/Services/WorktreeAutoIsolateService.swift": {
-    "mtime": 1791981678.436946,
-    "ast_hash": "d9ae33166336c9eab16f133e137294ac",
-    "semantic_hash": ""
-  },
   "Apps/Kouen/Sources/KouenApp/Services/ZombieHoldRegistry.swift": {
     "mtime": 1785510867.5112925,
     "ast_hash": "21a3b111b61518ce07fa1a8b2ccd30fb",
@@ -330,8 +325,8 @@
     "semantic_hash": ""
   },
   "Apps/Kouen/Sources/KouenApp/UI/Chrome/ContentAreaViewController.swift": {
-    "mtime": 1791981678.4374425,
-    "ast_hash": "4941d5c9519061251c70724a01a3e204",
+    "mtime": 1792244404.254515,
+    "ast_hash": "8fbb94eeeaba29f746f98a37ba6c28d4",
     "semantic_hash": ""
   },
   "Apps/Kouen/Sources/KouenApp/UI/Chrome/FilePreviewCoordinator.swift": {
@@ -1115,8 +1110,8 @@
     "semantic_hash": ""
   },
   "Packages/KouenCore/Sources/KouenCore/Worktree/WorktreeManager.swift": {
-    "mtime": 1791981678.4384854,
-    "ast_hash": "91f96dc3f22aaff6946fcc632bc6d52f",
+    "mtime": 1792244437.204621,
+    "ast_hash": "f541cd8798873d0b1d0333092b16a4c2",
     "semantic_hash": ""
   },
   "Packages/KouenDaemon/Sources/KouenDaemon/AgentScanner.swift": {
@@ -4599,19 +4594,9 @@
     "ast_hash": "dd2981f40c3dbcab80527a031a36920b",
     "semantic_hash": ""
   },
-  "Apps/Kouen/Sources/KouenApp/UI/Chrome/WorktreeIsolationNoticeView.swift": {
-    "mtime": 1791981678.4378872,
-    "ast_hash": "3edd32035b184125da1ba5bb693cd104",
-    "semantic_hash": ""
-  },
   "Packages/KouenDaemon/Sources/KouenDaemon/MobileBridgeServer+Connecting.swift": {
     "mtime": 1792029521.6557128,
     "ast_hash": "a95801184c1da8dd6ec43808c10eb416",
-    "semantic_hash": ""
-  },
-  "Tests/KouenAppTests/WorktreeAutoIsolateServiceTests.swift": {
-    "mtime": 1791981678.4403958,
-    "ast_hash": "3df359f4ad108e35b7e002cf5d132c18",
     "semantic_hash": ""
   },
   "docs/research/worktree-ownership.md": {
