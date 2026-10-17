@@ -159,7 +159,16 @@ final class WorkspaceFileTreeView: NSView {
     /// Expands all ancestor directories of `path`, highlights it in the keyboard navigator,
     /// then signals the SwiftUI list to scroll to it after a short delay for child loading.
     func revealFileInTree(path: String) {
-        let rootPrefix = context.rootPath.hasSuffix("/") ? context.rootPath : context.rootPath + "/"
+        var rootPrefix = context.rootPath.hasSuffix("/") ? context.rootPath : context.rootPath + "/"
+        // A path in another project (e.g. a central notes repo): re-root the tree on that
+        // project instead of leaving it on a root the path is not under, where it can't show.
+        if !path.hasPrefix(rootPrefix) && path != context.rootPath {
+            var isDir: ObjCBool = false
+            let dir = FileManager.default.fileExists(atPath: path, isDirectory: &isDir) && isDir.boolValue
+                ? path : (path as NSString).deletingLastPathComponent
+            context.rootPath = WorktreeManager().repoRoot(for: dir) ?? dir
+            rootPrefix = context.rootPath.hasSuffix("/") ? context.rootPath : context.rootPath + "/"
+        }
         if path.hasPrefix(rootPrefix) {
             let relative = String(path.dropFirst(rootPrefix.count))
             let parentRelative = (relative as NSString).deletingLastPathComponent

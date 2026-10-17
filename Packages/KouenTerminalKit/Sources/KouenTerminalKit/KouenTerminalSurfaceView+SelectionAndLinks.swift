@@ -193,13 +193,19 @@ extension KouenTerminalSurfaceView {
                 while hi + 1 < grid.cols, grid.cell(row: row, col: hi + 1)?.hyperlinkID == cell.hyperlinkID { hi += 1 }
                 return (url, lo ..< (hi + 1))
             }
-            var line = ""
-            line.reserveCapacity(grid.cols)
-            for c in 0 ..< grid.cols {
-                guard let cell = grid.cell(row: row, col: c), cell.width != .spacerTail else { line.append(" "); continue }
-                line.unicodeScalars.append(cell.codepoint == 0 ? " " : (Unicode.Scalar(cell.codepoint) ?? " "))
+            func text(_ r: Int) -> String? {
+                guard r >= 0, r < grid.rows else { return nil }
+                var line = ""
+                line.reserveCapacity(grid.cols)
+                for c in 0 ..< grid.cols {
+                    guard let cell = grid.cell(row: r, col: c), cell.width != .spacerTail else { line.append(" "); continue }
+                    line.unicodeScalars.append(cell.codepoint == 0 ? " " : (Unicode.Scalar(cell.codepoint) ?? " "))
+                }
+                return line
             }
+            guard let line = text(row) else { return nil }
             return URLDetection.match(in: line, at: col)
+                ?? URLDetection.detectWrappedFilePath(prev: text(row - 1), line: line, next: text(row + 1), at: col)
                 ?? URLDetection.detectFilePath(in: line, at: col)
                 ?? URLDetection.detectLocalhost(in: line, at: col)
         }

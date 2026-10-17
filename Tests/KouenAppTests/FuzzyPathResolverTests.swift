@@ -41,6 +41,28 @@ final class FuzzyPathResolverTests: XCTestCase {
         ]))
     }
 
+    // Nothing in the current project: a file in another recent project still resolves.
+    func testResolveFallsBackToOtherRecentProjects() throws {
+        // realpath: the enumerator reports /private/var/..., the temp URL says /var/...
+        let tmp = try XCTUnwrap(realpath(FileManager.default.temporaryDirectory.path, nil))
+        defer { free(tmp) }
+        let base = URL(fileURLWithPath: String(cString: tmp)).appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: base) }
+        let here = base.appendingPathComponent("kouen"), notes = base.appendingPathComponent("notes")
+        try FileManager.default.createDirectory(at: here.appendingPathComponent("src"), withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: notes.appendingPathComponent("plans"), withIntermediateDirectories: true)
+        try Data().write(to: here.appendingPathComponent("src/main.swift"))
+        let plan = notes.appendingPathComponent("plans/p51-architecture.md")
+        try Data().write(to: plan)
+
+        XCTAssertEqual(FuzzyPathResolver.resolve(query: "p51-architecture.md", root: here.path, otherRoots: [notes.path]),
+                       .unique(plan.path))
+        XCTAssertEqual(FuzzyPathResolver.resolve(query: "p51-architecture.md", root: here.path, otherRoots: []), .none)
+        // A local match wins; other projects are not consulted.
+        XCTAssertEqual(FuzzyPathResolver.resolve(query: "main.swift", root: here.path, otherRoots: [notes.path]),
+                       .unique(here.appendingPathComponent("src/main.swift").path))
+    }
+
     func testResolveReturnsNoneForNoMatches() {
         XCTAssertEqual(FuzzyPathResolver.resolve(query: "missing", ranked: []), .none)
     }
