@@ -1,5 +1,6 @@
 import AppKit
 import KouenCore
+import KouenIPC
 
 /// Minimal SVG path-data → `CGPath` parser, covering the subset the brand icons use
 /// (`M m L l H h V v C c S s Q q T t A a Z z`) and tolerant of SVG's number quirks:
