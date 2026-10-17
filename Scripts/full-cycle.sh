@@ -293,24 +293,34 @@ if [[ -x "$CLI_BIN" ]]; then
       echo "   Daemon: v${DAEMON_VER} (build ${DAEMON_BUILD})"
       echo "   App:    v${CLI_VER} (build ${CLI_BUILD})"
       echo ""
-      echo "   💡 Running tasks were kept alive. ต้องรัน \`kouen-cli install\` ด้วยเพื่อที่จะได้อัปเดต Daemon เป็นเวอร์ชันล่าสุด"
+      echo "   Restarting the daemon loads the new build but stops every process running in a"
+      echo "   Kouen pane (agents included); tabs and layout come back."
       echo ""
+      # `kouen-cli install` only copies the binaries; launchd must restart the daemon to load them.
+      restart_daemon() {
+        "$CLI_BIN" install >/dev/null
+        "$CLI_BIN" flush-session-state >/dev/null 2>&1 || sleep 1
+        launchctl kickstart -k "gui/$(id -u)/com.vit129.kouen.daemon"
+        for _ in $(seq 1 20); do
+          sleep 0.5
+          NOW=$("$CLI_BIN" version --json 2>/dev/null | grep -o '"daemonBuild":[0-9]*' | cut -d: -f2)
+          if [[ "$NOW" == "$CLI_BUILD" ]]; then echo "   ✅ Daemon restarted on v${CLI_VER} (build ${CLI_BUILD})."; return 0; fi
+        done
+        echo "   ❌ Daemon did not come back on build ${CLI_BUILD}; check: $CLI_BIN version"
+        return 1
+      }
       if [[ "$AUTO_YES" -eq 1 ]]; then
-        "$CLI_BIN" install
-        echo "   ✅ Daemon updated and reloaded to v${CLI_VER} (--yes specified)."
+        restart_daemon
       elif [ -t 0 ]; then
-        read -r -p "   Do you want to run 'kouen-cli install' now? (will reload background daemon) [y/N]: " restart_choice
+        read -r -p "   Restart the daemon now? [Y/n]: " restart_choice
         case "$restart_choice" in
-          [yY][eE][sS]|[yY])
-            "$CLI_BIN" install
-            echo "   ✅ Daemon updated and reloaded to v${CLI_VER}."
-            ;;
-          *)
-            echo "   ⏭️  Skipped. You can run \`kouen-cli install\` anytime later."
-            ;;
+          [nN]|[nN][oO]) echo "   ⏭️  Skipped. Later: kouen-cli install && launchctl kickstart -k gui/\$(id -u)/com.vit129.kouen.daemon" ;;
+          *) restart_daemon ;;
         esac
       else
-        echo "   👉 รันคำสั่งนี้ได้เมื่อสะดวก: kouen-cli install"
+        # No TTY and no --yes: likely an agent running inside a Kouen pane, which the restart would kill.
+        echo "   👉 To load it: kouen-cli install && launchctl kickstart -k gui/\$(id -u)/com.vit129.kouen.daemon"
+        echo "      (or re-run with --yes)"
       fi
     else
       echo "ℹ️  Daemon is up to date (v${CLI_VER} matches running daemon)."
