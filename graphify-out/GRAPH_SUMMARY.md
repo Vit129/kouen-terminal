@@ -1,15 +1,15 @@
-# Graph Summary — kouen-file-types
+# Graph Summary — kouen-terminal
 _Auto-generated from GRAPH_REPORT.md · do not edit manually_
 _Regen: `graphify update .`_
 
 ## Summary
-- 19739 nodes · 56628 edges · 2610 communities (1506 shown, 1104 thin omitted)
-- Extraction: 85% EXTRACTED · 15% INFERRED · 0% AMBIGUOUS · INFERRED: 8463 edges (avg confidence: 0.74)
+- 19838 nodes · 56782 edges · 2734 communities (1526 shown, 1208 thin omitted)
+- Extraction: 85% EXTRACTED · 15% INFERRED · 0% AMBIGUOUS · INFERRED: 8501 edges (avg confidence: 0.74)
 - Token cost: 0 input · 0 output
 
 
 ## Graph Freshness
-- Built from commit: `eb4172e9`
+- Built from commit: `f08aba0b`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -24,7 +24,7 @@ _Regen: `graphify update .`_
 7. `SurfaceRegistry` - 224 edges
 8. `u()` - 219 edges
 9. `KouenCLI` - 210 edges
-10. `IPCRequest` - 205 edges
+10. `DaemonClient` - 209 edges
 
 
 ## Cross-Cutting Nodes (span the most distinct areas of the codebase)
@@ -32,15 +32,15 @@ A high-degree node isn't always architecturally central - a widely-used
 utility/config file can rack up more edges than a real coupler while only
 ever touching one area. This ranks by how many DIFFERENT communities a
 node's neighbors span, not by raw edge count.
-1. `IPCRequest` - bridges 189 areas (205 edges)
+1. `IPCRequest` - bridges 188 areas (206 edges)
 2. `Command` - bridges 102 areas (108 edges)
-3. `AgentKind` - bridges 83 areas (178 edges)
-4. `t()` - bridges 79 areas (253 edges)
-5. `IPCResponse` - bridges 79 areas (101 edges)
-6. `KouenTerminalSurfaceView` - bridges 76 areas (345 edges)
-7. `KouenPaths` - bridges 74 areas (150 edges)
-8. `SessionCoordinator` - bridges 69 areas (236 edges)
-9. `KouenGridTerminal` - bridges 65 areas (117 edges)
+3. `AgentKind` - bridges 85 areas (178 edges)
+4. `KouenTerminalSurfaceView` - bridges 78 areas (345 edges)
+5. `t()` - bridges 78 areas (253 edges)
+6. `IPCResponse` - bridges 78 areas (101 edges)
+7. `KouenPaths` - bridges 71 areas (150 edges)
+8. `NSView` - bridges 70 areas (190 edges)
+9. `SessionCoordinator` - bridges 69 areas (236 edges)
 
 ## Surprising Connections (you probably didn't know these)
 - `.selectedHost` --references--> `RemoteHost`  [INFERRED]
