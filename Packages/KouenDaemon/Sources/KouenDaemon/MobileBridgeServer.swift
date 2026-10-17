@@ -644,7 +644,8 @@ public final class MobileBridgeServer: @unchecked Sendable {
       }, 500);
     }
 
-    function esc(t) { return (t || '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
+    // Some models emit sara am as nikhahit + sara aa (ํา), which iOS draws with a dotted circle.
+    function esc(t) { return (t || '').replace(/ํา/g, 'ำ').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
     function stripANSI(str) {
       return (str || '')
         .replace(/\x1b\][^\x07\x1b]*(\x07|\x1b\\)/g, '')
@@ -1430,6 +1431,7 @@ public final class MobileBridgeServer: @unchecked Sendable {
     }
 
     let sawServerError = false;
+    let ptyDecoder = new TextDecoder();
     function showError(msg) { toast('Notice', msg); }
 
     function connectWS() {
@@ -1444,6 +1446,7 @@ public final class MobileBridgeServer: @unchecked Sendable {
       ws.binaryType = 'arraybuffer';
       ws.onopen = () => {
         needsAttach = true;
+        ptyDecoder = new TextDecoder();
         const creds = storedCreds();
         sentCreds = !!creds;
         if (creds) {
@@ -1458,7 +1461,9 @@ public final class MobileBridgeServer: @unchecked Sendable {
         if (typeof e.data === 'string') {
           try { handleWSJSON(JSON.parse(e.data)); } catch (err) {}
         } else if (e.data instanceof ArrayBuffer) {
-          handleTerminalBytes(new TextDecoder().decode(e.data));
+          // One streaming decoder: a Thai character (3 UTF-8 bytes) split across two frames
+          // would otherwise decode as two U+FFFD halves.
+          handleTerminalBytes(ptyDecoder.decode(e.data, { stream: true }));
         }
       };
       ws.onclose = (ev) => {

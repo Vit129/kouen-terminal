@@ -35,7 +35,7 @@ final class MobileBridgeContractTests: XCTestCase {
     }
 
     func testPageCSSIncludesTheTextWrapRules() {
-        XCTAssertTrue(MobileBridgeServer.embeddedPageHTML.contains(".bot{overflow-wrap:anywhere}"))
+        XCTAssertTrue(MobileBridgeServer.embeddedPageHTML.contains(".msg,.bot,.tool,.ask{overflow-wrap:break-word"))
         XCTAssertFalse(MobileBridgeServer.embeddedPageHTML.contains("textWrapCSS"))
     }
 

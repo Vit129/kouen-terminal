@@ -96,6 +96,28 @@ final class AntigravityTranscriptTests: XCTestCase {
         XCTAssertFalse(AntigravitySessionLocator.matchesWorkspace(wsStr: wsJson, stdCwd: "/Users/supavit.cho/Git/Personal/kouen"))
     }
 
+    // The agy CLI has no conversation_summaries.db: the session is matched by the project its
+    // transcript works in, ignoring agy's own ~/.gemini reads, never by "newest wins".
+    func testCLIWithoutSummaryDBMatchesTranscriptByDominantProject() throws {
+        let home = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: home) }
+        let brain = home.appendingPathComponent(".gemini/antigravity-cli/brain")
+        func write(_ id: String, _ text: String, age: TimeInterval) throws {
+            let logs = brain.appendingPathComponent(id).appendingPathComponent(".system_generated/logs")
+            try FileManager.default.createDirectory(at: logs, withIntermediateDirectories: true)
+            let file = logs.appendingPathComponent("transcript.jsonl")
+            try Data(text.utf8).write(to: file)
+            try FileManager.default.setAttributes([.modificationDate: Date().addingTimeInterval(-age)], ofItemAtPath: file.path)
+        }
+        let gemini = String(repeating: #"{"p":"/Users/u/.gemini/config/skills/x/SKILL.md"}"# + "\n", count: 5)
+        try write("aodd", gemini + String(repeating: #"{"p":"/Users/u/Git/Personal/aodd-aisdlc/README.md"}"# + "\n", count: 3), age: 60)
+        try write("kouen", gemini + String(repeating: #"{"p":"/Users/u/Git/Personal/kouen-terminal/a.swift"}"# + "\n", count: 3), age: 0)
+
+        let url = AntigravitySessionLocator.transcriptURL(pid: 0, surfaceCwd: "/Users/u/Git/Personal/aodd-aisdlc", home: home)
+        XCTAssertEqual(url?.pathComponents.dropLast(3).last, "aodd")
+        XCTAssertNil(AntigravitySessionLocator.transcriptURL(pid: 0, surfaceCwd: "/Users/u/Git/Personal/other", home: home))
+    }
+
     func testParseRealAntigravityTranscriptIfAvailable() {
         let home = FileManager.default.homeDirectoryForCurrentUser
         let candidateDir = home.appendingPathComponent(".gemini/antigravity-cli/brain")
