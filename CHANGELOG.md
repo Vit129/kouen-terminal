@@ -15,7 +15,7 @@ has a matching `vX.Y.Z` tag and a signed, notarized DMG on
 - Show agy CLI transcript and stop breaking Thai text on the phone ([`68c4c8b`](https://github.com/Vit129/kouen-terminal/commit/68c4c8b918c3015c05ca0150cfb187700d0d29d2))
 - Print a loopback pairing URL for opening the page on the Mac itself ([`2b7f3e4`](https://github.com/Vit129/kouen-terminal/commit/2b7f3e423bee8b9b1f2582b02706eb565096dc76))
 - Ping the socket so a dead iOS connection reconnects on return ([`7f894aa`](https://github.com/Vit129/kouen-terminal/commit/7f894aa26b25a4953bb51f32d0d78d0e6a31a010))
-
+- Agy transcript, Thai text, black theme, brand icons, liveness ping; remove worktree banner (release v4.21.9) ([`971e323`](https://github.com/Vit129/kouen-terminal/commit/971e323195990035169fa5469f1f2884938d5e89))
 
 ## [4.21.8] - 2026-10-17
 
