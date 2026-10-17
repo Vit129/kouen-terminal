@@ -83,7 +83,7 @@ enum FuzzyPathResolver {
 
     static func resolve(
         query: String, root: String, limit: Int = 10,
-        otherRoots: [String] = UserDefaults.standard.stringArray(forKey: "RecentProjectPaths") ?? [],
+        otherRoots: [String] = FuzzyPathResolver.defaultOtherRoots(),
         fileManager: FileManager = .default
     ) -> FuzzyPathResolution {
         // Absolute path that exists on disk → skip fuzzy scan entirely
@@ -97,6 +97,23 @@ enum FuzzyPathResolver {
         let others = otherRoots.filter { $0 != root && !root.hasPrefix($0 + "/") }
         return resolve(query: query, ranked: FileFuzzyMatcher.rank(
             query: query, candidates: others.flatMap { scanFiles(root: $0, fileManager: fileManager) }, limit: limit))
+    }
+
+    /// Settings › Files search folders first, then the recent projects. Settings live on the
+    /// main actor; an off-main caller gets the recents only.
+    static func defaultOtherRoots() -> [String] {
+        let extra = Thread.isMainThread ? MainActor.assumeIsolated { SessionCoordinator.shared.settings.fileSearchRoots } : []
+        var seen = Set<String>()
+        return (extra + (UserDefaults.standard.stringArray(forKey: "RecentProjectPaths") ?? []))
+            .filter { seen.insert($0).inserted }
+    }
+
+    static func newestModified(_ paths: [String]) -> String? {
+        paths.max {
+            let a = (try? FileManager.default.attributesOfItem(atPath: $0)[.modificationDate] as? Date) ?? .distantPast
+            let b = (try? FileManager.default.attributesOfItem(atPath: $1)[.modificationDate] as? Date) ?? .distantPast
+            return a < b
+        }
     }
 
     static func resolve(query: String, ranked: [(candidate: String, score: Int)]) -> FuzzyPathResolution {
@@ -127,5 +144,25 @@ enum FuzzyPathResolver {
             if files.count >= 5_000 { break }
         }
         return files
+    }
+}
+
+/// Finds folders worth adding to Settings › Files › search folders: notes repos that agents write
+/// plans and memory to outside the project (`agent-memory` folders under `~/Git`).
+enum FileSearchRootScanner {
+    static func scan(base: URL = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Git"),
+                     maxDepth: Int = 4, fileManager: FileManager = .default) -> [String] {
+        guard let walker = fileManager.enumerator(at: base, includingPropertiesForKeys: [.isDirectoryKey],
+                                                  options: [.skipsHiddenFiles, .skipsPackageDescendants]) else { return [] }
+        var found: [String] = []
+        for case let url as URL in walker {
+            guard (try? url.resourceValues(forKeys: [.isDirectoryKey]))?.isDirectory == true else { continue }
+            let name = url.lastPathComponent
+            if walker.level > maxDepth || ["node_modules", ".build", "DerivedData", "dist", ".kouen-worktrees"].contains(name) {
+                walker.skipDescendants(); continue
+            }
+            if name == "agent-memory" { found.append(url.path); walker.skipDescendants() }
+        }
+        return found.sorted()
     }
 }

@@ -300,6 +300,10 @@ final class EngineConformanceTests: XCTestCase {
         XCTAssertEqual(bottom?.columns, 0 ..< 35)
         // A row that ends in a space is a real line break: nothing to join.
         XCTAssertNil(URLDetection.detectWrappedFilePath(prev: nil, line: "open src/a.md ", next: "next line", at: 6))
+        // Quotes on neighbouring rows must not pair into a "path" across rows (agent TUI summary lines).
+        let quoted = "Ran 4 commands (find Tests -name \"*FTS*\" · grep -rn \"Age"
+        let summary = "… 4 more actions (3 reads, 1 command) …"
+        XCTAssertNil(URLDetection.detectWrappedFilePath(prev: quoted, line: summary, next: "● Explored 2 files", at: 20))
     }
 
     func testDetectFilePathStripsToolCallParens() {

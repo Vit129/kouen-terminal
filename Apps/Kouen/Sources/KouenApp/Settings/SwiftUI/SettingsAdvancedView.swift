@@ -17,6 +17,8 @@ struct SettingsAdvancedView: View {
                 }
             }
 
+            SettingsFileSearchSection(model: model)
+
             Section("Performance") {
                 Toggle("Off-main render pipeline", isOn: Binding(
                     get: { model.settings.offMainParserFramePipeline },

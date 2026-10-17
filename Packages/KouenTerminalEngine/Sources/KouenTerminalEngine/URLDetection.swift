@@ -125,7 +125,11 @@ public enum URLDetection {
         let before = joins(prev, line) ? prev! : ""
         let after = joins(line, next) ? next! : ""
         guard !before.isEmpty || !after.isEmpty,
-              let match = detectFilePath(in: before + line + after, at: before.count + column) else { return nil }
+              let match = detectFilePath(in: before + line + after, at: before.count + column),
+              // Only a token that really crosses a seam, and never a quote-delimited one: quotes on
+              // different rows (`"*FTS*" … "Age`) would otherwise pair up into a bogus "path".
+              match.columns.lowerBound < before.count || match.columns.upperBound > before.count + line.count,
+              !match.url.hasPrefix("\""), !match.url.hasPrefix("'"), !match.url.contains(" ") else { return nil }
         let lo = max(match.columns.lowerBound - before.count, 0)
         let hi = min(match.columns.upperBound - before.count, line.count)
         guard lo < hi else { return nil }
