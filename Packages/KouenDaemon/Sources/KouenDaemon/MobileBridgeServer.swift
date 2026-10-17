@@ -1246,6 +1246,7 @@ public final class MobileBridgeServer: @unchecked Sendable {
     }
 
     function handleWSJSON(msg) {
+      if (msg.pong !== undefined) { onPong(); return; }
       if (msg.deviceCredentials) {
         localStorage.setItem(credKey, JSON.stringify(msg.deviceCredentials));
         authed = true;
@@ -1489,8 +1490,32 @@ public final class MobileBridgeServer: @unchecked Sendable {
     }
 
     if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => {});
-    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && (!ws || ws.readyState === WebSocket.CLOSED)) connectWS(); });
-    window.addEventListener('pageshow', e => { if (e.persisted && (!ws || ws.readyState === WebSocket.CLOSED)) connectWS(); });
+    // Liveness: iOS can leave a socket OPEN but dead after the page was in the background, so
+    // OPEN alone proves nothing. Ping every 20s and on every return; no pong within 3s → drop it,
+    // and reconnect now (re-attach replays the transcript, so nothing is lost). The dead socket's
+    // onclose is detached first: on iOS it may fire much later and would clobber the new one.
+    let pingSeq = 0, pongTimer = null;
+    function checkAlive() {
+      if (!authed || !ws || ws.readyState !== WebSocket.OPEN || pongTimer) return;
+      const sock = ws;
+      sock.send(JSON.stringify({ ping: ++pingSeq }));
+      pongTimer = setTimeout(() => {
+        pongTimer = null;
+        if (ws !== sock) return;
+        sock.onclose = null; sock.onmessage = null;
+        try { sock.close(); } catch {}
+        ws = null;
+        connectWS();
+      }, 3000);
+    }
+    function onPong() { clearTimeout(pongTimer); pongTimer = null; }
+    setInterval(() => { if (document.visibilityState === 'visible') checkAlive(); }, 20000);
+    function onReturn() {
+      if (!ws || ws.readyState === WebSocket.CLOSED) connectWS(); else checkAlive();
+    }
+    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') onReturn(); });
+    window.addEventListener('pageshow', e => { if (e.persisted) onReturn(); });
+    window.addEventListener('online', onReturn);
     connectWS();
     renderList();
     </script>
@@ -1812,6 +1837,9 @@ public final class MobileBridgeServer: @unchecked Sendable {
     // MARK: - Control protocol (client -> bridge, TEXT/JSON)
 
     struct ControlMessage: Decodable {
+        /// `{"ping":N}` → `{"pong":N}`: the page's liveness check. iOS can leave a suspended
+        /// socket reporting OPEN while it is dead; a missed pong makes the page reconnect.
+        var ping: Int?
         var attach: String?
         var detach: Bool?
         var spawn: SpawnPayload?
@@ -3057,6 +3085,10 @@ public final class MobileBridgeServer: @unchecked Sendable {
               let message = try? JSONDecoder().decode(ControlMessage.self, from: data)
         else {
             sendText(#"{"error":"unrecognized control message"}"#, on: connection)
+            return
+        }
+        if let n = message.ping {
+            sendText(#"{"pong":\#(n)}"#, on: connection)
             return
         }
         if let surfaceID = message.attach {
