@@ -118,12 +118,12 @@ final class AntigravityTranscriptTests: XCTestCase {
         XCTAssertNil(AntigravitySessionLocator.transcriptURL(pid: 0, surfaceCwd: "/Users/u/Git/Personal/other", home: home))
     }
 
-    func testParseRealAntigravityTranscriptIfAvailable() {
+    func testParseRealAntigravityTranscriptIfAvailable() throws {
         let home = FileManager.default.homeDirectoryForCurrentUser
         let candidateDir = home.appendingPathComponent(".gemini/antigravity-cli/brain")
         guard FileManager.default.fileExists(atPath: candidateDir.path),
               let sessions = try? FileManager.default.contentsOfDirectory(atPath: candidateDir.path) else {
-            return
+            throw XCTSkip("no agy CLI transcripts on this machine (\(candidateDir.path))")
         }
 
         var foundAny = false
@@ -141,8 +141,7 @@ final class AntigravityTranscriptTests: XCTestCase {
                 }
             }
         }
-        if foundAny {
-            XCTFail("Found Antigravity transcripts but none contained parsed token usage")
-        }
+        guard foundAny else { throw XCTSkip("no transcript.jsonl in the 20 newest agy CLI sessions") }
+        XCTFail("Found Antigravity transcripts but none contained parsed token usage")
     }
 }
