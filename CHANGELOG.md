@@ -5,6 +5,27 @@ All notable changes to Kouen are documented here. The format is based on
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Each released version
 has a matching `vX.Y.Z` tag and a signed, notarized DMG on
 [GitHub Releases](https://github.com/Vit129/kouen-terminal/releases).
+## [4.21.8] - 2026-10-17
+
+### Added
+- Route file types via shared FileViewRouting; map .gs to JavaScript ([`3aa3e6e`](https://github.com/Vit129/kouen-terminal/commit/3aa3e6eb787db4280acaff034de45aa608873e0a))
+- Cmd+click and viewer cover Office/Apple docs, AI data files, Xcode files and more languages ([`eb4172e`](https://github.com/Vit129/kouen-terminal/commit/eb4172e984185824e5f9f8f097af0968236b8d06))
+- Multi-agent transcript and usage metrics across CLI, Web, and Desktop ([`02c98d8`](https://github.com/Vit129/kouen-terminal/commit/02c98d85e972dac08a756f27a3c8d581a7d174b5))
+- Support AI and non-interactive execution in make start ([`3750b49`](https://github.com/Vit129/kouen-terminal/commit/3750b49be1138c4f79f77154a799dfdaf4426a73))
+
+### Documentation
+- Kouen-file-open — three open paths and where each extension list lives ([`d4825b8`](https://github.com/Vit129/kouen-terminal/commit/d4825b888bd20362fb826349b250b59163996ccd))
+
+### Fixed
+- Re-check Tailscale every 2s for real and stop leaking late-bound listeners ([`971ec5d`](https://github.com/Vit129/kouen-terminal/commit/971ec5d313b15e450d3ab50371f961570b912df1))
+- Follow Tailscale IP/Serve changes and keep pairing URL and shell wrapper as designed ([`8a2887a`](https://github.com/Vit129/kouen-terminal/commit/8a2887ac6ccb36ee3bd405c913f98dace08f1a94))
+- Stop leaking pipe fds that froze the app on "Reconnecting" ([`a7989b6`](https://github.com/Vit129/kouen-terminal/commit/a7989b6eb230c9f8b05e1652f44c2aa8d8a0b08f))
+- Close the port scanner's pipe explicitly too ([`d26932f`](https://github.com/Vit129/kouen-terminal/commit/d26932ffe76861279c12d86533b7092b84e03d82))
+- Map any LaunchAgent to its repo, not only .sh jobs ([`be47019`](https://github.com/Vit129/kouen-terminal/commit/be47019bd5adaadfcd6cf5f5afb6f9ce18442e90))
+- Cmd+click opens bare .gs/xlsx/heic/RAW filenames — extension was missing from the link allowlist ([`6b3064f`](https://github.com/Vit129/kouen-terminal/commit/6b3064fd8674f4731c17cdf3da07b8f773739b56))
+- Handle graphify refresh before rebase and auto-default build/commit in release ([`5f6394b`](https://github.com/Vit129/kouen-terminal/commit/5f6394b9bc83ea17a07e4fe7431b80cd9e9dfefc))
+
+
 ## [4.21.7] - 2026-10-14
 
 ### Added
