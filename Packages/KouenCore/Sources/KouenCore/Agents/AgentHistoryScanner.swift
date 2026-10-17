@@ -67,6 +67,8 @@ public struct AgentSessionRecord: Identifiable, Sendable, Equatable {
     public let crossRepoSiblings: [AgentSessionRecord]?
     /// Topic segments / milestones detected in this session (e.g. `["Happy vs Orca", "P51 Mobile Companion", "P52 History"]`).
     public let topicSegments: [String]?
+    /// Token counts, context utilization, and cost metrics if captured from the transcript.
+    public let usage: AgentUsage?
 
     public struct MatchLocationInfo: Sendable, Equatable {
         public let turnIndex: Int? // 0-based
@@ -109,7 +111,8 @@ public struct AgentSessionRecord: Identifiable, Sendable, Equatable {
         resumeCommandOverride: String? = nil,
         surfaceTag: String? = nil,
         crossRepoSiblings: [AgentSessionRecord]? = nil,
-        topicSegments: [String]? = nil
+        topicSegments: [String]? = nil,
+        usage: AgentUsage? = nil
     ) {
         self.id = id
         self.agentKind = agentKind
@@ -130,6 +133,7 @@ public struct AgentSessionRecord: Identifiable, Sendable, Equatable {
         self.surfaceTag = surfaceTag
         self.crossRepoSiblings = crossRepoSiblings
         self.topicSegments = topicSegments ?? Self.detectTopicSegments(title: title, firstPrompt: firstPrompt, turns: latestTurns)
+        self.usage = usage
     }
 
     /// Breadcrumbs for mixed-topic sessions (e.g. `"Happy vs Orca → P51 Companion → P52 History"`).
@@ -260,7 +264,8 @@ public struct AgentSessionRecord: Identifiable, Sendable, Equatable {
             resumeCommandOverride: AgentSessionRecord.resumeOverride(placement: placement, sessionID: id),
             surfaceTag: surfaceTag,
             crossRepoSiblings: crossRepoSiblings,
-            topicSegments: topicSegments
+            topicSegments: topicSegments,
+            usage: usage
         )
     }
 
@@ -273,7 +278,8 @@ public struct AgentSessionRecord: Identifiable, Sendable, Equatable {
             worktreeAvailable: worktreeAvailable, placement: placement, liveStatus: liveStatus,
             resumeCommandOverride: resumeCommandOverride, surfaceTag: surfaceTag,
             crossRepoSiblings: siblings,
-            topicSegments: topicSegments
+            topicSegments: topicSegments,
+            usage: usage
         )
     }
 
@@ -647,7 +653,6 @@ public actor AgentHistoryScanner {
         let sessionID = fileURL.deletingPathExtension().lastPathComponent
         var cwd: String?
         var gitBranch: String?
-        var modelName: String?
         var firstPrompt: String?
         var timestamp: Date?
         var turns: [AgentHistoryTurn] = []
@@ -672,9 +677,6 @@ public actor AgentHistoryScanner {
             }
 
             if let msg = json["message"] as? [String: Any] {
-                if modelName == nil, let m = msg["model"] as? String {
-                    modelName = m
-                }
                 let role = (msg["role"] as? String)?.lowercased() ?? ""
                 if role == "user" && firstPrompt == nil {
                     firstPrompt = ClaudeTranscriptLine.humanText(ClaudeTranscriptLine.messageText(msg), isUser: true)
@@ -760,6 +762,8 @@ public actor AgentHistoryScanner {
             topicSegments: topicSegments
         )
 
+        let (claudeModel, _, claudeUsage) = ClaudeTranscriptLine.meta(from: lines)
+
         return AgentSessionRecord(
             id: sessionID,
             agentKind: .claudeCode,
@@ -767,14 +771,15 @@ public actor AgentHistoryScanner {
             projectPath: finalCwd,
             projectName: projectName.isEmpty ? "Home" : projectName,
             gitBranch: gitBranch,
-            modelName: modelName,
+            modelName: claudeModel,
             messageCount: messageCount,
             updatedAt: modDate,
             firstPrompt: firstPrompt ?? "",
             latestTurns: turns,
             transcriptPath: fileURL.path,
             worktreeAvailable: FileManager.default.fileExists(atPath: finalCwd),
-            topicSegments: topicSegments
+            topicSegments: topicSegments,
+            usage: claudeUsage
         )
     }
 
@@ -1094,6 +1099,8 @@ public actor AgentHistoryScanner {
             var transcriptPath: String = dbPath
             var fileSize: Int = 0
             var messageCount = stepCount
+            var latestUsage: AgentUsage?
+            var detectedModel: String?
 
             let sessionDir = brainDir.appendingPathComponent(conversationID)
             if let transcriptURL = findFile(named: "transcript.jsonl", under: sessionDir) {
@@ -1109,15 +1116,19 @@ public actor AgentHistoryScanner {
                         var promptFound = false
                         var parts: [String] = []
                         for line in lines {
-                            guard let json = try? JSONSerialization.jsonObject(with: line) as? [String: Any],
-                                  let (role, trimmed) = antigravityTurn(json) else { continue }
-                            parts.append(trimmed)
-                            if role == "YOU" && !promptFound {
-                                firstPrompt = trimmed
-                                promptFound = true
+                            guard let json = try? JSONSerialization.jsonObject(with: Data(line)) as? [String: Any] else { continue }
+                            if let (role, trimmed) = antigravityTurn(json) {
+                                parts.append(trimmed)
+                                if role == "YOU" && !promptFound {
+                                    firstPrompt = trimmed
+                                    promptFound = true
+                                }
+                                appendTurn(&turns, role: role, text: trimmed)
                             }
-                            appendTurn(&turns, role: role, text: trimmed)
                         }
+                        let agMeta = AntigravityTranscriptLine.meta(from: lines.map { Data($0) })
+                        latestUsage = agMeta.usage
+                        detectedModel = agMeta.model
                         fullTranscript = parts.joined(separator: "\n")
                     }
                 }
@@ -1155,7 +1166,7 @@ public actor AgentHistoryScanner {
                 projectPath: finalPath,
                 projectName: projectName.isEmpty ? "Home" : projectName,
                 gitBranch: nil,
-                modelName: "Gemini",
+                modelName: detectedModel ?? "Gemini",
                 messageCount: messageCount,
                 updatedAt: modDate,
                 firstPrompt: firstPrompt,
@@ -1165,7 +1176,8 @@ public actor AgentHistoryScanner {
                 placement: .local,
                 liveStatus: nil,
                 resumeCommandOverride: resumeOverride,
-                surfaceTag: tag
+                surfaceTag: tag,
+                usage: latestUsage
             )
             records.append(record)
             toSave.append(CachedSessionEntry(record: record, mtime: modDate, fileSize: fileSize))
@@ -1244,7 +1256,6 @@ public actor AgentHistoryScanner {
         guard let (lines, dataSize) = Self.readJSONLLines(from: fileURL) else { return nil }
 
         var firstPrompt: String?
-        var modelName: String?
         var projectPath: String?
         var turns: [AgentHistoryTurn] = []
 
@@ -1267,25 +1278,27 @@ public actor AgentHistoryScanner {
                     clean = String(clean[rangeStart.upperBound..<rangeEnd.lowerBound])
                 }
                 firstPrompt = clean.trimmingCharacters(in: .whitespacesAndNewlines)
-
-                // Detect model change if present
-                if let modelRange = content.range(of: "Model Selection` from None to ") {
-                    let sub = content[modelRange.upperBound...]
-                    if let end = sub.firstIndex(of: ".") {
-                        modelName = String(sub[..<end])
-                    }
-                }
             }
 
             // Detect project path from tool calls or file paths
             if projectPath == nil {
                 if let toolCalls = json["tool_calls"] as? [[String: Any]] {
                     for tc in toolCalls {
-                        if let params = tc["parameters"] as? [String: Any] {
-                            if let cwd = params["Cwd"] as? String { projectPath = cwd; break }
-                            if let dir = params["SearchDirectory"] as? String { projectPath = dir; break }
+                        let params = (tc["args"] as? [String: Any]) ?? (tc["parameters"] as? [String: Any])
+                        if let params {
+                            if let cwd = params["Cwd"] as? String {
+                                let stripped = cwd.trimmingCharacters(in: CharacterSet(charactersIn: "\"'\n\r\t "))
+                                projectPath = stripped
+                                break
+                            }
+                            if let dir = params["SearchDirectory"] as? String {
+                                let stripped = dir.trimmingCharacters(in: CharacterSet(charactersIn: "\"'\n\r\t "))
+                                projectPath = stripped
+                                break
+                            }
                             if let file = (params["TargetFile"] ?? params["AbsolutePath"]) as? String {
-                                projectPath = (file as NSString).deletingLastPathComponent
+                                let stripped = file.trimmingCharacters(in: CharacterSet(charactersIn: "\"'\n\r\t "))
+                                projectPath = (stripped as NSString).deletingLastPathComponent
                                 break
                             }
                         }
@@ -1332,10 +1345,12 @@ public actor AgentHistoryScanner {
                     if let name = tc["name"] as? String, !name.isEmpty {
                         toolsCalled.insert(name)
                     }
-                    if let params = tc["parameters"] as? [String: Any] {
+                    let params = (tc["args"] as? [String: Any]) ?? (tc["parameters"] as? [String: Any])
+                    if let params {
                         for key in ["TargetFile", "AbsolutePath", "file_path", "path"] {
                             if let f = params[key] as? String, !f.isEmpty {
-                                filesEdited.insert((f as NSString).lastPathComponent)
+                                let stripped = f.trimmingCharacters(in: CharacterSet(charactersIn: "\"'\n\r\t "))
+                                filesEdited.insert((stripped as NSString).lastPathComponent)
                             }
                         }
                     }
@@ -1370,6 +1385,10 @@ public actor AgentHistoryScanner {
             topicSegments: topicSegments
         )
 
+        let agMeta = AntigravityTranscriptLine.meta(from: lines)
+        let resolvedModel = agMeta.model ?? "Gemini"
+        let latestUsage = agMeta.usage
+
         return AgentSessionRecord(
             id: sessionID,
             agentKind: .antigravity,
@@ -1377,14 +1396,15 @@ public actor AgentHistoryScanner {
             projectPath: finalPath,
             projectName: projectName.isEmpty ? "Home" : projectName,
             gitBranch: nil,
-            modelName: modelName ?? "Gemini",
+            modelName: resolvedModel,
             messageCount: messageCount,
             updatedAt: modDate,
             firstPrompt: firstPrompt ?? "",
             latestTurns: turns,
             transcriptPath: fileURL.path,
             worktreeAvailable: FileManager.default.fileExists(atPath: finalPath),
-            topicSegments: topicSegments
+            topicSegments: topicSegments,
+            usage: latestUsage
         )
     }
 
@@ -1516,6 +1536,9 @@ public actor AgentHistoryScanner {
                 if cwd == nil { cwd = payload?["cwd"] as? String }
                 continue
             }
+            if type == "turn_context" {
+                continue
+            }
 
             let itemType = (payload?["type"] as? String) ?? type
             if itemType == "function_call" {
@@ -1591,6 +1614,10 @@ public actor AgentHistoryScanner {
             topicSegments: topicSegments
         )
 
+        let codexMeta = CodexTranscriptLine.meta(from: lines)
+        let resolvedModel = codexMeta.model
+        let latestUsage = codexMeta.usage
+
         return AgentSessionRecord(
             id: resolvedID,
             agentKind: .codex,
@@ -1598,7 +1625,7 @@ public actor AgentHistoryScanner {
             projectPath: finalCwd,
             projectName: projectName.isEmpty ? "Home" : projectName,
             gitBranch: gitBranch,
-            modelName: nil,
+            modelName: resolvedModel,
             messageCount: messageCount,
             updatedAt: modDate,
             firstPrompt: firstPrompt ?? "",
@@ -1606,7 +1633,8 @@ public actor AgentHistoryScanner {
             transcriptPath: fileURL.path,
             worktreeAvailable: FileManager.default.fileExists(atPath: finalCwd),
             surfaceTag: surfaceTag,
-            topicSegments: topicSegments
+            topicSegments: topicSegments,
+            usage: latestUsage
         )
     }
 

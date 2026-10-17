@@ -292,5 +292,27 @@ final class MobileBridgeContractTests: XCTestCase {
         XCTAssertNil(check(brain.path + "/../repo-sibling/x"))
         XCTAssertNil(check("/etc/passwd"))
     }
+
+    func testEmbeddedPageHTMLHasUsageChipAndModal() {
+        let html = MobileBridgeServer.embeddedPageHTML
+        XCTAssertTrue(html.contains(#"id="usage-chip""#))
+        XCTAssertTrue(html.contains("openUsage()"))
+        XCTAssertTrue(html.contains("Token & Cost Breakdown") || html.contains("Token &amp; Cost Breakdown"))
+    }
+
+    func testTranscriptPushIncludesUsage() throws {
+        var usage = AgentUsage()
+        usage.inputTokens = 1200
+        usage.cacheReadTokens = 800
+        usage.outputTokens = 150
+        let push = MobileBridgeServer.TranscriptPush(transcript: .init(reset: false, items: [], usage: usage))
+        let json = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(push)) as? [String: Any])
+        let body = try XCTUnwrap(json["transcript"] as? [String: Any])
+        let usageObj = try XCTUnwrap(body["usage"] as? [String: Any])
+        XCTAssertEqual(usageObj["inputTokens"] as? Int, 1200)
+        XCTAssertEqual(usageObj["cacheReadTokens"] as? Int, 800)
+        XCTAssertEqual(usageObj["contextTokens"] as? Int, 2000)
+        XCTAssertEqual(usageObj["shortSummary"] as? String, "2.0k ctx")
+    }
 }
 #endif

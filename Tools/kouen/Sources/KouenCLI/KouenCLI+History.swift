@@ -57,11 +57,12 @@ extension KouenCLI {
                 // see `AgentSessionPlacement`.
                 let placement: String
                 let liveStatus: String?
+                let usage: AgentUsage?
             }
             let entries = shown.map {
                 Entry(id: $0.id, agent: $0.agentKind.displayName, title: $0.title, project: $0.projectName,
                       branch: $0.gitBranch, updatedAt: $0.updatedAt, messageCount: $0.messageCount,
-                      placement: $0.placement.rawValue, liveStatus: $0.liveStatus)
+                      placement: $0.placement.rawValue, liveStatus: $0.liveStatus, usage: $0.usage)
             }
             let encoder = JSONEncoder()
             encoder.dateEncodingStrategy = .iso8601
@@ -143,6 +144,17 @@ extension KouenCLI {
         if let branch = record.gitBranch { print("Branch:     \(branch)") }
         if let model = record.modelName { print("Model:      \(model)") }
         print("Messages:   \(record.messageCount)")
+        if let usage = record.usage {
+            if let ctx = usage.contextTokens ?? usage.inputTokens {
+                print("Context:    \(ctx) tokens")
+            }
+            if let out = usage.outputTokens {
+                print("Output:     \(out) tokens")
+            }
+            if let cost = usage.totalCostUSD {
+                print("Cost:       \(String(format: "$%.3f", cost))")
+            }
+        }
         print("Updated:    \(record.updatedAt)")
         if record.placement != .local {
             let status = record.liveStatus.map { " (\($0))" } ?? ""

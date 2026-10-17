@@ -69,8 +69,8 @@ public final class AgentHistoryFTSIndex: @unchecked Sendable {
     #endif
 
     /// Bump whenever extraction changes (not just the schema): cached records of unchanged
-    /// transcripts are otherwise served as-is forever. 3 = plumbing filter + agy tool turns.
-    public static let schemaVersion: Int32 = 3
+    /// transcripts are otherwise served as-is forever. 4 = usage_json column.
+    public static let schemaVersion: Int32 = 4
 
     private let dbPath: String
     #if canImport(SQLite3)
@@ -207,7 +207,8 @@ public final class AgentHistoryFTSIndex: @unchecked Sendable {
             resume_command_override TEXT,
             surface_tag TEXT,
             mtime REAL NOT NULL,
-            file_size INTEGER NOT NULL
+            file_size INTEGER NOT NULL,
+            usage_json TEXT
         );
         CREATE INDEX IF NOT EXISTS idx_session_records_updated_at ON session_records(updated_at DESC);
         """
@@ -265,8 +266,8 @@ public final class AgentHistoryFTSIndex: @unchecked Sendable {
             session_id, agent_kind, title, project_path, project_name,
             git_branch, model_name, message_count, updated_at, first_prompt,
             latest_turns_json, transcript_path, worktree_available, placement,
-            live_status, resume_command_override, surface_tag, mtime, file_size
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+            live_status, resume_command_override, surface_tag, mtime, file_size, usage_json
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
         """
         var stmt: OpaquePointer?
         guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else {
@@ -324,6 +325,11 @@ public final class AgentHistoryFTSIndex: @unchecked Sendable {
                 }
                 sqlite3_bind_double(stmt, 18, entry.mtime.timeIntervalSince1970)
                 sqlite3_bind_int64(stmt, 19, Int64(entry.fileSize))
+                if let usage = record.usage, let data = try? encoder.encode(usage), let str = String(data: data, encoding: .utf8) {
+                    sqlite3_bind_text(stmt, 20, str, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
+                } else {
+                    sqlite3_bind_null(stmt, 20)
+                }
 
                 let stepRes = sqlite3_step(stmt)
                 if stepRes != SQLITE_DONE {
@@ -355,7 +361,7 @@ public final class AgentHistoryFTSIndex: @unchecked Sendable {
         SELECT session_id, agent_kind, title, project_path, project_name,
                git_branch, model_name, message_count, updated_at, first_prompt,
                latest_turns_json, transcript_path, worktree_available, placement,
-               live_status, resume_command_override, surface_tag, mtime, file_size
+               live_status, resume_command_override, surface_tag, mtime, file_size, usage_json
         FROM session_records
         ORDER BY updated_at DESC;
         """
@@ -397,6 +403,7 @@ public final class AgentHistoryFTSIndex: @unchecked Sendable {
                 let surfaceTag = sqlite3_column_text(stmt, 16).map { String(cString: $0) }
                 let mtime = Date(timeIntervalSince1970: sqlite3_column_double(stmt, 17))
                 let fileSize = Int(sqlite3_column_int64(stmt, 18))
+                let usage = sqlite3_column_text(stmt, 19).flatMap { String(cString: $0).data(using: .utf8) }.flatMap { try? decoder.decode(AgentUsage.self, from: $0) }
 
                 let turnsData = turnsJSON.data(using: .utf8) ?? Data()
                 let turns = (try? decoder.decode([AgentHistoryTurn].self, from: turnsData)) ?? []
@@ -418,7 +425,8 @@ public final class AgentHistoryFTSIndex: @unchecked Sendable {
                     placement: placement,
                     liveStatus: liveStatus,
                     resumeCommandOverride: resumeOverride,
-                    surfaceTag: surfaceTag
+                    surfaceTag: surfaceTag,
+                    usage: usage
                 )
                 entries.append(CachedSessionEntry(
                     record: record,
