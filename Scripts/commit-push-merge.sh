@@ -92,6 +92,12 @@ else
   echo "Nothing to commit — using existing commit(s)."
 fi
 
+# If graphify-out/ was refreshed earlier, commit it on its own commit per repo rules
+if [[ -n "$(git status --porcelain graphify-out)" ]]; then
+  git add graphify-out
+  git commit -m "chore(graphify): refresh" || true
+fi
+
 echo ""
 echo "Fetching origin/main..."
 git fetch origin main
