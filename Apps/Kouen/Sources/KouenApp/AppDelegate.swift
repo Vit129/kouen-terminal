@@ -59,11 +59,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             return event
         }
 
-        // Defer non-critical startup services (WebKit prewarm, WorktreeAutoIsolate, ScriptHookCoordinator)
+        // Defer non-critical startup services (WebKit prewarm, ScriptHookCoordinator)
         // until after the first frame renders, eliminating contention on the launch critical path.
         DispatchQueue.main.async {
             BrowserPaneRegistry.shared.prewarm()
-            WorktreeAutoIsolateService.shared.start()
             ScriptHookCoordinator.shared.start()
         }
         DispatchQueue.global(qos: .utility).async {
