@@ -7,7 +7,9 @@ import assert from "node:assert/strict";
 
 const swift = readFileSync(new URL("../../Packages/KouenDaemon/Sources/KouenDaemon/MobileBridgeServer.swift", import.meta.url), "utf8");
 const page = swift.slice(swift.indexOf('static let embeddedPageHTML = #"""'), swift.indexOf('"""#', swift.indexOf('static let embeddedPageHTML')));
-const script = page.slice(page.indexOf("<script>") + 8, page.lastIndexOf("</script>"));
+// Swift fills \#(agentIconsJS) at runtime; stand in the shape it emits.
+const script = page.slice(page.indexOf("<script>") + 8, page.lastIndexOf("</script>"))
+  .replace("\\#(agentIconsJS)", 'const AGENT_ICONS = {"codex":{"c":"#10a37f","svg":"<svg/>"},"generic":{"c":"#9aa0a6"}};');
 new vm.Script(script); // throws on a syntax error
 
 const block = script.slice(script.indexOf("// <md-start>"), script.indexOf("// <md-end>"));
@@ -22,4 +24,7 @@ assert.equal(md("```\n<b>\n```"), "<pre><code>&lt;b&gt;</code></pre>");
 const lineFilter = new RegExp(script.match(/filter\(l => \/(.+?)\/u\.test\(l\)\)/)[1], "u");
 assert.ok(["◉ \u{F0E7}", "○ ", "╭──╮"].every(l => !lineFilter.test(l)), "spinner/border noise must be dropped");
 assert.ok(["Working", "ทดสอบ", "42"].every(l => lineFilter.test(l)));
+// Thai sara am written as nikhahit + sara aa is composed before display.
+const escFn = new Function(script.match(/function esc\(t\) \{.*\}/)[0] + "; return esc;")();
+assert.equal(escFn("ตําแหน่ง"), "ตำแหน่ง");
 console.log("companion page js: ok");

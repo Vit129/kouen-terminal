@@ -354,7 +354,7 @@ public final class MobileBridgeServer: @unchecked Sendable {
       <meta charset="utf-8">
       <title>Kouen Companion</title>
       <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
-      <meta name="theme-color" content="#2f6b4f">
+      <meta name="theme-color" content="#000000">
       <meta name="apple-mobile-web-app-capable" content="yes">
       <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
       <link rel="manifest" href="/manifest.json">
@@ -362,26 +362,14 @@ public final class MobileBridgeServer: @unchecked Sendable {
       <style>
       [hidden]{display:none !important}
       :root{
-        --bg:#eef1ee; --surface:#ffffff; --ink:#18201c; --muted:#5d6a63; --line:#d8dfda;
-        --accent:#2f6b4f; --accent-ink:#ffffff; --accent-soft:#e2efe8;
-        --add:#e3f4e8; --add-ink:#1d6b3a; --del:#fbe6e4; --del-ink:#a2342a;
-        --warn:#b86e00; --warn-soft:#fff1dc; --run:#2f6b4f; --idle:#8a958f;
-        --frame:#cfd7d2; --code-bg:#f5f7f5;
+        --bg:#000000; --surface:#0a0a0a; --ink:#e6ebe8; --muted:#8f9b95; --line:#232825;
+        --accent:#7cc4a0; --accent-ink:#06120c; --accent-soft:#14231b;
+        --add:#0f2617; --add-ink:#8fdcab; --del:#2e1513; --del-ink:#f2a097;
+        --warn:#f0b357; --warn-soft:#2c210d; --run:#7cc4a0; --idle:#6c7a73;
+        --frame:#232825; --code-bg:#050605; color-scheme:dark;
         --f-body:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
         --f-mono:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono",monospace;
       }
-      @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
-        --bg:#0f1412; --surface:#171d1a; --ink:#e4ebe7; --muted:#93a19a; --line:#2a332e;
-        --accent:#7cc4a0; --accent-ink:#0c1a13; --accent-soft:#1d2e25;
-        --add:#16301f; --add-ink:#8fdcab; --del:#3a1d1a; --del-ink:#f2a097;
-        --warn:#f0b357; --warn-soft:#3a2b12; --run:#7cc4a0; --idle:#6c7a73;
-        --frame:#2a332e; --code-bg:#111714; color-scheme:dark}}
-      :root[data-theme="dark"]{
-        --bg:#0f1412; --surface:#171d1a; --ink:#e4ebe7; --muted:#93a19a; --line:#2a332e;
-        --accent:#7cc4a0; --accent-ink:#0c1a13; --accent-soft:#1d2e25;
-        --add:#16301f; --add-ink:#8fdcab; --del:#3a1d1a; --del-ink:#f2a097;
-        --warn:#f0b357; --warn-soft:#3a2b12; --run:#7cc4a0; --idle:#6c7a73;
-        --frame:#2a332e; --code-bg:#111714; color-scheme:dark}
       *{box-sizing:border-box}
       html,body{height:100%}
       body{background:var(--bg);color:var(--ink);font:15px/1.45 var(--f-body);margin:0}
@@ -540,6 +528,7 @@ public final class MobileBridgeServer: @unchecked Sendable {
       .toast{position:absolute;left:16px;right:16px;bottom:96px;background:var(--ink);color:var(--surface);border-radius:12px;padding:10px 14px;font-size:14px;display:flex;justify-content:space-between;gap:10px;z-index:10}
       .toast span:last-child{font-family:var(--f-mono);font-size:12px;opacity:.8}
         \#(textWrapCSS)
+        \#(agentIconCSS)
       </style>
     </head>
     <body>
@@ -618,6 +607,13 @@ public final class MobileBridgeServer: @unchecked Sendable {
     </div>
 
     <script>
+    \#(agentIconsJS)
+    // Brand mark tinted like the Mac sidebar; a two-letter monogram for agents without one.
+    function aiIcon(s) {
+      const k = s && s.kind, a = AGENT_ICONS[k] || AGENT_ICONS.generic || { c: '#9aa0a6' };
+      const inner = a.svg || esc(((s && s.agent) || '?').slice(0, 2).toUpperCase());
+      return `<span class="ai" style="--c:${a.c}" aria-hidden="true">${inner}</span>`;
+    }
     const LABEL = { wait: "WAITING", run: "WORKING", idle: "IDLE" };
     const $ = id => document.getElementById(id);
     let ws = null, sessions = [], cur = null, atts = [], pv = "local", authed = false;
@@ -644,7 +640,8 @@ public final class MobileBridgeServer: @unchecked Sendable {
       }, 500);
     }
 
-    function esc(t) { return (t || '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
+    // Some models emit sara am as nikhahit + sara aa (ํา), which iOS draws with a dotted circle.
+    function esc(t) { return (t || '').replace(/ํา/g, 'ำ').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
     function stripANSI(str) {
       return (str || '')
         .replace(/\x1b\][^\x07\x1b]*(\x07|\x1b\\)/g, '')
@@ -679,7 +676,7 @@ public final class MobileBridgeServer: @unchecked Sendable {
             ? `${s.files.length} files +${add} −${del}`
             : (s.filesCount ? `${s.filesCount} files +${s.filesAdditions || 0} −${s.filesDeletions || 0}` : 'clean');
           const branchDisplay = s.branch ? esc(s.branch) : '—';
-          b.innerHTML = `<span class="dot ${st}"></span><span class="name">${esc(s.name)}<span class="agent">${esc(s.agent)}</span></span><span class="pill ${st}">${LABEL[st]}</span><span class="meta">${branchDisplay} · ${fileStat}</span>`;
+          b.innerHTML = `<span class="dot ${st}"></span><span class="name">${aiIcon(s)}${esc(s.name)}<span class="agent">${esc(s.agent)}</span></span><span class="pill ${st}">${LABEL[st]}</span><span class="meta">${branchDisplay} · ${fileStat}</span>`;
           b.onclick = () => openSession(s);
           box.appendChild(b);
         });
@@ -698,7 +695,7 @@ public final class MobileBridgeServer: @unchecked Sendable {
       saveView();
       $("scr-list").hidden = true; $("scr-list").style.display = "none";
       $("scr-sess").hidden = false; $("scr-sess").style.display = "contents";
-      $("s-name").textContent = s.name;
+      $("s-name").innerHTML = aiIcon(s) + esc(s.name);
       $("s-meta").textContent = s.agent + " · " + s.branch;
       if (ws && ws.readyState === WebSocket.OPEN) {
         ws.send(JSON.stringify({ attach: s.id }));
@@ -1249,6 +1246,7 @@ public final class MobileBridgeServer: @unchecked Sendable {
     }
 
     function handleWSJSON(msg) {
+      if (msg.pong !== undefined) { onPong(); return; }
       if (msg.deviceCredentials) {
         localStorage.setItem(credKey, JSON.stringify(msg.deviceCredentials));
         authed = true;
@@ -1263,6 +1261,7 @@ public final class MobileBridgeServer: @unchecked Sendable {
             id: s.surfaceID,
             name: s.tabTitle || s.cwd.split('/').pop() || 'Session',
             agent: s.agent || (s.tabTitle && s.tabTitle.toLowerCase().includes('claude') ? 'claude' : 'agent'),
+            kind: s.kind,
             state: s.state || (s.waiting ? 'wait' : 'idle'),
             cwd: s.cwd,
             branch: s.branch || '—',
@@ -1290,6 +1289,7 @@ public final class MobileBridgeServer: @unchecked Sendable {
             cur.state = updated.state;
             cur.branch = updated.branch;
             cur.agent = updated.agent;
+            cur.kind = updated.kind;
             $("s-meta").textContent = cur.agent + " · " + cur.branch;
             renderComposer();
             if (cur.state === "idle" && cur.files && cur.files.length > 0 && cur.branch && cur.branch !== 'main' && cur.branch !== 'master' && cur.branch !== '—' && !cur.out.some(x => x[0] === 'pr' || x[0] === 'prdone')) {
@@ -1430,6 +1430,7 @@ public final class MobileBridgeServer: @unchecked Sendable {
     }
 
     let sawServerError = false;
+    let ptyDecoder = new TextDecoder();
     function showError(msg) { toast('Notice', msg); }
 
     function connectWS() {
@@ -1444,6 +1445,7 @@ public final class MobileBridgeServer: @unchecked Sendable {
       ws.binaryType = 'arraybuffer';
       ws.onopen = () => {
         needsAttach = true;
+        ptyDecoder = new TextDecoder();
         const creds = storedCreds();
         sentCreds = !!creds;
         if (creds) {
@@ -1458,7 +1460,9 @@ public final class MobileBridgeServer: @unchecked Sendable {
         if (typeof e.data === 'string') {
           try { handleWSJSON(JSON.parse(e.data)); } catch (err) {}
         } else if (e.data instanceof ArrayBuffer) {
-          handleTerminalBytes(new TextDecoder().decode(e.data));
+          // One streaming decoder: a Thai character (3 UTF-8 bytes) split across two frames
+          // would otherwise decode as two U+FFFD halves.
+          handleTerminalBytes(ptyDecoder.decode(e.data, { stream: true }));
         }
       };
       ws.onclose = (ev) => {
@@ -1486,8 +1490,32 @@ public final class MobileBridgeServer: @unchecked Sendable {
     }
 
     if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => {});
-    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && (!ws || ws.readyState === WebSocket.CLOSED)) connectWS(); });
-    window.addEventListener('pageshow', e => { if (e.persisted && (!ws || ws.readyState === WebSocket.CLOSED)) connectWS(); });
+    // Liveness: iOS can leave a socket OPEN but dead after the page was in the background, so
+    // OPEN alone proves nothing. Ping every 20s and on every return; no pong within 3s → drop it,
+    // and reconnect now (re-attach replays the transcript, so nothing is lost). The dead socket's
+    // onclose is detached first: on iOS it may fire much later and would clobber the new one.
+    let pingSeq = 0, pongTimer = null;
+    function checkAlive() {
+      if (!authed || !ws || ws.readyState !== WebSocket.OPEN || pongTimer) return;
+      const sock = ws;
+      sock.send(JSON.stringify({ ping: ++pingSeq }));
+      pongTimer = setTimeout(() => {
+        pongTimer = null;
+        if (ws !== sock) return;
+        sock.onclose = null; sock.onmessage = null;
+        try { sock.close(); } catch {}
+        ws = null;
+        connectWS();
+      }, 3000);
+    }
+    function onPong() { clearTimeout(pongTimer); pongTimer = null; }
+    setInterval(() => { if (document.visibilityState === 'visible') checkAlive(); }, 20000);
+    function onReturn() {
+      if (!ws || ws.readyState === WebSocket.CLOSED) connectWS(); else checkAlive();
+    }
+    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') onReturn(); });
+    window.addEventListener('pageshow', e => { if (e.persisted) onReturn(); });
+    window.addEventListener('online', onReturn);
     connectWS();
     renderList();
     </script>
@@ -1790,6 +1818,12 @@ public final class MobileBridgeServer: @unchecked Sendable {
             print("\nScan with your iPhone's Camera app — valid \(Int(pairingLifetime))s, grants access to every session on this Mac:\n")
             print(qrAsciiArt(for: url) ?? "(QR generation failed — open this URL manually)")
             print("\n\(url)\n")
+            // A Mac can't open TCP to its own Tailscale IP (ping works, connect times out), so the
+            // phone URL above never loads on this Mac; give the loopback one too (same token).
+            if host != "127.0.0.1" || serveActive {
+                let local = Self.buildPairingURL(host: "127.0.0.1", pageURLPort: pageURLPort, wsPort: wsPort, token: token)
+                print("On this Mac: \(local)\n")
+            }
             fflush(stdout)
             var slept: TimeInterval = 0
             while slept < pairingLifetime && isRunning {
@@ -1803,6 +1837,9 @@ public final class MobileBridgeServer: @unchecked Sendable {
     // MARK: - Control protocol (client -> bridge, TEXT/JSON)
 
     struct ControlMessage: Decodable {
+        /// `{"ping":N}` → `{"pong":N}`: the page's liveness check. iOS can leave a suspended
+        /// socket reporting OPEN while it is dead; a missed pong makes the page reconnect.
+        var ping: Int?
         var attach: String?
         var detach: Bool?
         var spawn: SpawnPayload?
@@ -1879,6 +1916,8 @@ public final class MobileBridgeServer: @unchecked Sendable {
             var tabTitle: String
             var cwd: String
             var agent: String?
+            /// `AgentKind.rawValue`, the key into the page's `AGENT_ICONS`.
+            var kind: String?
             var branch: String?
             var state: String?
             var waiting: Bool?
@@ -2038,6 +2077,7 @@ public final class MobileBridgeServer: @unchecked Sendable {
                 tabTitle: s.tabTitle,
                 cwd: s.cwd,
                 agent: agent?.agentName.lowercased() ?? (s.tabTitle.lowercased().contains("claude") ? "claude" : nil),
+                kind: agent?.kind.rawValue ?? (s.tabTitle.lowercased().contains("claude") ? AgentKind.claudeCode.rawValue : nil),
                 branch: agent?.gitBranch,
                 state: state,
                 waiting: agent?.waiting,
@@ -3045,6 +3085,10 @@ public final class MobileBridgeServer: @unchecked Sendable {
               let message = try? JSONDecoder().decode(ControlMessage.self, from: data)
         else {
             sendText(#"{"error":"unrecognized control message"}"#, on: connection)
+            return
+        }
+        if let n = message.ping {
+            sendText(#"{"pong":\#(n)}"#, on: connection)
             return
         }
         if let surfaceID = message.attach {
