@@ -10,7 +10,7 @@ prod:
 	./Scripts/run.sh prod
 
 start:
-	./Scripts/start.sh $(filter-out $@,$(MAKECMDGOALS))
+	./Scripts/start.sh $(filter-out $@,$(MAKECMDGOALS)) $(if $(msg),--message "$(msg)",$(if $(message),--message "$(message)",$(if $(m),--message "$(m)",))) $(if $(y),--yes,$(if $(yes),--yes,))
 
 # Clear persisted session/scrollback state for debug builds (KouenDebug home only —
 # never touches the production app's real session state).

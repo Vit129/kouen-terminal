@@ -146,7 +146,10 @@ fi
 
 if [[ -z "$build" ]]; then
   next_build=$((plist_build + 1))
-  if [[ -t 0 ]]; then
+  if [[ -n "${AUTO_YES:-}" || "${CI:-}" == "1" || "${NON_INTERACTIVE:-}" == "1" ]]; then
+    build="$next_build"
+    echo "Auto-yes / CI mode: defaulting build number to $build."
+  elif [[ -t 0 ]]; then
     read -erp "Build number for $version [$next_build]: " build_input
     build="${build_input:-$next_build}"
   else

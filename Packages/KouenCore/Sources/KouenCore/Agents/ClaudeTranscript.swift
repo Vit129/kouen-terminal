@@ -66,17 +66,31 @@ public enum ClaudeTranscriptLine {
         return parts.compactMap { $0["text"] as? String }.joined()
     }
 
-    /// Current model and permission mode from raw JSONL lines (last one wins). Model comes from
-    /// assistant `message.model`; mode from the `permission-mode` bookkeeping lines.
-    public static func meta(from lines: [Data]) -> (model: String?, mode: String?) {
-        var model: String?, mode: String?
+    /// Current model, permission mode, and latest usage from raw JSONL lines (last one wins).
+    /// Model comes from assistant `message.model`; mode from `permission-mode`; usage from `message.usage`.
+    public static func meta(from lines: [Data]) -> (model: String?, mode: String?, usage: AgentUsage?) {
+        var model: String?, mode: String?, usage: AgentUsage?
         for line in lines {
             guard let json = try? JSONSerialization.jsonObject(with: line) as? [String: Any] else { continue }
             if json["type"] as? String == "permission-mode", let m = json["permissionMode"] as? String { mode = m }
-            if let msg = json["message"] as? [String: Any], msg["role"] as? String == "assistant",
-               let m = msg["model"] as? String, !m.hasPrefix("<") { model = m }
+            if let msg = json["message"] as? [String: Any] {
+                if msg["role"] as? String == "assistant", let m = msg["model"] as? String, !m.hasPrefix("<") {
+                    model = m
+                }
+                if let u = msg["usage"] as? [String: Any] {
+                    var agUsage = AgentUsage()
+                    agUsage.inputTokens = u["input_tokens"] as? Int
+                    agUsage.outputTokens = u["output_tokens"] as? Int
+                    agUsage.cacheReadTokens = u["cache_read_input_tokens"] as? Int
+                    agUsage.cacheWriteTokens = u["cache_creation_input_tokens"] as? Int
+                    if let details = u["output_tokens_details"] as? [String: Any] {
+                        agUsage.thinkingTokens = details["thinking_tokens"] as? Int
+                    }
+                    usage = agUsage
+                }
+            }
         }
-        return (model, mode)
+        return (model, mode, usage)
     }
 
     /// `[Image #4]` / `[Pasted text #2 +10 lines]`: the TUI's stand-ins for attachments, not words.

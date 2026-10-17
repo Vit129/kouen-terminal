@@ -15,7 +15,8 @@ final class AgentSessionHistoryModelTests: XCTestCase {
         gitBranch: String? = "main",
         updatedAt: Date = Date(),
         firstPrompt: String = "help me fix this",
-        turns: [AgentHistoryTurn] = []
+        turns: [AgentHistoryTurn] = [],
+        usage: AgentUsage? = nil
     ) -> AgentSessionRecord {
         AgentSessionRecord(
             id: id,
@@ -30,7 +31,8 @@ final class AgentSessionHistoryModelTests: XCTestCase {
             firstPrompt: firstPrompt,
             latestTurns: turns,
             transcriptPath: "/tmp/\(id).jsonl",
-            worktreeAvailable: true
+            worktreeAvailable: true,
+            usage: usage
         )
     }
 
@@ -543,6 +545,17 @@ final class AgentSessionHistoryModelTests: XCTestCase {
         let enriched = cache.enrich(files: touchedFiles, projectPath: projectPath)
         XCTAssertFalse(enriched.isEmpty, "Should extract symbols from .graphify_labels.json")
         XCTAssertTrue(enriched.contains("DaemonClient") || enriched.contains(where: { $0.contains("Daemon") }))
+    }
+
+    func testRecordPreservesUsageAndShortSummary() {
+        var usage = AgentUsage()
+        usage.inputTokens = 15000
+        usage.cacheReadTokens = 35000
+        usage.outputTokens = 420
+        let record = makeRecord(id: "u1", title: "Usage Test", usage: usage)
+
+        XCTAssertEqual(record.usage?.contextTokens, 50000)
+        XCTAssertEqual(record.usage?.shortSummary, "50k ctx")
     }
 }
 
