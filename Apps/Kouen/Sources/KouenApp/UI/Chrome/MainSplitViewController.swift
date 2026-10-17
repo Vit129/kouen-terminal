@@ -268,6 +268,7 @@ final class MainSplitViewController: NSViewController {
 
     @objc private func openFilePreviewFromTerminal(_ notification: Notification) {
         guard let rawPath = notification.userInfo?["path"] as? String else { return }
+        NSLog("[kouen-open] terminal link %@ exists=%d", rawPath, FileManager.default.fileExists(atPath: rawPath) ? 1 : 0)
         // The terminal surface's own OSC-7 cwd tracking can be nil or stale (e.g. a
         // non-interactive agent subprocess that never emits OSC 7), so a raw candidate that
         // doesn't exist as-is gets a second, authoritative resolution attempt here — same
@@ -283,6 +284,7 @@ final class MainSplitViewController: NSViewController {
         else { return }
         // A folder has no preview: show it in the Files tree (re-rooted if it is in another project).
         if isDirectory.boolValue {
+            NSLog("[kouen-open] folder -> Files tree %@", path)
             setSidebarVisible(true, animated: true)
             sidebar.selectFilesTab(revealPath: path)
             return

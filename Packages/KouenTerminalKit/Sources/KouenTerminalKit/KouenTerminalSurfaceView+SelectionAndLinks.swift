@@ -237,6 +237,7 @@ extension KouenTerminalSurfaceView {
             }
             return
         }
+        NSLog("[kouen-open] cmd+click posts %@", resolveFilePath(string) ?? string)
         NotificationCenter.default.post(
             name: Notification.Name("KouenOpenFilePreview"),
             object: nil,
