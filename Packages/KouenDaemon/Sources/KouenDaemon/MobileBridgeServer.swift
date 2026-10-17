@@ -597,6 +597,7 @@ public final class MobileBridgeServer: @unchecked Sendable {
             <div class="ctl" id="ctl" hidden>
               <button class="chipbtn" id="model-chip" aria-haspopup="dialog"></button>
               <button class="chipbtn" id="mode-chip" aria-haspopup="dialog"></button>
+              <button class="chipbtn" id="usage-chip" aria-haspopup="dialog" hidden></button>
             </div>
           </div>
         </section>
@@ -638,7 +639,7 @@ public final class MobileBridgeServer: @unchecked Sendable {
       clearTimeout(saveTimer);
       saveTimer = setTimeout(() => {
         view.open = cur ? cur.id : null;
-        if (cur) view.s[cur.id] = { modelName: cur.modelName, effort: cur.effort, out: cur.transcript ? cur.out.slice(-150) : undefined };
+        if (cur) view.s[cur.id] = { modelName: cur.modelName, effort: cur.effort, usage: cur.usage, out: cur.transcript ? cur.out.slice(-150) : undefined };
         try { localStorage.setItem(viewKey, JSON.stringify(view)); } catch {}
       }, 500);
     }
@@ -691,6 +692,7 @@ public final class MobileBridgeServer: @unchecked Sendable {
       if (saved) {
         cur.modelName = cur.modelName || saved.modelName;
         cur.effort = cur.effort || saved.effort;
+        cur.usage = cur.usage || saved.usage;
         if (saved.out && cur.out.length <= 1) cur.out = saved.out;
       }
       saveView();
@@ -874,6 +876,23 @@ public final class MobileBridgeServer: @unchecked Sendable {
       mc.disabled = !inCycle; // a mode outside Shift+Tab's cycle (e.g. bypass) is shown, not switchable
       mc.className = "chipbtn" + (cur.mode === "plan" ? " mode-plan" : "");
       mc.innerHTML = `${esc(modeName(cur.mode || ""))}${inCycle ? ' <span class="car">▾</span>' : ""}`;
+      const uc = $("usage-chip");
+      const u = cur.usage;
+      let summary = u ? (u.shortSummary || null) : null;
+      if (!summary && u) {
+        if (u.totalCostUSD != null && u.totalCostUSD > 0.0001) summary = `$${u.totalCostUSD.toFixed(2)}`;
+        else {
+          const ctx = (u.contextTokens != null) ? u.contextTokens : ((u.inputTokens || 0) + (u.cacheReadTokens || 0));
+          if (ctx > 0) summary = (ctx >= 1000 ? (ctx / 1000).toFixed(1) + "k" : ctx) + " ctx";
+          else if (u.outputTokens) summary = (u.outputTokens >= 1000 ? (u.outputTokens / 1000).toFixed(1) + "k" : u.outputTokens) + " out";
+        }
+      }
+      if (summary) {
+        uc.hidden = false;
+        uc.innerHTML = `📊 ${esc(summary)} <span class="car">▾</span>`;
+      } else {
+        uc.hidden = true;
+      }
     }
 
     function sendAgentCommand(kind, value) {
@@ -900,6 +919,27 @@ public final class MobileBridgeServer: @unchecked Sendable {
       $("panel-body").querySelectorAll("[data-o]").forEach(b => b.onclick = () => {
         sendAgentCommand("mode", b.dataset.o); cur.mode = b.dataset.o; renderComposer(); $("panel").hidden = true; toast("Mode: " + modeName(cur.mode), "Shift+Tab");
       });
+    }
+    function openUsage() {
+      if (!cur || !cur.usage) return;
+      const u = cur.usage;
+      const fmt = n => (n != null ? n.toLocaleString() : "—");
+      const computedCtx = (u.contextTokens != null) ? u.contextTokens : ((u.inputTokens || 0) + (u.cacheReadTokens || 0));
+      const ctx = computedCtx > 0 ? fmt(computedCtx) : (u.inputTokens != null ? fmt(u.inputTokens) : "—");
+      const cost = u.totalCostUSD != null ? `$${u.totalCostUSD.toFixed(3)}` : (u.costUSD != null ? `$${u.costUSD.toFixed(3)}` : null);
+      const html = `<div style="padding: 12px 14px; font-size: 14px; line-height: 1.6;">
+        <div style="font-weight: 700; margin-bottom: 8px; color: var(--accent);">Token & Cost Breakdown</div>
+        <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
+          <tr><td style="padding: 4px 0; color: var(--muted);">Context Window:</td><td style="text-align: right; font-weight: 600;">${ctx}</td></tr>
+          <tr><td style="padding: 4px 0; color: var(--muted);">Input Tokens:</td><td style="text-align: right; font-weight: 600;">${fmt(u.inputTokens)}</td></tr>
+          <tr><td style="padding: 4px 0; color: var(--muted);">Output Tokens:</td><td style="text-align: right; font-weight: 600;">${fmt(u.outputTokens)}</td></tr>
+          <tr><td style="padding: 4px 0; color: var(--muted);">Cache Read:</td><td style="text-align: right; font-weight: 600;">${fmt(u.cacheReadTokens)}</td></tr>
+          <tr><td style="padding: 4px 0; color: var(--muted);">Cache Creation:</td><td style="text-align: right; font-weight: 600;">${fmt(u.cacheWriteTokens)}</td></tr>
+          ${u.thinkingTokens ? `<tr><td style="padding: 4px 0; color: var(--muted);">Thinking Tokens:</td><td style="text-align: right; font-weight: 600;">${fmt(u.thinkingTokens)}</td></tr>` : ""}
+          ${cost ? `<tr style="border-top: 1px solid var(--line);"><td style="padding: 6px 0 0 0; font-weight: 700; color: var(--ink);">Total Cost:</td><td style="padding: 6px 0 0 0; text-align: right; font-weight: 700; color: var(--accent);">${cost}</td></tr>` : ""}
+        </table>
+      </div>`;
+      panel("Session Usage", html, true);
     }
 
     function panel(title, html, small) {
@@ -1125,6 +1165,7 @@ public final class MobileBridgeServer: @unchecked Sendable {
     $("msg").addEventListener("input", syncSend);
     $("model-chip").onclick = openModel;
     $("mode-chip").onclick = openMode;
+    $("usage-chip").onclick = openUsage;
     $("send").onclick = () => send($("msg").value);
     $("msg").addEventListener("keydown", e => {
       if (e.key === "Enter" && !e.shiftKey) {
@@ -1202,6 +1243,7 @@ public final class MobileBridgeServer: @unchecked Sendable {
       if (cur.out.length > 400) cur.out = cur.out.slice(-400);
       if (t.model) cur.modelName = modelLabel(t.model);
       if (t.mode) cur.mode = t.mode;
+      if (t.usage) cur.usage = t.usage;
       renderPane();
       saveView();
     }
@@ -1852,7 +1894,13 @@ public final class MobileBridgeServer: @unchecked Sendable {
     /// (first send after attach, or the agent switched sessions via /clear or /resume); otherwise
     /// append. Absent entirely for a surface with no transcript — the client keeps its raw view.
     struct TranscriptPush: Encodable {
-        struct Body: Encodable { var reset: Bool; var items: [TranscriptItem]; var model: String?; var mode: String? }
+        struct Body: Encodable {
+            var reset: Bool
+            var items: [TranscriptItem]
+            var model: String?
+            var mode: String?
+            var usage: AgentUsage?
+        }
         var transcript: Body
     }
     static let transcriptBacklogLimit = 200
@@ -2075,9 +2123,9 @@ public final class MobileBridgeServer: @unchecked Sendable {
         }
     }
 
-    /// P57: streams the attached agent's own transcript (Claude today) as typed items, so the
+    /// Streams the attached agent's own transcript (Claude, Antigravity, Codex) as typed items, so the
     /// phone shows real user/assistant/tool bubbles instead of ANSI-stripped TUI redraws.
-    /// Re-resolves pid → transcript every tick: `/clear` and `/resume` swap the session file.
+    /// Re-resolves pid/surface → transcript every tick: `/clear` and `/resume` swap the session file.
     private func startTranscriptTail(surfaceID: String, connection: NWConnection, state: ConnectionState) {
         var url: URL?
         var offset = 0
@@ -2085,8 +2133,23 @@ public final class MobileBridgeServer: @unchecked Sendable {
         timer.schedule(deadline: .now(), repeating: 1.0, leeway: .milliseconds(250))
         timer.setEventHandler { [weak self, weak connection, weak state] in
             guard let self, let connection, let state, state.surfaceID == surfaceID,
-                  let snap = AgentDetector.snapshot(forSurfaceKey: surfaceID), snap.kind == .claudeCode,
-                  let current = ClaudeSessionLocator.transcriptURL(pid: snap.pid) else { return }
+                  let snap = AgentDetector.snapshot(forSurfaceKey: surfaceID) else { return }
+
+            let cwd = Self.surfaceCwd(surfaceID: surfaceID)
+            let current: URL?
+            switch snap.kind {
+            case .claudeCode:
+                current = ClaudeSessionLocator.transcriptURL(pid: snap.pid)
+            case .antigravity:
+                current = AntigravitySessionLocator.transcriptURL(pid: snap.pid, surfaceCwd: cwd)
+            case .codex:
+                current = CodexSessionLocator.transcriptURL(pid: snap.pid, surfaceCwd: cwd)
+            default:
+                current = nil
+            }
+
+            guard let current else { return }
+
             var reset = false
             if current != url { url = current; offset = 0; reset = true }
             guard let read = AgentHistoryScanner.readJSONLLines(from: current, fromOffset: offset) else {
@@ -2094,12 +2157,48 @@ public final class MobileBridgeServer: @unchecked Sendable {
                 return
             }
             offset = read.endOffset
-            var items = read.lines.flatMap(ClaudeTranscriptLine.items(from:))
+
+            var items: [TranscriptItem]
+            let metaModel: String?
+            let metaMode: String?
+            let metaUsage: AgentUsage?
+
+            switch snap.kind {
+            case .claudeCode:
+                items = read.lines.flatMap(ClaudeTranscriptLine.items(from:))
+                let meta = ClaudeTranscriptLine.meta(from: read.lines)
+                metaModel = meta.model
+                metaMode = meta.mode
+                metaUsage = meta.usage
+            case .antigravity:
+                items = read.lines.flatMap(AntigravityTranscriptLine.items(from:))
+                let meta = AntigravityTranscriptLine.meta(from: read.lines)
+                metaModel = meta.model
+                metaMode = meta.mode
+                metaUsage = meta.usage
+            case .codex:
+                items = read.lines.flatMap(CodexTranscriptLine.items(from:))
+                let meta = CodexTranscriptLine.meta(from: read.lines)
+                metaModel = meta.model
+                metaMode = meta.mode
+                metaUsage = meta.usage
+            default:
+                items = []
+                metaModel = nil
+                metaMode = nil
+                metaUsage = nil
+            }
+
             if reset { items = Array(items.suffix(Self.transcriptBacklogLimit)) }
-            let meta = ClaudeTranscriptLine.meta(from: read.lines)
-            if let mode = meta.mode { state.agentMode = mode }
-            guard reset || !items.isEmpty || meta.model != nil || meta.mode != nil else { return }
-            self.sendJSON(TranscriptPush(transcript: .init(reset: reset, items: items, model: meta.model, mode: meta.mode)), on: connection)
+            if let mode = metaMode { state.agentMode = mode }
+            guard reset || !items.isEmpty || metaModel != nil || metaMode != nil || metaUsage != nil else { return }
+            self.sendJSON(TranscriptPush(transcript: .init(
+                reset: reset,
+                items: items,
+                model: metaModel,
+                mode: metaMode,
+                usage: metaUsage
+            )), on: connection)
         }
         state.transcriptTimer = timer
         timer.resume()

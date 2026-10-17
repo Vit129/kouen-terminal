@@ -456,6 +456,16 @@ public struct AgentSessionHistoryView: View {
                                     .foregroundStyle(Color(nsColor: c.textSecondary))
                             }
 
+                            if let usage = record.usage, let summary = usage.shortSummary {
+                                Text(summary)
+                                    .font(.system(size: 8, weight: .medium))
+                                    .padding(.horizontal, 3)
+                                    .padding(.vertical, 1)
+                                    .background(Color.blue.opacity(0.12))
+                                    .cornerRadius(3)
+                                    .foregroundStyle(Color.blue)
+                            }
+
                             if isLive {
                                 HStack(spacing: 2) {
                                     Circle()
@@ -626,6 +636,42 @@ public struct AgentSessionHistoryView: View {
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .padding(.vertical, 1)
                         }
+                        if let usage = record.usage {
+                            HStack(spacing: 8) {
+                                if let ctx = usage.contextTokens ?? usage.inputTokens {
+                                    HStack(spacing: 2) {
+                                        Text("ctx:")
+                                            .font(.system(size: 8.5))
+                                            .foregroundStyle(Color(nsColor: c.textTertiary))
+                                        Text("\(ctx)")
+                                            .font(.system(size: 8.5, weight: .medium))
+                                            .foregroundStyle(Color(nsColor: c.textSecondary))
+                                    }
+                                }
+                                if let out = usage.outputTokens {
+                                    HStack(spacing: 2) {
+                                        Text("out:")
+                                            .font(.system(size: 8.5))
+                                            .foregroundStyle(Color(nsColor: c.textTertiary))
+                                        Text("\(out)")
+                                            .font(.system(size: 8.5, weight: .medium))
+                                            .foregroundStyle(Color(nsColor: c.textSecondary))
+                                    }
+                                }
+                                if let cost = usage.totalCostUSD {
+                                    HStack(spacing: 2) {
+                                        Text("cost:")
+                                            .font(.system(size: 8.5))
+                                            .foregroundStyle(Color(nsColor: c.textTertiary))
+                                        Text(String(format: "$%.3f", cost))
+                                            .font(.system(size: 8.5, weight: .medium))
+                                            .foregroundStyle(Color(nsColor: c.textSecondary))
+                                    }
+                                }
+                            }
+                            .padding(.vertical, 1)
+                        }
+
                         HStack(spacing: 0) {
                             Spacer()
                             splitActionButton(for: record, isLive: isLive)
