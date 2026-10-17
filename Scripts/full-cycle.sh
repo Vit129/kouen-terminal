@@ -12,7 +12,7 @@ cd "$ROOT"
 usage() {
   cat <<'USAGE'
 Usage:
-  Scripts/full-cycle.sh [patch|minor|major] [--version X.Y.Z] [--build N] [--no-bump]
+  Scripts/full-cycle.sh [patch|minor|major|skip] [--version X.Y.Z] [--build N] [--no-bump] [-m <msg>] [-y|--yes]
 
 Runs:
   1. Pre-build verification (swift build).
@@ -28,20 +28,59 @@ USAGE
 
 NO_BUMP=0
 BUMP_ARGS=()
-for arg in "$@"; do
-  if [[ "$arg" == "--no-bump" ]]; then
-    NO_BUMP=1
-  else
-    BUMP_ARGS+=("$arg")
-  fi
-done
+COMMIT_MSG="${COMMIT_MESSAGE:-}"
+AUTO_YES=0
 
-case "${1:-}" in
-  -h|--help|help)
-    usage
-    exit 0
-    ;;
-esac
+while (($#)); do
+  case "$1" in
+    --no-bump|skip)
+      NO_BUMP=1
+      shift
+      ;;
+    patch|minor|major)
+      BUMP_ARGS+=("$1")
+      shift
+      ;;
+    --version)
+      BUMP_ARGS+=("--version" "${2:?Missing value for --version}")
+      shift 2
+      ;;
+    --build)
+      BUMP_ARGS+=("--build" "${2:?Missing value for --build}")
+      shift 2
+      ;;
+    --dry-run)
+      BUMP_ARGS+=("--dry-run")
+      shift
+      ;;
+    -m|--message)
+      COMMIT_MSG="${2:?Missing value for -m/--message}"
+      shift 2
+      ;;
+    --message=*)
+      COMMIT_MSG="${1#*=}"
+      shift
+      ;;
+    -y|--yes)
+      AUTO_YES=1
+      shift
+      ;;
+    -h|--help|help)
+      usage
+      exit 0
+      ;;
+    *)
+      if [[ -z "$COMMIT_MSG" ]]; then
+        COMMIT_MSG="$1"
+      else
+        echo "Unknown argument: $1" >&2
+        usage >&2
+        exit 2
+      fi
+      shift
+      ;;
+  esac
+done
 
 # A worktree release ends with `git pull` in the main checkout; check it is clean up front,
 # before Step 3 merges to main, so a dirty checkout can't leave main merged but untagged.
@@ -83,7 +122,14 @@ fi
 # always-actually-merge behavior fixes that.)
 git_dir="$(git rev-parse --git-dir)"
 prior_branch="$(git branch --show-current)"
-./Scripts/commit-push-merge.sh
+cpm_args=()
+if [[ -n "$COMMIT_MSG" ]]; then
+  cpm_args+=("-m" "$COMMIT_MSG")
+fi
+if [[ "$AUTO_YES" -eq 1 ]]; then
+  cpm_args+=("-y")
+fi
+./Scripts/commit-push-merge.sh "${cpm_args[@]}"
 
 if [[ "$git_dir" == *"worktrees"* ]]; then
   common_dir="$(git rev-parse --git-common-dir)"
@@ -247,7 +293,10 @@ if [[ -x "$CLI_BIN" ]]; then
       echo ""
       echo "   💡 Running tasks were kept alive. ต้องรัน \`kouen-cli install\` ด้วยเพื่อที่จะได้อัปเดต Daemon เป็นเวอร์ชันล่าสุด"
       echo ""
-      if [ -t 0 ]; then
+      if [[ "$AUTO_YES" -eq 1 ]]; then
+        "$CLI_BIN" install
+        echo "   ✅ Daemon updated and reloaded to v${CLI_VER} (--yes specified)."
+      elif [ -t 0 ]; then
         read -r -p "   Do you want to run 'kouen-cli install' now? (will reload background daemon) [y/N]: " restart_choice
         case "$restart_choice" in
           [yY][eE][sS]|[yY])
