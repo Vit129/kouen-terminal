@@ -503,58 +503,24 @@ public final class AgentHistoryFTSIndex: @unchecked Sendable {
         surfaceTag: String? = nil,
         topicSegments: [String]? = nil
     ) {
-        // The scanner's in-memory cache is empty on every app launch / CLI run, so it re-parses
-        // every transcript; skip the FTS write when the stored mtime/size still match.
-        guard needsReindex(sessionID: sessionID, mtime: mtime, fileSize: fileSize) else { return }
-        lock.lock()
-        defer { lock.unlock() }
-        guard let db else { return }
-
-        inTransaction("indexSession") {
-            // Remove old entries if any
-            deleteRows([sessionID], from: ["session_fts", "session_index_meta"], context: "reindex delete")
-
-            // Insert into FTS
-            let insertFtsSQL = """
-            INSERT INTO session_fts(session_id, title, first_prompt, full_transcript, git_branch, repo_name, agent, files_edited, tools_called)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """
-            var insertFtsStmt: OpaquePointer?
-            if sqlite3_prepare_v2(db, insertFtsSQL, -1, &insertFtsStmt, nil) == SQLITE_OK {
-                let ftsAgent = (surfaceTag?.isEmpty == false) ? "\(agentName) \(surfaceTag!)" : agentName
-                let transcriptToStore: String
-                if let topicSegments, !topicSegments.isEmpty {
-                    transcriptToStore = "\(fullTranscript)\nMilestones: " + topicSegments.joined(separator: " · ")
-                } else {
-                    transcriptToStore = fullTranscript
-                }
-                sqlite3_bind_text(insertFtsStmt, 1, sessionID, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
-                sqlite3_bind_text(insertFtsStmt, 2, title, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
-                sqlite3_bind_text(insertFtsStmt, 3, firstPrompt, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
-                sqlite3_bind_text(insertFtsStmt, 4, transcriptToStore, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
-                sqlite3_bind_text(insertFtsStmt, 5, gitBranch ?? "", -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
-                sqlite3_bind_text(insertFtsStmt, 6, repoName, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
-                sqlite3_bind_text(insertFtsStmt, 7, ftsAgent, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
-                sqlite3_bind_text(insertFtsStmt, 8, filesEdited, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
-                sqlite3_bind_text(insertFtsStmt, 9, toolsCalled, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
-                let stepRes = sqlite3_step(insertFtsStmt)
-                if stepRes != SQLITE_DONE { logStepFailure(stepRes, context: "insert session_fts") }
-                sqlite3_finalize(insertFtsStmt)
-            }
-
-            // Insert into meta
-            let insertMetaSQL = "INSERT INTO session_index_meta(session_id, transcript_path, mtime, file_size) VALUES (?, ?, ?, ?)"
-            var insertMetaStmt: OpaquePointer?
-            if sqlite3_prepare_v2(db, insertMetaSQL, -1, &insertMetaStmt, nil) == SQLITE_OK {
-                sqlite3_bind_text(insertMetaStmt, 1, sessionID, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
-                sqlite3_bind_text(insertMetaStmt, 2, transcriptPath, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
-                sqlite3_bind_double(insertMetaStmt, 3, mtime.timeIntervalSince1970)
-                sqlite3_bind_int64(insertMetaStmt, 4, Int64(fileSize))
-                let stepRes = sqlite3_step(insertMetaStmt)
-                if stepRes != SQLITE_DONE { logStepFailure(stepRes, context: "insert session_index_meta") }
-                sqlite3_finalize(insertMetaStmt)
-            }
-        }
+        indexSessionsBatch([
+            SessionIndexItem(
+                sessionID: sessionID,
+                transcriptPath: transcriptPath,
+                mtime: mtime,
+                fileSize: fileSize,
+                title: title,
+                firstPrompt: firstPrompt,
+                fullTranscript: fullTranscript,
+                gitBranch: gitBranch,
+                repoName: repoName,
+                agentName: agentName,
+                surfaceTag: surfaceTag,
+                topicSegments: topicSegments,
+                filesEdited: filesEdited,
+                toolsCalled: toolsCalled
+            )
+        ])
     }
 
     /// Payload for batch session indexing.
@@ -609,12 +575,15 @@ public final class AgentHistoryFTSIndex: @unchecked Sendable {
 
     /// Indexes a batch of sessions in a single SQLite transaction with prepared statement reuse.
     public func indexSessionsBatch(_ items: [SessionIndexItem]) {
+        let itemsToIndex = items.filter { needsReindex(sessionID: $0.sessionID, mtime: $0.mtime, fileSize: $0.fileSize) }
+        guard !itemsToIndex.isEmpty else { return }
+
         lock.lock()
         defer { lock.unlock() }
-        guard let db, !items.isEmpty else { return }
+        guard let db else { return }
 
         inTransaction("indexSessionsBatch") {
-            let sessionIDs = items.map(\.sessionID)
+            let sessionIDs = itemsToIndex.map(\.sessionID)
             deleteRows(sessionIDs, from: ["session_fts", "session_index_meta"], context: "batch reindex delete")
 
             let insertFtsSQL = """
@@ -623,7 +592,7 @@ public final class AgentHistoryFTSIndex: @unchecked Sendable {
             """
             var insertFtsStmt: OpaquePointer?
             if sqlite3_prepare_v2(db, insertFtsSQL, -1, &insertFtsStmt, nil) == SQLITE_OK {
-                for item in items {
+                for item in itemsToIndex {
                     sqlite3_reset(insertFtsStmt)
                     let ftsAgent = (item.surfaceTag?.isEmpty == false) ? "\(item.agentName) \(item.surfaceTag!)" : item.agentName
                     let transcriptToStore: String
