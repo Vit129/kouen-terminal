@@ -5,6 +5,35 @@ All notable changes to Kouen are documented here. The format is based on
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Each released version
 has a matching `vX.Y.Z` tag and a signed, notarized DMG on
 [GitHub Releases](https://github.com/Vit129/kouen-terminal/releases).
+## [4.21.10] - 2026-10-18
+
+### Added
+- Open files and folders from other projects ([`9ab8529`](https://github.com/Vit129/kouen-terminal/commit/9ab8529002270ec0ad6b895c37ca2b7d2c750f81))
+- Open bare file names from agent output across projects ([`fcc9d2b`](https://github.com/Vit129/kouen-terminal/commit/fcc9d2b2c2febdb063b5e38ae017908357004a53))
+- Pin the file tree on another folder; root picker in its header ([`0fbde41`](https://github.com/Vit129/kouen-terminal/commit/0fbde415016a0e6da2ee60b7a57f87d2b7d3f99f))
+
+### Changed
+- Route indexSession through indexSessionsBatch ([`561b1ea`](https://github.com/Vit129/kouen-terminal/commit/561b1eabc2b8cecb867e22deae065f2a07dcdd26))
+- Write the FTS index in batches of 50 during a scan ([`a6037f2`](https://github.com/Vit129/kouen-terminal/commit/a6037f2381d80c32b6364e7822343caffa84ab96))
+- Spawn git only when a worktree or HEAD actually changed ([`7fe5a48`](https://github.com/Vit129/kouen-terminal/commit/7fe5a4803d3cc71dccc16ebcba1bb520a646adcb))
+- Watch the transcript file instead of polling it every 1s ([`cb11ff2`](https://github.com/Vit129/kouen-terminal/commit/cb11ff2f4fd1e9659b821edbc43d8c4898785057))
+
+### Documentation
+- Kouen-file-open covers folders, wrapped paths and other projects ([`2dd2ee9`](https://github.com/Vit129/kouen-terminal/commit/2dd2ee907bbfe585c4266afbd5827df4121759c2))
+- Document FileTree programmatic reveal race prevention ([`4f9bc4c`](https://github.com/Vit129/kouen-terminal/commit/4f9bc4c0c4a08e0906911f84d5fdcf62806ec349))
+- Kouen-file-open: how to see click logs in KouenPreview ([`9488351`](https://github.com/Vit129/kouen-terminal/commit/948835123f98afb908d23fe6b7f24cf79233fb03))
+- Kouen-file-open: stale HTML after reload is usually page state ([`51ccef4`](https://github.com/Vit129/kouen-terminal/commit/51ccef49dab76d6275719e7180091a39ad25928d))
+
+### Fixed
+- Restart the daemon for real at the end of make start ([`88e1b6a`](https://github.com/Vit129/kouen-terminal/commit/88e1b6a2e8769be3c9844c1c33aa06f133c81bd4))
+- Fix header scroll overlap and cross-project reveal ancestor expansion ([`9c66415`](https://github.com/Vit129/kouen-terminal/commit/9c6641541be9e3215ac719506b35766c5e2c1990))
+- Cancel overlapping reveal tasks and remove cascading revealEpoch bumps ([`3fc33da`](https://github.com/Vit129/kouen-terminal/commit/3fc33daf53ab1ab3dd7ff6b1fadaa9314bf882af))
+- Protect child nodes from parallel loadChildren races during reveal ([`9cf8d07`](https://github.com/Vit129/kouen-terminal/commit/9cf8d074e5220ada485c99a55ef152c81818a739))
+- Loop over itemsToIndex in session_index_meta insert and add mixed batch test ([`2f052cb`](https://github.com/Vit129/kouen-terminal/commit/2f052cb86405fb4f9f71fd9587787458ce0cd79c))
+- Address P59 review findings (transcript meta, KeyTable precedence, semantic sort, locator head-tail) ([`a519846`](https://github.com/Vit129/kouen-terminal/commit/a51984666dc3ec1345b0465c8101841cfd344197))
+- Cmd+R reloads the browser pane, Cmd+Shift+R ignores the cache ([`7119f16`](https://github.com/Vit129/kouen-terminal/commit/7119f1608e9789dae513fcae4094bf2a05e90ea3))
+
+
 ## [4.21.9] - 2026-10-17
 
 ### Added
