@@ -964,7 +964,7 @@ final class KouenSidebarPanelViewController: NSViewController {
         // Ensure the tree is shown, not the inline file viewer.
         fileViewerVC.view.isHidden = true
         fileTreeView.isHidden = false
-        fileTreeView.revealFileInTree(path: path)
+        fileTreeView.revealFileInTree(path: path, pinOutside: true)
     }
 
     func previewFile(path: String) {
@@ -1045,7 +1045,7 @@ final class KouenSidebarPanelViewController: NSViewController {
                 let activeSessionID = SessionCoordinator.shared.snapshot.activeWorkspace?.activeSessionID
                 let root = WorktreeManager().repoRoot(for: cwd) ?? cwd
                 fileTreeView.updateRoot(path: root, sessionID: activeSessionID)
-                fileTreeView.revealFileInTree(path: cwd)
+                if !fileTreeView.isPinned { fileTreeView.revealFileInTree(path: cwd) }
             }
         case 2:
             sidebarSectionModel.text = "JOBS"
