@@ -531,7 +531,7 @@ public final class AgentSessionHistoryModel: ObservableObject {
 
     /// Match location info (e.g. "late in session · turn 42/50") for active query (O(1) dictionary read).
     public func matchLocation(for record: AgentSessionRecord) -> AgentSessionRecord.MatchLocationInfo? {
-        searchMatchLocations[record.id] ?? (searchQuery.isEmpty ? nil : record.matchLocation(for: searchQuery))
+        searchMatchLocations[record.id]
     }
 
     /// Whether this hit was returned by local semantic search fallback.

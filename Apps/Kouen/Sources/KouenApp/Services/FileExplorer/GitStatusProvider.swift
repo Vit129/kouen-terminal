@@ -31,6 +31,7 @@ public actor GitStatusProvider {
         let stdoutPipe = Pipe()
         process.standardOutput = stdoutPipe
         process.standardError = FileHandle.nullDevice   // suppress — non-git dirs exit non-zero
+        process.terminationHandler = { _ in }
 
         do {
             try process.run()
@@ -66,7 +67,6 @@ public actor GitStatusProvider {
         }
 
         guard let data else { return [:] }
-        process.waitUntilExit()
         return parse(data)
     }
 

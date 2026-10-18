@@ -42,7 +42,7 @@ final class FileTreeNode: Identifiable {
         }
         
         var treeNodes: [String: FileTreeNode] = [:]
-        let rawNodesByPath = Dictionary(uniqueKeysWithValues: rawNodes.map { ($0.path.lowercased(), $0) })
+        let rawNodesByPath = Dictionary(rawNodes.map { ($0.path.lowercased(), $0) }, uniquingKeysWith: { first, _ in first })
         
         // First, create FileTreeNode for every path
         for path in allPaths {
@@ -336,38 +336,14 @@ struct FileTreeSwiftUIView: View {
         }
     }
 
-    private func listBranches() async -> [String] {
+    private func runGitCommand(arguments: [String]) async -> String? {
         let path = rootPath
+        guard !path.isEmpty, FileManager.default.fileExists(atPath: path) else { return nil }
         return await withCheckedContinuation { continuation in
             DispatchQueue.global(qos: .userInitiated).async {
                 let process = Process()
                 process.executableURL = URL(fileURLWithPath: "/usr/bin/git")
-                process.arguments = ["branch", "--format=%(refname:short)"]
-                process.currentDirectoryURL = URL(fileURLWithPath: path)
-                let pipe = Pipe()
-                process.standardOutput = pipe
-                process.standardError = FileHandle.nullDevice
-                do {
-                    try process.run()
-                    let data = (try? pipe.fileHandleForReading.readToEnd()) ?? Data()
-                    process.waitUntilExit()
-                    let output = String(data: data, encoding: .utf8) ?? ""
-                    let branches = output.components(separatedBy: "\n").filter { !$0.isEmpty }
-                    continuation.resume(returning: branches)
-                } catch {
-                    continuation.resume(returning: [])
-                }
-            }
-        }
-    }
-
-    private func getCurrentBranch() async -> String? {
-        let path = rootPath
-        return await withCheckedContinuation { continuation in
-            DispatchQueue.global(qos: .userInitiated).async {
-                let process = Process()
-                process.executableURL = URL(fileURLWithPath: "/usr/bin/git")
-                process.arguments = ["rev-parse", "--abbrev-ref", "HEAD"]
+                process.arguments = arguments
                 process.currentDirectoryURL = URL(fileURLWithPath: path)
                 let pipe = Pipe()
                 process.standardOutput = pipe
@@ -380,14 +356,24 @@ struct FileTreeSwiftUIView: View {
                         continuation.resume(returning: nil)
                         return
                     }
-                    let output = String(data: data, encoding: .utf8) ?? ""
-                    let trimmed = output.trimmingCharacters(in: .whitespacesAndNewlines)
-                    continuation.resume(returning: trimmed.isEmpty ? nil : trimmed)
+                    let output = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines)
+                    continuation.resume(returning: output?.isEmpty == true ? nil : output)
                 } catch {
                     continuation.resume(returning: nil)
                 }
             }
         }
+    }
+
+    private func listBranches() async -> [String] {
+        guard let output = await runGitCommand(arguments: ["branch", "--format=%(refname:short)"]) else {
+            return []
+        }
+        return output.components(separatedBy: "\n").filter { !$0.isEmpty }
+    }
+
+    private func getCurrentBranch() async -> String? {
+        await runGitCommand(arguments: ["rev-parse", "--abbrev-ref", "HEAD"])
     }
 
     private func refreshGitBranch() {
@@ -466,11 +452,11 @@ struct FileTreeSwiftUIView: View {
     private func loadRoot() async {
         let taskRootPath = rootPath
         let taskSessionID = sessionID
-        refreshGitBranch()
         let statusProvider = GitStatusProvider()
         async let gitStatusTask  = statusProvider.status(rootPath: rootPath)
         async let rawNodesTask   = (try? watcher.scan(rootPath: rootPath, options: scanOptions)) ?? []
-        let (status, rawNodes)   = await (gitStatusTask, rawNodesTask)
+        async let branchTask     = getCurrentBranch()
+        let (status, rawNodes, branch) = await (gitStatusTask, rawNodesTask, branchTask)
 
         // scanDirectory() has no cancellation checks, so a stale scan for a root/session
         // we've since switched away from can still finish and land here. Drop it instead
@@ -492,7 +478,7 @@ struct FileTreeSwiftUIView: View {
 
         // Reconcile in-place: preserve existing FileTreeNode identity so
         // SwiftUI @State (expand/collapse) is retained.
-        let existingByID = Dictionary(uniqueKeysWithValues: rootNodes.map { ($0.id, $0) })
+        let existingByID = Dictionary(rootNodes.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
         var reconciled: [FileTreeNode] = []
         for node in updatedNodes {
             if let existing = existingByID[node.id] {
@@ -514,7 +500,6 @@ struct FileTreeSwiftUIView: View {
             await loadSearchResults(query: trimmedSearchText)
         }
 
-        let branch = await getCurrentBranch()
         if gitBranch != branch {
             gitBranch = branch
         }

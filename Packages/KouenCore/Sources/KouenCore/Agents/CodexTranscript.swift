@@ -119,19 +119,48 @@ public enum CodexSessionLocator {
 
         // Find rollout-*.jsonl files modified recently
         let opt = FileManager.DirectoryEnumerationOptions.skipsHiddenFiles
-        guard let enumerator = FileManager.default.enumerator(at: codexDir, includingPropertiesForKeys: [.contentModificationDateKey], options: opt) else {
-            return nil
-        }
-
         var candidateURLs: [(url: URL, date: Date)] = []
         let now = Date()
 
-        for case let fileURL as URL in enumerator {
-            guard fileURL.lastPathComponent.hasPrefix("rollout-") && fileURL.pathExtension == "jsonl" else { continue }
-            if let mtime = (try? fileURL.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate {
-                // Consider files within the last 24 hours
-                if now.timeIntervalSince(mtime) < 86400 {
-                    candidateURLs.append((fileURL, mtime))
+        // Fast-path: Codex stores sessions under ~/.codex/sessions/YYYY/MM/DD/
+        // Check today's and yesterday's directories first before doing a full recursive walk
+        let cal = Calendar.current
+        var fastCheckDirs: [URL] = []
+        let dateComponents = cal.dateComponents([.year, .month, .day], from: now)
+        if let year = dateComponents.year, let month = dateComponents.month, let day = dateComponents.day {
+            let todaySub = String(format: "%04d/%02d/%02d", year, month, day)
+            fastCheckDirs.append(codexDir.appendingPathComponent(todaySub))
+        }
+        if let yesterday = cal.date(byAdding: .day, value: -1, to: now) {
+            let yComp = cal.dateComponents([.year, .month, .day], from: yesterday)
+            if let year = yComp.year, let month = yComp.month, let day = yComp.day {
+                let yestSub = String(format: "%04d/%02d/%02d", year, month, day)
+                fastCheckDirs.append(codexDir.appendingPathComponent(yestSub))
+            }
+        }
+
+        for dir in fastCheckDirs where FileManager.default.fileExists(atPath: dir.path) {
+            if let files = try? FileManager.default.contentsOfDirectory(at: dir, includingPropertiesForKeys: [.contentModificationDateKey], options: opt) {
+                for fileURL in files {
+                    guard fileURL.lastPathComponent.hasPrefix("rollout-") && fileURL.pathExtension == "jsonl" else { continue }
+                    if let mtime = (try? fileURL.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate {
+                        if now.timeIntervalSince(mtime) < 86400 {
+                            candidateURLs.append((fileURL, mtime))
+                        }
+                    }
+                }
+            }
+        }
+
+        // Fallback to recursive enumeration only if fast-path yielded no candidates
+        if candidateURLs.isEmpty,
+           let enumerator = FileManager.default.enumerator(at: codexDir, includingPropertiesForKeys: [.contentModificationDateKey], options: opt) {
+            for case let fileURL as URL in enumerator {
+                guard fileURL.lastPathComponent.hasPrefix("rollout-") && fileURL.pathExtension == "jsonl" else { continue }
+                if let mtime = (try? fileURL.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate {
+                    if now.timeIntervalSince(mtime) < 86400 {
+                        candidateURLs.append((fileURL, mtime))
+                    }
                 }
             }
         }

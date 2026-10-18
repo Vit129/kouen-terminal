@@ -250,5 +250,29 @@ final class AgentHistorySearchTests: XCTestCase {
         XCTAssertEqual(hits[0].record.id, "sess-both")
         XCTAssertEqual(hits[1].record.id, "sess-one")
     }
+
+    func testIndexSessionsBatchIndexesMultipleSessionsInSingleTransaction() {
+        let (index, url) = tempIndex()
+        defer { try? FileManager.default.removeItem(at: url) }
+
+        let item1 = AgentHistoryFTSIndex.SessionIndexItem(
+            sessionID: "batch-1", transcriptPath: "/tmp/b1.jsonl", mtime: Date(), fileSize: 100,
+            title: "Performance tuning", firstPrompt: "improve sqlite speed",
+            fullTranscript: "we enabled WAL mode and batch transactions"
+        )
+        let item2 = AgentHistoryFTSIndex.SessionIndexItem(
+            sessionID: "batch-2", transcriptPath: "/tmp/b2.jsonl", mtime: Date(), fileSize: 200,
+            title: "Browser RAM reduction", firstPrompt: "fix memory leak",
+            fullTranscript: "use cgImage directly to avoid TIFF"
+        )
+
+        index.indexSessionsBatch([item1, item2])
+
+        let matches1 = index.searchRanked(query: "transactions")
+        XCTAssertEqual(matches1.map(\.sessionID), ["batch-1"])
+
+        let matches2 = index.searchRanked(query: "cgImage")
+        XCTAssertEqual(matches2.map(\.sessionID), ["batch-2"])
+    }
 }
 
