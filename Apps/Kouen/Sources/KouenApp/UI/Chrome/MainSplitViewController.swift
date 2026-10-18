@@ -277,10 +277,16 @@ final class MainSplitViewController: NSViewController {
             : contentVC.resolveTerminalLinkPath(rawPath)
         guard let path = resolvedPath else { return }
         var isDirectory: ObjCBool = false
-        guard FileManager.default.fileExists(atPath: path, isDirectory: &isDirectory), !isDirectory.boolValue,
+        guard FileManager.default.fileExists(atPath: path, isDirectory: &isDirectory),
               // Don't open executables (.app, .command, etc.) — security
               !path.hasSuffix(".app"), !path.hasSuffix(".command"), !path.hasSuffix(".tool")
         else { return }
+        // A folder has no preview: show it in the Files tree (re-rooted if it is in another project).
+        if isDirectory.boolValue {
+            setSidebarVisible(true, animated: true)
+            sidebar.selectFilesTab(revealPath: path)
+            return
+        }
         // HTML files open in the browser pane, not file preview
         if path.hasSuffix(".html") || path.hasSuffix(".htm") {
             NotificationCenter.default.post(

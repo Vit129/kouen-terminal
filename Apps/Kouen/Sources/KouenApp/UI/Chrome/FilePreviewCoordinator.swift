@@ -364,10 +364,21 @@ final class FilePreviewCoordinator {
             expanded = (cwd as NSString).appendingPathComponent(expanded)
         }
         if FileManager.default.fileExists(atPath: expanded) { return expanded }
-        if case .unique(let match) = FuzzyPathResolver.resolve(query: path, root: cwd, limit: 5) {
+        // The terminal already joined a bare name to its own cwd; search for what was clicked,
+        // not that joined path (it can't fuzzy-match anything).
+        let query = expanded.hasPrefix(cwd + "/") ? String(expanded.dropFirst(cwd.count + 1))
+            : (expanded as NSString).lastPathComponent
+        switch FuzzyPathResolver.resolve(query: query, root: cwd, limit: 50) {
+        case .unique(let match):
             return match
+        case .ambiguous(let matches):
+            // Agents print bare names of files they just touched (`ai-sdlc-task-progress.md`
+            // exists in every plan folder): the most recently modified one is the one meant.
+            let exact = matches.filter { ($0 as NSString).lastPathComponent == (query as NSString).lastPathComponent }
+            return FuzzyPathResolver.newestModified(exact.isEmpty ? matches : exact)
+        case .none:
+            return nil
         }
-        return nil
     }
 
     private func resolveViPath(_ path: String, command: String) -> String? {

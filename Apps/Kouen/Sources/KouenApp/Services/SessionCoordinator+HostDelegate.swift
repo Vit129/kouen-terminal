@@ -127,7 +127,7 @@ extension SessionCoordinator {
     /// Walk up from `path` to find `.git` and return the current branch name from its `HEAD`.
     /// Returns nil for detached HEAD, worktrees with non-standard HEAD, or paths outside a repo.
     /// ponytail: direct file read — no subprocess, no blocking git invocation.
-    private nonisolated static func readGitHead(at path: String) -> String? {
+    nonisolated static func readGitHead(at path: String) -> String? {
         var url = URL(fileURLWithPath: path, isDirectory: true)
         for _ in 0 ..< 16 {
             let dotGit = url.appendingPathComponent(".git")

@@ -13,11 +13,21 @@ import KouenTerminalKit
 final class FileTreeContext {
     var rootPath: String
     var sessionID: SessionID?
+    /// Path to reveal and scroll to; accompanied by revealEpoch so repeated reveals always fire.
+    var pendingRevealPath: String?
+    var revealEpoch: Int = 0
     /// Set to scroll-and-highlight a file path in the tree; cleared after the scroll fires.
     var revealPath: String?
+    /// A root the user chose (header menu, or cmd+click into another project). While set, the
+    /// session's cwd-follow (`updateRoot`) leaves the tree alone; a session switch clears it.
+    var pinnedRoot: String?
+    /// The session's own root, kept while pinned so the menu can go back to it.
+    var projectRoot: String
+    var onPickRoot: ((String?) -> Void)?
 
     init(rootPath: String, sessionID: SessionID?) {
         self.rootPath = rootPath
+        self.projectRoot = rootPath
         self.sessionID = sessionID
     }
 }
@@ -35,6 +45,7 @@ final class WorkspaceFileTreeView: NSView {
     private let context: FileTreeContext
     private var hostingView: NSHostingView<FileTreeSwiftUIView>!
     private let scrollbar = TerminalScrollbarView()
+    private var scrollbarTopConstraint: NSLayoutConstraint?
     private weak var observedScrollView: NSScrollView?
     let keyboard = FileTreeKeyboardNavigator()
 
@@ -47,6 +58,7 @@ final class WorkspaceFileTreeView: NSView {
         let initialSessionID = SessionCoordinator.shared.snapshot.activeWorkspace?.activeSessionID
         self.context = FileTreeContext(rootPath: initialPath, sessionID: initialSessionID)
         super.init(frame: .zero)
+        context.onPickRoot = { [weak self] in self?.pin($0) }
         self.hostingView = NSHostingView(rootView: FileTreeSwiftUIView(
             context: context,
             watcher: watcher,
@@ -156,32 +168,51 @@ final class WorkspaceFileTreeView: NSView {
         return path
     }
 
-    /// Expands all ancestor directories of `path`, highlights it in the keyboard navigator,
-    /// then signals the SwiftUI list to scroll to it after a short delay for child loading.
-    func revealFileInTree(path: String) {
+    /// If `path` is outside the currently shown tree root, pins the tree on `path`'s enclosing
+    /// git repository (or directory if not in git).
+    func pinOutsideIfNeeded(path: String) {
+        let cleanPath = (path.count > 1 && path.hasSuffix("/")) ? String(path.dropLast()) : path
+        var isDir: ObjCBool = false
+        let dir = FileManager.default.fileExists(atPath: cleanPath, isDirectory: &isDir) && isDir.boolValue
+            ? cleanPath : (cleanPath as NSString).deletingLastPathComponent
+        let targetRepo = WorktreeManager().repoRoot(for: dir)
         let rootPrefix = context.rootPath.hasSuffix("/") ? context.rootPath : context.rootPath + "/"
-        if path.hasPrefix(rootPrefix) {
-            let relative = String(path.dropFirst(rootPrefix.count))
-            let parentRelative = (relative as NSString).deletingLastPathComponent
-            let components = parentRelative.components(separatedBy: "/").filter { !$0.isEmpty }
-            var accumulated = context.rootPath
-            for component in components {
-                accumulated = (accumulated as NSString).appendingPathComponent(component)
-                NotificationCenter.default.post(
-                    name: .fileTreeToggleExpand,
-                    object: nil,
-                    userInfo: ["path": accumulated, "action": "expand"]
-                )
+        if let targetRepo {
+            if targetRepo != context.rootPath {
+                pin(targetRepo)
             }
-        }
-        keyboard.state.focusedPath = path
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { [weak self] in
-            guard let self else { return }
-            self.context.revealPath = path
+        } else if !cleanPath.hasPrefix(rootPrefix) && cleanPath != context.rootPath {
+            pin(dir)
         }
     }
 
+    /// Expands all ancestor directories of `path`, highlights it in the keyboard navigator,
+    /// and reveals it in the SwiftUI tree.
+    func revealFileInTree(path: String, pinOutside: Bool = false) {
+        let cleanPath = (path.count > 1 && path.hasSuffix("/")) ? String(path.dropLast()) : path
+        if pinOutside {
+            pinOutsideIfNeeded(path: cleanPath)
+        }
+        keyboard.state.focusedPath = cleanPath
+        context.pendingRevealPath = cleanPath
+        context.revealEpoch &+= 1
+    }
+
+    /// Show `root` instead of the session's project until unpinned or the session changes.
+    /// `nil` goes back to the session's project.
+    func pin(_ root: String?) {
+        context.pinnedRoot = root
+        context.rootPath = root ?? context.projectRoot
+    }
+
+    var isPinned: Bool { context.pinnedRoot != nil }
+    var shownRoot: String { context.rootPath }
+    var pendingRevealPath: String? { context.pendingRevealPath }
+
     func updateRoot(path: String, sessionID: SessionID?) {
+        if sessionID != context.sessionID { context.pinnedRoot = nil }
+        context.projectRoot = path
+        if context.pinnedRoot != nil { return }
         guard path != context.rootPath || sessionID != context.sessionID else { return }
         // Mutate the shared context instead of replacing hostingView.rootView.
         // Replacing rootView mid-layout-pass can leave AttributeGraph holding
@@ -201,6 +232,10 @@ final class WorkspaceFileTreeView: NSView {
         hostingView.translatesAutoresizingMaskIntoConstraints = false
         addSubview(hostingView)
         addSubview(scrollbar)
+
+        let initialTop = scrollbar.topAnchor.constraint(equalTo: topAnchor)
+        scrollbarTopConstraint = initialTop
+
         NSLayoutConstraint.activate([
             hostingView.topAnchor.constraint(equalTo: topAnchor),
             hostingView.leadingAnchor.constraint(equalTo: leadingAnchor),
@@ -208,7 +243,7 @@ final class WorkspaceFileTreeView: NSView {
             hostingView.bottomAnchor.constraint(equalTo: bottomAnchor),
 
             scrollbar.trailingAnchor.constraint(equalTo: trailingAnchor),
-            scrollbar.topAnchor.constraint(equalTo: topAnchor),
+            initialTop,
             scrollbar.bottomAnchor.constraint(equalTo: bottomAnchor),
             scrollbar.widthAnchor.constraint(equalToConstant: TerminalScrollbarView.stripWidth),
         ])
@@ -232,6 +267,26 @@ final class WorkspaceFileTreeView: NSView {
 
     private func setupScrollObservationIfNeeded() {
         guard let scroll = findScrollView() else { return }
+        scroll.clipsToBounds = true
+        scroll.contentView.clipsToBounds = true
+        scroll.wantsLayer = true
+        scroll.layer?.masksToBounds = true
+        scroll.contentView.wantsLayer = true
+        scroll.contentView.layer?.masksToBounds = true
+        if let parentHost = scroll.superview {
+            parentHost.wantsLayer = true
+            parentHost.layer?.masksToBounds = true
+        }
+
+        // Align the custom scrollbar overlay directly with the list scroll view,
+        // so it never overlaps the header (picker / filter row).
+        if scrollbarTopConstraint?.secondItem !== scroll {
+            scrollbarTopConstraint?.isActive = false
+            let newTop = scrollbar.topAnchor.constraint(equalTo: scroll.topAnchor)
+            scrollbarTopConstraint = newTop
+            newTop.isActive = true
+        }
+
         if scroll !== observedScrollView {
             observedScrollView = scroll
             scroll.postsBoundsChangedNotifications = true

@@ -311,6 +311,10 @@ public struct KouenSettings: Codable, Sendable, Equatable {
     public var lspServers: [String: String]
     /// Mode to open files when selected in the file tree ("preview", "editor", "cat", "vi", "terminalOnly").
     public var fileClickAction: String
+    /// Extra folders a clicked or typed file name is looked up in when the current project has no
+    /// match (e.g. a central notes repo agents write plans to). Filled by Settings › Files › Scan,
+    /// editable by hand.
+    public var fileSearchRoots: [String]
     /// Anthropic API key for the built-in Claude chat sidebar and inline AI completions.
     /// Stored in settings.json (plain text). Users who prefer Keychain can leave this empty
     /// and set ANTHROPIC_API_KEY in their environment instead.
@@ -435,6 +439,7 @@ public struct KouenSettings: Codable, Sendable, Equatable {
         lspAutoStart: Bool = false,
         lspServers: [String: String] = [:],
         fileClickAction: String = "preview",
+        fileSearchRoots: [String] = [],
         claudeAPIKey: String? = nil,
         terminalShaderEffect: String = "none",
         browserHomePage: String = "https://www.google.com"
@@ -518,6 +523,7 @@ public struct KouenSettings: Codable, Sendable, Equatable {
         self.lspAutoStart = lspAutoStart
         self.lspServers = lspServers
         self.fileClickAction = fileClickAction
+        self.fileSearchRoots = fileSearchRoots
         self.claudeAPIKey = claudeAPIKey
         self.terminalShaderEffect = terminalShaderEffect
         self.browserHomePage = browserHomePage
@@ -717,6 +723,7 @@ public struct KouenSettings: Codable, Sendable, Equatable {
         lspAutoStart = try container.decodeIfPresent(Bool.self, forKey: .lspAutoStart) ?? fallback.lspAutoStart
         lspServers = try container.decodeIfPresent([String: String].self, forKey: .lspServers) ?? fallback.lspServers
         fileClickAction = try container.decodeIfPresent(String.self, forKey: .fileClickAction) ?? fallback.fileClickAction
+        fileSearchRoots = try container.decodeIfPresent([String].self, forKey: .fileSearchRoots) ?? fallback.fileSearchRoots
         claudeAPIKey = try container.decodeIfPresent(String.self, forKey: .claudeAPIKey)
         terminalShaderEffect = try container.decodeIfPresent(String.self, forKey: .terminalShaderEffect) ?? fallback.terminalShaderEffect
         browserHomePage = try container.decodeIfPresent(String.self, forKey: .browserHomePage) ?? fallback.browserHomePage

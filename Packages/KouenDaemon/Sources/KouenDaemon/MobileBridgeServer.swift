@@ -269,13 +269,25 @@ public final class MobileBridgeServer: @unchecked Sendable {
             set { lock.lock(); _snapshotSubscription = newValue; lock.unlock() }
         }
         private var _snapshotSubscription: DaemonSubscription?
-        /// P57: per-attach 1s poll that tails the attached agent's own transcript file. Replaced
+        /// P57: per-attach slow timer (re-resolves the transcript URL + re-arms the file watcher) that tails the attached agent's own transcript file. Replaced
         /// on every attach, cancelled on detach and disconnect — same lifetime as `subscription`.
         var transcriptTimer: DispatchSourceTimer? {
             get { lock.lock(); defer { lock.unlock() }; return _transcriptTimer }
-            set { lock.lock(); let old = _transcriptTimer; _transcriptTimer = newValue; lock.unlock(); old?.cancel() }
+            set {
+                lock.lock(); let old = _transcriptTimer; _transcriptTimer = newValue; lock.unlock()
+                old?.cancel()
+                if newValue == nil { transcriptWatcher = nil } // tail stopped: release the fd too
+            }
         }
         private var _transcriptTimer: DispatchSourceTimer?
+        /// Watches the resolved transcript file so `startTranscriptTail` reads only on change.
+        /// Same lifetime as `transcriptTimer`: replacing/clearing it cancels the old watcher,
+        /// whose cancel handler closes the file descriptor.
+        var transcriptWatcher: TranscriptFileWatcher? {
+            get { lock.lock(); defer { lock.unlock() }; return _transcriptWatcher }
+            set { lock.lock(); let old = _transcriptWatcher; _transcriptWatcher = newValue; lock.unlock(); old?.cancel() }
+        }
+        private var _transcriptWatcher: TranscriptFileWatcher?
         /// Set once, at authorization — the id `PairedDeviceStore` tracks this
         /// connection under, so a `mobile-revoke-client` can cancel it specifically.
         var deviceID: String? {
@@ -2165,59 +2177,52 @@ public final class MobileBridgeServer: @unchecked Sendable {
 
     /// Streams the attached agent's own transcript (Claude, Antigravity, Codex) as typed items, so the
     /// phone shows real user/assistant/tool bubbles instead of ANSI-stripped TUI redraws.
-    /// Re-resolves pid/surface → transcript every tick: `/clear` and `/resume` swap the session file.
+    /// A slow 5s timer re-resolves pid/surface → transcript (`/clear` and `/resume` swap the session
+    /// file) and re-arms a `TranscriptFileWatcher` on it; the read/parse/push path itself runs only
+    /// when that watcher reports the file changed. Both run on `state.controlQueue` (serial), so the
+    /// captured locals below need no lock.
     private func startTranscriptTail(surfaceID: String, connection: NWConnection, state: ConnectionState) {
         var url: URL?
         var offset = 0
-        let timer = DispatchSource.makeTimerSource(queue: state.controlQueue)
-        timer.schedule(deadline: .now(), repeating: 1.0, leeway: .milliseconds(250))
-        timer.setEventHandler { [weak self, weak connection, weak state] in
-            guard let self, let connection, let state, state.surfaceID == surfaceID,
-                  let snap = AgentDetector.snapshot(forSurfaceKey: surfaceID) else { return }
+        var cachedCwd: String?
+        var lastCwdCheck: Date = .distantPast
+        var lastUrlCheck: Date = .distantPast
+        var lastPid: Int32?
+        var kind: AgentKind?
+        var watchedURL: URL?
 
-            let cwd = Self.surfaceCwd(surfaceID: surfaceID)
-            let current: URL?
-            switch snap.kind {
-            case .claudeCode:
-                current = ClaudeSessionLocator.transcriptURL(pid: snap.pid)
-            case .antigravity:
-                current = AntigravitySessionLocator.transcriptURL(pid: snap.pid, surfaceCwd: cwd)
-            case .codex:
-                current = CodexSessionLocator.transcriptURL(pid: snap.pid, surfaceCwd: cwd)
-            default:
-                current = nil
-            }
-
-            guard let current else { return }
-
-            var reset = false
-            if current != url { url = current; offset = 0; reset = true }
+        // Read new lines from `url`, parse, push. `reset` = the URL just changed (backlog replay).
+        let readAndPush: (NWConnection, ConnectionState, Bool) -> Void = { [weak self] connection, state, reset in
+            guard let self, state.surfaceID == surfaceID, let current = url, let kind else { return }
             guard let read = AgentHistoryScanner.readJSONLLines(from: current, fromOffset: offset) else {
-                offset = 0 // truncated or replaced: start over next tick
+                offset = 0 // truncated or replaced: start over next read
                 return
             }
             offset = read.endOffset
+
+            // Performance: on initial attach or reset, only parse the tail lines needed for backlog
+            let linesToProcess = reset ? Array(read.lines.suffix(Self.transcriptBacklogLimit * 2)) : read.lines
 
             var items: [TranscriptItem]
             let metaModel: String?
             let metaMode: String?
             let metaUsage: AgentUsage?
 
-            switch snap.kind {
+            switch kind {
             case .claudeCode:
-                items = read.lines.flatMap(ClaudeTranscriptLine.items(from:))
+                items = linesToProcess.flatMap(ClaudeTranscriptLine.items(from:))
                 let meta = ClaudeTranscriptLine.meta(from: read.lines)
                 metaModel = meta.model
                 metaMode = meta.mode
                 metaUsage = meta.usage
             case .antigravity:
-                items = read.lines.flatMap(AntigravityTranscriptLine.items(from:))
+                items = linesToProcess.flatMap(AntigravityTranscriptLine.items(from:))
                 let meta = AntigravityTranscriptLine.meta(from: read.lines)
                 metaModel = meta.model
                 metaMode = meta.mode
                 metaUsage = meta.usage
             case .codex:
-                items = read.lines.flatMap(CodexTranscriptLine.items(from:))
+                items = linesToProcess.flatMap(CodexTranscriptLine.items(from:))
                 let meta = CodexTranscriptLine.meta(from: read.lines)
                 metaModel = meta.model
                 metaMode = meta.mode
@@ -2239,6 +2244,82 @@ public final class MobileBridgeServer: @unchecked Sendable {
                 mode: metaMode,
                 usage: metaUsage
             )), on: connection)
+        }
+
+        let timer = DispatchSource.makeTimerSource(queue: state.controlQueue)
+        timer.schedule(deadline: .now(), repeating: 5.0, leeway: .milliseconds(500))
+        timer.setEventHandler { [weak self, weak connection, weak state] in
+            guard let self, let connection, let state, state.surfaceID == surfaceID,
+                  let snap = AgentDetector.snapshot(forSurfaceKey: surfaceID) else { return }
+
+            let now = Date()
+            let pidChanged = (snap.pid != lastPid)
+            if pidChanged {
+                lastPid = snap.pid
+                cachedCwd = nil
+                url = nil
+                offset = 0
+            }
+
+            // Avoid opening a new DaemonClient socket on every tick:
+            // CWD only needs refresh if unknown, PID changed, or every 5 seconds.
+            let cwd: String?
+            if let cached = cachedCwd, !pidChanged, now.timeIntervalSince(lastCwdCheck) < 5.0 {
+                cwd = cached
+            } else {
+                let freshCwd = Self.surfaceCwd(surfaceID: surfaceID)
+                cachedCwd = freshCwd
+                lastCwdCheck = now
+                cwd = freshCwd
+            }
+
+            // Re-resolve transcript URL only if not resolved yet, PID changed,
+            // or periodically every 5 seconds (to catch /clear or /resume).
+            let current: URL?
+            let shouldRecheckURL = url == nil || pidChanged || now.timeIntervalSince(lastUrlCheck) >= 5.0
+            if shouldRecheckURL {
+                lastUrlCheck = now
+                switch snap.kind {
+                case .claudeCode:
+                    current = ClaudeSessionLocator.transcriptURL(pid: snap.pid)
+                case .antigravity:
+                    current = AntigravitySessionLocator.transcriptURL(pid: snap.pid, surfaceCwd: cwd)
+                case .codex:
+                    current = CodexSessionLocator.transcriptURL(pid: snap.pid, surfaceCwd: cwd)
+                default:
+                    current = nil
+                }
+            } else {
+                current = url
+            }
+
+            guard let current else { return }
+            kind = snap.kind
+
+            var reset = false
+            if current != url { url = current; offset = 0; reset = true }
+
+            // (Re-)arm the watcher when the file changed, or the old one died (file deleted/renamed).
+            if watchedURL != current || state.transcriptWatcher == nil {
+                state.transcriptWatcher = TranscriptFileWatcher(
+                    url: current, queue: state.controlQueue
+                ) { [weak connection, weak state] event in
+                    guard let connection, let state else { return }
+                    if !event.isDisjoint(with: [.delete, .rename]) {
+                        // Bound to the old inode: drop it, the next slow tick re-arms on the new file.
+                        state.transcriptWatcher = nil
+                        watchedURL = nil
+                    }
+                    readAndPush(connection, state, false)
+                }
+                watchedURL = state.transcriptWatcher == nil ? nil : current
+            }
+
+            // Read now on a URL switch (backlog) — and on every tick if no watcher could be opened
+            // (degrades to the old poll, at the slow rate).
+            if reset || state.transcriptWatcher == nil {
+                readAndPush(connection, state, reset)
+            }
         }
         state.transcriptTimer = timer
         timer.resume()
