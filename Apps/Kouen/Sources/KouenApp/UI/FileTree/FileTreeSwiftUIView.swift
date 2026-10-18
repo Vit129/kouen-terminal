@@ -217,35 +217,42 @@ struct FileTreeSwiftUIView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            rootPicker
-            HStack(spacing: 6) {
-                Image(systemName: "magnifyingglass")
-                    .font(.system(size: 11))
-                    .foregroundStyle(.secondary)
-                TextField("Filter files…", text: $searchText)
-                    .textFieldStyle(.plain)
-                    .font(.system(size: 11))
-                if !searchText.isEmpty {
-                    Button { searchText = "" } label: {
-                        Image(systemName: "xmark.circle.fill")
-                            .font(.system(size: 10))
-                            .foregroundStyle(.secondary)
+            VStack(spacing: 0) {
+                rootPicker
+                HStack(spacing: 6) {
+                    Image(systemName: "magnifyingglass")
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                    TextField("Filter files…", text: $searchText)
+                        .textFieldStyle(.plain)
+                        .font(.system(size: 11))
+                    if !searchText.isEmpty {
+                        Button { searchText = "" } label: {
+                            Image(systemName: "xmark.circle.fill")
+                                .font(.system(size: 10))
+                                .foregroundStyle(.secondary)
+                        }
+                        .buttonStyle(.plain)
                     }
-                    .buttonStyle(.plain)
+                    hiddenToggle(
+                        isOn: $showsHiddenFiles,
+                        systemImage: "doc",
+                        help: showsHiddenFiles ? "Hide hidden files" : "Show hidden files"
+                    )
+                    hiddenToggle(
+                        isOn: $showsHiddenFolders,
+                        systemImage: "folder",
+                        help: showsHiddenFolders ? "Hide hidden folders" : "Show hidden folders"
+                    )
                 }
-                hiddenToggle(
-                    isOn: $showsHiddenFiles,
-                    systemImage: "doc",
-                    help: showsHiddenFiles ? "Hide hidden files" : "Show hidden files"
-                )
-                hiddenToggle(
-                    isOn: $showsHiddenFolders,
-                    systemImage: "folder",
-                    help: showsHiddenFolders ? "Hide hidden folders" : "Show hidden folders"
-                )
+                .padding(.horizontal, 8)
+                .padding(.vertical, 5)
+
+                Divider()
+                    .overlay(Color(KouenDesign.chrome.border))
             }
-            .padding(.horizontal, 8)
-            .padding(.vertical, 5)
+            .background(Color(KouenDesign.chrome.sidebarBackground))
+
             ScrollViewReader { proxy in
                 List {
                     if let gitBranch, !gitBranch.isEmpty {
@@ -271,6 +278,12 @@ struct FileTreeSwiftUIView: View {
                     updateVisiblePaths()
                 }
                 .onAppear { updateVisiblePaths() }
+                .onChange(of: context.revealEpoch) { _, _ in
+                    guard let path = context.pendingRevealPath else { return }
+                    Task {
+                        await expandAncestorsAndReveal(targetPath: path, proxy: proxy)
+                    }
+                }
                 .onChange(of: context.revealPath) { _, path in
                     guard let path else { return }
                     withAnimation(.easeInOut(duration: 0.25)) {
@@ -279,7 +292,9 @@ struct FileTreeSwiftUIView: View {
                     context.revealPath = nil
                 }
             }
+            .clipped()
         }
+        .background(Color(KouenDesign.chrome.sidebarBackground))
         .onAppear { refreshGitBranch(); updateVisiblePaths() }
         .onReceive(NotificationCenter.default.publisher(for: Notification.Name("KouenActiveTabGitBranchDidChange"))) { _ in
             refreshGitBranch()
@@ -566,6 +581,72 @@ struct FileTreeSwiftUIView: View {
         let branch = await getCurrentBranch()
         if gitBranch != branch {
             gitBranch = branch
+        }
+
+        if context.pendingRevealPath != nil {
+            context.revealEpoch &+= 1
+        }
+    }
+
+    private func expandAncestorsAndReveal(targetPath: String, proxy: ScrollViewProxy) async {
+        let cleanTarget = (targetPath.count > 1 && targetPath.hasSuffix("/"))
+            ? String(targetPath.dropLast())
+            : targetPath
+        let cleanRoot = (rootPath.count > 1 && rootPath.hasSuffix("/"))
+            ? String(rootPath.dropLast())
+            : rootPath
+
+        let rootPrefix = cleanRoot + "/"
+        guard cleanTarget.hasPrefix(rootPrefix) || cleanTarget == cleanRoot else { return }
+
+        // Ensure root nodes are loaded for the current rootPath
+        let nodesMatchRoot = rootNodes.first.map { $0.node.path.hasPrefix(rootPrefix) } ?? false
+        if rootNodes.isEmpty || !nodesMatchRoot {
+            await loadRoot()
+        }
+
+        let relative = String(cleanTarget.dropFirst(rootPrefix.count))
+        let components = relative.split(separator: "/").map(String.init)
+
+        var currentNodes = rootNodes
+        var accumulated = cleanRoot
+
+        // Expand each ancestor directory along the path
+        for i in 0..<components.count {
+            accumulated = (accumulated as NSString).appendingPathComponent(components[i])
+            let isLast = (i == components.count - 1)
+
+            if let node = currentNodes.first(where: { $0.node.path == accumulated }) {
+                if !isLast {
+                    if node.node.isDirectory {
+                        node.isExpanded = true
+                        if node.children == nil || node.children?.isEmpty == true {
+                            do {
+                                let children = try await watcher.expand(node: node.node, gitStatus: currentGitStatus, options: scanOptions)
+                                node.children = children.map { FileTreeNode(node: $0) }
+                            } catch {
+                                node.children = []
+                            }
+                        }
+                        currentNodes = node.children ?? []
+                    }
+                }
+            } else {
+                break
+            }
+        }
+
+        updateVisiblePaths()
+        keyboard.focusedPath = cleanTarget
+
+        // Brief yield for SwiftUI to mount the expanded disclosure rows
+        try? await Task.sleep(nanoseconds: 100_000_000)
+        withAnimation(.easeInOut(duration: 0.25)) {
+            proxy.scrollTo(cleanTarget, anchor: .center)
+        }
+
+        if context.pendingRevealPath == targetPath {
+            context.pendingRevealPath = nil
         }
     }
 }

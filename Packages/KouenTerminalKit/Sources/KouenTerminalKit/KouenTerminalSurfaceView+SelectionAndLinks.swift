@@ -146,18 +146,12 @@ extension KouenTerminalSurfaceView {
     }
 
     public override func mouseDown(with event: NSEvent) {
-        NSLog("[kouen-open] mouseDown cmd=%d copyMode=%d", event.modifierFlags.contains(.command) ? 1 : 0, copyMode != nil ? 1 : 0)
         window?.makeFirstResponder(self)
         if copyMode != nil { return } // copy mode is keyboard-driven; ignore clicks
         // ⌘-click opens an OSC 8 hyperlink or an auto-detected URL — matching other terminal
         // apps' convention for ⌘-click, nothing more. Block actions (Copy Output/Command Only,
         // Re-run) live on the right-click context menu instead (`menu(for:)` in
         // KouenTerminalSurfaceView+Find.swift) — discoverable without a hidden modifier.
-        if event.modifierFlags.contains(.command) {
-            let pos = cell(at: event.locationInWindow)
-            NSLog("[kouen-open] cmd mouseDown cell=%@ link=%@", pos.map { "\($0.row),\($0.column)" } ?? "nil",
-                  pos.flatMap { linkURL(atRow: $0.row, column: $0.column) } ?? "nil")
-        }
         if event.modifierFlags.contains(.command), let pos = cell(at: event.locationInWindow),
            let url = linkURL(atRow: pos.row, column: pos.column) {
             openLink(url); return
@@ -243,7 +237,6 @@ extension KouenTerminalSurfaceView {
             }
             return
         }
-        NSLog("[kouen-open] cmd+click posts %@", resolveFilePath(string) ?? string)
         NotificationCenter.default.post(
             name: Notification.Name("KouenOpenFilePreview"),
             object: nil,
