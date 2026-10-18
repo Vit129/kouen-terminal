@@ -124,6 +124,7 @@ final class SplitPaneCoordinator {
                 .rootPane.allPaneIDs().first
             else { return }
             await applyLayoutShape(layout.shape, at: rootPaneID, tabID: newTabID)
+            await coord.syncFromDaemon()
         }
     }
 
@@ -132,10 +133,8 @@ final class SplitPaneCoordinator {
         guard case let .paneID(newPaneID)? = await coord.requestDaemon(.newSplit(
             tabID: tabID, paneID: paneID, direction: direction, shell: coord.settings.defaultShell
         )) else {
-            await coord.syncFromDaemon()
             return
         }
-        await coord.syncFromDaemon()
         // Ratio is not restored in v1 (documented cut, design.md) — every split lands at
         // the daemon's default 0.5.
         await applyLayoutShape(first, at: paneID, tabID: tabID)

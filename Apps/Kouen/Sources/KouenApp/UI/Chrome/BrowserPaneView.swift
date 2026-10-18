@@ -84,6 +84,12 @@ public final class BrowserPaneView: NSView {
         return "if ([\(hosts)].indexOf(location.hostname) !== -1) return;"
     }
 
+    private static let logDateFormatter: DateFormatter = {
+        let df = DateFormatter()
+        df.dateFormat = "yyyy-MM-dd HH:mm:ss.SSS"
+        return df
+    }()
+
     public convenience init(url: URL, paneID: PaneID = UUID()) {
         let web: WKWebView
         if let warmed = BrowserPaneRegistry.shared.dequeueWarmedWebView() {
@@ -149,6 +155,9 @@ public final class BrowserPaneView: NSView {
     deinit {
         let uuid = paneID.uuidString
         NSLog("[BrowserPane] deinit \(uuid)")
+        let logPath = (NSTemporaryDirectory() as NSString)
+            .appendingPathComponent("kouen-browser-\(uuid).log")
+        try? FileManager.default.removeItem(atPath: logPath)
     }
 
     override public func viewDidMoveToSuperview() {
@@ -1235,9 +1244,13 @@ public final class BrowserPaneView: NSView {
                     return
                 }
                 guard let image,
-                      let tiffData = image.tiffRepresentation,
-                      let bitmap = NSBitmapImageRep(data: tiffData),
-                      let pngData = bitmap.representation(using: .png, properties: [:]) else {
+                      let cgImage = image.cgImage(forProposedRect: nil, context: nil, hints: nil) else {
+                    continuation.resume(throwing: NSError(domain: "BrowserPaneView", code: 3,
+                        userInfo: [NSLocalizedDescriptionKey: "Failed to encode screenshot"]))
+                    return
+                }
+                let bitmap = NSBitmapImageRep(cgImage: cgImage)
+                guard let pngData = bitmap.representation(using: .png, properties: [:]) else {
                     continuation.resume(throwing: NSError(domain: "BrowserPaneView", code: 3,
                         userInfo: [NSLocalizedDescriptionKey: "Failed to encode screenshot"]))
                     return
@@ -1615,16 +1628,17 @@ extension BrowserPaneView: WKScriptMessageHandler {
             self.pendingLogLines.removeAll(keepingCapacity: true)
             let logPath = (NSTemporaryDirectory() as NSString)
                 .appendingPathComponent("kouen-browser-\(self.paneID.uuidString).log")
+            let ts = Self.logDateFormatter.string(from: Date())
+            let lines = batch.map { "[\(ts)] \($0)\n" }.joined()
+            guard let data = lines.data(using: .utf8) else { return }
             DispatchQueue.global(qos: .utility).async {
-                let df = DateFormatter()
-                df.dateFormat = "yyyy-MM-dd HH:mm:ss.SSS"
-                let ts = df.string(from: Date())
-                let lines = batch.map { "[\(ts)] \($0)\n" }.joined()
-                guard let data = lines.data(using: .utf8) else { return }
                 let url = URL(fileURLWithPath: logPath)
                 if let fh = try? FileHandle(forWritingTo: url) {
                     defer { try? fh.close() }
-                    _ = try? fh.seekToEnd()
+                    let currentOffset = (try? fh.seekToEnd()) ?? 0
+                    if currentOffset > 500_000 {
+                        try? fh.truncate(atOffset: 0)
+                    }
                     _ = try? fh.write(contentsOf: data)
                 } else {
                     _ = try? data.write(to: url, options: .atomic)
