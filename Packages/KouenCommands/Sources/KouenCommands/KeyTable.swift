@@ -59,15 +59,17 @@ public struct KeyTable: Codable, Sendable, Equatable {
     /// spec missing from the saved file, so a plain delete is indistinguishable from an
     /// uncustomized default and silently resurrects. Re-binding a spec clears its tombstone.
     public private(set) var disabledSpecs: [KeySpec]
+    private var bindingMap: [KeySpec: Binding] = [:]
 
     public init(id: KeyTableID, bindings: [Binding] = [], disabledSpecs: [KeySpec] = []) {
         self.id = id
         self.bindings = bindings
         self.disabledSpecs = disabledSpecs
+        self.bindingMap = Dictionary(bindings.map { ($0.spec, $0) }, uniquingKeysWith: { first, _ in first })
     }
 
     public func lookup(_ spec: KeySpec) -> Binding? {
-        bindings.first(where: { $0.spec == spec })
+        bindingMap[spec]
     }
 
     /// Whether `spec` was explicitly unbound (so the load-time default merge must skip it).
@@ -82,10 +84,12 @@ public struct KeyTable: Codable, Sendable, Equatable {
         } else {
             bindings.append(binding)
         }
+        bindingMap[binding.spec] = binding
     }
 
     public mutating func remove(spec: KeySpec) {
         bindings.removeAll { $0.spec == spec }
+        bindingMap.removeValue(forKey: spec)
         if !disabledSpecs.contains(spec) {
             disabledSpecs.append(spec)
         }
@@ -99,6 +103,7 @@ public struct KeyTable: Codable, Sendable, Equatable {
         id = try c.decode(KeyTableID.self, forKey: .id)
         bindings = try c.decode([Binding].self, forKey: .bindings)
         disabledSpecs = try c.decodeIfPresent([KeySpec].self, forKey: .disabledSpecs) ?? []
+        bindingMap = Dictionary(bindings.map { ($0.spec, $0) }, uniquingKeysWith: { first, _ in first })
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -119,18 +124,24 @@ public struct KeyTableSet: Codable, Sendable, Equatable {
     /// Array form (instead of `[KeyTableID: KeyTable]`) keeps the JSON file
     /// stable and readable — Swift's dictionary-with-custom-key encoding is
     /// awkward, and the lookup helpers below preserve the dictionary feel.
-    public var tableList: [KeyTable]
+    public var tableList: [KeyTable] {
+        didSet {
+            tableMap = Dictionary(tableList.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        }
+    }
+    private var tableMap: [KeyTableID: KeyTable] = [:]
 
     public init(tables: [KeyTable]) {
         self.tableList = tables
+        self.tableMap = Dictionary(tables.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
     }
 
     public var tables: [KeyTableID: KeyTable] {
-        Dictionary(uniqueKeysWithValues: tableList.map { ($0.id, $0) })
+        tableMap
     }
 
     public func table(_ id: KeyTableID) -> KeyTable? {
-        tableList.first(where: { $0.id == id })
+        tableMap[id]
     }
 
     public mutating func setBinding(table: KeyTableID, binding: Binding) {
@@ -157,6 +168,7 @@ public struct KeyTableSet: Codable, Sendable, Equatable {
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         self.tableList = try container.decode([KeyTable].self, forKey: .tables)
+        self.tableMap = Dictionary(tableList.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
     }
 
     public func encode(to encoder: Encoder) throws {

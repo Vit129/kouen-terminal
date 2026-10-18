@@ -45,6 +45,18 @@ final class ClaudeTranscriptTests: XCTestCase {
         XCTAssertEqual(m.mode, "plan")
     }
 
+    func testMetaModelPreservedAcrossManyLaterLines() {
+        var lines: [Data] = [
+            Data(#"{"message":{"role":"assistant","model":"claude-sonnet-4-6","content":"Starting"}}"#.utf8)
+        ]
+        for i in 1...500 {
+            lines.append(Data("{\"message\":{\"role\":\"assistant\",\"content\":\"Progress \(i)\",\"usage\":{\"input_tokens\":1500,\"output_tokens\":100}}}".utf8))
+        }
+        let meta = ClaudeTranscriptLine.meta(from: lines)
+        XCTAssertEqual(meta.model, "claude-sonnet-4-6")
+        XCTAssertEqual(meta.usage?.inputTokens, 1500)
+    }
+
     func testTS5702_bashToolTargetIsTheCommand() {
         let got = items(#"{"uuid":"a2","message":{"role":"assistant","content":[{"type":"tool_use","name":"Bash","input":{"command":"swift test"}}]}}"#)
         XCTAssertEqual(got.first?.toolTarget, "swift test")

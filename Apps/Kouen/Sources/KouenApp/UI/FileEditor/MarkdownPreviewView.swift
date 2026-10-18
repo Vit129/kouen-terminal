@@ -7,7 +7,7 @@ import KouenSyntaxResources
 /// Uses bundled offline Marked.js, Highlight.js, and Mermaid.js.
 @MainActor
 final class MarkdownPreviewView: NSView, WKNavigationDelegate {
-    private let webView: WKWebView
+    private var webView: WKWebView?
     private var isWebViewReady = false
     private var pendingMarkdown: String?
     private var currentFileURL: URL?
@@ -20,8 +20,8 @@ final class MarkdownPreviewView: NSView, WKNavigationDelegate {
     /// actual rendered state (e.g. that `window.renderMarkdown` is really defined) instead of
     /// only checking Swift-side view visibility flags, which stay green even when the inline
     /// `<script>` fails to parse — see the 2026-09-15 blank-preview regression this guards.
-    func debugEvaluateJS(_ js: String, completion: @escaping (Any?, Error?) -> Void) {
-        webView.evaluateJavaScript(js, completionHandler: completion)
+    func debugEvaluateJS(_ js: String, completion: @escaping @MainActor @Sendable (Any?, (any Error)?) -> Void) {
+        ensureWebView().evaluateJavaScript(js, completionHandler: completion)
     }
 
     /// Injected before marked/highlight/mermaid so a load-time syntax or runtime error in any
@@ -51,6 +51,17 @@ final class MarkdownPreviewView: NSView, WKNavigationDelegate {
     }()
 
     override init(frame frameRect: NSRect) {
+        super.init(frame: frameRect)
+        wantsLayer = true
+        layer?.backgroundColor = .clear
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) { fatalError() }
+
+    @discardableResult
+    private func ensureWebView() -> WKWebView {
+        if let existing = webView { return existing }
         let config = WKWebViewConfiguration()
         let userController = WKUserContentController()
         for script in Self.cachedUserScripts {
@@ -59,33 +70,23 @@ final class MarkdownPreviewView: NSView, WKNavigationDelegate {
         config.userContentController = userController
         config.preferences.setValue(true, forKey: "allowFileAccessFromFileURLs")
 
-        self.webView = WKWebView(frame: frameRect, configuration: config)
-        super.init(frame: frameRect)
-
-        setupView()
-    }
-
-    @available(*, unavailable)
-    required init?(coder: NSCoder) { fatalError() }
-
-    private func setupView() {
-        wantsLayer = true
-        layer?.backgroundColor = .clear
-
-        webView.translatesAutoresizingMaskIntoConstraints = false
-        webView.navigationDelegate = self
-        webView.setValue(false, forKey: "drawsBackground")
+        let wv = WKWebView(frame: bounds, configuration: config)
+        wv.translatesAutoresizingMaskIntoConstraints = false
+        wv.navigationDelegate = self
+        wv.setValue(false, forKey: "drawsBackground")
         if #available(macOS 12.0, *) {
-            webView.underPageBackgroundColor = .clear
+            wv.underPageBackgroundColor = .clear
         }
 
-        addSubview(webView)
+        addSubview(wv)
         NSLayoutConstraint.activate([
-            webView.topAnchor.constraint(equalTo: topAnchor),
-            webView.leadingAnchor.constraint(equalTo: leadingAnchor),
-            webView.trailingAnchor.constraint(equalTo: trailingAnchor),
-            webView.bottomAnchor.constraint(equalTo: bottomAnchor),
+            wv.topAnchor.constraint(equalTo: topAnchor),
+            wv.leadingAnchor.constraint(equalTo: leadingAnchor),
+            wv.trailingAnchor.constraint(equalTo: trailingAnchor),
+            wv.bottomAnchor.constraint(equalTo: bottomAnchor),
         ])
+        self.webView = wv
+        return wv
     }
 
     public static let codeExtensionToLanguage: [String: String] = [
@@ -183,16 +184,17 @@ final class MarkdownPreviewView: NSView, WKNavigationDelegate {
         isWebViewReady = false
         pendingMarkdown = nil
 
+        let wv = ensureWebView()
         let isDark = isAppearanceDark
         let html = generateHTML(markdown: effectiveMarkdown, isDark: isDark)
         let baseURL = fileURL?.deletingLastPathComponent() ?? URL(fileURLWithPath: NSHomeDirectory())
-        webView.loadHTMLString(html, baseURL: baseURL)
+        wv.loadHTMLString(html, baseURL: baseURL)
     }
 
     func update(markdown: String) {
         let effectiveMarkdown = Self.wrapContentIfNeeded(markdown, fileURL: currentFileURL)
         currentMarkdown = effectiveMarkdown
-        guard isWebViewReady else {
+        guard isWebViewReady, let webView else {
             pendingMarkdown = effectiveMarkdown
             return
         }
@@ -206,12 +208,14 @@ final class MarkdownPreviewView: NSView, WKNavigationDelegate {
 
     override func viewDidChangeEffectiveAppearance() {
         super.viewDidChangeEffectiveAppearance()
+        guard let webView else { return }
         let isDark = isAppearanceDark
         let js = "window.setDarkMode && window.setDarkMode(\(isDark));"
         webView.evaluateJavaScript(js, completionHandler: nil)
     }
 
     @objc func copy(_ sender: Any?) {
+        guard let webView else { return }
         NSApp.sendAction(#selector(NSText.copy(_:)), to: webView, from: sender)
     }
 

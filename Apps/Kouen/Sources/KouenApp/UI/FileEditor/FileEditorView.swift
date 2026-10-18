@@ -100,11 +100,66 @@ final class FileEditorView: NSView {
             showMessage("File too large to preview (\(ByteCountFormatter.string(fromByteCount: Int64(size), countStyle: .file))).")
             return
         }
-        guard let data = try? Data(contentsOf: url), let contents = String(data: data, encoding: .utf8) else {
-            showMessage("Binary file — cannot preview.")
+        if size <= 128_000 {
+            // Fast synchronous path for files <= 128 KB (instantaneous decode, preserves immediate UI sync)
+            guard let data = try? Data(contentsOf: url) else {
+                showMessage("Unable to read file.")
+                return
+            }
+            guard let contents = String(data: data, encoding: .utf8) else {
+                showMessage("Binary file — cannot preview.")
+                return
+            }
+            applyLoadedContent(
+                contents: contents,
+                ext: ext,
+                url: url,
+                cleanPath: cleanPath,
+                isReloadingSamePath: isReloadingSamePath
+            )
             return
         }
 
+        // Heavy files (> 128 KB up to 5 MB): read & decode asynchronously off the main thread
+        Task { @MainActor [weak self, cleanPath, ext, url, isReloadingSamePath] in
+            let result = await Task.detached(priority: .userInitiated) { () -> (contents: String?, isBinary: Bool) in
+                guard let data = try? Data(contentsOf: url) else {
+                    return (contents: nil, isBinary: false)
+                }
+                guard let contents = String(data: data, encoding: .utf8) else {
+                    return (contents: nil, isBinary: true)
+                }
+                return (contents: contents, isBinary: false)
+            }.value
+
+            guard let self, self.filePath == cleanPath else { return }
+
+            if result.isBinary {
+                self.showMessage("Binary file — cannot preview.")
+                return
+            }
+            guard let contents = result.contents else {
+                self.showMessage("Unable to read file.")
+                return
+            }
+
+            self.applyLoadedContent(
+                contents: contents,
+                ext: ext,
+                url: url,
+                cleanPath: cleanPath,
+                isReloadingSamePath: isReloadingSamePath
+            )
+        }
+    }
+
+    private func applyLoadedContent(
+        contents: String,
+        ext: String,
+        url: URL,
+        cleanPath: String,
+        isReloadingSamePath: Bool
+    ) {
         if ext == "diff" || ext == "patch" {
             isMarkdownFile = false
             isMarkdownEditMode = false
