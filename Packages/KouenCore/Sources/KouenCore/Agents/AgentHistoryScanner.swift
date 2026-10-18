@@ -363,6 +363,9 @@ public actor AgentHistoryScanner {
     /// Max characters kept per turn — enough to actually convey what happened, not just a
     /// fragment (the card preview clips visually with lineLimit; this only bounds memory/copy size).
     static let turnContentLimit = 800
+    /// Sessions written to the FTS index per transaction during a scan: bounds how many full
+    /// transcripts a first scan holds in memory at once, while still batching the writes.
+    static let indexBatchSize = 50
 
     struct FileCacheEntry: Sendable {
         let mtime: Date
@@ -631,6 +634,7 @@ public actor AgentHistoryScanner {
                     }
                 }
 
+                if toIndex.count >= Self.indexBatchSize { ftsIndex.indexSessionsBatch(toIndex); toIndex.removeAll(keepingCapacity: true) }
                 if let record = parseClaudeTranscript(fileURL: fileURL, toIndex: &toIndex) {
                     if let rv = try? fileURL.resourceValues(forKeys: [.contentModificationDateKey, .fileSizeKey]),
                        let mtime = rv.contentModificationDate,
@@ -1200,6 +1204,7 @@ public actor AgentHistoryScanner {
                 resolvedTitle = "Antigravity Session \(conversationID.prefix(8))"
             }
 
+            if toIndex.count >= Self.indexBatchSize { ftsIndex?.indexSessionsBatch(toIndex); toIndex.removeAll(keepingCapacity: true) }
             toIndex.append(
                 AgentHistoryFTSIndex.SessionIndexItem(
                     sessionID: conversationID,
@@ -1304,6 +1309,7 @@ public actor AgentHistoryScanner {
                 }
             }
 
+            if toIndex.count >= Self.indexBatchSize { ftsIndex.indexSessionsBatch(toIndex); toIndex.removeAll(keepingCapacity: true) }
             if let record = parseAntigravityTranscript(sessionID: folder, fileURL: transcriptURL, toIndex: &toIndex) {
                 if let rv = try? transcriptURL.resourceValues(forKeys: [.contentModificationDateKey, .fileSizeKey]),
                    let mtime = rv.contentModificationDate,
@@ -1561,6 +1567,7 @@ public actor AgentHistoryScanner {
             }
 
             let tag = codexSurfaceTag(filePath: path, placement: .local)
+            if toIndex.count >= Self.indexBatchSize { ftsIndex?.indexSessionsBatch(toIndex); toIndex.removeAll(keepingCapacity: true) }
             if let record = parseCodexTranscript(fileURL: fileURL, surfaceTag: tag, ftsIndex: ftsIndex, toIndex: &toIndex) {
                 fileCache[path] = FileCacheEntry(mtime: mtime, size: size, record: record)
                 records.append(record)
