@@ -1,7 +1,7 @@
 ---
 name: kouen-file-open
 description: Kouen does not open a file or folder (also one in another project) — cmd+click on a filename in terminal output does nothing, a file type shows blank or opens in the wrong viewer. Use for "กด cmd+click แล้วไม่ขึ้น", "เปิดไฟล์ .xxx ไม่ได้", "file preview blank", "add support for .ext".
-version: 0.1.2
+version: 0.1.3
 origin: auto-captured
 created: 2026-10-16
 last_improved: 2026-10-18
@@ -24,6 +24,7 @@ Adding a file type usually touches 1 and 2.
 - **Testing in the installed app:** a fix on a branch is not in it. Build `make preview` from that worktree first.
 - **Seeing logs from a click in KouenPreview:** the preview's `NSLog` goes to the app's stdout, not reliably to `log stream`. Run `make preview > <file> 2>&1` (never pipe it through `grep | head`, which drops the rest), then grep the file. In zsh call `/usr/bin/log`, since a builtin `log` shadows it.
 - **A click that reaches the handler but the tree doesn't move:** a periodic cwd-follow (`reload`/`refreshMetadata` → `updateRoot`) re-roots the tree; check for it before adding delays.
+- **An HTML file "still shows the old page" after reload** (`.html` opens in the browser pane): a plain WKWebView reload does re-read an edited `file://` page and its sibling scripts (`BrowserFileReloadTests`), so check first whether the page restores its own state from `localStorage`. The browser pane's keys: ⌘R reload, ⌘⇧R reload ignoring the cache (`BrowserPaneView.performKeyEquivalent`).
 - **Paths in tests:** the enumerator reports `/private/var/...` for the temp dir; build the expected path with `realpath`, not `resolvingSymlinksInPath()` (which drops `/private`).
 
 ## Check it worked
