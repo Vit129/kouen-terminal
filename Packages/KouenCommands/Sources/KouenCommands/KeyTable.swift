@@ -65,7 +65,7 @@ public struct KeyTable: Codable, Sendable, Equatable {
         self.id = id
         self.bindings = bindings
         self.disabledSpecs = disabledSpecs
-        self.bindingMap = Dictionary(bindings.map { ($0.spec, $0) }, uniquingKeysWith: { _, last in last })
+        self.bindingMap = Dictionary(bindings.map { ($0.spec, $0) }, uniquingKeysWith: { first, _ in first })
     }
 
     public func lookup(_ spec: KeySpec) -> Binding? {
@@ -103,7 +103,7 @@ public struct KeyTable: Codable, Sendable, Equatable {
         id = try c.decode(KeyTableID.self, forKey: .id)
         bindings = try c.decode([Binding].self, forKey: .bindings)
         disabledSpecs = try c.decodeIfPresent([KeySpec].self, forKey: .disabledSpecs) ?? []
-        bindingMap = Dictionary(bindings.map { ($0.spec, $0) }, uniquingKeysWith: { _, last in last })
+        bindingMap = Dictionary(bindings.map { ($0.spec, $0) }, uniquingKeysWith: { first, _ in first })
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -126,14 +126,14 @@ public struct KeyTableSet: Codable, Sendable, Equatable {
     /// awkward, and the lookup helpers below preserve the dictionary feel.
     public var tableList: [KeyTable] {
         didSet {
-            tableMap = Dictionary(tableList.map { ($0.id, $0) }, uniquingKeysWith: { _, last in last })
+            tableMap = Dictionary(tableList.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
         }
     }
     private var tableMap: [KeyTableID: KeyTable] = [:]
 
     public init(tables: [KeyTable]) {
         self.tableList = tables
-        self.tableMap = Dictionary(tables.map { ($0.id, $0) }, uniquingKeysWith: { _, last in last })
+        self.tableMap = Dictionary(tables.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
     }
 
     public var tables: [KeyTableID: KeyTable] {
@@ -168,7 +168,7 @@ public struct KeyTableSet: Codable, Sendable, Equatable {
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         self.tableList = try container.decode([KeyTable].self, forKey: .tables)
-        self.tableMap = Dictionary(tableList.map { ($0.id, $0) }, uniquingKeysWith: { _, last in last })
+        self.tableMap = Dictionary(tableList.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
     }
 
     public func encode(to encoder: Encoder) throws {

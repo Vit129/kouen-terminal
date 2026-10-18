@@ -12,37 +12,12 @@ final class PaneLifecycleManager {
     private(set) var paneContainer: PaneContainerView?
     private var lastStructureKey = ""
     private var containerCache: [String: PaneContainerView] = [:] // tabID → cached container
-    private var cachedTabMRU: [String] = []
-    private static let maxCachedContainers: Int = 8
     private var activeTabID: String?
     var pendingReload: Bool?
 
     init(terminalHost: NSView, containerView: NSView) {
         self.terminalHost = terminalHost
         self.containerView = containerView
-    }
-
-    private func touchMRU(tabID: String) {
-        cachedTabMRU.removeAll { $0 == tabID }
-        cachedTabMRU.append(tabID)
-        enforceCacheLimit()
-    }
-
-    private func evictFromCache(tabID: String) {
-        cachedTabMRU.removeAll { $0 == tabID }
-        if let container = containerCache.removeValue(forKey: tabID) {
-            container.removeFromSuperview()
-        }
-    }
-
-    private func enforceCacheLimit() {
-        while cachedTabMRU.count > Self.maxCachedContainers {
-            guard let oldestIndex = cachedTabMRU.firstIndex(where: { $0 != activeTabID }) else { break }
-            let oldestKey = cachedTabMRU.remove(at: oldestIndex)
-            if let container = containerCache.removeValue(forKey: oldestKey) {
-                container.removeFromSuperview()
-            }
-        }
     }
 
     // MARK: - Reload
@@ -85,7 +60,6 @@ final class PaneLifecycleManager {
                 paneContainer = cached
                 lastStructureKey = key
                 activeTabID = tabID
-                touchMRU(tabID: tabID)
                 coordinator.ensureActivePane(for: tab)
                 paneContainer?.refreshChrome(snapshot: coordinator.snapshot)
                 cachedHosts.values.forEach { $0.forceRepaint() }
@@ -96,7 +70,8 @@ final class PaneLifecycleManager {
                 return
             }
             // Hosts were stolen or structure is stale — evict and fall through to rebuild.
-            evictFromCache(tabID: tabID)
+            containerCache.removeValue(forKey: tabID)
+            cached.removeFromSuperview()
         }
 
         lastStructureKey = key
@@ -136,10 +111,10 @@ final class PaneLifecycleManager {
             old.isHidden = true
             if let prevTabID = activeTabID {
                 if force {
-                    evictFromCache(tabID: prevTabID)
+                    containerCache.removeValue(forKey: prevTabID)
+                    old.removeFromSuperview()
                 } else {
                     containerCache[prevTabID] = old
-                    touchMRU(tabID: prevTabID)
                 }
             } else {
                 if force { ZombieHoldRegistry.shared.hold(old) }
@@ -171,7 +146,6 @@ final class PaneLifecycleManager {
             orphan.removeFromSuperview()
         }
         containerCache[tabID] = container
-        touchMRU(tabID: tabID)
         coordinator.ensureActivePane(for: tab)
 
         for h in container.collectTerminalHosts().values where !affectedHosts.contains(where: { $0 === h }) {
@@ -194,7 +168,8 @@ final class PaneLifecycleManager {
     func pruneCache(keepingTabIDs liveTabIDs: Set<String>) {
         let staleKeys = containerCache.keys.filter { !liveTabIDs.contains($0) }
         for key in staleKeys {
-            evictFromCache(tabID: key)
+            let container = containerCache.removeValue(forKey: key)
+            container?.removeFromSuperview()
         }
     }
 

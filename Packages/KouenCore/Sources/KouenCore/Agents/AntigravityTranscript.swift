@@ -224,14 +224,29 @@ public enum AntigravitySessionLocator {
             guard let mtime = (try? url.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate else { return nil }
             return (id, url, mtime)
         }
+        let chunkSize = 65536
         for candidate in dated.sorted(by: { $0.mtime > $1.mtime }).prefix(10) {
             // agy reads its own skills/config under ~/.gemini in every conversation; that is not a workspace.
             let ignore = stdCwd.contains("/.gemini") ? nil : "/.gemini"
             guard let handle = try? FileHandle(forReadingFrom: candidate.url) else { continue }
             defer { try? handle.close() }
-            let data = handle.readData(ofLength: 65536)
-            guard let text = String(data: data, encoding: .utf8),
-                  let root = dominantProjectRoot(in: text, ignoringSuffix: ignore) else { continue }
+            let fileSize = (try? handle.seekToEnd()) ?? 0
+            let headData: Data
+            let tailData: Data
+            if fileSize <= UInt64(chunkSize * 2) {
+                try? handle.seek(toOffset: 0)
+                headData = handle.readDataToEndOfFile()
+                tailData = Data()
+            } else {
+                try? handle.seek(toOffset: 0)
+                headData = handle.readData(ofLength: chunkSize)
+                try? handle.seek(toOffset: fileSize - UInt64(chunkSize))
+                tailData = handle.readDataToEndOfFile()
+            }
+            let headText = String(decoding: headData, as: UTF8.self)
+            let tailText = String(decoding: tailData, as: UTF8.self)
+            let text = headText + "\n" + tailText
+            guard let root = dominantProjectRoot(in: text, ignoringSuffix: ignore) else { continue }
             if root == stdCwd || stdCwd.hasPrefix(root + "/") || root.hasPrefix(stdCwd + "/") {
                 return candidate.id
             }
