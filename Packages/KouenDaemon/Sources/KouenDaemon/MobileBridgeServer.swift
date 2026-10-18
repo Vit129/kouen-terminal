@@ -2241,19 +2241,19 @@ public final class MobileBridgeServer: @unchecked Sendable {
             switch snap.kind {
             case .claudeCode:
                 items = linesToProcess.flatMap(ClaudeTranscriptLine.items(from:))
-                let meta = ClaudeTranscriptLine.meta(from: linesToProcess)
+                let meta = ClaudeTranscriptLine.meta(from: read.lines)
                 metaModel = meta.model
                 metaMode = meta.mode
                 metaUsage = meta.usage
             case .antigravity:
                 items = linesToProcess.flatMap(AntigravityTranscriptLine.items(from:))
-                let meta = AntigravityTranscriptLine.meta(from: linesToProcess)
+                let meta = AntigravityTranscriptLine.meta(from: read.lines)
                 metaModel = meta.model
                 metaMode = meta.mode
                 metaUsage = meta.usage
             case .codex:
                 items = linesToProcess.flatMap(CodexTranscriptLine.items(from:))
-                let meta = CodexTranscriptLine.meta(from: linesToProcess)
+                let meta = CodexTranscriptLine.meta(from: read.lines)
                 metaModel = meta.model
                 metaMode = meta.mode
                 metaUsage = meta.usage

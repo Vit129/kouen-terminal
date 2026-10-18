@@ -324,7 +324,7 @@ public enum AgentHistorySearch {
         guard cleanQuery.count >= 3 else { return [] }
 
         var results: [(record: AgentSessionRecord, score: Double, snippet: String?)] = []
-        let candidates = records.prefix(100)
+        let candidates = records.sorted(by: { $0.updatedAt > $1.updatedAt }).prefix(100)
 
         for record in candidates {
             var minDistance = Double.greatestFiniteMagnitude

@@ -606,6 +606,7 @@ public actor AgentHistoryScanner {
 
         var records: [AgentSessionRecord] = []
         var toSave: [CachedSessionEntry] = []
+        var toIndex: [AgentHistoryFTSIndex.SessionIndexItem] = []
         guard let projectFolders = try? FileManager.default.contentsOfDirectory(atPath: claudeProjectsDir.path) else {
             return []
         }
@@ -630,7 +631,7 @@ public actor AgentHistoryScanner {
                     }
                 }
 
-                if let record = parseClaudeTranscript(fileURL: fileURL) {
+                if let record = parseClaudeTranscript(fileURL: fileURL, toIndex: &toIndex) {
                     if let rv = try? fileURL.resourceValues(forKeys: [.contentModificationDateKey, .fileSizeKey]),
                        let mtime = rv.contentModificationDate,
                        let size = rv.fileSize {
@@ -641,6 +642,9 @@ public actor AgentHistoryScanner {
                 }
             }
         }
+        if !toIndex.isEmpty {
+            ftsIndex.indexSessionsBatch(toIndex)
+        }
         if !toSave.isEmpty {
             ftsIndex.saveRecordsBatch(toSave)
         }
@@ -648,6 +652,15 @@ public actor AgentHistoryScanner {
     }
 
     private func parseClaudeTranscript(fileURL: URL) -> AgentSessionRecord? {
+        var dummy: [AgentHistoryFTSIndex.SessionIndexItem] = []
+        let rec = parseClaudeTranscript(fileURL: fileURL, toIndex: &dummy)
+        if !dummy.isEmpty {
+            ftsIndex.indexSessionsBatch(dummy)
+        }
+        return rec
+    }
+
+    private func parseClaudeTranscript(fileURL: URL, toIndex: inout [AgentHistoryFTSIndex.SessionIndexItem]) -> AgentSessionRecord? {
         guard let (lines, dataSize) = Self.readJSONLLines(from: fileURL) else { return nil }
 
         let sessionID = fileURL.deletingPathExtension().lastPathComponent
@@ -746,20 +759,22 @@ public actor AgentHistoryScanner {
         let graphifySymbols = GraphifyIndexCache.shared.enrich(files: filesEdited, projectPath: finalCwd)
         let allFilesEdited = filesEdited.union(graphifySymbols).joined(separator: " ")
 
-        ftsIndex.indexSession(
-            sessionID: sessionID,
-            title: title,
-            firstPrompt: firstPrompt ?? "",
-            fullTranscript: fullTranscriptParts.joined(separator: "\n"),
-            gitBranch: gitBranch,
-            repoName: projectName,
-            agentName: AgentKind.claudeCode.displayName,
-            filesEdited: allFilesEdited,
-            toolsCalled: toolsCalled.joined(separator: " "),
-            transcriptPath: fileURL.path,
-            mtime: modDate,
-            fileSize: fileSize,
-            topicSegments: topicSegments
+        toIndex.append(
+            AgentHistoryFTSIndex.SessionIndexItem(
+                sessionID: sessionID,
+                transcriptPath: fileURL.path,
+                mtime: modDate,
+                fileSize: fileSize,
+                title: title,
+                firstPrompt: firstPrompt ?? "",
+                fullTranscript: fullTranscriptParts.joined(separator: "\n"),
+                gitBranch: gitBranch,
+                repoName: projectName,
+                agentName: AgentKind.claudeCode.displayName,
+                topicSegments: topicSegments,
+                filesEdited: allFilesEdited,
+                toolsCalled: toolsCalled.joined(separator: " ")
+            )
         )
 
         let (claudeModel, _, claudeUsage) = ClaudeTranscriptLine.meta(from: lines)
@@ -1100,6 +1115,7 @@ public actor AgentHistoryScanner {
 
         var records: [AgentSessionRecord] = []
         var toSave: [CachedSessionEntry] = []
+        var toIndex: [AgentHistoryFTSIndex.SessionIndexItem] = []
 
         while sqlite3_step(stmt) == SQLITE_ROW {
             guard let convIDCStr = sqlite3_column_text(stmt, 0) else { continue }
@@ -1184,20 +1200,23 @@ public actor AgentHistoryScanner {
                 resolvedTitle = "Antigravity Session \(conversationID.prefix(8))"
             }
 
-            ftsIndex?.indexSession(
-                sessionID: conversationID,
-                title: resolvedTitle,
-                firstPrompt: firstPrompt,
-                fullTranscript: fullTranscript.isEmpty ? "\(resolvedTitle)\n\(firstPrompt)" : fullTranscript,
-                gitBranch: nil,
-                repoName: projectName,
-                agentName: AgentKind.antigravity.displayName,
-                filesEdited: "",
-                toolsCalled: "",
-                transcriptPath: transcriptPath,
-                mtime: modDate,
-                fileSize: fileSize,
-                surfaceTag: tag
+            toIndex.append(
+                AgentHistoryFTSIndex.SessionIndexItem(
+                    sessionID: conversationID,
+                    transcriptPath: transcriptPath,
+                    mtime: modDate,
+                    fileSize: fileSize,
+                    title: resolvedTitle,
+                    firstPrompt: firstPrompt,
+                    fullTranscript: fullTranscript.isEmpty ? "\(resolvedTitle)\n\(firstPrompt)" : fullTranscript,
+                    gitBranch: nil,
+                    repoName: projectName,
+                    agentName: AgentKind.antigravity.displayName,
+                    surfaceTag: tag,
+                    topicSegments: nil,
+                    filesEdited: "",
+                    toolsCalled: ""
+                )
             )
 
             let record = AgentSessionRecord(
@@ -1225,6 +1244,9 @@ public actor AgentHistoryScanner {
             toSave.append(CachedSessionEntry(record: record, mtime: modDate, fileSize: fileSize))
         }
 
+        if !toIndex.isEmpty {
+            ftsIndex?.indexSessionsBatch(toIndex)
+        }
         if !toSave.isEmpty {
             ftsIndex?.saveRecordsBatch(toSave)
         }
@@ -1259,6 +1281,7 @@ public actor AgentHistoryScanner {
 
         var records: [AgentSessionRecord] = []
         var toSave: [CachedSessionEntry] = []
+        var toIndex: [AgentHistoryFTSIndex.SessionIndexItem] = []
         guard let sessionFolders = try? FileManager.default.contentsOfDirectory(atPath: brainDir.path) else {
             return []
         }
@@ -1281,7 +1304,7 @@ public actor AgentHistoryScanner {
                 }
             }
 
-            if let record = parseAntigravityTranscript(sessionID: folder, fileURL: transcriptURL) {
+            if let record = parseAntigravityTranscript(sessionID: folder, fileURL: transcriptURL, toIndex: &toIndex) {
                 if let rv = try? transcriptURL.resourceValues(forKeys: [.contentModificationDateKey, .fileSizeKey]),
                    let mtime = rv.contentModificationDate,
                    let size = rv.fileSize {
@@ -1291,6 +1314,9 @@ public actor AgentHistoryScanner {
                 records.append(record)
             }
         }
+        if !toIndex.isEmpty {
+            ftsIndex.indexSessionsBatch(toIndex)
+        }
         if !toSave.isEmpty {
             ftsIndex.saveRecordsBatch(toSave)
         }
@@ -1298,6 +1324,15 @@ public actor AgentHistoryScanner {
     }
 
     func parseAntigravityTranscript(sessionID: String, fileURL: URL) -> AgentSessionRecord? {
+        var dummy: [AgentHistoryFTSIndex.SessionIndexItem] = []
+        let rec = parseAntigravityTranscript(sessionID: sessionID, fileURL: fileURL, toIndex: &dummy)
+        if !dummy.isEmpty {
+            ftsIndex.indexSessionsBatch(dummy)
+        }
+        return rec
+    }
+
+    func parseAntigravityTranscript(sessionID: String, fileURL: URL, toIndex: inout [AgentHistoryFTSIndex.SessionIndexItem]) -> AgentSessionRecord? {
         guard let (lines, dataSize) = Self.readJSONLLines(from: fileURL) else { return nil }
 
         var firstPrompt: String?
@@ -1414,20 +1449,22 @@ public actor AgentHistoryScanner {
         let graphifySymbols = GraphifyIndexCache.shared.enrich(files: filesEdited, projectPath: finalPath)
         let allFilesEdited = filesEdited.union(graphifySymbols).joined(separator: " ")
 
-        ftsIndex.indexSession(
-            sessionID: sessionID,
-            title: title,
-            firstPrompt: firstPrompt ?? "",
-            fullTranscript: fullTranscriptParts.joined(separator: "\n"),
-            gitBranch: nil,
-            repoName: projectName,
-            agentName: AgentKind.antigravity.displayName,
-            filesEdited: allFilesEdited,
-            toolsCalled: toolsCalled.joined(separator: " "),
-            transcriptPath: fileURL.path,
-            mtime: modDate,
-            fileSize: fileSize,
-            topicSegments: topicSegments
+        toIndex.append(
+            AgentHistoryFTSIndex.SessionIndexItem(
+                sessionID: sessionID,
+                transcriptPath: fileURL.path,
+                mtime: modDate,
+                fileSize: fileSize,
+                title: title,
+                firstPrompt: firstPrompt ?? "",
+                fullTranscript: fullTranscriptParts.joined(separator: "\n"),
+                gitBranch: nil,
+                repoName: projectName,
+                agentName: AgentKind.antigravity.displayName,
+                topicSegments: topicSegments,
+                filesEdited: allFilesEdited,
+                toolsCalled: toolsCalled.joined(separator: " ")
+            )
         )
 
         let agMeta = AntigravityTranscriptLine.meta(from: lines)
@@ -1502,6 +1539,7 @@ public actor AgentHistoryScanner {
 
         var records: [AgentSessionRecord] = []
         var toSave: [CachedSessionEntry] = []
+        var toIndex: [AgentHistoryFTSIndex.SessionIndexItem] = []
 
         for fileURL in rolloutFiles {
             let path = fileURL.path
@@ -1523,13 +1561,16 @@ public actor AgentHistoryScanner {
             }
 
             let tag = codexSurfaceTag(filePath: path, placement: .local)
-            if let record = parseCodexTranscript(fileURL: fileURL, surfaceTag: tag, ftsIndex: ftsIndex) {
+            if let record = parseCodexTranscript(fileURL: fileURL, surfaceTag: tag, ftsIndex: ftsIndex, toIndex: &toIndex) {
                 fileCache[path] = FileCacheEntry(mtime: mtime, size: size, record: record)
                 records.append(record)
                 toSave.append(CachedSessionEntry(record: record, mtime: mtime, fileSize: size))
             }
         }
 
+        if !toIndex.isEmpty {
+            ftsIndex?.indexSessionsBatch(toIndex)
+        }
         if !toSave.isEmpty {
             ftsIndex?.saveRecordsBatch(toSave)
         }
@@ -1558,6 +1599,20 @@ public actor AgentHistoryScanner {
         fileURL: URL,
         surfaceTag: String = "CLI",
         ftsIndex: AgentHistoryFTSIndex? = nil
+    ) -> AgentSessionRecord? {
+        var dummy: [AgentHistoryFTSIndex.SessionIndexItem] = []
+        let rec = parseCodexTranscript(fileURL: fileURL, surfaceTag: surfaceTag, ftsIndex: ftsIndex, toIndex: &dummy)
+        if !dummy.isEmpty {
+            ftsIndex?.indexSessionsBatch(dummy)
+        }
+        return rec
+    }
+
+    static func parseCodexTranscript(
+        fileURL: URL,
+        surfaceTag: String = "CLI",
+        ftsIndex: AgentHistoryFTSIndex? = nil,
+        toIndex: inout [AgentHistoryFTSIndex.SessionIndexItem]
     ) -> AgentSessionRecord? {
         guard let (lines, dataSize) = readJSONLLines(from: fileURL) else { return nil }
 
@@ -1662,21 +1717,23 @@ public actor AgentHistoryScanner {
         let graphifySymbols = GraphifyIndexCache.shared.enrich(files: filesEdited, projectPath: finalCwd)
         let allFilesEdited = filesEdited.union(graphifySymbols).joined(separator: " ")
 
-        ftsIndex?.indexSession(
-            sessionID: resolvedID,
-            title: title,
-            firstPrompt: firstPrompt ?? "",
-            fullTranscript: fullTranscriptParts.joined(separator: "\n"),
-            gitBranch: gitBranch,
-            repoName: projectName,
-            agentName: AgentKind.codex.displayName,
-            filesEdited: allFilesEdited,
-            toolsCalled: toolsCalled.joined(separator: " "),
-            transcriptPath: fileURL.path,
-            mtime: modDate,
-            fileSize: fileSize,
-            surfaceTag: surfaceTag,
-            topicSegments: topicSegments
+        toIndex.append(
+            AgentHistoryFTSIndex.SessionIndexItem(
+                sessionID: resolvedID,
+                transcriptPath: fileURL.path,
+                mtime: modDate,
+                fileSize: fileSize,
+                title: title,
+                firstPrompt: firstPrompt ?? "",
+                fullTranscript: fullTranscriptParts.joined(separator: "\n"),
+                gitBranch: gitBranch,
+                repoName: projectName,
+                agentName: AgentKind.codex.displayName,
+                surfaceTag: surfaceTag,
+                topicSegments: topicSegments,
+                filesEdited: allFilesEdited,
+                toolsCalled: toolsCalled.joined(separator: " ")
+            )
         )
 
         let codexMeta = CodexTranscriptLine.meta(from: lines)

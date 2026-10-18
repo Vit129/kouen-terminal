@@ -84,6 +84,18 @@ final class AntigravityTranscriptTests: XCTestCase {
         XCTAssertEqual(meta.usage?.shortSummary, "1.6k ctx")
     }
 
+    func testMetaModelPreservedAcrossManyLaterLines() {
+        var lines: [Data] = [
+            Data(#"{"type":"PLANNER_RESPONSE","content":"Using model Model Selection` from None to gemini-2.5-pro. Starting work."}"#.utf8)
+        ]
+        for i in 1...500 {
+            lines.append(Data("{\"type\":\"PLANNER_RESPONSE\",\"content\":\"Step \(i) progress\",\"input_tokens\":1000,\"output_tokens\":200}".utf8))
+        }
+        let meta = AntigravityTranscriptLine.meta(from: lines)
+        XCTAssertEqual(meta.model, "gemini-2.5-pro")
+        XCTAssertEqual(meta.usage?.inputTokens, 1000)
+    }
+
     func testWorkspacePathBoundaryMatching() {
         let wsJson = #"["file:///Users/supavit.cho/Git/Personal/kouen-terminal"]"#
         // Exact match passes
