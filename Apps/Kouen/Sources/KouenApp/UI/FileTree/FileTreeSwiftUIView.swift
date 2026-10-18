@@ -167,8 +167,57 @@ struct FileTreeSwiftUIView: View {
         trimmedSearchText.isEmpty ? rootNodes : searchResultNodes
     }
 
+    /// Which folder the tree shows: the session's project, a Settings › File search folder, a
+    /// recent project, or any folder. Picking one pins it until "back to project" or a session switch.
+    private var rootPicker: some View {
+        let extra = SessionCoordinator.shared.settings.fileSearchRoots
+        let recents = UserDefaults.standard.stringArray(forKey: "RecentProjectPaths") ?? []
+        return HStack(spacing: 4) {
+            Menu {
+                Button("Project: \((context.projectRoot as NSString).lastPathComponent)") { context.onPickRoot?(nil) }
+                    .disabled(context.pinnedRoot == nil)
+                if !extra.isEmpty {
+                    Section("File search folders") {
+                        ForEach(extra, id: \.self) { root in Button(root) { context.onPickRoot?(root) } }
+                    }
+                }
+                let others = recents.filter { $0 != context.projectRoot && !extra.contains($0) }
+                if !others.isEmpty {
+                    Section("Recent projects") {
+                        ForEach(others, id: \.self) { root in Button(root) { context.onPickRoot?(root) } }
+                    }
+                }
+                Divider()
+                Button("Choose Folder…") {
+                    let panel = NSOpenPanel()
+                    panel.canChooseFiles = false
+                    panel.canChooseDirectories = true
+                    if panel.runModal() == .OK, let url = panel.url { context.onPickRoot?(url.path) }
+                }
+            } label: {
+                Label((context.rootPath as NSString).lastPathComponent,
+                      systemImage: context.pinnedRoot == nil ? "folder" : "pin.fill")
+                    .font(.system(size: 11))
+                    .lineLimit(1)
+            }
+            .menuStyle(.borderlessButton)
+            .help(context.rootPath)
+            Spacer(minLength: 0)
+            if context.pinnedRoot != nil {
+                Button { context.onPickRoot?(nil) } label: {
+                    Image(systemName: "arrow.uturn.backward").font(.system(size: 10))
+                }
+                .buttonStyle(.plain)
+                .help("Back to this session's project")
+            }
+        }
+        .padding(.horizontal, 8)
+        .padding(.top, 4)
+    }
+
     var body: some View {
         VStack(spacing: 0) {
+            rootPicker
             HStack(spacing: 6) {
                 Image(systemName: "magnifyingglass")
                     .font(.system(size: 11))

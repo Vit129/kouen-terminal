@@ -15,9 +15,16 @@ final class FileTreeContext {
     var sessionID: SessionID?
     /// Set to scroll-and-highlight a file path in the tree; cleared after the scroll fires.
     var revealPath: String?
+    /// A root the user chose (header menu, or cmd+click into another project). While set, the
+    /// session's cwd-follow (`updateRoot`) leaves the tree alone; a session switch clears it.
+    var pinnedRoot: String?
+    /// The session's own root, kept while pinned so the menu can go back to it.
+    var projectRoot: String
+    var onPickRoot: ((String?) -> Void)?
 
     init(rootPath: String, sessionID: SessionID?) {
         self.rootPath = rootPath
+        self.projectRoot = rootPath
         self.sessionID = sessionID
     }
 }
@@ -47,6 +54,7 @@ final class WorkspaceFileTreeView: NSView {
         let initialSessionID = SessionCoordinator.shared.snapshot.activeWorkspace?.activeSessionID
         self.context = FileTreeContext(rootPath: initialPath, sessionID: initialSessionID)
         super.init(frame: .zero)
+        context.onPickRoot = { [weak self] in self?.pin($0) }
         self.hostingView = NSHostingView(rootView: FileTreeSwiftUIView(
             context: context,
             watcher: watcher,
@@ -158,15 +166,15 @@ final class WorkspaceFileTreeView: NSView {
 
     /// Expands all ancestor directories of `path`, highlights it in the keyboard navigator,
     /// then signals the SwiftUI list to scroll to it after a short delay for child loading.
-    func revealFileInTree(path: String) {
+    func revealFileInTree(path: String, pinOutside: Bool = false) {
         var rootPrefix = context.rootPath.hasSuffix("/") ? context.rootPath : context.rootPath + "/"
-        // A path in another project (e.g. a central notes repo): re-root the tree on that
-        // project instead of leaving it on a root the path is not under, where it can't show.
-        if !path.hasPrefix(rootPrefix) && path != context.rootPath {
+        // A path in another project (e.g. a central notes repo): pin the tree on that project,
+        // where the path can show; the session's cwd-follow would otherwise pull it back.
+        if pinOutside && !path.hasPrefix(rootPrefix) && path != context.rootPath {
             var isDir: ObjCBool = false
             let dir = FileManager.default.fileExists(atPath: path, isDirectory: &isDir) && isDir.boolValue
                 ? path : (path as NSString).deletingLastPathComponent
-            context.rootPath = WorktreeManager().repoRoot(for: dir) ?? dir
+            pin(WorktreeManager().repoRoot(for: dir) ?? dir)
             rootPrefix = context.rootPath.hasSuffix("/") ? context.rootPath : context.rootPath + "/"
         }
         if path.hasPrefix(rootPrefix) {
@@ -190,7 +198,20 @@ final class WorkspaceFileTreeView: NSView {
         }
     }
 
+    /// Show `root` instead of the session's project until unpinned or the session changes.
+    /// `nil` goes back to the session's project.
+    func pin(_ root: String?) {
+        context.pinnedRoot = root
+        context.rootPath = root ?? context.projectRoot
+    }
+
+    var isPinned: Bool { context.pinnedRoot != nil }
+    var shownRoot: String { context.rootPath }
+
     func updateRoot(path: String, sessionID: SessionID?) {
+        if sessionID != context.sessionID { context.pinnedRoot = nil }
+        context.projectRoot = path
+        if context.pinnedRoot != nil { return }
         guard path != context.rootPath || sessionID != context.sessionID else { return }
         // Mutate the shared context instead of replacing hostingView.rootView.
         // Replacing rootView mid-layout-pass can leave AttributeGraph holding
