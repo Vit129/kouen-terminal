@@ -10,6 +10,7 @@ final class FileTreeNode: Identifiable {
     let node: FileNode
     var children: [FileTreeNode]?
     var isExpanded: Bool = false
+    var isLoadingChildren: Bool = false
 
     init(node: FileNode) {
         self.id = node.id
@@ -624,16 +625,21 @@ struct FileTreeSwiftUIView: View {
             if let node = currentNodes.first(where: { $0.node.path == accumulated }) {
                 if !isLast {
                     if node.node.isDirectory {
-                        node.isExpanded = true
                         if node.children == nil || node.children?.isEmpty == true {
+                            node.isLoadingChildren = true
                             do {
                                 let children = try await watcher.expand(node: node.node, gitStatus: currentGitStatus, options: scanOptions)
-                                guard !Task.isCancelled else { return }
+                                guard !Task.isCancelled else {
+                                    node.isLoadingChildren = false
+                                    return
+                                }
                                 node.children = children.map { FileTreeNode(node: $0) }
                             } catch {
                                 node.children = []
                             }
+                            node.isLoadingChildren = false
                         }
+                        node.isExpanded = true
                         currentNodes = node.children ?? []
                     }
                 }
@@ -980,12 +986,17 @@ private struct NodeRow: View {
     }
 
     private func loadChildren() async {
-        guard node.children?.isEmpty == true else { return }
+        guard node.children?.isEmpty == true, !node.isLoadingChildren else { return }
+        node.isLoadingChildren = true
+        defer { node.isLoadingChildren = false }
         do {
             let childNodes = try await watcher.expand(node: node.node, gitStatus: gitStatus, options: scanOptions)
+            guard node.children?.isEmpty == true else { return }
             node.children = childNodes.map { FileTreeNode(node: $0) }
         } catch {
-            node.children = []
+            if node.children?.isEmpty == true {
+                node.children = []
+            }
         }
     }
 
