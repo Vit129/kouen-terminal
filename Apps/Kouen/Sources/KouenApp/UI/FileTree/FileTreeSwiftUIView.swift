@@ -606,6 +606,9 @@ struct FileTreeSwiftUIView: View {
         }
         guard !Task.isCancelled else { return }
 
+        // Cancel any pending debounced background scan so it cannot clobber the reveal
+        pendingLoadTask?.cancel()
+
         let relative = String(cleanTarget.dropFirst(rootPrefix.count))
         let components = relative.split(separator: "/").map(String.init)
 
