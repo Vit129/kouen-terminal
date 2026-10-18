@@ -2633,5 +2633,17 @@
   "2631": "c2n",
   "2632": ".transcriptWatcher",
   "2633": "P38 Phase E — Scripting Hook Parity (JS vs WezTerm's Lua)",
-  "2634": "UInt8"
+  "2634": "UInt8",
+  "2635": ".printUsage",
+  "2636": "KouenCLI+MCP.swift",
+  "2637": "KouenCLI+Memo.swift",
+  "2638": ".printSnapshot",
+  "2639": "KouenCLI+Settings.swift",
+  "2640": "TimeInterval",
+  "2641": "KouenCLI+Undo.swift",
+  "2642": "KouenCLI+Verify.swift",
+  "2643": "KouenCLI+Wake.swift",
+  "2644": "DispatchSourceSignal",
+  "2645": ".activePaneID",
+  "2646": "WKUIDelegate"
 }
