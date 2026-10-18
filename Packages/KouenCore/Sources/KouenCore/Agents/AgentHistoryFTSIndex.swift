@@ -619,7 +619,7 @@ public final class AgentHistoryFTSIndex: @unchecked Sendable {
             let insertMetaSQL = "INSERT INTO session_index_meta(session_id, transcript_path, mtime, file_size) VALUES (?, ?, ?, ?)"
             var insertMetaStmt: OpaquePointer?
             if sqlite3_prepare_v2(db, insertMetaSQL, -1, &insertMetaStmt, nil) == SQLITE_OK {
-                for item in items {
+                for item in itemsToIndex {
                     sqlite3_reset(insertMetaStmt)
                     sqlite3_bind_text(insertMetaStmt, 1, item.sessionID, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
                     sqlite3_bind_text(insertMetaStmt, 2, item.transcriptPath, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
