@@ -207,6 +207,7 @@ final class WorkspaceFileTreeView: NSView {
 
     var isPinned: Bool { context.pinnedRoot != nil }
     var shownRoot: String { context.rootPath }
+    var pendingRevealPath: String? { context.pendingRevealPath }
 
     func updateRoot(path: String, sessionID: SessionID?) {
         if sessionID != context.sessionID { context.pinnedRoot = nil }

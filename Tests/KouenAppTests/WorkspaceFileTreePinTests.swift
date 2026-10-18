@@ -99,9 +99,9 @@ final class WorkspaceFileTreePinTests: XCTestCase {
             let isLast = (i == components.count - 1)
             if let node = currentNodes.first(where: { $0.node.path == accumulated }) {
                 if !isLast && node.node.isDirectory {
-                    node.isExpanded = true
                     let children = try await watcher.expand(node: node.node)
                     node.children = children.map { FileTreeNode(node: $0) }
+                    node.isExpanded = true
                     currentNodes = node.children ?? []
                 }
             }
@@ -118,5 +118,20 @@ final class WorkspaceFileTreePinTests: XCTestCase {
         let fileNode = childNode?.children?.first(where: { $0.node.path == targetFile.path })
         XCTAssertNotNil(fileNode)
         XCTAssertEqual(fileNode?.node.name, "target.txt")
+    }
+
+    func testRevealFileInTreeDoesNotOverwriteDataWhenAlreadyPopulated() async throws {
+        let tempDir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        let sub = tempDir.appendingPathComponent("parent")
+        let target = sub.appendingPathComponent("child.txt")
+        try FileManager.default.createDirectory(at: sub, withIntermediateDirectories: true)
+        try "data".write(to: target, atomically: true, encoding: .utf8)
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+
+        let tree = WorkspaceFileTreeView(rootPath: tempDir.path)
+        tree.revealFileInTree(path: target.path, pinOutside: false)
+
+        XCTAssertEqual(tree.keyboard.state.focusedPath, target.path)
+        XCTAssertEqual(tree.pendingRevealPath, target.path)
     }
 }
