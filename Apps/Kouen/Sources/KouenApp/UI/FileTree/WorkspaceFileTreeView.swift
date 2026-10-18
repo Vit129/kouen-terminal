@@ -13,6 +13,9 @@ import KouenTerminalKit
 final class FileTreeContext {
     var rootPath: String
     var sessionID: SessionID?
+    /// Path to reveal and scroll to; accompanied by revealEpoch so repeated reveals always fire.
+    var pendingRevealPath: String?
+    var revealEpoch: Int = 0
     /// Set to scroll-and-highlight a file path in the tree; cleared after the scroll fires.
     var revealPath: String?
     /// A root the user chose (header menu, or cmd+click into another project). While set, the
@@ -42,6 +45,7 @@ final class WorkspaceFileTreeView: NSView {
     private let context: FileTreeContext
     private var hostingView: NSHostingView<FileTreeSwiftUIView>!
     private let scrollbar = TerminalScrollbarView()
+    private var scrollbarTopConstraint: NSLayoutConstraint?
     private weak var observedScrollView: NSScrollView?
     let keyboard = FileTreeKeyboardNavigator()
 
@@ -164,38 +168,34 @@ final class WorkspaceFileTreeView: NSView {
         return path
     }
 
-    /// Expands all ancestor directories of `path`, highlights it in the keyboard navigator,
-    /// then signals the SwiftUI list to scroll to it after a short delay for child loading.
-    func revealFileInTree(path: String, pinOutside: Bool = false) {
-        var rootPrefix = context.rootPath.hasSuffix("/") ? context.rootPath : context.rootPath + "/"
-        // A path in another project (e.g. a central notes repo): pin the tree on that project,
-        // where the path can show; the session's cwd-follow would otherwise pull it back.
-        if pinOutside && !path.hasPrefix(rootPrefix) && path != context.rootPath {
-            var isDir: ObjCBool = false
-            let dir = FileManager.default.fileExists(atPath: path, isDirectory: &isDir) && isDir.boolValue
-                ? path : (path as NSString).deletingLastPathComponent
-            pin(WorktreeManager().repoRoot(for: dir) ?? dir)
-            rootPrefix = context.rootPath.hasSuffix("/") ? context.rootPath : context.rootPath + "/"
-        }
-        if path.hasPrefix(rootPrefix) {
-            let relative = String(path.dropFirst(rootPrefix.count))
-            let parentRelative = (relative as NSString).deletingLastPathComponent
-            let components = parentRelative.components(separatedBy: "/").filter { !$0.isEmpty }
-            var accumulated = context.rootPath
-            for component in components {
-                accumulated = (accumulated as NSString).appendingPathComponent(component)
-                NotificationCenter.default.post(
-                    name: .fileTreeToggleExpand,
-                    object: nil,
-                    userInfo: ["path": accumulated, "action": "expand"]
-                )
+    /// If `path` is outside the currently shown tree root, pins the tree on `path`'s enclosing
+    /// git repository (or directory if not in git).
+    func pinOutsideIfNeeded(path: String) {
+        let cleanPath = (path.count > 1 && path.hasSuffix("/")) ? String(path.dropLast()) : path
+        var isDir: ObjCBool = false
+        let dir = FileManager.default.fileExists(atPath: cleanPath, isDirectory: &isDir) && isDir.boolValue
+            ? cleanPath : (cleanPath as NSString).deletingLastPathComponent
+        let targetRepo = WorktreeManager().repoRoot(for: dir)
+        let rootPrefix = context.rootPath.hasSuffix("/") ? context.rootPath : context.rootPath + "/"
+        if let targetRepo {
+            if targetRepo != context.rootPath {
+                pin(targetRepo)
             }
+        } else if !cleanPath.hasPrefix(rootPrefix) && cleanPath != context.rootPath {
+            pin(dir)
         }
-        keyboard.state.focusedPath = path
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { [weak self] in
-            guard let self else { return }
-            self.context.revealPath = path
+    }
+
+    /// Expands all ancestor directories of `path`, highlights it in the keyboard navigator,
+    /// and reveals it in the SwiftUI tree.
+    func revealFileInTree(path: String, pinOutside: Bool = false) {
+        let cleanPath = (path.count > 1 && path.hasSuffix("/")) ? String(path.dropLast()) : path
+        if pinOutside {
+            pinOutsideIfNeeded(path: cleanPath)
         }
+        keyboard.state.focusedPath = cleanPath
+        context.pendingRevealPath = cleanPath
+        context.revealEpoch &+= 1
     }
 
     /// Show `root` instead of the session's project until unpinned or the session changes.
@@ -231,6 +231,10 @@ final class WorkspaceFileTreeView: NSView {
         hostingView.translatesAutoresizingMaskIntoConstraints = false
         addSubview(hostingView)
         addSubview(scrollbar)
+
+        let initialTop = scrollbar.topAnchor.constraint(equalTo: topAnchor)
+        scrollbarTopConstraint = initialTop
+
         NSLayoutConstraint.activate([
             hostingView.topAnchor.constraint(equalTo: topAnchor),
             hostingView.leadingAnchor.constraint(equalTo: leadingAnchor),
@@ -238,7 +242,7 @@ final class WorkspaceFileTreeView: NSView {
             hostingView.bottomAnchor.constraint(equalTo: bottomAnchor),
 
             scrollbar.trailingAnchor.constraint(equalTo: trailingAnchor),
-            scrollbar.topAnchor.constraint(equalTo: topAnchor),
+            initialTop,
             scrollbar.bottomAnchor.constraint(equalTo: bottomAnchor),
             scrollbar.widthAnchor.constraint(equalToConstant: TerminalScrollbarView.stripWidth),
         ])
@@ -262,6 +266,26 @@ final class WorkspaceFileTreeView: NSView {
 
     private func setupScrollObservationIfNeeded() {
         guard let scroll = findScrollView() else { return }
+        scroll.clipsToBounds = true
+        scroll.contentView.clipsToBounds = true
+        scroll.wantsLayer = true
+        scroll.layer?.masksToBounds = true
+        scroll.contentView.wantsLayer = true
+        scroll.contentView.layer?.masksToBounds = true
+        if let parentHost = scroll.superview {
+            parentHost.wantsLayer = true
+            parentHost.layer?.masksToBounds = true
+        }
+
+        // Align the custom scrollbar overlay directly with the list scroll view,
+        // so it never overlaps the header (picker / filter row).
+        if scrollbarTopConstraint?.secondItem !== scroll {
+            scrollbarTopConstraint?.isActive = false
+            let newTop = scrollbar.topAnchor.constraint(equalTo: scroll.topAnchor)
+            scrollbarTopConstraint = newTop
+            newTop.isActive = true
+        }
+
         if scroll !== observedScrollView {
             observedScrollView = scroll
             scroll.postsBoundsChangedNotifications = true
