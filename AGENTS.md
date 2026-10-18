@@ -23,6 +23,7 @@ Per-project memory lives centrally in `~/Git/Personal/agent-memory-private/agent
 - `rules/build-release.md` — build/test/run commands, release flow, version sync, git hooks, worktree constraint
 - `rules/concurrency.md` — Swift 6 strict concurrency, `@unchecked Sendable` ownership, terminal replay
 - `rules/ipc-protocol.md` — IPC framing, daemon socket security, generated-file regeneration
+- FileTree programmatic reveal: populate `node.children` before setting `node.isExpanded = true`, and guard `NodeRow.loadChildren` to prevent race conditions clobbering descendants.
 
 ## Graphify
 
