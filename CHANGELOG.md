@@ -32,7 +32,7 @@ has a matching `vX.Y.Z` tag and a signed, notarized DMG on
 - Loop over itemsToIndex in session_index_meta insert and add mixed batch test ([`2f052cb`](https://github.com/Vit129/kouen-terminal/commit/2f052cb86405fb4f9f71fd9587787458ce0cd79c))
 - Address P59 review findings (transcript meta, KeyTable precedence, semantic sort, locator head-tail) ([`a519846`](https://github.com/Vit129/kouen-terminal/commit/a51984666dc3ec1345b0465c8101841cfd344197))
 - Cmd+R reloads the browser pane, Cmd+Shift+R ignores the cache ([`7119f16`](https://github.com/Vit129/kouen-terminal/commit/7119f1608e9789dae513fcae4094bf2a05e90ea3))
-
+- Cmd+R / Cmd+Shift+R reload the browser pane (release v4.21.10) ([`d397e9c`](https://github.com/Vit129/kouen-terminal/commit/d397e9c8168068dda1ff39cc5fd5e67ce4eced87))
 
 ## [4.21.9] - 2026-10-17
 
