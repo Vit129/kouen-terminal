@@ -965,7 +965,7 @@ final class KouenSidebarPanelViewController: NSViewController {
         // Ensure the tree is shown, not the inline file viewer.
         fileViewerVC.view.isHidden = true
         fileTreeView.isHidden = false
-        fileTreeView.revealFileInTree(path: path, pinOutside: true)
+        fileTreeView.revealFileInTree(path: path, pinOutside: false)
     }
 
     func previewFile(path: String) {
