@@ -1299,6 +1299,12 @@ public final class BrowserPaneView: NSView {
             self.window?.makeFirstResponder(urlTextField)
             return true
         }
+        if cmd && characters.lowercased() == "r" {
+            // WKWebView has no ⌘R of its own and Kouen's menu doesn't claim it, so without this
+            // the keys did nothing. ⌘⇧R skips caches, like Safari/Chrome.
+            if event.modifierFlags.contains(.shift) { webView.reloadFromOrigin() } else { webView.reload() }
+            return true
+        }
         if cmd && characters.lowercased() == "d" {
             // Don't let WKWebView (via super) silently swallow ⌘D/⌘⇧D — let it
             // propagate up so Kouen's Split Right / Split Down menu shortcuts fire.
