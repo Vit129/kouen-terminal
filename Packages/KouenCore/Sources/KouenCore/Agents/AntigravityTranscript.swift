@@ -210,6 +210,10 @@ public enum AntigravitySessionLocator {
         return latestFolder
     }
 
+    private static let dominantProjectRootRegex: NSRegularExpression? = try? NSRegularExpression(
+        pattern: #"/(?:Users|home)/[^/"\\\s]+/(?:Git/[^/"\\\s]+/[^/"\\\s]+|\.[A-Za-z0-9_-]+)"#
+    )
+
     /// ponytail: a heuristic (path mentions in the transcript), checked over the 10 newest
     /// conversations; replace with agy's own workspace record if the CLI ever writes one.
     static func newestConversation(in brainDir: URL, dominatedBy stdCwd: String) -> String? {
@@ -220,11 +224,29 @@ public enum AntigravitySessionLocator {
             guard let mtime = (try? url.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate else { return nil }
             return (id, url, mtime)
         }
+        let chunkSize = 65536
         for candidate in dated.sorted(by: { $0.mtime > $1.mtime }).prefix(10) {
             // agy reads its own skills/config under ~/.gemini in every conversation; that is not a workspace.
             let ignore = stdCwd.contains("/.gemini") ? nil : "/.gemini"
-            guard let text = try? String(contentsOf: candidate.url, encoding: .utf8),
-                  let root = dominantProjectRoot(in: text, ignoringSuffix: ignore) else { continue }
+            guard let handle = try? FileHandle(forReadingFrom: candidate.url) else { continue }
+            defer { try? handle.close() }
+            let fileSize = (try? handle.seekToEnd()) ?? 0
+            let headData: Data
+            let tailData: Data
+            if fileSize <= UInt64(chunkSize * 2) {
+                try? handle.seek(toOffset: 0)
+                headData = handle.readDataToEndOfFile()
+                tailData = Data()
+            } else {
+                try? handle.seek(toOffset: 0)
+                headData = handle.readData(ofLength: chunkSize)
+                try? handle.seek(toOffset: fileSize - UInt64(chunkSize))
+                tailData = handle.readDataToEndOfFile()
+            }
+            let headText = String(decoding: headData, as: UTF8.self)
+            let tailText = String(decoding: tailData, as: UTF8.self)
+            let text = headText + "\n" + tailText
+            guard let root = dominantProjectRoot(in: text, ignoringSuffix: ignore) else { continue }
             if root == stdCwd || stdCwd.hasPrefix(root + "/") || root.hasPrefix(stdCwd + "/") {
                 return candidate.id
             }
@@ -234,8 +256,7 @@ public enum AntigravitySessionLocator {
 
     /// The most-mentioned project root (`~/Git/<group>/<repo>` or a `~/.<dir>`) in `text`.
     static func dominantProjectRoot(in text: String, ignoringSuffix ignore: String? = nil) -> String? {
-        guard let regex = try? NSRegularExpression(
-            pattern: #"/(?:Users|home)/[^/"\\\s]+/(?:Git/[^/"\\\s]+/[^/"\\\s]+|\.[A-Za-z0-9_-]+)"#) else { return nil }
+        guard let regex = dominantProjectRootRegex else { return nil }
         var counts: [String: Int] = [:]
         let ns = text as NSString
         for match in regex.matches(in: text, range: NSRange(location: 0, length: ns.length)) {

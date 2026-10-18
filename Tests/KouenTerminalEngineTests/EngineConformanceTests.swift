@@ -287,6 +287,25 @@ final class EngineConformanceTests: XCTestCase {
         XCTAssertNil(URLDetection.url(in: line, at: 0), "the leading 'see' is not a URL")
     }
 
+    // A long path the terminal soft-wrapped onto two rows opens whole from either half.
+    func testDetectWrappedFilePathJoinsAcrossRows() {
+        let row1 = "see /Users/u/Git/Personal/agent-memory-pri"
+        let row2 = "vate/agent-memory/kouen/plans/p1.md for it"
+        let full = "/Users/u/Git/Personal/agent-memory-private/agent-memory/kouen/plans/p1.md"
+        let top = URLDetection.detectWrappedFilePath(prev: nil, line: row1, next: row2, at: 10)
+        XCTAssertEqual(top?.url, full)
+        XCTAssertEqual(top?.columns, 4 ..< row1.count)
+        let bottom = URLDetection.detectWrappedFilePath(prev: row1, line: row2, next: nil, at: 3)
+        XCTAssertEqual(bottom?.url, full)
+        XCTAssertEqual(bottom?.columns, 0 ..< 35)
+        // A row that ends in a space is a real line break: nothing to join.
+        XCTAssertNil(URLDetection.detectWrappedFilePath(prev: nil, line: "open src/a.md ", next: "next line", at: 6))
+        // Quotes on neighbouring rows must not pair into a "path" across rows (agent TUI summary lines).
+        let quoted = "Ran 4 commands (find Tests -name \"*FTS*\" · grep -rn \"Age"
+        let summary = "… 4 more actions (3 reads, 1 command) …"
+        XCTAssertNil(URLDetection.detectWrappedFilePath(prev: quoted, line: summary, next: "● Explored 2 files", at: 20))
+    }
+
     func testDetectFilePathStripsToolCallParens() {
         // Coding-agent CLIs (Claude Code, Codex) print tool calls like this with no space
         // before the path, e.g. "⏺ Update(Apps/Kouen/.../SyntaxTextView.swift)".

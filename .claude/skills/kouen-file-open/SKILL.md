@@ -1,10 +1,10 @@
 ---
 name: kouen-file-open
-description: Kouen does not open a file — cmd+click on a filename in terminal output does nothing, a file type shows blank or opens in the wrong viewer. Use for "กด cmd+click แล้วไม่ขึ้น", "เปิดไฟล์ .xxx ไม่ได้", "file preview blank", "add support for .ext".
-version: 0.1.0
+description: Kouen does not open a file or folder (also one in another project) — cmd+click on a filename in terminal output does nothing, a file type shows blank or opens in the wrong viewer. Use for "กด cmd+click แล้วไม่ขึ้น", "เปิดไฟล์ .xxx ไม่ได้", "file preview blank", "add support for .ext".
+version: 0.1.2
 origin: auto-captured
 created: 2026-10-16
-last_improved: 2026-10-16
+last_improved: 2026-10-18
 ---
 
 # Kouen: why a file does not open
@@ -16,6 +16,15 @@ Ask first how it was opened — there are three separate paths:
 3. **Finder "Open With" / external open** → `ExternalOpenKind`.
 
 Adding a file type usually touches 1 and 2.
+
+## A path that exists but cmd+click is silent
+- **Folder:** `MainSplitViewController.openFilePreviewFromTerminal` handles it by revealing it in the Files tree; check that branch before the file-only guard.
+- **Long path wrapped onto two rows:** detection reads one grid row. `URLDetection.detectWrappedFilePath` joins neighbouring rows that meet at the edge with no space; the snapshot carries no wrap flag, so this is a heuristic.
+- **Another project:** the tree only shows paths under its root; `WorkspaceFileTreeView.revealFileInTree` re-roots on the path's repo. A relative name falls back from the cwd to the recent projects in `FuzzyPathResolver.resolve(otherRoots:)`.
+- **Testing in the installed app:** a fix on a branch is not in it. Build `make preview` from that worktree first.
+- **Seeing logs from a click in KouenPreview:** the preview's `NSLog` goes to the app's stdout, not reliably to `log stream`. Run `make preview > <file> 2>&1` (never pipe it through `grep | head`, which drops the rest), then grep the file. In zsh call `/usr/bin/log`, since a builtin `log` shadows it.
+- **A click that reaches the handler but the tree doesn't move:** a periodic cwd-follow (`reload`/`refreshMetadata` → `updateRoot`) re-roots the tree; check for it before adding delays.
+- **Paths in tests:** the enumerator reports `/private/var/...` for the temp dir; build the expected path with `realpath`, not `resolvingSymlinksInPath()` (which drops `/private`).
 
 ## Check it worked
 - `swift test --filter "EngineConformanceTests/testDetectFilePath"` (path 1) and `FileEditorViewQuickLookRoutingTests` (path 2) — write the failing case first.

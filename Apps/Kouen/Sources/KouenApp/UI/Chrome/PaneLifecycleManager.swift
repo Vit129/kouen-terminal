@@ -80,8 +80,11 @@ final class PaneLifecycleManager {
             window.makeFirstResponder(nil)
         }
 
-        let allHosts = coordinator.terminalHosts.allHosts()
-        allHosts.forEach { $0.setPresentsWithTransaction(true) }
+        var affectedHosts: [TerminalHostView] = []
+        if let oldHosts = paneContainer?.collectTerminalHosts().values {
+            affectedHosts.append(contentsOf: oldHosts)
+        }
+        affectedHosts.forEach { $0.setPresentsWithTransaction(true) }
 
         // Structural rebuild (force=true): harvest and detach hosts so the new container
         // can reuse surviving ones (same surface IDs). Tab switch (!force): leave the old
@@ -145,9 +148,14 @@ final class PaneLifecycleManager {
         containerCache[tabID] = container
         coordinator.ensureActivePane(for: tab)
 
+        for h in container.collectTerminalHosts().values where !affectedHosts.contains(where: { $0 === h }) {
+            h.setPresentsWithTransaction(true)
+            affectedHosts.append(h)
+        }
+
         CATransaction.begin()
         CATransaction.setCompletionBlock {
-            allHosts.forEach { $0.setPresentsWithTransaction(false) }
+            affectedHosts.forEach { $0.setPresentsWithTransaction(false) }
         }
         containerView.layout()
         CATransaction.commit()

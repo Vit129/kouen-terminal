@@ -95,4 +95,19 @@ final class KeyTableTests: XCTestCase {
         let decoded = try JSONDecoder().decode(KeyTableSet.self, from: data)
         XCTAssertEqual(decoded.table(.prefix)?.lookup(KeySpec(key: "S", modifiers: .shift))?.command, .killWindow)
     }
+
+    func testKeyTableFirstDuplicatePrecedence() throws {
+        let spec = KeySpec(key: "x")
+        let first = Binding(spec: spec, command: .killPane, note: "first")
+        let second = Binding(spec: spec, command: .newWindow, note: "second")
+
+        let table = KeyTable(id: .prefix, bindings: [first, second])
+        XCTAssertEqual(table.lookup(spec)?.note, "first")
+
+        let set = KeyTableSet(tables: [
+            KeyTable(id: .prefix, bindings: [first]),
+            KeyTable(id: .prefix, bindings: [second])
+        ])
+        XCTAssertEqual(set.table(.prefix)?.lookup(spec)?.note, "first")
+    }
 }

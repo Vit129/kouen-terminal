@@ -959,12 +959,13 @@ final class KouenSidebarPanelViewController: NSViewController {
     /// Switches the sidebar to the Files tab and reveals `path` in the file tree
     /// (expands ancestors, highlights the row, and scrolls to it).
     func selectFilesTab(revealPath path: String) {
+        fileTreeView.pinOutsideIfNeeded(path: path)
         sidebarSectionModel.selectedTab = 1
         selectSidebarTab(index: 1)
         // Ensure the tree is shown, not the inline file viewer.
         fileViewerVC.view.isHidden = true
         fileTreeView.isHidden = false
-        fileTreeView.revealFileInTree(path: path)
+        fileTreeView.revealFileInTree(path: path, pinOutside: false)
     }
 
     func previewFile(path: String) {
@@ -1045,7 +1046,7 @@ final class KouenSidebarPanelViewController: NSViewController {
                 let activeSessionID = SessionCoordinator.shared.snapshot.activeWorkspace?.activeSessionID
                 let root = WorktreeManager().repoRoot(for: cwd) ?? cwd
                 fileTreeView.updateRoot(path: root, sessionID: activeSessionID)
-                fileTreeView.revealFileInTree(path: cwd)
+                if !fileTreeView.isPinned { fileTreeView.revealFileInTree(path: cwd) }
             }
         case 2:
             sidebarSectionModel.text = "JOBS"
@@ -1258,7 +1259,9 @@ final class KouenSidebarPanelViewController: NSViewController {
                 }
             }
             if cwd != lastFileTreeCWD {
-                fileTreeView.revealFileInTree(path: cwd)
+                if !fileTreeView.isPinned {
+                    fileTreeView.revealFileInTree(path: cwd)
+                }
                 lastFileTreeCWD = cwd
             }
             lastFileTreeSessionID = activeSessionID
@@ -1314,7 +1317,9 @@ final class KouenSidebarPanelViewController: NSViewController {
                 }
             }
             if cwd != lastFileTreeCWD {
-                fileTreeView.revealFileInTree(path: cwd)
+                if !fileTreeView.isPinned {
+                    fileTreeView.revealFileInTree(path: cwd)
+                }
                 lastFileTreeCWD = cwd
             }
             lastFileTreeSessionID = activeSessionID

@@ -106,6 +106,8 @@ final class SidebarListModel {
     @ObservationIgnored private var gitMetadataCache: [String: (metadata: RepoGitMetadata, fetchedAt: Date)] = [:]
     @ObservationIgnored private var gitMetadataUpdatesInProgress: Set<String> = []
     private var lastWorktreeFetchTime: [String: Date] = [:]
+    /// Reflog/worktree-dir mtimes seen at the last `git worktree list` per repo; unchanged → skip.
+    private var lastWorktreeSignature: [String: [Date]] = [:]
     @ObservationIgnored private var pendingRebuild: Task<Void, Never>?
 
     private var gitStatusFetchedAt: [String: Date] = [:]
@@ -222,6 +224,11 @@ final class SidebarListModel {
             if !force, let lastFetch = lastWorktreeFetchTime[rootPath],
                now.timeIntervalSince(lastFetch) < 3.0 { continue }
             lastWorktreeFetchTime[rootPath] = now
+            // Snapshots arrive constantly while a pane prints; only spawn git when a worktree's
+            // HEAD moved or one was added/removed (both touch these files).
+            let signature = Self.worktreeSignature(rootPath: rootPath)
+            if !force, let signature, signature == lastWorktreeSignature[rootPath] { continue }
+            lastWorktreeSignature[rootPath] = signature
             Task {
                 let worktrees = await self.fetchWorktrees(for: rootPath)
                 if self.projectWorktrees[rootPath] != worktrees {
@@ -636,6 +643,22 @@ final class SidebarListModel {
 
             return RepoGitMetadata(prNumber: prNumber, prURL: prURL, prTitle: prTitle, prBaseBranch: prBaseBranch, prChecksStatus: prChecksStatus, prMergeable: prMergeable, prReviewDecision: prReviewDecision, aheadCount: aheadCount, behindCount: behindCount)
         }.value
+    }
+
+    /// Modification dates of everything `git worktree list --porcelain` output depends on:
+    /// `.git/worktrees` (add/remove) and each HEAD reflog (commit, checkout, reset), in a stable
+    /// order. Nil when `.git` is not a directory (a linked worktree), so callers fall back to time.
+    nonisolated static func worktreeSignature(rootPath: String, fileManager: FileManager = .default) -> [Date]? {
+        let git = URL(fileURLWithPath: rootPath).appendingPathComponent(".git")
+        var isDir: ObjCBool = false
+        guard fileManager.fileExists(atPath: git.path, isDirectory: &isDir), isDir.boolValue else { return nil }
+        func mtime(_ url: URL) -> Date {
+            (try? fileManager.attributesOfItem(atPath: url.path)[.modificationDate] as? Date) ?? .distantPast
+        }
+        let worktreesDir = git.appendingPathComponent("worktrees")
+        let names = ((try? fileManager.contentsOfDirectory(atPath: worktreesDir.path)) ?? []).sorted()
+        return [mtime(worktreesDir), mtime(git.appendingPathComponent("logs/HEAD"))]
+            + names.map { mtime(worktreesDir.appendingPathComponent($0).appendingPathComponent("logs/HEAD")) }
     }
 
     private func fetchWorktrees(for rootPath: String) async -> [SidebarWorktreeEntry] {

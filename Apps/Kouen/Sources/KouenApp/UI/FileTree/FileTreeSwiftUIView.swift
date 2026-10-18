@@ -10,6 +10,7 @@ final class FileTreeNode: Identifiable {
     let node: FileNode
     var children: [FileTreeNode]?
     var isExpanded: Bool = false
+    var isLoadingChildren: Bool = false
 
     init(node: FileNode) {
         self.id = node.id
@@ -42,7 +43,7 @@ final class FileTreeNode: Identifiable {
         }
         
         var treeNodes: [String: FileTreeNode] = [:]
-        let rawNodesByPath = Dictionary(uniqueKeysWithValues: rawNodes.map { ($0.path.lowercased(), $0) })
+        let rawNodesByPath = Dictionary(rawNodes.map { ($0.path.lowercased(), $0) }, uniquingKeysWith: { first, _ in first })
         
         // First, create FileTreeNode for every path
         for path in allPaths {
@@ -146,6 +147,8 @@ struct FileTreeSwiftUIView: View {
     /// Coalesces bursts of `scheduleLoadRoot()` calls (e.g. rapid `.fileTreeDidChange`
     /// notifications) into a single `loadRoot()` — see its doc comment.
     @State private var pendingLoadTask: Task<Void, Never>?
+    /// Cancels previous in-flight ancestor expansion when a new reveal arrives.
+    @State private var pendingRevealTask: Task<Void, Never>?
     @AppStorage("KouenFileTreeShowsHiddenFiles") private var showsHiddenFiles = false
     @AppStorage("KouenFileTreeShowsHiddenFolders") private var showsHiddenFolders = false
 
@@ -167,36 +170,92 @@ struct FileTreeSwiftUIView: View {
         trimmedSearchText.isEmpty ? rootNodes : searchResultNodes
     }
 
+    /// Which folder the tree shows: the session's project, a Settings › File search folder, a
+    /// recent project, or any folder. Picking one pins it until "back to project" or a session switch.
+    private var rootPicker: some View {
+        let extra = SessionCoordinator.shared.settings.fileSearchRoots
+        let recents = UserDefaults.standard.stringArray(forKey: "RecentProjectPaths") ?? []
+        return HStack(spacing: 4) {
+            Menu {
+                Button("Project: \((context.projectRoot as NSString).lastPathComponent)") { context.onPickRoot?(nil) }
+                    .disabled(context.pinnedRoot == nil)
+                if !extra.isEmpty {
+                    Section("File search folders") {
+                        ForEach(extra, id: \.self) { root in Button(root) { context.onPickRoot?(root) } }
+                    }
+                }
+                let others = recents.filter { $0 != context.projectRoot && !extra.contains($0) }
+                if !others.isEmpty {
+                    Section("Recent projects") {
+                        ForEach(others, id: \.self) { root in Button(root) { context.onPickRoot?(root) } }
+                    }
+                }
+                Divider()
+                Button("Choose Folder…") {
+                    let panel = NSOpenPanel()
+                    panel.canChooseFiles = false
+                    panel.canChooseDirectories = true
+                    if panel.runModal() == .OK, let url = panel.url { context.onPickRoot?(url.path) }
+                }
+            } label: {
+                Label((context.rootPath as NSString).lastPathComponent,
+                      systemImage: context.pinnedRoot == nil ? "folder" : "pin.fill")
+                    .font(.system(size: 11))
+                    .lineLimit(1)
+            }
+            .menuStyle(.borderlessButton)
+            .help(context.rootPath)
+            Spacer(minLength: 0)
+            if context.pinnedRoot != nil {
+                Button { context.onPickRoot?(nil) } label: {
+                    Image(systemName: "arrow.uturn.backward").font(.system(size: 10))
+                }
+                .buttonStyle(.plain)
+                .help("Back to this session's project")
+            }
+        }
+        .padding(.horizontal, 8)
+        .padding(.top, 4)
+    }
+
     var body: some View {
         VStack(spacing: 0) {
-            HStack(spacing: 6) {
-                Image(systemName: "magnifyingglass")
-                    .font(.system(size: 11))
-                    .foregroundStyle(.secondary)
-                TextField("Filter files…", text: $searchText)
-                    .textFieldStyle(.plain)
-                    .font(.system(size: 11))
-                if !searchText.isEmpty {
-                    Button { searchText = "" } label: {
-                        Image(systemName: "xmark.circle.fill")
-                            .font(.system(size: 10))
-                            .foregroundStyle(.secondary)
+            VStack(spacing: 0) {
+                rootPicker
+                HStack(spacing: 6) {
+                    Image(systemName: "magnifyingglass")
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                    TextField("Filter files…", text: $searchText)
+                        .textFieldStyle(.plain)
+                        .font(.system(size: 11))
+                    if !searchText.isEmpty {
+                        Button { searchText = "" } label: {
+                            Image(systemName: "xmark.circle.fill")
+                                .font(.system(size: 10))
+                                .foregroundStyle(.secondary)
+                        }
+                        .buttonStyle(.plain)
                     }
-                    .buttonStyle(.plain)
+                    hiddenToggle(
+                        isOn: $showsHiddenFiles,
+                        systemImage: "doc",
+                        help: showsHiddenFiles ? "Hide hidden files" : "Show hidden files"
+                    )
+                    hiddenToggle(
+                        isOn: $showsHiddenFolders,
+                        systemImage: "folder",
+                        help: showsHiddenFolders ? "Hide hidden folders" : "Show hidden folders"
+                    )
                 }
-                hiddenToggle(
-                    isOn: $showsHiddenFiles,
-                    systemImage: "doc",
-                    help: showsHiddenFiles ? "Hide hidden files" : "Show hidden files"
-                )
-                hiddenToggle(
-                    isOn: $showsHiddenFolders,
-                    systemImage: "folder",
-                    help: showsHiddenFolders ? "Hide hidden folders" : "Show hidden folders"
-                )
+                .padding(.horizontal, 8)
+                .padding(.vertical, 5)
+
+                Divider()
+                    .overlay(Color(KouenDesign.chrome.border))
             }
-            .padding(.horizontal, 8)
-            .padding(.vertical, 5)
+            .background(Color(KouenDesign.chrome.sidebarBackground))
+
             ScrollViewReader { proxy in
                 List {
                     if let gitBranch, !gitBranch.isEmpty {
@@ -222,6 +281,13 @@ struct FileTreeSwiftUIView: View {
                     updateVisiblePaths()
                 }
                 .onAppear { updateVisiblePaths() }
+                .onChange(of: context.revealEpoch) { _, _ in
+                    guard let path = context.pendingRevealPath else { return }
+                    pendingRevealTask?.cancel()
+                    pendingRevealTask = Task {
+                        await expandAncestorsAndReveal(targetPath: path, proxy: proxy)
+                    }
+                }
                 .onChange(of: context.revealPath) { _, path in
                     guard let path else { return }
                     withAnimation(.easeInOut(duration: 0.25)) {
@@ -230,7 +296,9 @@ struct FileTreeSwiftUIView: View {
                     context.revealPath = nil
                 }
             }
+            .clipped()
         }
+        .background(Color(KouenDesign.chrome.sidebarBackground))
         .onAppear { refreshGitBranch(); updateVisiblePaths() }
         .onReceive(NotificationCenter.default.publisher(for: Notification.Name("KouenActiveTabGitBranchDidChange"))) { _ in
             refreshGitBranch()
@@ -336,38 +404,14 @@ struct FileTreeSwiftUIView: View {
         }
     }
 
-    private func listBranches() async -> [String] {
+    private func runGitCommand(arguments: [String]) async -> String? {
         let path = rootPath
+        guard !path.isEmpty, FileManager.default.fileExists(atPath: path) else { return nil }
         return await withCheckedContinuation { continuation in
             DispatchQueue.global(qos: .userInitiated).async {
                 let process = Process()
                 process.executableURL = URL(fileURLWithPath: "/usr/bin/git")
-                process.arguments = ["branch", "--format=%(refname:short)"]
-                process.currentDirectoryURL = URL(fileURLWithPath: path)
-                let pipe = Pipe()
-                process.standardOutput = pipe
-                process.standardError = FileHandle.nullDevice
-                do {
-                    try process.run()
-                    let data = (try? pipe.fileHandleForReading.readToEnd()) ?? Data()
-                    process.waitUntilExit()
-                    let output = String(data: data, encoding: .utf8) ?? ""
-                    let branches = output.components(separatedBy: "\n").filter { !$0.isEmpty }
-                    continuation.resume(returning: branches)
-                } catch {
-                    continuation.resume(returning: [])
-                }
-            }
-        }
-    }
-
-    private func getCurrentBranch() async -> String? {
-        let path = rootPath
-        return await withCheckedContinuation { continuation in
-            DispatchQueue.global(qos: .userInitiated).async {
-                let process = Process()
-                process.executableURL = URL(fileURLWithPath: "/usr/bin/git")
-                process.arguments = ["rev-parse", "--abbrev-ref", "HEAD"]
+                process.arguments = arguments
                 process.currentDirectoryURL = URL(fileURLWithPath: path)
                 let pipe = Pipe()
                 process.standardOutput = pipe
@@ -380,14 +424,27 @@ struct FileTreeSwiftUIView: View {
                         continuation.resume(returning: nil)
                         return
                     }
-                    let output = String(data: data, encoding: .utf8) ?? ""
-                    let trimmed = output.trimmingCharacters(in: .whitespacesAndNewlines)
-                    continuation.resume(returning: trimmed.isEmpty ? nil : trimmed)
+                    let output = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines)
+                    continuation.resume(returning: output?.isEmpty == true ? nil : output)
                 } catch {
                     continuation.resume(returning: nil)
                 }
             }
         }
+    }
+
+    private func listBranches() async -> [String] {
+        guard let output = await runGitCommand(arguments: ["branch", "--format=%(refname:short)"]) else {
+            return []
+        }
+        return output.components(separatedBy: "\n").filter { !$0.isEmpty }
+    }
+
+    /// Reads `.git/HEAD` directly instead of spawning `git rev-parse` on every root load.
+    /// A detached HEAD shows no branch.
+    private func getCurrentBranch() async -> String? {
+        let path = rootPath
+        return await Task.detached(priority: .utility) { SessionCoordinator.readGitHead(at: path) }.value
     }
 
     private func refreshGitBranch() {
@@ -466,11 +523,11 @@ struct FileTreeSwiftUIView: View {
     private func loadRoot() async {
         let taskRootPath = rootPath
         let taskSessionID = sessionID
-        refreshGitBranch()
         let statusProvider = GitStatusProvider()
         async let gitStatusTask  = statusProvider.status(rootPath: rootPath)
         async let rawNodesTask   = (try? watcher.scan(rootPath: rootPath, options: scanOptions)) ?? []
-        let (status, rawNodes)   = await (gitStatusTask, rawNodesTask)
+        async let branchTask     = getCurrentBranch()
+        let (status, rawNodes, branch) = await (gitStatusTask, rawNodesTask, branchTask)
 
         // scanDirectory() has no cancellation checks, so a stale scan for a root/session
         // we've since switched away from can still finish and land here. Drop it instead
@@ -492,7 +549,7 @@ struct FileTreeSwiftUIView: View {
 
         // Reconcile in-place: preserve existing FileTreeNode identity so
         // SwiftUI @State (expand/collapse) is retained.
-        let existingByID = Dictionary(uniqueKeysWithValues: rootNodes.map { ($0.id, $0) })
+        let existingByID = Dictionary(rootNodes.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
         var reconciled: [FileTreeNode] = []
         for node in updatedNodes {
             if let existing = existingByID[node.id] {
@@ -514,9 +571,84 @@ struct FileTreeSwiftUIView: View {
             await loadSearchResults(query: trimmedSearchText)
         }
 
-        let branch = await getCurrentBranch()
         if gitBranch != branch {
             gitBranch = branch
+        }
+    }
+
+    private func expandAncestorsAndReveal(targetPath: String, proxy: ScrollViewProxy) async {
+        guard !Task.isCancelled else { return }
+        let cleanTarget = (targetPath.count > 1 && targetPath.hasSuffix("/"))
+            ? String(targetPath.dropLast())
+            : targetPath
+        let cleanRoot = (rootPath.count > 1 && rootPath.hasSuffix("/"))
+            ? String(rootPath.dropLast())
+            : rootPath
+
+        let rootPrefix = cleanRoot + "/"
+        guard cleanTarget.hasPrefix(rootPrefix) || cleanTarget == cleanRoot else { return }
+
+        // Ensure root nodes are loaded for the current rootPath
+        let nodesMatchRoot = rootNodes.first.map { $0.node.path.hasPrefix(rootPrefix) } ?? false
+        if rootNodes.isEmpty || !nodesMatchRoot {
+            await loadRoot()
+        }
+        guard !Task.isCancelled else { return }
+
+        // Cancel any pending debounced background scan so it cannot clobber the reveal
+        pendingLoadTask?.cancel()
+
+        let relative = String(cleanTarget.dropFirst(rootPrefix.count))
+        let components = relative.split(separator: "/").map(String.init)
+
+        var currentNodes = rootNodes
+        var accumulated = cleanRoot
+
+        // Expand each ancestor directory along the path
+        for i in 0..<components.count {
+            guard !Task.isCancelled else { return }
+            accumulated = (accumulated as NSString).appendingPathComponent(components[i])
+            let isLast = (i == components.count - 1)
+
+            if let node = currentNodes.first(where: { $0.node.path == accumulated }) {
+                if !isLast {
+                    if node.node.isDirectory {
+                        if node.children == nil || node.children?.isEmpty == true {
+                            node.isLoadingChildren = true
+                            do {
+                                let children = try await watcher.expand(node: node.node, gitStatus: currentGitStatus, options: scanOptions)
+                                guard !Task.isCancelled else {
+                                    node.isLoadingChildren = false
+                                    return
+                                }
+                                node.children = children.map { FileTreeNode(node: $0) }
+                            } catch {
+                                node.children = []
+                            }
+                            node.isLoadingChildren = false
+                        }
+                        node.isExpanded = true
+                        currentNodes = node.children ?? []
+                    }
+                }
+            } else {
+                break
+            }
+        }
+
+        guard !Task.isCancelled else { return }
+        updateVisiblePaths()
+        keyboard.focusedPath = cleanTarget
+
+        // Yield for SwiftUI to mount the expanded disclosure rows
+        await Task.yield()
+        guard !Task.isCancelled else { return }
+        withAnimation(.easeInOut(duration: 0.25)) {
+            proxy.scrollTo(cleanTarget, anchor: .center)
+        }
+
+        if context.pendingRevealPath == targetPath {
+            context.pendingRevealPath = nil
         }
     }
 }
@@ -842,12 +974,17 @@ private struct NodeRow: View {
     }
 
     private func loadChildren() async {
-        guard node.children?.isEmpty == true else { return }
+        guard node.children?.isEmpty == true, !node.isLoadingChildren else { return }
+        node.isLoadingChildren = true
+        defer { node.isLoadingChildren = false }
         do {
             let childNodes = try await watcher.expand(node: node.node, gitStatus: gitStatus, options: scanOptions)
+            guard node.children?.isEmpty == true else { return }
             node.children = childNodes.map { FileTreeNode(node: $0) }
         } catch {
-            node.children = []
+            if node.children?.isEmpty == true {
+                node.children = []
+            }
         }
     }
 
