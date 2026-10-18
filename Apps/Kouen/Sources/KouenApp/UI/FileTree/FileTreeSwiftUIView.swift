@@ -440,8 +440,11 @@ struct FileTreeSwiftUIView: View {
         return output.components(separatedBy: "\n").filter { !$0.isEmpty }
     }
 
+    /// Reads `.git/HEAD` directly instead of spawning `git rev-parse` on every root load.
+    /// A detached HEAD shows no branch.
     private func getCurrentBranch() async -> String? {
-        await runGitCommand(arguments: ["rev-parse", "--abbrev-ref", "HEAD"])
+        let path = rootPath
+        return await Task.detached(priority: .utility) { SessionCoordinator.readGitHead(at: path) }.value
     }
 
     private func refreshGitBranch() {
