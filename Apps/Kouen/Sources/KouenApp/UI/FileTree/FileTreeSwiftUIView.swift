@@ -146,6 +146,8 @@ struct FileTreeSwiftUIView: View {
     /// Coalesces bursts of `scheduleLoadRoot()` calls (e.g. rapid `.fileTreeDidChange`
     /// notifications) into a single `loadRoot()` — see its doc comment.
     @State private var pendingLoadTask: Task<Void, Never>?
+    /// Cancels previous in-flight ancestor expansion when a new reveal arrives.
+    @State private var pendingRevealTask: Task<Void, Never>?
     @AppStorage("KouenFileTreeShowsHiddenFiles") private var showsHiddenFiles = false
     @AppStorage("KouenFileTreeShowsHiddenFolders") private var showsHiddenFolders = false
 
@@ -280,7 +282,8 @@ struct FileTreeSwiftUIView: View {
                 .onAppear { updateVisiblePaths() }
                 .onChange(of: context.revealEpoch) { _, _ in
                     guard let path = context.pendingRevealPath else { return }
-                    Task {
+                    pendingRevealTask?.cancel()
+                    pendingRevealTask = Task {
                         await expandAncestorsAndReveal(targetPath: path, proxy: proxy)
                     }
                 }
@@ -582,13 +585,10 @@ struct FileTreeSwiftUIView: View {
         if gitBranch != branch {
             gitBranch = branch
         }
-
-        if context.pendingRevealPath != nil {
-            context.revealEpoch &+= 1
-        }
     }
 
     private func expandAncestorsAndReveal(targetPath: String, proxy: ScrollViewProxy) async {
+        guard !Task.isCancelled else { return }
         let cleanTarget = (targetPath.count > 1 && targetPath.hasSuffix("/"))
             ? String(targetPath.dropLast())
             : targetPath
@@ -604,6 +604,7 @@ struct FileTreeSwiftUIView: View {
         if rootNodes.isEmpty || !nodesMatchRoot {
             await loadRoot()
         }
+        guard !Task.isCancelled else { return }
 
         let relative = String(cleanTarget.dropFirst(rootPrefix.count))
         let components = relative.split(separator: "/").map(String.init)
@@ -613,6 +614,7 @@ struct FileTreeSwiftUIView: View {
 
         // Expand each ancestor directory along the path
         for i in 0..<components.count {
+            guard !Task.isCancelled else { return }
             accumulated = (accumulated as NSString).appendingPathComponent(components[i])
             let isLast = (i == components.count - 1)
 
@@ -623,6 +625,7 @@ struct FileTreeSwiftUIView: View {
                         if node.children == nil || node.children?.isEmpty == true {
                             do {
                                 let children = try await watcher.expand(node: node.node, gitStatus: currentGitStatus, options: scanOptions)
+                                guard !Task.isCancelled else { return }
                                 node.children = children.map { FileTreeNode(node: $0) }
                             } catch {
                                 node.children = []
@@ -636,11 +639,13 @@ struct FileTreeSwiftUIView: View {
             }
         }
 
+        guard !Task.isCancelled else { return }
         updateVisiblePaths()
         keyboard.focusedPath = cleanTarget
 
-        // Brief yield for SwiftUI to mount the expanded disclosure rows
-        try? await Task.sleep(nanoseconds: 100_000_000)
+        // Yield for SwiftUI to mount the expanded disclosure rows
+        await Task.yield()
+        guard !Task.isCancelled else { return }
         withAnimation(.easeInOut(duration: 0.25)) {
             proxy.scrollTo(cleanTarget, anchor: .center)
         }
