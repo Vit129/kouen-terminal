@@ -72,4 +72,51 @@ final class WorkspaceFileTreePinTests: XCTestCase {
         let actualRepo = URL(fileURLWithPath: tree.shownRoot).resolvingSymlinksInPath().path
         XCTAssertEqual(actualRepo, expectedRepo)
     }
+
+    func testAncestorExpansionDownHierarchy() async throws {
+        let tempDir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        let sub1 = tempDir.appendingPathComponent("parent")
+        let sub2 = sub1.appendingPathComponent("child")
+        let targetFile = sub2.appendingPathComponent("target.txt")
+        try FileManager.default.createDirectory(at: sub2, withIntermediateDirectories: true)
+        try "hello".write(to: targetFile, atomically: true, encoding: .utf8)
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+
+        let watcher = FileTreeWatcher()
+        let rootRaw = try await watcher.scan(rootPath: tempDir.path)
+        let rootNodes = rootRaw.map { FileTreeNode(node: $0) }
+
+        let cleanTarget = targetFile.path
+        let cleanRoot = tempDir.path
+        let rootPrefix = cleanRoot + "/"
+        let relative = String(cleanTarget.dropFirst(rootPrefix.count))
+        let components = relative.split(separator: "/").map(String.init)
+
+        var currentNodes = rootNodes
+        var accumulated = cleanRoot
+        for i in 0..<components.count {
+            accumulated = (accumulated as NSString).appendingPathComponent(components[i])
+            let isLast = (i == components.count - 1)
+            if let node = currentNodes.first(where: { $0.node.path == accumulated }) {
+                if !isLast && node.node.isDirectory {
+                    node.isExpanded = true
+                    let children = try await watcher.expand(node: node.node)
+                    node.children = children.map { FileTreeNode(node: $0) }
+                    currentNodes = node.children ?? []
+                }
+            }
+        }
+
+        let parentNode = rootNodes.first(where: { $0.node.path == sub1.path })
+        XCTAssertNotNil(parentNode)
+        XCTAssertTrue(parentNode?.isExpanded == true)
+
+        let childNode = parentNode?.children?.first(where: { $0.node.path == sub2.path })
+        XCTAssertNotNil(childNode)
+        XCTAssertTrue(childNode?.isExpanded == true)
+
+        let fileNode = childNode?.children?.first(where: { $0.node.path == targetFile.path })
+        XCTAssertNotNil(fileNode)
+        XCTAssertEqual(fileNode?.node.name, "target.txt")
+    }
 }
