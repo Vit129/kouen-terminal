@@ -2169,23 +2169,55 @@ public final class MobileBridgeServer: @unchecked Sendable {
     private func startTranscriptTail(surfaceID: String, connection: NWConnection, state: ConnectionState) {
         var url: URL?
         var offset = 0
+        var cachedCwd: String?
+        var lastCwdCheck: Date = .distantPast
+        var lastUrlCheck: Date = .distantPast
+        var lastPid: Int32?
         let timer = DispatchSource.makeTimerSource(queue: state.controlQueue)
         timer.schedule(deadline: .now(), repeating: 1.0, leeway: .milliseconds(250))
         timer.setEventHandler { [weak self, weak connection, weak state] in
             guard let self, let connection, let state, state.surfaceID == surfaceID,
                   let snap = AgentDetector.snapshot(forSurfaceKey: surfaceID) else { return }
 
-            let cwd = Self.surfaceCwd(surfaceID: surfaceID)
+            let now = Date()
+            let pidChanged = (snap.pid != lastPid)
+            if pidChanged {
+                lastPid = snap.pid
+                cachedCwd = nil
+                url = nil
+                offset = 0
+            }
+
+            // Avoid opening a new DaemonClient socket every 1s:
+            // CWD only needs refresh if unknown, PID changed, or every 5 seconds.
+            let cwd: String?
+            if let cached = cachedCwd, !pidChanged, now.timeIntervalSince(lastCwdCheck) < 5.0 {
+                cwd = cached
+            } else {
+                let freshCwd = Self.surfaceCwd(surfaceID: surfaceID)
+                cachedCwd = freshCwd
+                lastCwdCheck = now
+                cwd = freshCwd
+            }
+
+            // Re-resolve transcript URL only if not resolved yet, PID changed,
+            // or periodically every 5 seconds (to catch /clear or /resume).
             let current: URL?
-            switch snap.kind {
-            case .claudeCode:
-                current = ClaudeSessionLocator.transcriptURL(pid: snap.pid)
-            case .antigravity:
-                current = AntigravitySessionLocator.transcriptURL(pid: snap.pid, surfaceCwd: cwd)
-            case .codex:
-                current = CodexSessionLocator.transcriptURL(pid: snap.pid, surfaceCwd: cwd)
-            default:
-                current = nil
+            let shouldRecheckURL = url == nil || pidChanged || now.timeIntervalSince(lastUrlCheck) >= 5.0
+            if shouldRecheckURL {
+                lastUrlCheck = now
+                switch snap.kind {
+                case .claudeCode:
+                    current = ClaudeSessionLocator.transcriptURL(pid: snap.pid)
+                case .antigravity:
+                    current = AntigravitySessionLocator.transcriptURL(pid: snap.pid, surfaceCwd: cwd)
+                case .codex:
+                    current = CodexSessionLocator.transcriptURL(pid: snap.pid, surfaceCwd: cwd)
+                default:
+                    current = nil
+                }
+            } else {
+                current = url
             }
 
             guard let current else { return }
@@ -2198,6 +2230,9 @@ public final class MobileBridgeServer: @unchecked Sendable {
             }
             offset = read.endOffset
 
+            // Performance: on initial attach or reset, only parse the tail lines needed for backlog
+            let linesToProcess = reset ? Array(read.lines.suffix(Self.transcriptBacklogLimit * 2)) : read.lines
+
             var items: [TranscriptItem]
             let metaModel: String?
             let metaMode: String?
@@ -2205,20 +2240,20 @@ public final class MobileBridgeServer: @unchecked Sendable {
 
             switch snap.kind {
             case .claudeCode:
-                items = read.lines.flatMap(ClaudeTranscriptLine.items(from:))
-                let meta = ClaudeTranscriptLine.meta(from: read.lines)
+                items = linesToProcess.flatMap(ClaudeTranscriptLine.items(from:))
+                let meta = ClaudeTranscriptLine.meta(from: linesToProcess)
                 metaModel = meta.model
                 metaMode = meta.mode
                 metaUsage = meta.usage
             case .antigravity:
-                items = read.lines.flatMap(AntigravityTranscriptLine.items(from:))
-                let meta = AntigravityTranscriptLine.meta(from: read.lines)
+                items = linesToProcess.flatMap(AntigravityTranscriptLine.items(from:))
+                let meta = AntigravityTranscriptLine.meta(from: linesToProcess)
                 metaModel = meta.model
                 metaMode = meta.mode
                 metaUsage = meta.usage
             case .codex:
-                items = read.lines.flatMap(CodexTranscriptLine.items(from:))
-                let meta = CodexTranscriptLine.meta(from: read.lines)
+                items = linesToProcess.flatMap(CodexTranscriptLine.items(from:))
+                let meta = CodexTranscriptLine.meta(from: linesToProcess)
                 metaModel = meta.model
                 metaMode = meta.mode
                 metaUsage = meta.usage

@@ -210,6 +210,10 @@ public enum AntigravitySessionLocator {
         return latestFolder
     }
 
+    private static let dominantProjectRootRegex: NSRegularExpression? = try? NSRegularExpression(
+        pattern: #"/(?:Users|home)/[^/"\\\s]+/(?:Git/[^/"\\\s]+/[^/"\\\s]+|\.[A-Za-z0-9_-]+)"#
+    )
+
     /// ponytail: a heuristic (path mentions in the transcript), checked over the 10 newest
     /// conversations; replace with agy's own workspace record if the CLI ever writes one.
     static func newestConversation(in brainDir: URL, dominatedBy stdCwd: String) -> String? {
@@ -223,7 +227,10 @@ public enum AntigravitySessionLocator {
         for candidate in dated.sorted(by: { $0.mtime > $1.mtime }).prefix(10) {
             // agy reads its own skills/config under ~/.gemini in every conversation; that is not a workspace.
             let ignore = stdCwd.contains("/.gemini") ? nil : "/.gemini"
-            guard let text = try? String(contentsOf: candidate.url, encoding: .utf8),
+            guard let handle = try? FileHandle(forReadingFrom: candidate.url) else { continue }
+            defer { try? handle.close() }
+            let data = handle.readData(ofLength: 65536)
+            guard let text = String(data: data, encoding: .utf8),
                   let root = dominantProjectRoot(in: text, ignoringSuffix: ignore) else { continue }
             if root == stdCwd || stdCwd.hasPrefix(root + "/") || root.hasPrefix(stdCwd + "/") {
                 return candidate.id
@@ -234,8 +241,7 @@ public enum AntigravitySessionLocator {
 
     /// The most-mentioned project root (`~/Git/<group>/<repo>` or a `~/.<dir>`) in `text`.
     static func dominantProjectRoot(in text: String, ignoringSuffix ignore: String? = nil) -> String? {
-        guard let regex = try? NSRegularExpression(
-            pattern: #"/(?:Users|home)/[^/"\\\s]+/(?:Git/[^/"\\\s]+/[^/"\\\s]+|\.[A-Za-z0-9_-]+)"#) else { return nil }
+        guard let regex = dominantProjectRootRegex else { return nil }
         var counts: [String: Int] = [:]
         let ns = text as NSString
         for match in regex.matches(in: text, range: NSRange(location: 0, length: ns.length)) {

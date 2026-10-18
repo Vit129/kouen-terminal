@@ -364,7 +364,7 @@ public actor AgentHistoryScanner {
     /// fragment (the card preview clips visually with lineLimit; this only bounds memory/copy size).
     static let turnContentLimit = 800
 
-    private struct FileCacheEntry: Sendable {
+    struct FileCacheEntry: Sendable {
         let mtime: Date
         let size: Int
         let record: AgentSessionRecord
@@ -962,39 +962,54 @@ public actor AgentHistoryScanner {
         return "CLI"
     }
 
+    private static let antigravityDateLock = NSLock()
+    nonisolated(unsafe) private static let antigravityISOWithFrac: ISO8601DateFormatter = {
+        let f = ISO8601DateFormatter()
+        f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return f
+    }()
+    nonisolated(unsafe) private static let antigravityISOBasic: ISO8601DateFormatter = {
+        let f = ISO8601DateFormatter()
+        f.formatOptions = [.withInternetDateTime]
+        return f
+    }()
+    private static let antigravityDateFormats: [DateFormatter] = [
+        "yyyy-MM-dd HH:mm:ss.SSSSSSXXXXX",
+        "yyyy-MM-dd HH:mm:ss.SSSSSSZZZZZ",
+        "yyyy-MM-dd'T'HH:mm:ss.SSSSSSXXXXX",
+        "yyyy-MM-dd'T'HH:mm:ss.SSSSSSZZZZZ",
+        "yyyy-MM-dd HH:mm:ss.SSSXXXXX",
+        "yyyy-MM-dd'T'HH:mm:ss.SSSXXXXX",
+        "yyyy-MM-dd HH:mm:ssZZZZZ",
+        "yyyy-MM-dd HH:mm:ss",
+        "yyyy-MM-dd'T'HH:mm:ssXXXXX",
+        "yyyy-MM-dd'T'HH:mm:ss"
+    ].map { format in
+        let df = DateFormatter()
+        df.locale = Locale(identifier: "en_US_POSIX")
+        df.timeZone = TimeZone(secondsFromGMT: 0)
+        df.dateFormat = format
+        return df
+    }
+
     private static func parseAntigravityDate(_ raw: String?) -> Date {
         guard let raw, !raw.isEmpty else { return Date.distantPast }
         if raw.hasPrefix("0001-") || raw.hasPrefix("0000-") {
             return Date.distantPast
         }
         let normalized = raw.replacingOccurrences(of: " ", with: "T")
-        let iso = ISO8601DateFormatter()
-        iso.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        if let d = iso.date(from: normalized) ?? iso.date(from: raw) {
+        antigravityDateLock.lock()
+        defer { antigravityDateLock.unlock() }
+
+        if let d = antigravityISOWithFrac.date(from: normalized) ?? antigravityISOWithFrac.date(from: raw) {
             if d.timeIntervalSince1970 < 946684800 { return Date.distantPast }
             return d
         }
-        let isoBasic = ISO8601DateFormatter()
-        if let d = isoBasic.date(from: normalized) ?? isoBasic.date(from: raw) {
+        if let d = antigravityISOBasic.date(from: normalized) ?? antigravityISOBasic.date(from: raw) {
             if d.timeIntervalSince1970 < 946684800 { return Date.distantPast }
             return d
         }
-        let df = DateFormatter()
-        df.locale = Locale(identifier: "en_US_POSIX")
-        df.timeZone = TimeZone(secondsFromGMT: 0)
-        for format in [
-            "yyyy-MM-dd HH:mm:ss.SSSSSSXXXXX",
-            "yyyy-MM-dd HH:mm:ss.SSSSSSZZZZZ",
-            "yyyy-MM-dd'T'HH:mm:ss.SSSSSSXXXXX",
-            "yyyy-MM-dd'T'HH:mm:ss.SSSSSSZZZZZ",
-            "yyyy-MM-dd HH:mm:ss.SSSXXXXX",
-            "yyyy-MM-dd'T'HH:mm:ss.SSSXXXXX",
-            "yyyy-MM-dd HH:mm:ssZZZZZ",
-            "yyyy-MM-dd HH:mm:ss",
-            "yyyy-MM-dd'T'HH:mm:ssXXXXX",
-            "yyyy-MM-dd'T'HH:mm:ss"
-        ] {
-            df.dateFormat = format
+        for df in antigravityDateFormats {
             if let d = df.date(from: raw) ?? df.date(from: normalized) {
                 if d.timeIntervalSince1970 < 946684800 { return Date.distantPast }
                 return d
@@ -1052,6 +1067,16 @@ public actor AgentHistoryScanner {
         brainDir: URL,
         ftsIndex: AgentHistoryFTSIndex? = nil
     ) -> [AgentSessionRecord] {
+        var dummy: [String: FileCacheEntry] = [:]
+        return readAntigravitySummaries(dbPath: dbPath, brainDir: brainDir, ftsIndex: ftsIndex, fileCache: &dummy)
+    }
+
+    static func readAntigravitySummaries(
+        dbPath: String,
+        brainDir: URL,
+        ftsIndex: AgentHistoryFTSIndex? = nil,
+        fileCache: inout [String: FileCacheEntry]
+    ) -> [AgentSessionRecord] {
         var db: OpaquePointer?
         guard sqlite3_open_v2(dbPath, &db, SQLITE_OPEN_READONLY, nil) == SQLITE_OK, let db else {
             return []
@@ -1108,6 +1133,22 @@ public actor AgentHistoryScanner {
                 if let rv = try? transcriptURL.resourceValues(forKeys: [.fileSizeKey]), let size = rv.fileSize {
                     fileSize = size
                 }
+            }
+
+            if let cached = fileCache[transcriptPath],
+               cached.mtime == modDate && cached.size == fileSize {
+                if let ftsIndex = ftsIndex {
+                    if !ftsIndex.needsReindex(sessionID: conversationID, mtime: modDate, fileSize: fileSize) {
+                        records.append(cached.record)
+                        continue
+                    }
+                } else {
+                    records.append(cached.record)
+                    continue
+                }
+            }
+
+            if let transcriptURL = findFile(named: "transcript.jsonl", under: sessionDir) {
                 // Memory-mapped and split on newline bytes: no whole-file String copy.
                 if let content = try? Data(contentsOf: transcriptURL, options: .mappedIfSafe) {
                     let lines = content.split(separator: UInt8(ascii: "\n"))
@@ -1179,6 +1220,7 @@ public actor AgentHistoryScanner {
                 surfaceTag: tag,
                 usage: latestUsage
             )
+            fileCache[transcriptPath] = FileCacheEntry(mtime: modDate, size: fileSize, record: record)
             records.append(record)
             toSave.append(CachedSessionEntry(record: record, mtime: modDate, fileSize: fileSize))
         }
@@ -1195,6 +1237,13 @@ public actor AgentHistoryScanner {
         brainDir: URL,
         ftsIndex: AgentHistoryFTSIndex? = nil
     ) -> [AgentSessionRecord] { [] }
+
+    static func readAntigravitySummaries(
+        dbPath: String,
+        brainDir: URL,
+        ftsIndex: AgentHistoryFTSIndex? = nil,
+        fileCache: inout [String: FileCacheEntry]
+    ) -> [AgentSessionRecord] { [] }
     #endif
 
     public func scanAntigravity() async -> [AgentSessionRecord] {
@@ -1203,11 +1252,7 @@ public actor AgentHistoryScanner {
         let dbPath = home.appendingPathComponent(".gemini/antigravity-cli/conversation_summaries.db").path
 
         if FileManager.default.fileExists(atPath: dbPath) {
-            let records = Self.readAntigravitySummaries(dbPath: dbPath, brainDir: brainDir, ftsIndex: ftsIndex)
-            for rec in records {
-                fileCache[rec.transcriptPath] = FileCacheEntry(mtime: rec.updatedAt, size: 0, record: rec)
-            }
-            return records
+            return Self.readAntigravitySummaries(dbPath: dbPath, brainDir: brainDir, ftsIndex: ftsIndex, fileCache: &fileCache)
         }
 
         guard FileManager.default.fileExists(atPath: brainDir.path) else { return [] }
@@ -1428,6 +1473,15 @@ public actor AgentHistoryScanner {
         baseDir: URL,
         ftsIndex: AgentHistoryFTSIndex? = nil
     ) -> [AgentSessionRecord] {
+        var dummy: [String: FileCacheEntry] = [:]
+        return readCodexRollouts(baseDir: baseDir, ftsIndex: ftsIndex, fileCache: &dummy)
+    }
+
+    static func readCodexRollouts(
+        baseDir: URL,
+        ftsIndex: AgentHistoryFTSIndex? = nil,
+        fileCache: inout [String: FileCacheEntry]
+    ) -> [AgentSessionRecord] {
         let activeDir = baseDir.appendingPathComponent("sessions")
         let archivedDir = baseDir.appendingPathComponent("archived_sessions")
 
@@ -1451,11 +1505,26 @@ public actor AgentHistoryScanner {
 
         for fileURL in rolloutFiles {
             let path = fileURL.path
+            let rv = try? fileURL.resourceValues(forKeys: [.contentModificationDateKey, .fileSizeKey])
+            let mtime = rv?.contentModificationDate ?? Date()
+            let size = rv?.fileSize ?? 0
+
+            if let cached = fileCache[path],
+               cached.mtime == mtime && cached.size == size {
+                if let ftsIndex = ftsIndex {
+                    if !ftsIndex.needsReindex(sessionID: cached.record.id, mtime: mtime, fileSize: size) {
+                        records.append(cached.record)
+                        continue
+                    }
+                } else {
+                    records.append(cached.record)
+                    continue
+                }
+            }
+
             let tag = codexSurfaceTag(filePath: path, placement: .local)
             if let record = parseCodexTranscript(fileURL: fileURL, surfaceTag: tag, ftsIndex: ftsIndex) {
-                let rv = try? fileURL.resourceValues(forKeys: [.contentModificationDateKey, .fileSizeKey])
-                let mtime = rv?.contentModificationDate ?? Date()
-                let size = rv?.fileSize ?? 0
+                fileCache[path] = FileCacheEntry(mtime: mtime, size: size, record: record)
                 records.append(record)
                 toSave.append(CachedSessionEntry(record: record, mtime: mtime, fileSize: size))
             }
@@ -1475,11 +1544,7 @@ public actor AgentHistoryScanner {
         let codexDir = home.appendingPathComponent(".codex")
         guard FileManager.default.fileExists(atPath: codexDir.path) else { return [] }
 
-        let records = Self.readCodexRollouts(baseDir: codexDir, ftsIndex: ftsIndex)
-        for rec in records {
-            fileCache[rec.transcriptPath] = FileCacheEntry(mtime: rec.updatedAt, size: 0, record: rec)
-        }
-        return records
+        return Self.readCodexRollouts(baseDir: codexDir, ftsIndex: ftsIndex, fileCache: &fileCache)
     }
 
     /// A Codex `AGENTS.md`/environment prelude gets injected as the first `user`-role message
@@ -1667,6 +1732,15 @@ public actor AgentHistoryScanner {
         storageDirs: [URL],
         ftsIndex: AgentHistoryFTSIndex? = nil
     ) -> [AgentSessionRecord] {
+        var dummy: [String: FileCacheEntry] = [:]
+        return readVSCodeStorageSessions(storageDirs: storageDirs, ftsIndex: ftsIndex, fileCache: &dummy)
+    }
+
+    static func readVSCodeStorageSessions(
+        storageDirs: [URL],
+        ftsIndex: AgentHistoryFTSIndex? = nil,
+        fileCache: inout [String: FileCacheEntry]
+    ) -> [AgentSessionRecord] {
         let fm = FileManager.default
         var records: [AgentSessionRecord] = []
         var toSave: [CachedSessionEntry] = []
@@ -1684,10 +1758,26 @@ public actor AgentHistoryScanner {
                     let url = dir.appendingPathComponent("chatSessions").appendingPathComponent(file)
                     guard let rv = try? url.resourceValues(forKeys: [.contentModificationDateKey, .fileSizeKey]),
                           let mtime = rv.contentModificationDate, let size = rv.fileSize else { continue }
+                    let path = url.path
+
+                    if let cached = fileCache[path],
+                       cached.mtime == mtime && cached.size == size {
+                        if let ftsIndex = ftsIndex {
+                            if !ftsIndex.needsReindex(sessionID: cached.record.id, mtime: mtime, fileSize: size) {
+                                records.append(cached.record)
+                                continue
+                            }
+                        } else {
+                            records.append(cached.record)
+                            continue
+                        }
+                    }
+
                     guard let data = try? Data(contentsOf: url, options: .mappedIfSafe),
                           let session = VSCodeChatSession.parse(data, isJSONL: file.hasSuffix(".jsonl")),
                           let record = vscodeRecord(session, projectPath: projectPath, transcriptPath: url.path, fallbackDate: mtime, fileSize: size, ftsIndex: ftsIndex, surfaceTag: surfaceTag)
                     else { continue }
+                    fileCache[path] = FileCacheEntry(mtime: mtime, size: size, record: record)
                     records.append(record)
                     toSave.append(CachedSessionEntry(record: record, mtime: mtime, fileSize: size))
                 }
@@ -1708,11 +1798,7 @@ public actor AgentHistoryScanner {
             appSupport.appendingPathComponent("Code - Insiders/User/workspaceStorage")
         ].filter { fm.fileExists(atPath: $0.path) }
 
-        let records = Self.readVSCodeStorageSessions(storageDirs: dirs, ftsIndex: ftsIndex)
-        for rec in records {
-            fileCache[rec.transcriptPath] = FileCacheEntry(mtime: rec.updatedAt, size: 0, record: rec)
-        }
-        return records
+        return Self.readVSCodeStorageSessions(storageDirs: dirs, ftsIndex: ftsIndex, fileCache: &fileCache)
     }
 
     /// `workspace.json` holds `folder` (a `file://` dir) or `workspace` (a `.code-workspace`
