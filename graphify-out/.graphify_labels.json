@@ -858,6 +858,7 @@
   "856": "go",
   "857": ".sidebarContainerView",
   "858": "NSLayoutConstraint",
+  "859": "Switch To Session 1",
   "870": ".deinit",
   "871": "SessionStore",
   "872": "FSEventStreamRef",
