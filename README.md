@@ -363,6 +363,10 @@ make dmg
 make finalize
 ```
 
+## Contributors
+
+Developed and maintained by **Vit129** and **Claude** (Anthropic).
+
 ## License
 
 Apache License 2.0 — see `LICENSE` and `NOTICE`. Kouen is a fork of
