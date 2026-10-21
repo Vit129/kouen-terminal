@@ -200,7 +200,7 @@
     "semantic_hash": ""
   },
   "Apps/Kouen/Sources/KouenApp/Services/SplitPaneCoordinator.swift": {
-    "mtime": 1792566004.4310558,
+    "mtime": 1792569037.0359247,
     "ast_hash": "3946e7b044da8643462e39f3a058bbbd",
     "semantic_hash": ""
   },
@@ -320,7 +320,7 @@
     "semantic_hash": ""
   },
   "Apps/Kouen/Sources/KouenApp/UI/Chrome/BrowserPaneView.swift": {
-    "mtime": 1792566138.2226157,
+    "mtime": 1792569037.0392935,
     "ast_hash": "012c0a5e60d15ce0df777c1086d46853",
     "semantic_hash": ""
   },
@@ -2030,7 +2030,7 @@
     "semantic_hash": ""
   },
   "Tests/KouenAppTests/BrowserPaneViewTests.swift": {
-    "mtime": 1792566152.7557433,
+    "mtime": 1792569037.040345,
     "ast_hash": "e6a93590a2a08440196a1984e75bf5cd",
     "semantic_hash": ""
   },
@@ -3355,8 +3355,8 @@
     "semantic_hash": ""
   },
   "README.md": {
-    "mtime": 1792565628.9408305,
-    "ast_hash": "641586820c136a9f4d84e3e3d02452ae",
+    "mtime": 1792566269.026805,
+    "ast_hash": "dbecfdda2005b7b514cfda7b81d893ae",
     "semantic_hash": ""
   },
   "Scripts/benchmarks/README.md": {
@@ -4682,6 +4682,21 @@
   "Tests/KouenAppTests/BrowserFileReloadTests.swift": {
     "mtime": 1792317951.57436,
     "ast_hash": "ff14a0f3d353d1320706b67e0994d23a",
+    "semantic_hash": ""
+  },
+  "docs/features.md": {
+    "mtime": 1792566269.0275354,
+    "ast_hash": "ba1f067736f769f7c8c90fa8bd5179ab",
+    "semantic_hash": ""
+  },
+  "docs/keyboard-shortcuts.md": {
+    "mtime": 1792566269.0279164,
+    "ast_hash": "e824842b060860c916ca46c48accadb6",
+    "semantic_hash": ""
+  },
+  "docs/mcp-tools.md": {
+    "mtime": 1792566269.0294423,
+    "ast_hash": "70eba5c16e67721d3c97c135f7cad672",
     "semantic_hash": ""
   }
 }
