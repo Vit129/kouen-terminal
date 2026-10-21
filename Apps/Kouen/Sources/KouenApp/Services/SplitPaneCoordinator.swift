@@ -255,14 +255,15 @@ final class SplitPaneCoordinator {
     /// human happened to be looking at B. Falls back to the active tab only when there is
     /// no origin surface at all (menu/keyboard-triggered opens have no originating agent
     /// surface); a present-but-unresolvable origin surface no-ops instead of misrouting.
-    func openBrowserPane(url: URL, direction: SplitDirection, paneID: PaneID = UUID(), originSurfaceID: SurfaceID? = nil) {
+    @discardableResult
+    func openBrowserPane(url: URL, direction: SplitDirection, paneID: PaneID = UUID(), originSurfaceID: SurfaceID? = nil) -> PaneID? {
         let tab: Tab?
         if let originSurfaceID {
             tab = coord.surfaceIndex[originSurfaceID]?.tab
         } else {
             tab = coord.snapshot.activeWorkspace?.activeTab
         }
-        guard let tab else { return }
+        guard let tab else { return nil }
 
         let resolvedURL: URL
         if let savedURLString = UserDefaults.standard.string(forKey: "browserPane.\(paneID.uuidString).url"),
@@ -270,6 +271,14 @@ final class SplitPaneCoordinator {
             resolvedURL = savedURL
         } else {
             resolvedURL = url
+        }
+
+        // Reuse existing browser pane in this tab by creating a new tab instead of splitting a new pane
+        if let existingPaneID = DaemonSyncService.existingBrowserPaneID(inTab: tab),
+           let existing = BrowserPaneRegistry.shared.get(existingPaneID) {
+            existing.createTab(url: resolvedURL)
+            existing.window?.makeFirstResponder(existing.webView)
+            return existingPaneID
         }
 
         let browserLeaf = BrowserLeaf(id: paneID, url: resolvedURL)
@@ -291,11 +300,12 @@ final class SplitPaneCoordinator {
                         updatedSnapshot.workspaces[wIdx].sessions[sIdx].tabs[tIdx] = updatedTab
 
                         coord.daemonSyncService.applyLocalSnapshot(updatedSnapshot)
-                        return
+                        return paneID
                     }
                 }
             }
         }
+        return nil
     }
 
     private func insertBrowserLeaf(

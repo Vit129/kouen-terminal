@@ -16,6 +16,7 @@ public final class BrowserPaneView: NSView {
     }
 
     private var tabs: [BrowserTab] = []
+    var tabCount: Int { tabs.count }
     private var activeTabIndex: Int = 0
     private var activeTab: BrowserTab? { tabs.indices.contains(activeTabIndex) ? tabs[activeTabIndex] : nil }
     private var consoleLogs: [String] = []
