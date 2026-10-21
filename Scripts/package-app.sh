@@ -104,6 +104,9 @@ if [[ -d "$FONTS" ]]; then
   ditto "$FONTS" "$APP/Contents/Resources/Fonts"
 fi
 
+# License texts ship with the binary (Apache-2.0 §4: LICENSE + NOTICE; MIT: the upstream notice).
+for f in LICENSE LICENSE-MIT NOTICE; do cp "$ROOT/$f" "$APP/Contents/Resources/$f"; done
+
 chmod +x "$APP/Contents/MacOS/"*
 
 echo "Created $APP"

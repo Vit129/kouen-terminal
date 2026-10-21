@@ -365,4 +365,6 @@ make finalize
 
 ## License
 
-MIT
+Apache License 2.0 — see `LICENSE` and `NOTICE`. Kouen is a fork of
+[robzilla1738/harness-terminal](https://github.com/robzilla1738/harness-terminal) (MIT, © 2026 Robert);
+that code and releases up to v4.21.10 remain available under MIT (`LICENSE-MIT`).

@@ -1,0 +1,12 @@
+Kouen
+Copyright 2026 Vit129.
+
+This product is licensed under the Apache License, Version 2.0 (see LICENSE).
+
+Kouen is a fork of Harness (https://github.com/robzilla1738/harness-terminal),
+Copyright (c) 2026 Robert, licensed under the MIT License. That code, and every
+contribution made before the relicensing, remains available under the MIT License;
+its text and copyright notices are retained in LICENSE-MIT.
+
+The app bundles third-party components under their own licenses, including
+Sparkle (MIT) and Symbols Nerd Font Mono (MIT, license shipped in Resources/Fonts).
