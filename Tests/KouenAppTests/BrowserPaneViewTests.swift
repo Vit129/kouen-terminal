@@ -213,6 +213,37 @@ final class BrowserPaneViewTests: XCTestCase {
         XCTAssertEqual(root.paneID, termLeaf.id)
     }
 
+    func testOpenBrowserPaneReusesExistingBrowserPaneInTab() {
+        let initialURL = URL(string: "https://example.com/initial")!
+        let newURL = URL(string: "https://example.com/new-pr")!
+        let browserPaneID = UUID()
+
+        let mockWebView = MockWebView(frame: .zero, configuration: WKWebViewConfiguration())
+        let paneView = BrowserPaneView(url: initialURL, paneID: browserPaneID, webView: mockWebView)
+        BrowserPaneRegistry.shared.register(paneView)
+        defer {
+            BrowserPaneRegistry.shared.unregister(browserPaneID)
+        }
+
+        let browserLeaf = BrowserLeaf(id: browserPaneID, url: initialURL)
+        let tab = Tab(id: TabID(), cwd: "/tmp", rootPane: .browser(browserLeaf))
+        let session = SessionGroup(id: SessionID(), tabs: [tab], activeTabID: tab.id)
+        let workspace = Workspace(id: WorkspaceID(), name: "Test", sessions: [session], activeSessionID: session.id)
+        let snapshot = SessionSnapshot(workspaces: [workspace], activeWorkspaceID: workspace.id)
+
+        SessionCoordinator.shared.daemonSyncService.applyLocalSnapshot(snapshot)
+
+        XCTAssertEqual(paneView.tabCount, 1)
+
+        let returnedPaneID = SessionCoordinator.shared.splitPaneCoordinator.openBrowserPane(
+            url: newURL,
+            direction: .horizontal
+        )
+
+        XCTAssertEqual(returnedPaneID, browserPaneID, "Should reuse the existing browser pane ID")
+        XCTAssertEqual(paneView.tabCount, 2, "Should create a new tab in the existing browser pane instead of splitting")
+    }
+
     func testBrowserPaneHitTestAndActions() {
         let mockWebView = MockWebView(frame: .zero, configuration: WKWebViewConfiguration())
         let testURL = URL(string: "https://example.com/test")!
