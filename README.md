@@ -123,6 +123,12 @@ Kouen has four experience modes:
 
 Switch modes in **Settings -> Terminal -> Experience**. Details live in [docs/MODES.md](docs/MODES.md).
 
+## Installation
+
+1. Download the latest `Kouen.dmg` from [Releases](https://github.com/Vit129/kouen-terminal/releases).
+2. Open the DMG and drag **Kouen.app** to your `/Applications` folder.
+3. Open Kouen from Launchpad or `/Applications`.
+
 ## CLI
 
 After installation, `kouen-cli` is available from the app bundle or app-support bin directory:
