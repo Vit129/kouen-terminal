@@ -2,40 +2,31 @@
 
 *An Agent Development Environment built around a native macOS terminal.*
 
-> This is a personal fork of [robzilla1738/harness-terminal](https://github.com/robzilla1738/harness-terminal), maintained independently by [Vit129](https://github.com/Vit129). Not affiliated with the original project or its author. It's a hard fork, not a PR queue back upstream — see [What's different from upstream](#whats-different-from-upstream).
+> This is a personal fork of [robzilla1738/harness-terminal](https://github.com/robzilla1738/harness-terminal), maintained independently by [Vit129](https://github.com/Vit129). Not affiliated with the original project or its author. It's a hard fork, not a PR queue back upstream — see [What's different from upstream](docs/features.md#whats-different-from-upstream).
 
-Kouen is an Agent Development Environment built around a native macOS terminal — a first-party Swift terminal engine, a background session daemon, a scriptable CLI, embedded browser with MCP control, and multi-agent awareness, plus worktree-aware sessions, a diff viewer that feeds review comments straight back to the agent, an issue tracker that spins up an isolated worktree per ticket, and a fleet view for scheduled automations, an orchestrator that spawns and supervises worker agents, and cross-agent history with handoff — all in one app. Terminal-first: it supervises agents and git/process state, it is not an IDE.
+Kouen is a native macOS terminal (Swift) with a first-party terminal engine, a background session daemon, a scriptable CLI, an embedded browser with MCP control, and multi-agent awareness. Run Claude Code, Codex, Gemini CLI, or any agent side by side; sessions persist across app restarts and agents notify you when done. It is terminal-first: it supervises agents and git/process state, it is not an IDE.
 
-Run Claude Code, Codex, Gemini CLI, or any agent side-by-side. Sessions persist across app restarts, agents notify you when done, the embedded browser responds to MCP tool calls, and panes render on Metal.
+## Key features
 
----
+- Native Metal terminal rendering; daemon-owned sessions, tabs and panes that survive app restarts.
+- `kouen-cli` automation: create sessions, send keys, capture panes, install hooks, drive remote/headless daemons.
+- Agent detection and notifications for Claude Code, Codex, Gemini, Cursor, Aider and others.
+- Embedded browser pane with `kouen-mcp`, so agents can open pages, read the DOM, click and capture screenshots.
+- Orchestrator and Agent Swarm, scheduled Automations, and worktree-first sessions.
+- Agent safety net: per-turn checkpoints (`kouen undo`), build/test verification, and write guards.
+- Built-in editor with LSP, unified agent History, and an optional tmux-style mode.
 
-## What's different from upstream
+More in [docs/features.md](docs/features.md).
 
-This fork started from upstream (currently v1.12.1) and has since diverged substantially — over 100 changelog entries of its own (upstream's count of 23 was last checked earlier and may be stale), and a set of first-party Swift packages backing the features below (see [ARCHITECTURE.md](ARCHITECTURE.md)). Checked directly against upstream's current source, not assumed:
-
-- **AI browser control via MCP** — `kouen-mcp` exposes tools like `kouenBrowserOpen` and `kouenBrowserSnapshot` (full list under [AI Browser Control](#ai-browser-control-kouen-mcp)) so agents can drive the embedded browser pane directly. Upstream has no browser pane and no MCP server.
-- **A built-in code editor with LSP** across 21 languages, with vi ex commands `gd` / `K` / `:errors` working against the live session (see [Editor & LSP](#editor--lsp)). Upstream's sidebar is session/tab lists only — no file editor, no LSP.
-- **A denser navigation layer** — Recipes (`⌘⇧R`), Composer (`⌘⇧E`), the zoxide frecency picker (`⌘⇧J`), tab overview (`⌘⇧\`), and hint mode (`⌘⇧U`) — none of these shortcuts exist upstream.
-- **JavaScriptCore-based scripting** (see [Stack](#stack)) — upstream has no scripting layer at all.
-
-None of this is a knock on the original — it's a different, more actively-maintained branch, kept for personal use rather than as a distributed product.
-
----
-
-## Install
-
-This fork does not currently publish a downloadable `.dmg` asset. Install it by building from source.
-
-### Requirements
+## Requirements
 
 - Apple silicon Mac
 - macOS 15 or later
 - Xcode 16+ / Swift 6.0
 
-### Install Into Applications
+## Install
 
-Use this for a normal local install:
+This fork does not currently publish a downloadable `.dmg`; build from source. Prebuilt DMG and in-app updates (Sparkle) are planned.
 
 ```bash
 git clone https://github.com/Vit129/kouen-terminal.git
@@ -43,331 +34,45 @@ cd kouen-terminal
 make install-graceful
 ```
 
-`make install-graceful` (`Scripts/install-graceful.sh`) builds first, then packages `Kouen.app`, copies it to `/Applications/Kouen.app`, refreshes the local daemon/CLI helper binaries and opens the app. Workspace/session state is preserved, and the daemon is only restarted when the IPC protocol changed, so running agents survive an update.
-
-After the app opens, install the CLI on your `PATH` if prompted, or run:
-
-```bash
-/Applications/Kouen.app/Contents/MacOS/kouen-cli install
-```
-
-Then verify:
+`make install-graceful` builds, installs `Kouen.app` into `/Applications`, refreshes the daemon/CLI helpers and opens the app. Then verify:
 
 ```bash
 kouen-cli doctor
 kouen-cli ping
 ```
 
-The release helper `Scripts/full-cycle.sh` ends by comparing the running daemon's build with the app's and offering `kouen-cli install` when they differ. Since Kouen is only ever built locally from this clone, launching the app also checks this repo's `version.json` on `main` once per launch and, on a clean working tree, asks whether to `git pull` when a newer version is available — never automatically. Decline and it won't ask again for that version; a dirty tree gets a notice instead of a prompt.
+For an isolated dev app that does not touch production state, run `make preview`.
 
-### Development Builds
-
-For an isolated dev/test app that does not touch production Kouen state:
+## Update
 
 ```bash
-make preview
+git pull
+make install-graceful
 ```
 
-See [docs/USAGE.md](docs/USAGE.md) for the full install, run, CLI, and remote/headless guide.
+Workspace and session state is preserved, and the daemon only restarts when the IPC protocol changed, so running agents survive an update.
 
-## Why Kouen
+## Usage
 
-- Native terminal rendering with Swift, CoreText, Metal, ligatures, and a large built-in theme catalog.
-- Daemon-owned sessions, tabs, panes, scrollback, and layouts so work survives app restarts and can be attached from another client.
-- `kouen-cli` automation for creating sessions, sending keys, capturing panes, installing hooks, and driving remote/headless daemons.
-- Agent detection and notifications for Claude Code, Codex, Cursor, Grok, Pi, Hermes, OpenClaw, OpenCode, Aider, Gemini, Goose, and generic agents.
-- Embedded browser pane with `kouen-mcp` — AI agents can open URLs, read DOM snapshots, click elements, fill forms, capture screenshots, and inspect network/storage without a separate Playwright process.
-- Headless Claude Code runs — `kouen cc run` (CLI) or `kouenCCRun`/`kouenCCStatus` (`kouen-mcp`) drive `claude` as a real subprocess for one-shot prompts/automations, no pane or human supervision needed.
-- Multi-agent workflows — run Claude Code, Codex, and Gemini CLI in parallel panes with per-agent statusline showing model, context usage, and rate limits.
-- Orchestrator and Agent Swarm — an agent decomposes a goal into Tasks, spawns Worker sessions (interactive or headless via `kouenSpawnWorker`), and drives each toward merge-ready with a bounded auto-fix loop; task status shows inline on tabs and the sidebar. Headless workers accept follow-up turns.
-- Automations — scheduled agent launches with a Jobs fleet view and result viewer (`kouenAutomation*` MCP tools).
-- Worktree-first sessions — lineage and drift tracking per worktree, per-ticket isolated worktrees from the issue tracker, and auto-isolate that keeps the primary checkout on its own branch.
-- Unified History — Claude Code, Codex, Antigravity, Copilot and VS Code Copilot Chat sessions in one list; resume in place or hand a session off to another agent. ◀ ▶ next to the sidebar toggle step to the previous/next session in list order (same action as ⌘⇧[ / ⌘⇧], not a switch-history stack).
-- Per-agent launch modes — `local`, `remote-control` or `cloud` per agent (`agentSessionModes` in `settings.json`), driven by one launch table; see [Mobile](#mobile).
-- Optional tmux-style controls: prefix key, status line, copy mode, paste buffers, hooks, command prompt, and many tmux-compatible commands.
-- IDE-like navigation — double-click folders to cd, ⌘P fuzzy jump to any directory via zoxide frecency, ⌘⇧J frecency dir picker (↩ cd · ⌘↩ open new tab), ⌘⇧R saved command recipes, ⌘-click file paths, `:cd` from the command prompt, and **Open With Kouen** from Finder on any source file.
-- Sidebar tools for sessions, file navigation, real-time Git workflows (one-step Commit & Push, per-hunk stage/unstage, PR merge with squash/rebase/merge picker), command palette, and editor/LSP flows across 21 languages — see [Editor & LSP](#editor--lsp).
-- Sidebar dev-server detection — live listening-port badge per session, click to open in the browser pane.
-- SSH agent forwarding for remote hosts, toggleable per host in Settings.
-- Fleet visibility — footer badge + Agent Inbox header show running/needs-attention counts across all active agent sessions, plus a dedicated Fleet sidebar tab flattening every live session across every workspace.
-- Agent safety net — automatic per-turn checkpoints with `kouen undo`, two-tier build/test verification (`kouen verify`, `verify-on-turn`), and write-origin guards that refuse an automation write onto a protected branch, a dirty unisolated checkout, or a surface a human is actively typing in — see [Agent Safety Net](#agent-safety-net-checkpoints-verification-write-guards).
-- Stable under long sessions — per-pane controller trees and browser network buffers are bounded and released on pane close; memory stays flat across hours of use.
-
-## Keyboard Shortcuts
-
-The most-used ones. Full reference (Vi modal editing, prompt tools, navigation, session/layout files, agent protocol) is in [docs/KEYBINDINGS.md](docs/KEYBINDINGS.md).
-
-| Shortcut | Action |
-|----------|--------|
-| ⌘⌃V | Toggle Vi modal editing (normal / insert mode) |
-| ⌘⇧J | Frecency directory picker (zoxide-powered) |
-| ⌘⇧R | Recipes — saved command picker |
-| ⌘⇧E | Composer panel — multi-line command editor |
-| ⌘⌥F | Floating terminal pane (NSPanel, persisted frame) |
-| ⌘⇧\ | Tab overview — thumbnail grid, click to switch |
-| ⌘F / ⌘⇧F | Scrollback search / find in files |
-| ⌘⇧U | Hint mode — keyboard-driven link/path opening |
-| ⌘K | Quick Context Injector — inject `@diff`/`@file`/`@last`/`@error`/`@builderror` into the terminal |
-| ⌘⌥D | Turn Diff Reviewer — review the agent's last turn against its checkpoint (`y` accept, `r` revert) |
-
-## How It Feels
-
-Kouen has four experience modes:
-
-| Mode | Best for | Persistence |
-| --- | --- | --- |
-| Plain Terminal | A normal, quiet terminal | Sessions close on clean quit |
-| Persistent Terminal | Plain terminal plus daemon-backed sessions | Sessions survive clean quit |
-| Full Terminal | tmux-style panes, prefix, status line, copy mode | Sessions survive clean quit |
-| Agent Workspace | Project workspaces with agent detection foregrounded | Sessions survive clean quit |
-
-Switch modes in **Settings -> Terminal -> Experience**. Details live in [docs/MODES.md](docs/MODES.md).
-
-## Installation
-
-1. Download the latest `Kouen.dmg` from [Releases](https://github.com/Vit129/kouen-terminal/releases).
-2. Open the DMG and drag **Kouen.app** to your `/Applications` folder.
-3. Open Kouen from Launchpad or `/Applications`.
-
-## CLI
-
-After installation, `kouen-cli` is available from the app bundle or app-support bin directory:
-
-```bash
-/Applications/Kouen.app/Contents/MacOS/kouen-cli install
-export PATH="$HOME/Library/Application Support/Kouen/bin:$PATH"
-```
-
-Common commands:
-
-```bash
-kouen-cli doctor
-kouen-cli list-sessions
-kouen-cli list-surfaces
-kouen-cli new-session --workspace Default --cwd ~/Code
-kouen-cli attach --surface <uuid>
-kouen-cli attach-window --session <name>
-kouen-cli send-keys --surface <uuid> --keys "ls -la Enter"
-kouen-cli capture-pane --surface <uuid> --scrollback
-kouen-cli install-hooks codex
-kouen-cli cc run "summarize the last commit" --cwd ~/Code/myrepo
-```
-
-More examples are in [docs/USAGE.md](docs/USAGE.md), [docs/COMMANDS.md](docs/COMMANDS.md), and [docs/MULTIPLEXER_GUIDE.md](docs/MULTIPLEXER_GUIDE.md).
-
-## AI Browser Control (kouen-mcp)
-
-AI agents (Claude Code, Codex, Kiro) can see and interact with the embedded browser pane via `kouen-mcp`. No separate browser or Playwright process needed.
-
-**What an agent can do:**
-
-| Capability | Tool | Returns |
-| --- | --- | --- |
-| Open / navigate URL | `kouenBrowserOpen`, `kouenBrowserNavigate` | pane ID |
-| Read DOM + elements | `kouenBrowserSnapshot` | accessibility tree with stable refs (e1, e2…) |
-| Click / fill / scroll | `kouenBrowserInteract` | ok / error |
-| Screenshot | `kouenBrowserScreenshot` | base64 PNG |
-| Read console logs | included in snapshot | array of log strings |
-| Network requests | `kouenBrowserNetwork` | url, method, status, req/res body |
-| Cookies | `kouenBrowserCookies` | name, value, domain, expires, secure |
-| localStorage / sessionStorage | `kouenBrowserStorage` | key/value pairs |
-
-**Snapshot element format** — stable refs let agents interact without writing selectors:
-
-```json
-{ "id": "e7", "tag": "button", "role": "button", "text": "Save", "bounds": {"x":120,"y":340,"width":80,"height":32}, "visible": true }
-```
-
-**Default home page** is configurable in `settings.json`:
-
-```json
-{ "browserHomePage": "https://www.google.com" }
-```
-
-**Auto-close:** a browser pane an agent opened with `kouenBrowserOpen` closes itself when that agent goes idle (panes you opened, or that were reused, stay).
-
-**Token efficiency:** snapshot returns structured data (~200–500 tokens), not screenshots or raw HTML — significantly cheaper than vision-based browser automation.
-
-**Beyond the browser** — `kouen-mcp` registers 77 tools in total (`Tools/kouen-mcp/Sources/KouenMCP/ToolRegistry.swift`). The tables in this README cover the browser and Claude Code tools; the rest, by group:
-
-| Group | Tools |
-| --- | --- |
-| Browser (also) | `kouenBrowserWait`, `kouenBrowserClose`, `kouenBrowserEvaluate`, `kouenBrowserGoBack`, `kouenBrowserGoForward`, `kouenBrowserReload`, `kouenBrowserDesignModeInfo` |
-| Panes and sessions | `kouenList`, `kouenBoard`, `openDiffReview`, `readPaneOutput`, `kouenGetLastBlock`, `kouenGetBlock`, `setPaneLabel`, `sendPaneText`, `sendPaneKeys`, `spawnSession`, `splitPane`, `closePane`, `waitForPaneOutput` |
-| Files and commands | `readFile`, `writeFile`, `listDirectory`, `runCommand` |
-| Git | `gitStatus`, `gitDiff`, `gitLog`, `kouenPRStatus` |
-| Code navigation | `kouenFind`, `kouenGrep`, `kouenRecent`, `kouenErrors` |
-| Agents and swarm | `kouenSpawnAgent`, `kouenSpawnWorker`, `kouenSwarmList`, `kouenSwarmInput`, `kouenSwarmTerminate` |
-| Tasks | `kouenTaskList`, `kouenTaskGet`, `kouenTaskCreate`, `kouenTaskUpdate`, `kouenTaskDelete` |
-| Features (AI-SDLC) | `kouenFeatureCreate`, `kouenFeatureGet`, `kouenFeatureList`, `kouenFeatureApproveGate`, `kouenFeatureUpdatePhase`, `kouenContextResolve`, `kouenFeaturePreview` |
-| Worktrees, hosts, projects | `kouenWorktreeList`, `kouenWorktreeCreate`, `kouenWorktreeRemove`, `kouenHostList`, `kouenProjectsList` |
-| Automations | `kouenAutomationList`, `kouenAutomationGet`, `kouenAutomationCreate`, `kouenAutomationUpdate`, `kouenAutomationDelete`, `kouenAutomationPause`, `kouenAutomationResume`, `kouenAutomationRunNow` |
-| Agent routing rules | `kouenRoutingRuleList`, `kouenRoutingRuleCreate`, `kouenRoutingRuleUpdate`, `kouenRoutingRuleDelete`, `kouenRoutingRuleReorder` |
-
-## Claude Code Harness
-
-Run `claude` as a real subprocess — `-p --output-format stream-json` — instead of a pty pane. No adapter binary, no screen-scraping; tool access is controlled via `--allowedTools`/`--disallowedTools`. For one-shot prompts and automations where nothing needs to watch it run; use `kouenSpawnAgent`/an interactive pane instead when a human is steering.
-
-**From the terminal, no AI agent needed:**
-
-```bash
-kouen-cli cc run "summarize the last commit" --cwd ~/Code/myrepo
-kouen-cli cc run "add input validation" --profile edit --model sonnet --effort high
-kouen-cli cc status <runId>
-kouen-cli cc list
-kouen-cli cc cancel <runId>
-```
-
-**From an AI agent, via `kouen-mcp`:**
-
-| Capability | Tool | Returns |
-| --- | --- | --- |
-| Start a run | `kouenCCRun` | run id + immediate status |
-| Get / list / cancel | `kouenCCStatus` | run status, result, cost |
-
-**Permission profiles** — `readonly` (Read/Glob/Grep only) or `edit` (default: Edit/Write + a git-readonly Bash allowlist; `rm`/`sudo`/`git push` always denied). Never `bypassPermissions`.
-
-## Agent Safety Net (Checkpoints, Verification, Write Guards)
-
-Every agent turn is automatically snapshotted and, optionally, verified — so a bad turn is a
-`kouen undo` away instead of a manual `git diff`/`git checkout` scramble, and a broken build
-surfaces as a desktop notification instead of silently compounding into the next turn.
-
-- **Checkpoints on every turn** — when an agent's Stop hook fires, the daemon snapshots the
-  working tree (tracked + untracked) into a `refs/kouen/checkpoints/<session>/<turn>` git ref via
-  a temporary index, never touching your real staging area or `git stash`.
-- **`kouen undo`** — revert the working tree in a tab's `cwd` to its last checkpoint, or list
-  checkpoints with their diffstat: `kouen undo`, `kouen undo list`, `kouen undo --tab <id>`,
-  `kouen undo --feature <slug>`.
-- **`kouen verify`** — run a two-tier check against a tab's project: `tier1` (fast syntax/build
-  check, auto-detected per toolchain) or `tier2` (the project's own full test command, manual-only
-  since running a full suite after every turn is too expensive a default). Enable tier1
-  automatically after every agent turn with `set-option -g verify-on-turn on`; a failing check
-  flips the tab to an error state with a desktop notification you can act on directly (see
-  Turn Diff Reviewer below).
-- **Write-origin guards** — every PTY write is tagged `human` or `automation`. An automation
-  write is refused (not silently accepted) when: a human typed in that surface within the last
-  1.5s (avoids stepping on a live human edit), the tab sits directly on a protected branch
-  (`main`/`master`/`develop`) with no worktree isolation, or the tab's checkout already has
-  uncommitted changes with no worktree isolation — each a guard against an agent clobbering work
-  that isn't its own. Worktree-isolated tabs are exempt from the branch/dirty-tree checks by design.
-- **Turn Diff Reviewer (⌘⌥D)** — review the diff since the last checkpoint in a floating panel;
-  `y` accepts, `r` reverts to the checkpoint, `esc` dismisses.
-- **Quick Context Injector (⌘K)** — a HUD that resolves `@`-mention tokens (`@diff`, `@file:<path>`,
-  `@last`, `@error`, `@builderror` for the last failed `verify-on-turn` output, `@pane:<id>`,
-  `@graph:<symbol>`, `@issue`) and sends the expanded text straight into the active surface.
-- **`kouen history`** — list, search, show, or resume past agent sessions (Claude Code, Codex,
-  Antigravity) across every workspace from the shell (Copilot and VS Code Copilot Chat sessions also appear in the app's History view): `kouen history`, `kouen history search
-  <keyword>`, `kouen history show <id>`, `kouen history resume <id>`.
-- **`kouen task pack-pr [<slug>] [--out <file>]`** — assembles a PR description (diff stat, gate
-  approvals, task checklist) from a feature's tracked state, for `gh pr create --body "$(kouen
-  task pack-pr <slug>)"`.
-- **Fleet tab** — one sidebar view flattening every live tab across every workspace, sorted
-  needs-attention-first, with a filter box; the more useful entry point in day-to-day use is
-  still a notification's own "jump to this session" action — the tab itself is for scanning many
-  concurrent agents at once, not a screen you keep open.
-
-## Editor & LSP
-
-Opening a file in the sidebar file editor auto-detects a language server from the file extension or a project marker (e.g. `package.json`, `Package.swift`) in an ancestor directory, and starts it if the binary is on `PATH`. Vi ex commands work against the live session: `gd` (go to definition, falls back to `gf` path resolution), `K` (hover), `:errors` (diagnostics). See [docs/COMMANDS.md](docs/COMMANDS.md#errors-and-lsp).
-
-Nothing ships bundled — install the server binary you need yourself. Auto-start is off by default; turn it on and override any default binary path via `settings.json`:
-
-```json
-{ "lspAutoStart": true, "lspServers": { "python": "/opt/homebrew/bin/pyright-langserver" } }
-```
-
-| Group | Extensions | Server |
-| --- | --- | --- |
-| iOS native | `.swift` `.m` `.mm` | `sourcekit-lsp` |
-| Android native | `.kt` `.kts` | `kotlin-language-server` |
-| Android native | `.java` | `jdtls` |
-| Flutter | `.dart` | `dart language-server` |
-| Web / React / Next.js / Apps Script | `.ts` `.tsx` `.js` `.jsx` `.gs` | `typescript-language-server` |
-| PHP | `.php` | `intelephense` |
-| Ruby | `.rb` | `ruby-lsp` |
-| Go | `.go` | `gopls` |
-| Rust | `.rs` | `rust-analyzer` |
-| Python | `.py` | `pyright-langserver` |
-| C / C++ | `.c` `.cpp` `.cc` `.cxx` `.h` `.hpp` `.hxx` | `clangd` |
-| C# / .NET | `.cs` | `csharp-ls` |
-| SQL | `.sql` | `sql-language-server` |
-| JSON | `.json` `.jsonc` | `vscode-json-language-server` |
-| YAML | `.yml` `.yaml` | `yaml-language-server` |
-| CSS | `.css` `.scss` `.sass` | `vscode-css-language-server` |
-| HTML | `.html` `.htm` | `vscode-html-language-server` |
-| Robot Framework | `.robot` `.resource` | `robotcode` |
-| Gherkin / Cucumber | `.feature` | `cucumber-language-server` |
-| Shell | `.sh` `.bash` `.zsh` | `bash-language-server` |
-| Markdown | `.md` | `marksman` |
-
-## Mobile
-
-Kouen does not ship its own mobile app or relay. To watch or steer an agent from a phone, use the vendor's own remote-control app for the session Kouen launched:
-
-| Agent | Mobile route | Status |
-| --- | --- | --- |
-| Claude Code | `claude remote-control` → Claude app / claude.ai/code (Kouen's default launch mode) | Confirmed |
-| Codex | ChatGPT mobile app | Not yet confirmed for `codex` CLI sessions started inside Kouen |
-| Antigravity | Antigravity remote control / companion app | Not yet confirmed for `agy` CLI sessions |
-
-
-Trade-off: no single cross-vendor mobile dashboard by default — Kouen's Fleet view is desktop-only. The earlier built-in Mobile Connect bridge (QR + Tailscale web client) is deprecated, off by default (`mobileBridgeEnabled`) and no longer developed. Reasoning: [ARCHITECTURE.md](ARCHITECTURE.md) § Architecture Decisions (2026-09-23).
-
-## Remote And Headless
-
-The daemon and CLI can run without the GUI, including on Linux. Register a remote daemon over SSH and use `--host` with normal CLI commands:
-
-```bash
-kouen-cli remote add --name devbox --ssh me@devbox --socket "/home/me/.config/kouen/kouen.sock"
-kouen-cli ping --host devbox
-kouen-cli new-session --host devbox --cwd ~/Code
-kouen-cli capture-pane --host devbox --surface <id>
-```
-
-## Stack
-
-| Area | Technology |
-| --- | --- |
-| Language | Swift 6, strict concurrency |
-| GUI | AppKit + SwiftUI |
-| Terminal rendering | CoreText + Metal |
-| IPC | Unix sockets, length-prefixed JSON, binary PTY frames |
-| Scripting | JavaScriptCore |
-| Agent tooling | CLI hooks + `kouen-mcp` |
-| Platforms | macOS 15+ GUI, macOS/Linux daemon and CLI |
+Run `kouen-cli install` (from `/Applications/Kouen.app/Contents/MacOS/`) to put the CLI on your `PATH`, then `kouen-cli doctor`. See [docs/USAGE.md](docs/USAGE.md) and [docs/COMMANDS.md](docs/COMMANDS.md) for commands, and [docs/keyboard-shortcuts.md](docs/keyboard-shortcuts.md) for shortcuts.
 
 ## Documentation
 
-- [PRODUCT.md](PRODUCT.md) / [ARCHITECTURE.md](ARCHITECTURE.md) / [DESIGN.md](DESIGN.md) - product scope, system architecture and decision log, visual system
-- [docs/USAGE.md](docs/USAGE.md) - install, run, CLI, remote/headless, IDE-like workflow, experience modes, migration, and troubleshooting
-- [docs/MODES.md](docs/MODES.md) - Plain, Persistent, Full, and Agent Workspace modes (detail)
-- [docs/MIGRATION.md](docs/MIGRATION.md) - migrating from tmux or another terminal setup
-- [docs/COMMANDS.md](docs/COMMANDS.md) - full command reference including workbench commands (`:find`, `:grep`, `:make`, `:errors`, `:recent`) and the agent-safety CLI (`kouen history`, `kouen undo`, `kouen verify`, `kouen task pack-pr`)
-- [docs/KEYBINDINGS.md](docs/KEYBINDINGS.md) - shortcuts, key bindings, and vi ex command quick reference (IDE-like navigation)
-- [sheet-cheat.html](sheet-cheat.html) - interactive cheat sheet (shell tools, unix, vim, Kouen) — regenerate with `make cheatsheet`
+- [PRODUCT.md](PRODUCT.md) / [ARCHITECTURE.md](ARCHITECTURE.md) / [DESIGN.md](DESIGN.md) - scope, architecture, visual system
+- [docs/features.md](docs/features.md) - upstream differences, feature details, harness, safety net, editor and LSP, mobile, remote, stack
+- [docs/keyboard-shortcuts.md](docs/keyboard-shortcuts.md) - most-used shortcuts
+- [docs/mcp-tools.md](docs/mcp-tools.md) - `kouen-mcp` browser control tools
+- [docs/USAGE.md](docs/USAGE.md) - install, run, CLI, remote/headless, troubleshooting
+- [docs/MODES.md](docs/MODES.md) - experience modes
+- [docs/MIGRATION.md](docs/MIGRATION.md) - migrating from tmux or another terminal
+- [docs/COMMANDS.md](docs/COMMANDS.md) - full command reference
+- [docs/KEYBINDINGS.md](docs/KEYBINDINGS.md) - full key binding reference
+- [docs/MULTIPLEXER_GUIDE.md](docs/MULTIPLEXER_GUIDE.md) - sessions, panes, prefix key, copy mode
 - [docs/shell-integration/README.md](docs/shell-integration/README.md) - shell integration
 - [docs/agent-hooks/README.md](docs/agent-hooks/README.md) - agent notification hooks
-- [docs/MULTIPLEXER_GUIDE.md](docs/MULTIPLEXER_GUIDE.md) - sessions, panes, prefix key, attach, copy mode
 - [docs/RELEASE.md](docs/RELEASE.md) - release workflow
+- [sheet-cheat.html](sheet-cheat.html) - interactive cheat sheet (`make cheatsheet`)
 - [CHANGELOG.md](CHANGELOG.md) - release history
-
-## Build From Source
-
-```bash
-swift build
-swift test
-make preview
-```
-
-For release packaging, use the documented order:
-
-```bash
-make release
-make sign
-make dmg
-make finalize
-```
 
 ## Contributors
 
