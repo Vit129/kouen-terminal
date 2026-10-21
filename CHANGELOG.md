@@ -5,6 +5,18 @@ All notable changes to Kouen are documented here. The format is based on
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Each released version
 has a matching `vX.Y.Z` tag and a signed, notarized DMG on
 [GitHub Releases](https://github.com/Vit129/kouen-terminal/releases).
+## [4.21.11] - 2026-10-21
+
+### Added
+- Reuse existing browser pane with new tab instead of splitting ([`2587335`](https://github.com/Vit129/kouen-terminal/commit/2587335cfa92e15921d8b40ffba015824530def9))
+
+### Documentation
+- Relicense to Apache-2.0, keep the Harness MIT notice ([`6120233`](https://github.com/Vit129/kouen-terminal/commit/612023341b0765c78bc19630417a7a7152f31386))
+- Credit Claude as co-developer and contributor ([`5feea86`](https://github.com/Vit129/kouen-terminal/commit/5feea86610e98c2cea586a3ee477bb0442c744ac))
+- Add Installation section in README ([`395fe02`](https://github.com/Vit129/kouen-terminal/commit/395fe02049eef808d2632fdc83a13218320309f0))
+- Slim README and move reference material to docs/ ([`b4f5e4a`](https://github.com/Vit129/kouen-terminal/commit/b4f5e4a04ff0c04ef37e0a0b50f8d68be368e145))
+
+
 ## [4.21.10] - 2026-10-18
 
 ### Added
