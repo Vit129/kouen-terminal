@@ -20,8 +20,8 @@
     "semantic_hash": ""
   },
   "Apps/Kouen/Sources/KouenApp/AppDelegate.swift": {
-    "mtime": 1792244711.2249582,
-    "ast_hash": "75e11fb6d6e83e8a3147628147c537f0",
+    "mtime": 1792651865.132564,
+    "ast_hash": "33c082d044a5ad43b5941a963fad1aab",
     "semantic_hash": ""
   },
   "Apps/Kouen/Sources/KouenApp/Scripting/PluginLoader.swift": {
@@ -3645,13 +3645,13 @@
     "semantic_hash": ""
   },
   "Apps/Kouen/Sources/KouenApp/Services/ActivityAssertionManager.swift": {
-    "mtime": 1785510867.5014808,
-    "ast_hash": "ee8794ca7ace68b325b33bd78bd265f7",
+    "mtime": 1792651865.1336267,
+    "ast_hash": "71778f0a44fec6e00b3feb5b7bded576",
     "semantic_hash": ""
   },
   "Tests/KouenAppTests/ActivityAssertionManagerTests.swift": {
-    "mtime": 1785510867.6143498,
-    "ast_hash": "af85a60e84fe194116bb64bffe1810ee",
+    "mtime": 1792651865.134599,
+    "ast_hash": "708e881d3c663faff8c6879e30e4ba28",
     "semantic_hash": ""
   },
   "Scripts/fix-xcode27beta-test-rpath.sh": {
@@ -4697,6 +4697,21 @@
   "docs/mcp-tools.md": {
     "mtime": 1792566269.0294423,
     "ast_hash": "70eba5c16e67721d3c97c135f7cad672",
+    "semantic_hash": ""
+  },
+  "Apps/Kouen/Sources/KouenApp/Services/AIProviderAwakeService.swift": {
+    "mtime": 1792651865.1329575,
+    "ast_hash": "efa36484376f5a070d3e08b232e4e6ec",
+    "semantic_hash": ""
+  },
+  "Scripts/closed-lid-helper.sh": {
+    "mtime": 1792651865.1338675,
+    "ast_hash": "e2ce7a94ea37d44b453effd446daeaea",
+    "semantic_hash": ""
+  },
+  "docs/CLOSED_LID.md": {
+    "mtime": 1792651865.1348531,
+    "ast_hash": "a0bab4c241f224189e0572b811b3575a",
     "semantic_hash": ""
   }
 }
