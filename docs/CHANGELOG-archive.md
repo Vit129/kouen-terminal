@@ -5,1492 +5,1492 @@ Older releases. See [CHANGELOG.md](../CHANGELOG.md) for recent versions.
 ## [4.19.1] - 2026-09-24
 
 ### Added
-- Multi-agent remote-control & centralized launch table (P50) (release v4.19.1) ([`bf0ac3b`](https://github.com/Vit129/kouen-terminal/commit/bf0ac3b1d38883e3e126ff37f889558f7513cd1f))
+- Multi-agent remote-control & centralized launch table (P50) (release v4.19.1) ([`3f8ad46`](https://github.com/Vit129/kouen-terminal/commit/3f8ad469bb5986bf312cf89eb94457dcb6a43c75))
 
 ## [4.18.6] - 2026-09-23
 
 ### Added
-- Real Codex/Copilot session scanning, resume variants, list UX parity ([`776dded`](https://github.com/Vit129/kouen-terminal/commit/776dded462a3d6626ad055e0af420c1f833df4da))
+- Real Codex/Copilot session scanning, resume variants, list UX parity ([`410161d`](https://github.com/Vit129/kouen-terminal/commit/410161dc64db9c4151b6ef115c06e7daaee1e1bd))
 
 ### Documentation
-- Record decision to depend on vendor remote-control apps for mobile ([`39322af`](https://github.com/Vit129/kouen-terminal/commit/39322af0b8b4b304dbfa20fa6a4d3e729a248d94))
+- Record decision to depend on vendor remote-control apps for mobile ([`1b21933`](https://github.com/Vit129/kouen-terminal/commit/1b219335080ffd23ed287d5466ed1c2798b4d785))
 
 ### Fixed
-- Content pane covers the header cluster during the Cmd+\ slide ([`cc3dd33`](https://github.com/Vit129/kouen-terminal/commit/cc3dd335e29f9d236d8c7152f88db3156ff2a53f))
+- Content pane covers the header cluster during the Cmd+\ slide ([`1dbd578`](https://github.com/Vit129/kouen-terminal/commit/1dbd578193bb3e5064c0c7619827b622b1bc3c75))
 
 ## [4.18.4] - 2026-09-23
 
 ### Changed
-- P49 architectural hardening and decoupling (release v4.18.4) ([`c75ba14`](https://github.com/Vit129/kouen-terminal/commit/c75ba1499007082b5c86c00136185239efc5dc10))
+- P49 architectural hardening and decoupling (release v4.18.4) ([`f13b912`](https://github.com/Vit129/kouen-terminal/commit/f13b912b9486aced151953d4723d573c0908b51c))
 
 ## [4.18.2] - 2026-09-22
 
 ### Added
-- Add browser-style back/forward navigation for tab/session switches ([`80b25ae`](https://github.com/Vit129/kouen-terminal/commit/80b25aeeecdd5627ad696cfad18380b97e28fd1e))
+- Add browser-style back/forward navigation for tab/session switches ([`a9f3cd9`](https://github.com/Vit129/kouen-terminal/commit/a9f3cd9da516ccbfedffb522e3dc869c5401c240))
 
 ### Changed
-- Replace MRU back/forward with the existing session-cycle logic ([`93362f0`](https://github.com/Vit129/kouen-terminal/commit/93362f0f64ae28ddb8179b5a0588bd261b97e3a1))
+- Replace MRU back/forward with the existing session-cycle logic ([`c32f372`](https://github.com/Vit129/kouen-terminal/commit/c32f372c95fa2051797efe71442fde1f89c7de41))
 
 ### Fixed
-- Stop primary tree from squatting on a feature branch after auto-isolate ([`d1aa214`](https://github.com/Vit129/kouen-terminal/commit/d1aa21438eb2872f23c20f91e4f3528add15bfe9))
-- Force bracketed-paste wrapping for unsafe multi-line pastes ([`be58975`](https://github.com/Vit129/kouen-terminal/commit/be589755c20f981459f1e3a2aa4bac266ace5b33))
+- Stop primary tree from squatting on a feature branch after auto-isolate ([`33ab8db`](https://github.com/Vit129/kouen-terminal/commit/33ab8db1f4bd1303eb4938159973d6fc7c9ad7f2))
+- Force bracketed-paste wrapping for unsafe multi-line pastes ([`2ad8bf4`](https://github.com/Vit129/kouen-terminal/commit/2ad8bf41b8f10b7f3344ec038a72bc0925f05520))
 
 ## [4.18.1] - 2026-09-22
 
 ### Added
-- Refresh graphify index before any make-start action ([`3c8c13e`](https://github.com/Vit129/kouen-terminal/commit/3c8c13e70ed75f842112abc0961132a2acdc0577))
+- Refresh graphify index before any make-start action ([`3ab464c`](https://github.com/Vit129/kouen-terminal/commit/3ab464c94cb564b06cef5fe933a3ca5bc51adaa2))
 
 ### Fixed
-- Point skill-trigger at real skill names, not a nonexistent doc ([`e32685a`](https://github.com/Vit129/kouen-terminal/commit/e32685a48b793326fd4b8d8d06423c48c295a057))
-- Skip graphify refresh for the preview option ([`37d8006`](https://github.com/Vit129/kouen-terminal/commit/37d8006146355b59bfecbf69c7a2b054953f1338))
-- Skill-keywords.json was missing entries AGENTS.md declares ([`298b0ec`](https://github.com/Vit129/kouen-terminal/commit/298b0ec62d9e56ce3a4a64cc42522822ec1df271))
+- Point skill-trigger at real skill names, not a nonexistent doc ([`7a328c2`](https://github.com/Vit129/kouen-terminal/commit/7a328c2cc2f5c371ee5782b401cc76bcf8992111))
+- Skip graphify refresh for the preview option ([`1191651`](https://github.com/Vit129/kouen-terminal/commit/119165143399b6f2b135a8303db0cc0161b86b23))
+- Skill-keywords.json was missing entries AGENTS.md declares ([`ee95464`](https://github.com/Vit129/kouen-terminal/commit/ee95464f67afa9add2bee48acef863661a42a5cd))
 
 ## [4.18.0] - 2026-09-21
 
 ### Added
-- Auto-show job result on run-now + scheduled runs ([`ce56d8d`](https://github.com/Vit129/kouen-terminal/commit/ce56d8db59febcae9232ed6c2108582c1f653a15))
-- Harden multi-agent attention & write safety (P46 Pillar 6) ([`28585cf`](https://github.com/Vit129/kouen-terminal/commit/28585cf27ec24584a8633d3bd1815ebdcccf3020))
-- Complete P46 CLI-First Agent Harness (phases 1-4) ([`9a7eda8`](https://github.com/Vit129/kouen-terminal/commit/9a7eda8598779fc48aab784ed9a822187efbfd9a))
-- Plan-46-agent-dev-env-completely (release v4.18.0) ([`b951db9`](https://github.com/Vit129/kouen-terminal/commit/b951db9b193eb19e04a6dbecf0b9bd174489b2c2))
+- Auto-show job result on run-now + scheduled runs ([`ee30c4e`](https://github.com/Vit129/kouen-terminal/commit/ee30c4e84dbee25b4d9702f4f248aa7c72acefb0))
+- Harden multi-agent attention & write safety (P46 Pillar 6) ([`8e39a3f`](https://github.com/Vit129/kouen-terminal/commit/8e39a3f7b280ba2721f02d2fb341c7d06a63cd26))
+- Complete P46 CLI-First Agent Harness (phases 1-4) ([`d333cef`](https://github.com/Vit129/kouen-terminal/commit/d333cef663c1d862fa1aa0fe83b12f37c84f3fb1))
+- Plan-46-agent-dev-env-completely (release v4.18.0) ([`591f084`](https://github.com/Vit129/kouen-terminal/commit/591f084bab43058000b75b76803a1fa0683fd300))
 
 ### Documentation
-- Add document for kouen agent dev env terminal ([`68edb71`](https://github.com/Vit129/kouen-terminal/commit/68edb71e557046ef306b9644357ccf8f3a74a6d0))
+- Add document for kouen agent dev env terminal ([`675f881`](https://github.com/Vit129/kouen-terminal/commit/675f881115b0271a49e7fd496becf5db1a6b54d8))
 
 ### Fixed
-- Close P46 follow-up gaps — verification timeout, dirty-tree guard, feed-to-agent ([`6014b78`](https://github.com/Vit129/kouen-terminal/commit/6014b7855c99785259ec425255f3f572fdefbb10))
-- Row click did nothing — .onTapGesture inside List is a no-op on macOS ([`06153c2`](https://github.com/Vit129/kouen-terminal/commit/06153c21532d16788337534d78977a2f6a71fd52))
-- Make PR and no-PR release paths behave identically ([`61ff7d7`](https://github.com/Vit129/kouen-terminal/commit/61ff7d7da8a46966dffc0186b6744d63dfb120a3))
+- Close P46 follow-up gaps — verification timeout, dirty-tree guard, feed-to-agent ([`c7e66fb`](https://github.com/Vit129/kouen-terminal/commit/c7e66fb8b9e6f921899225e2d5290eea5be8f0c9))
+- Row click did nothing — .onTapGesture inside List is a no-op on macOS ([`6b84d6b`](https://github.com/Vit129/kouen-terminal/commit/6b84d6b790fffc48b4ee29ea0e3146a616809bdc))
+- Make PR and no-PR release paths behave identically ([`4ef384e`](https://github.com/Vit129/kouen-terminal/commit/4ef384e2dec66324f987f01bb7c8c8502520f158))
 
 ## [4.17.3] - 2026-09-19
 
 ### Added
-- Add context resolve MCP tool, fix process (release v4.17.3) ([`1f8b873`](https://github.com/Vit129/kouen-terminal/commit/1f8b873df611dda29aca7e4bb42432684256f9ec))
+- Add context resolve MCP tool, fix process (release v4.17.3) ([`1737cee`](https://github.com/Vit129/kouen-terminal/commit/1737cee9e444c1106f95089471cb8049acf61860))
 
 ## [4.17.2] - 2026-09-18
 
 ### Added
-- Implement Phase 0 AI-SDLC workflow engine and worktree discipline ([`6b043ee`](https://github.com/Vit129/kouen-terminal/commit/6b043ee84792f23a74c8dbd96fe583ed2904d48d))
-- Auto markdown sync, GUI preview, and MCP feature tools ([`61161d1`](https://github.com/Vit129/kouen-terminal/commit/61161d1318710edd9d986074693f1961643f09bc))
-- Add session history phase 1, centralize logic search, centralize logo and ai provider name, fast context and token guard phase 2 (release v4.17.2) ([`15900dd`](https://github.com/Vit129/kouen-terminal/commit/15900dd84ea48effc5dd8070f57002a629cb7936))
+- Implement Phase 0 AI-SDLC workflow engine and worktree discipline ([`619ac23`](https://github.com/Vit129/kouen-terminal/commit/619ac2371877ea0477904f700de4e6e943538bd5))
+- Auto markdown sync, GUI preview, and MCP feature tools ([`fd336ee`](https://github.com/Vit129/kouen-terminal/commit/fd336ee574930f41ad9a53dc9426219cc613c53a))
+- Add session history phase 1, centralize logic search, centralize logo and ai provider name, fast context and token guard phase 2 (release v4.17.2) ([`440cd48`](https://github.com/Vit129/kouen-terminal/commit/440cd48d9f56376040e7d08019c11e9f44f006d6))
 
 ### Fixed
-- Restore green test suite and update graphify index ([`ed9f1ac`](https://github.com/Vit129/kouen-terminal/commit/ed9f1acd6ac82c00046aabddc6deb623a9e1c570))
+- Restore green test suite and update graphify index ([`bb7d847`](https://github.com/Vit129/kouen-terminal/commit/bb7d84739f193c32e7d22a7829addb81bb8dc81b))
 
 ## [4.17.1] - 2026-09-18
 
 ### Fixed
-- Automation tab coding just show cron job only (release v4.17.1) ([`3d42f36`](https://github.com/Vit129/kouen-terminal/commit/3d42f36a2e8f35885d014531a6ff02a82ab1412a))
+- Automation tab coding just show cron job only (release v4.17.1) ([`69d65ac`](https://github.com/Vit129/kouen-terminal/commit/69d65ac6a36ddeb38377b128285879ab9b2e2d16))
 
 ## [4.17.0] - 2026-09-18
 
 ### Added
-- Add jobs fleet view and multi-format result viewer replacing git panel (release v4.17.0) ([`786ee2a`](https://github.com/Vit129/kouen-terminal/commit/786ee2a93ecc74b7f113f8602307d12d91136208))
+- Add jobs fleet view and multi-format result viewer replacing git panel (release v4.17.0) ([`4a36837`](https://github.com/Vit129/kouen-terminal/commit/4a36837d9f04cfef5616e46a1ccc9acc39ffc2dd))
 
 ### Documentation
-- Standardize ARCHITECTURE.md and CONTEXT.md per workspace rules ([`0a47025`](https://github.com/Vit129/kouen-terminal/commit/0a4702536af688b162da0dfa54fa5ae360d1bf5e))
-- Split CLAUDE.md into rules/, consolidate to AGENTS.md ([`99614f0`](https://github.com/Vit129/kouen-terminal/commit/99614f0c21f3ba7ea52445c998258b06142ae9be))
+- Standardize ARCHITECTURE.md and CONTEXT.md per workspace rules ([`5312520`](https://github.com/Vit129/kouen-terminal/commit/53125207a8304803e55c0b85a74561cb794390e9))
+- Split CLAUDE.md into rules/, consolidate to AGENTS.md ([`c66452d`](https://github.com/Vit129/kouen-terminal/commit/c66452db3e00accdda3f37ea499b441063dc9468))
 
 ### Fixed
-- Reset markdown/code edit-mode per file, not sticky across tabs ([`747bf50`](https://github.com/Vit129/kouen-terminal/commit/747bf50762f5f7e02b5b881e2810e3e08c6adae1))
-- Never leave markdown preview blank on a JS render failure ([`3aff6e9`](https://github.com/Vit129/kouen-terminal/commit/3aff6e96232435f0e3e6a06a6e12b32bfefd6188))
-- Markdown preview render completely broken since v4.15.8 ([`eb575b4`](https://github.com/Vit129/kouen-terminal/commit/eb575b453e6ef18d22f51eed00a172fc241d01be))
+- Reset markdown/code edit-mode per file, not sticky across tabs ([`d96405c`](https://github.com/Vit129/kouen-terminal/commit/d96405c30dec47b2b40df0709f185a4382409641))
+- Never leave markdown preview blank on a JS render failure ([`461bd1a`](https://github.com/Vit129/kouen-terminal/commit/461bd1a27909cf362c49001844b5bb6c5b4abed1))
+- Markdown preview render completely broken since v4.15.8 ([`d280d07`](https://github.com/Vit129/kouen-terminal/commit/d280d0732fec535af98330bce09954d452fce707))
 
 ## [4.16.0] - 2026-09-15
 
 ### Added
-- Agent Swarm Core — headless fleet orchestration (P44 follow-on) ([`30d995a`](https://github.com/Vit129/kouen-terminal/commit/30d995abca4371a24288fcefed6ab3fe01447719))
-- Remote HTTP/SSE transport for kouen-mcp ([`cba6927`](https://github.com/Vit129/kouen-terminal/commit/cba6927b535fdcb4922762b21c6fbc6daf253d45))
-- Render non-markdown source files in preview, inline file-tree preview, more languages ([`5dcefd5`](https://github.com/Vit129/kouen-terminal/commit/5dcefd53a9094c259ed126487044960509404a23))
+- Agent Swarm Core — headless fleet orchestration (P44 follow-on) ([`d125680`](https://github.com/Vit129/kouen-terminal/commit/d1256802652e4bf68c557dccd02e5bd945db5926))
+- Remote HTTP/SSE transport for kouen-mcp ([`b2a982b`](https://github.com/Vit129/kouen-terminal/commit/b2a982bbf0f97a80920414dbbc68c63c8e1a6922))
+- Render non-markdown source files in preview, inline file-tree preview, more languages ([`346a17e`](https://github.com/Vit129/kouen-terminal/commit/346a17e0f545b7f08ca50db7c2745757569a76b5))
 
 ### Fixed
-- Secure defaults for kouen-mcp's remote HTTP/SSE server ([`22735f9`](https://github.com/Vit129/kouen-terminal/commit/22735f9e0153e8a0af612f5a61451cc040aa6700))
-- Sync fleet node status on real completion, turn on Fleet dashboard ([`2d004d5`](https://github.com/Vit129/kouen-terminal/commit/2d004d5bfae9eed53fbbf64e6cadb16cac142236))
+- Secure defaults for kouen-mcp's remote HTTP/SSE server ([`3b9b58c`](https://github.com/Vit129/kouen-terminal/commit/3b9b58c74ed5cedba5ee2be9ff54fc67b7bc2138))
+- Sync fleet node status on real completion, turn on Fleet dashboard ([`c66f4c2`](https://github.com/Vit129/kouen-terminal/commit/c66f4c2b1a81161c806445a4168b70a390bc7051))
 
 ## [4.15.10] - 2026-09-14
 
 ### Fixed
-- Clear stale git branch label when cwd leaves a git repo (release v4.15.9) ([`d2d3c25`](https://github.com/Vit129/kouen-terminal/commit/d2d3c257e435a4437543eb695b7cd4f50136c6b2))
-- Hide gutter triangles and check non-git folders in file tree (release v4.15.10) ([`f9758fb`](https://github.com/Vit129/kouen-terminal/commit/f9758fb31b766ae76c38b472ba44234d9c5f660b))
+- Clear stale git branch label when cwd leaves a git repo (release v4.15.9) ([`aabdaaa`](https://github.com/Vit129/kouen-terminal/commit/aabdaaac87538967abb7cef6548009127c3288a0))
+- Hide gutter triangles and check non-git folders in file tree (release v4.15.10) ([`a4c7b06`](https://github.com/Vit129/kouen-terminal/commit/a4c7b06ac74c77f43fde5edee56feae7f8a27a25))
 
 ## [4.15.8] - 2026-09-09
 
 ### Fixed
-- Editor file preview (release v4.15.8) ([`17ccef2`](https://github.com/Vit129/kouen-terminal/commit/17ccef29c94917f617080607905bedbf5b0b566f))
+- Editor file preview (release v4.15.8) ([`866ef65`](https://github.com/Vit129/kouen-terminal/commit/866ef650d43b9da5b5b5a99fcdd4a39f2c1f2739))
 
 ## [4.15.7] - 2026-09-09
 
 ### Fixed
-- Display markdown and mermaid format and able to click fromterminal (release v4.15.7) ([`c56411c`](https://github.com/Vit129/kouen-terminal/commit/c56411ca0cb580302b6a80d3c434876ce8e02990))
+- Display markdown and mermaid format and able to click fromterminal (release v4.15.7) ([`0130c7c`](https://github.com/Vit129/kouen-terminal/commit/0130c7c60822fa5023651410db3da956d72d1c11))
 
 ## [4.15.6] - 2026-09-08
 
 ### Added
-- Comment kouen create branch (release v4.15.6) ([`9dde22a`](https://github.com/Vit129/kouen-terminal/commit/9dde22a3c73d0a3c1a8db397920ab47a4fa46eb3))
+- Comment kouen create branch (release v4.15.6) ([`5405cfb`](https://github.com/Vit129/kouen-terminal/commit/5405cfb125a205ba156532d9d4381d1b04c3f93a))
 
 ## [4.15.4] - 2026-09-06
 
 ### Fixed
-- Keep transient notch peek notification independent of the persistent HUD toggle (release v4.15.4) ([`9457638`](https://github.com/Vit129/kouen-terminal/commit/9457638dc30e649bf6f60ed5a81c40d888e2a7bc))
+- Keep transient notch peek notification independent of the persistent HUD toggle (release v4.15.4) ([`5796303`](https://github.com/Vit129/kouen-terminal/commit/57963032d6fc8b5aee3fe2d323e971453c848b87))
 
 ## [4.15.3] - 2026-09-06
 
 ### Fixed
-- Stop trusting NSSplitView.setPosition, assign sidebar/content frames directly ([`f3e0cba`](https://github.com/Vit129/kouen-terminal/commit/f3e0cba9bfabecfb457c55d604f84c1add939d65))
-- Turn off Agent Notch HUD by default, merge menu-bar sessions list, fix Close toggle (release v4.15.3) ([`36220c9`](https://github.com/Vit129/kouen-terminal/commit/36220c944e4942281c7e76964ac198219091b8c9))
+- Stop trusting NSSplitView.setPosition, assign sidebar/content frames directly ([`d6519ad`](https://github.com/Vit129/kouen-terminal/commit/d6519ad95cbd3d73c1ce0368b322d9b5c68a3683))
+- Turn off Agent Notch HUD by default, merge menu-bar sessions list, fix Close toggle (release v4.15.3) ([`40620fc`](https://github.com/Vit129/kouen-terminal/commit/40620fc077db157260b876169a0650220b57ffa0))
 
 ## [4.15.2] - 2026-09-06
 
 ### Fixed
-- Keep collapsed sidebar hidden across screen/window resize (release v4.15.2) ([`2f370d8`](https://github.com/Vit129/kouen-terminal/commit/2f370d887912d34c0ab8bc3bd2e8832928ae0740))
+- Keep collapsed sidebar hidden across screen/window resize (release v4.15.2) ([`e84ed2d`](https://github.com/Vit129/kouen-terminal/commit/e84ed2d8077ae78f44bf74ac1264a3de5b2bbff6))
 
 ## [4.15.1] - 2026-09-04
 
 ### Fixed
-- Don't wipe scrollback on ESC[3J (erase saved lines) ([`d1860af`](https://github.com/Vit129/kouen-terminal/commit/d1860afd3310d11e3f0adba5185a84f3b2c73c63))
-- Support drag-to-scroll on terminal and file view scrollbars ([`86acdf7`](https://github.com/Vit129/kouen-terminal/commit/86acdf71266351e8fe0e3fb2d53284c245eb68ed))
-- Fire scrollbar update immediately on pane split + register hover tracking area reliably (release v4.15.1) ([`fb9e095`](https://github.com/Vit129/kouen-terminal/commit/fb9e0953ff54f6be9677fecdad5c3ff2272fe17e))
+- Don't wipe scrollback on ESC[3J (erase saved lines) ([`28cd81e`](https://github.com/Vit129/kouen-terminal/commit/28cd81ef668d9af5c8a7a54ddb4803b30b3cface))
+- Support drag-to-scroll on terminal and file view scrollbars ([`22240df`](https://github.com/Vit129/kouen-terminal/commit/22240dfa60382e4fe95e84c0300edf070800f464))
+- Fire scrollbar update immediately on pane split + register hover tracking area reliably (release v4.15.1) ([`459a000`](https://github.com/Vit129/kouen-terminal/commit/459a000529e65b0185b7f1c291db21957c8ab0bc))
 
 ## [4.14.0] - 2026-08-31
 
 ### Added
-- P44 autonomous orchestrator (MCP tools, inline task badges, orchestrator contract) + git diff gutter extraction (release v4.14.0) ([`80bee3a`](https://github.com/Vit129/kouen-terminal/commit/80bee3a1aae2bb04343a6ac66af732e337105eb2))
+- P44 autonomous orchestrator (MCP tools, inline task badges, orchestrator contract) + git diff gutter extraction (release v4.14.0) ([`32fa5b9`](https://github.com/Vit129/kouen-terminal/commit/32fa5b92997255484ea9b53fb213ec24c3aed0a0))
 
 ## [4.13.1] - 2026-08-24
 
 ### Fixed
-- Wake WKWebView compositor when a cached browser pane is revealed on tab switch ([`dbc950c`](https://github.com/Vit129/kouen-terminal/commit/dbc950c3fef8a2a704084e2a53b97bb3a7cc76ff))
-- Wake WKWebView compositor when BrowserPaneView's own tab switch reveals a webview ([`f6bc6a0`](https://github.com/Vit129/kouen-terminal/commit/f6bc6a083845c4395004ca074b804736524d616e))
-- Wake WKWebView compositor when BrowserPaneView's own tab switch reveals a webview (release v4.13.1) ([`c446c2d`](https://github.com/Vit129/kouen-terminal/commit/c446c2ddf5b953ea93a126141e3a7703f4d62f70))
+- Wake WKWebView compositor when a cached browser pane is revealed on tab switch ([`6003830`](https://github.com/Vit129/kouen-terminal/commit/600383020312ae7a5023ba0e131f80829908f55f))
+- Wake WKWebView compositor when BrowserPaneView's own tab switch reveals a webview ([`546aa68`](https://github.com/Vit129/kouen-terminal/commit/546aa68071f87ff7841c5569e213fab42b81b4ca))
+- Wake WKWebView compositor when BrowserPaneView's own tab switch reveals a webview (release v4.13.1) ([`1574111`](https://github.com/Vit129/kouen-terminal/commit/157411129ba9156b1dd895620c8f66330a7b6440))
 
 ## [4.13.0] - 2026-08-23
 
 ### Added
-- Notch auto-hides when idle; fix dead approval buttons and false waiting badge across all agent hooks ([`28562da`](https://github.com/Vit129/kouen-terminal/commit/28562dacd430fdd728d0ef36a6fafedf09fb83cb))
+- Notch auto-hides when idle; fix dead approval buttons and false waiting badge across all agent hooks ([`4517786`](https://github.com/Vit129/kouen-terminal/commit/4517786394bc800a2be62059043ce5e4e3641432))
 
 ## [4.12.3] - 2026-08-19
 
 ### Documentation
-- Note agent-memory is gitignored + centrally backed up (claude-memory-private) ([`9d93a02`](https://github.com/Vit129/kouen-terminal/commit/9d93a0209c39b8d4787a85a13a40bd95b4aa4ab2))
-- Agent-memory-private rename (was claude-memory-private) ([`2d6bdb0`](https://github.com/Vit129/kouen-terminal/commit/2d6bdb0f13e089fa7764d9419f7ac47da621c663))
+- Note agent-memory is gitignored + centrally backed up (claude-memory-private) ([`bbe0980`](https://github.com/Vit129/kouen-terminal/commit/bbe0980c731df3290ee9029d732c49a4ef099a4f))
+- Agent-memory-private rename (was claude-memory-private) ([`930fc1c`](https://github.com/Vit129/kouen-terminal/commit/930fc1c1712e211b1ae039f76299dfa571aa6f4b))
 
 ### Fixed
-- Allow secondary browser tabs to receive the compositor repaint kick ([`3ab1695`](https://github.com/Vit129/kouen-terminal/commit/3ab16956cf0904fe30e4b4573d4f6cf79bf98498))
-- Stop stuck git child processes and fix new file/folder not appearing in an already-expanded file tree folder (release v4.12.2) ([`6ebf132`](https://github.com/Vit129/kouen-terminal/commit/6ebf1320456a9d490c3f712c9db08e8e1b2ca3d9))
-- Use launchctl instead of pgrep for daemon liveness in graceful install (release v4.12.3) ([`f439a8b`](https://github.com/Vit129/kouen-terminal/commit/f439a8b68b44f59603584db878d84ef4a26e8566))
+- Allow secondary browser tabs to receive the compositor repaint kick ([`6046423`](https://github.com/Vit129/kouen-terminal/commit/6046423e17eb7132a4553f326aaaffd3255533a8))
+- Stop stuck git child processes and fix new file/folder not appearing in an already-expanded file tree folder (release v4.12.2) ([`f5a2736`](https://github.com/Vit129/kouen-terminal/commit/f5a273616ee97ada381490192e40bf64d3aed48d))
+- Use launchctl instead of pgrep for daemon liveness in graceful install (release v4.12.3) ([`096a9b5`](https://github.com/Vit129/kouen-terminal/commit/096a9b594395b3a30eac965ad1f8be219b14eb24))
 
 ## [4.12.1] - 2026-08-13
 
 ### Fixed
-- Force WKWebView repaint after load, flush session state before daemon restart (release v4.12.1) ([`0173222`](https://github.com/Vit129/kouen-terminal/commit/0173222f49425199ef29d3b12f0b7d87241592b3))
+- Force WKWebView repaint after load, flush session state before daemon restart (release v4.12.1) ([`12e12d1`](https://github.com/Vit129/kouen-terminal/commit/12e12d12e1a130aebabd9e380615b2bc37b784d0))
 
 ## [4.12.0] - 2026-08-09
 
 ### Added
-- Add --model/--effort passthrough and kouen-cli cc run/status/list/cancel (release v4.12.0) ([`ee63244`](https://github.com/Vit129/kouen-terminal/commit/ee63244b18c51d03cb4da67877fa5fddc79c0d1b))
+- Add --model/--effort passthrough and kouen-cli cc run/status/list/cancel (release v4.12.0) ([`3b1d72b`](https://github.com/Vit129/kouen-terminal/commit/3b1d72b107b90c9781cfcbe3bc0f62db11376df5))
 
 ## [4.11.0] - 2026-08-09
 
 ### Added
-- Add Claude Code CLI subprocess harness (kouenCCRun/kouenCCStatus) ([`c5f37e2`](https://github.com/Vit129/kouen-terminal/commit/c5f37e204dbc0e8a0c8e640e79f319abb025055f))
+- Add Claude Code CLI subprocess harness (kouenCCRun/kouenCCStatus) ([`3544a5f`](https://github.com/Vit129/kouen-terminal/commit/3544a5f0371d107f3f69dcfff381790a2fc277b1))
 
 ### Documentation
-- Resolve M2-M9 competitive gaps to Closed, add M2-M9 feature matrix ([`ba1b713`](https://github.com/Vit129/kouen-terminal/commit/ba1b71305ddb606aa161e320016e38d992031a29))
+- Resolve M2-M9 competitive gaps to Closed, add M2-M9 feature matrix ([`71ff18e`](https://github.com/Vit129/kouen-terminal/commit/71ff18e7796ef7712cb19f1eb7674bd982c403a0))
 
 ### Fixed
-- Bump ipcProtocolVersion so M2/M5's new IPC cases force a daemon restart ([`3ec755f`](https://github.com/Vit129/kouen-terminal/commit/3ec755ff5f4ab485d07ed02e12bf9d1b260d1246))
+- Bump ipcProtocolVersion so M2/M5's new IPC cases force a daemon restart ([`26874b4`](https://github.com/Vit129/kouen-terminal/commit/26874b4f5336e71ad8fe2e1f33c65542be1c6336))
 
 ## [4.10.0] - 2026-08-06
 
 ### Added
-- Select all URL text on click ([`758481b`](https://github.com/Vit129/kouen-terminal/commit/758481b7a5888ab0e8acfa382d7dd35dde5e4526))
-- Add AgentRoutingRule model for agent:"auto" spawn-time CLI routing ([`9273a62`](https://github.com/Vit129/kouen-terminal/commit/9273a627c0690cd38303c304f7a9b76d592091f4))
-- Add AgentRoutingRuleStore persistence for routing rules ([`85b6702`](https://github.com/Vit129/kouen-terminal/commit/85b6702695adbaf67dae21af31968aad3f452de1))
-- Add AgentRoutingResolver, first-match rule resolution to AgentKind ([`653d0b5`](https://github.com/Vit129/kouen-terminal/commit/653d0b5bc9ead8de08fa03c568dd8ccfaad8fe6e))
-- Add IPC-safe AgentRoutingRuleSummary type ([`72ee1ca`](https://github.com/Vit129/kouen-terminal/commit/72ee1cabab9edf0150d26195119826fb35ae51bb))
-- Add defaultAgentKind fallback for unmatched auto-routing ([`a981c64`](https://github.com/Vit129/kouen-terminal/commit/a981c6495329a75dac61727ec26ec08fed7829f2))
-- Gate routing-rule mutate tools behind MCP control policy ([`f7347ed`](https://github.com/Vit129/kouen-terminal/commit/f7347edd6574abd712479d0212a288b4918bd1e6))
-- Register kouenRoutingRule* MCP tools ([`39c19fa`](https://github.com/Vit129/kouen-terminal/commit/39c19fa9fd22036424dec0f241179c12bc5d6f70))
-- Resolve agent:"auto" via routing rules in kouenSpawnAgent ([`87c99e7`](https://github.com/Vit129/kouen-terminal/commit/87c99e7c327fbdaf6265c17f1952f63b5c0ac884))
-- Add routing-rule and saved-layout IPC request/response cases ([`1cf3d4a`](https://github.com/Vit129/kouen-terminal/commit/1cf3d4a62248715b020b5aa6df5c0625b2fee68e))
-- Wire AgentRoutingRuleStore and SavedLayoutStore into the daemon ([`764fa60`](https://github.com/Vit129/kouen-terminal/commit/764fa60b7299b4ad35acf06f6696f243482ec258))
-- Add agent-routing-rules.json and saved-layouts.json paths ([`286a26c`](https://github.com/Vit129/kouen-terminal/commit/286a26c9f888d47901436496856f4eec0fdadd7f))
-- Add browser design mode — hover-highlight, click-select, style preview, Copy CSS ([`d6346ba`](https://github.com/Vit129/kouen-terminal/commit/d6346baa8b4224e46b86ec95b77d9e1384e19d19))
-- Add SavedLayout/PaneLayoutShape model, distinct from LayoutTemplate ([`5c6c96e`](https://github.com/Vit129/kouen-terminal/commit/5c6c96e8281692c31e03937f603067ce4fce27ee))
-- Add IPC-safe SavedLayout type ([`e768dea`](https://github.com/Vit129/kouen-terminal/commit/e768dea3423d75369c0df56916e000ff4aa00f22))
-- Apply saved layout shape via recursive client-side split ([`bf98703`](https://github.com/Vit129/kouen-terminal/commit/bf987036b46faeffffa795299c0fa5246963cb68))
-- Add RiskyCommandClassifier regex heuristic for risky-shell-command detection ([`f3f3dbd`](https://github.com/Vit129/kouen-terminal/commit/f3f3dbd89341ec680fe89520fd318a3983219ceb))
-- Saved-layout facade methods + risky-command advisory toast on command finish ([`e99d26b`](https://github.com/Vit129/kouen-terminal/commit/e99d26b918c6f3da674afa427e13c4c4c80454c9))
-- Add Fork Conversation, Save/Apply Layout, Request Peer Review menu actions ([`0909fb3`](https://github.com/Vit129/kouen-terminal/commit/0909fb3154689ae8015ab59ad786fa64423d11a4))
-- Parse PR reviewDecision from gh CLI output ([`8a1d6fc`](https://github.com/Vit129/kouen-terminal/commit/8a1d6fceb9be6d535f3b005379d922b649557203))
-- Thread prReviewDecision through RepoGitMetadata ([`6e9b5b6`](https://github.com/Vit129/kouen-terminal/commit/6e9b5b668c71981aa0c43be3cf4fdb3bd875cec7))
-- Offer checks-waiver merge when PR is approved, never waive mergeable ([`1b1af54`](https://github.com/Vit129/kouen-terminal/commit/1b1af548e7799a598771f7785cced65ef9e539a8))
-- Add slash-command discoverability picker; fix(composer): reassert typingAttributes before every keystroke, not just once, so typed text is never black ([`95c8f1c`](https://github.com/Vit129/kouen-terminal/commit/95c8f1cf16a438109dbd3aa2a73e27ac953fd0a7))
+- Select all URL text on click ([`378c2d7`](https://github.com/Vit129/kouen-terminal/commit/378c2d71a94c7a53ae98171bd4946f41574d1967))
+- Add AgentRoutingRule model for agent:"auto" spawn-time CLI routing ([`20dc1cf`](https://github.com/Vit129/kouen-terminal/commit/20dc1cf68fc3e7901dc480dd19b65459d91c827c))
+- Add AgentRoutingRuleStore persistence for routing rules ([`90c0e7d`](https://github.com/Vit129/kouen-terminal/commit/90c0e7d78b93b2b9a89710a961e67f36b3146ae6))
+- Add AgentRoutingResolver, first-match rule resolution to AgentKind ([`55df6e9`](https://github.com/Vit129/kouen-terminal/commit/55df6e9f0d4f55b66ae1765a703141a496172af7))
+- Add IPC-safe AgentRoutingRuleSummary type ([`ba9081c`](https://github.com/Vit129/kouen-terminal/commit/ba9081cf1b2742df515efd1214de81ff73c7e88e))
+- Add defaultAgentKind fallback for unmatched auto-routing ([`b7ec376`](https://github.com/Vit129/kouen-terminal/commit/b7ec37671d09e60c3294483e0fdecba86207fa62))
+- Gate routing-rule mutate tools behind MCP control policy ([`9a74c89`](https://github.com/Vit129/kouen-terminal/commit/9a74c89358890028c0dc3f4b54e4f9494b971c18))
+- Register kouenRoutingRule* MCP tools ([`ef6cfaa`](https://github.com/Vit129/kouen-terminal/commit/ef6cfaac229639fa7acd0c232d582a3b15c207bd))
+- Resolve agent:"auto" via routing rules in kouenSpawnAgent ([`9af8ce0`](https://github.com/Vit129/kouen-terminal/commit/9af8ce07579869f9e00e20213a28b0922715eb68))
+- Add routing-rule and saved-layout IPC request/response cases ([`0fcf649`](https://github.com/Vit129/kouen-terminal/commit/0fcf6495f65a03f8219c58790b40b332abb60f53))
+- Wire AgentRoutingRuleStore and SavedLayoutStore into the daemon ([`ab89e33`](https://github.com/Vit129/kouen-terminal/commit/ab89e33e89db80fe758046c0950d395257ffbd23))
+- Add agent-routing-rules.json and saved-layouts.json paths ([`9003355`](https://github.com/Vit129/kouen-terminal/commit/9003355e58874e26901e5a214c00b479c599e02b))
+- Add browser design mode — hover-highlight, click-select, style preview, Copy CSS ([`88ceec7`](https://github.com/Vit129/kouen-terminal/commit/88ceec72d377ff3a038cf46dbba24ddb20ea8a44))
+- Add SavedLayout/PaneLayoutShape model, distinct from LayoutTemplate ([`de854b3`](https://github.com/Vit129/kouen-terminal/commit/de854b3131358b0d11673d3582669c3741d6ee6b))
+- Add IPC-safe SavedLayout type ([`f35eb06`](https://github.com/Vit129/kouen-terminal/commit/f35eb060eba83a8d0dacf322f706dd4f0fb9c462))
+- Apply saved layout shape via recursive client-side split ([`df654b5`](https://github.com/Vit129/kouen-terminal/commit/df654b511d63f602f10ec79cf3680457145bbb6e))
+- Add RiskyCommandClassifier regex heuristic for risky-shell-command detection ([`53c5e8f`](https://github.com/Vit129/kouen-terminal/commit/53c5e8ffa62f0bc6b3ca7ed7d24962d11ce617d7))
+- Saved-layout facade methods + risky-command advisory toast on command finish ([`48628e5`](https://github.com/Vit129/kouen-terminal/commit/48628e5ebcff258bf296a76860ed2bfdb7ea012b))
+- Add Fork Conversation, Save/Apply Layout, Request Peer Review menu actions ([`c5f34d9`](https://github.com/Vit129/kouen-terminal/commit/c5f34d9f4eb5ee84f2cca73f533678cba962046c))
+- Parse PR reviewDecision from gh CLI output ([`38a6d02`](https://github.com/Vit129/kouen-terminal/commit/38a6d020e1ef7ffa2c9993ac4329bf44c22a285c))
+- Thread prReviewDecision through RepoGitMetadata ([`cbabb1e`](https://github.com/Vit129/kouen-terminal/commit/cbabb1e9d93b66739f4612406a2bc52794121301))
+- Offer checks-waiver merge when PR is approved, never waive mergeable ([`a4b1ef2`](https://github.com/Vit129/kouen-terminal/commit/a4b1ef2ec3c2f0aa8fba718bd33d255e1cf3e745))
+- Add slash-command discoverability picker; fix(composer): reassert typingAttributes before every keystroke, not just once, so typed text is never black ([`b990ae9`](https://github.com/Vit129/kouen-terminal/commit/b990ae965f809b6e45097d51d1d0774645a35974))
 
 ### Changed
-- Drop Agents cross-repo review dashboard, redundant with Board+Worktrees ([`c9e6989`](https://github.com/Vit129/kouen-terminal/commit/c9e69896675b0214d898bda62236837acaf2a0fd))
-- Drop selectAgentsTab notification handling, Agents tab removed ([`46da53b`](https://github.com/Vit129/kouen-terminal/commit/46da53bfce8c4527896612210b138208383a959f))
-- Drop Review Agent Work action, Agents tab removed ([`dc44cc0`](https://github.com/Vit129/kouen-terminal/commit/dc44cc003c9663100942492eab338b3f8d1141d3))
+- Drop Agents cross-repo review dashboard, redundant with Board+Worktrees ([`ebde550`](https://github.com/Vit129/kouen-terminal/commit/ebde550f34bd36084d32043fcdd4063c8cf7ebfd))
+- Drop selectAgentsTab notification handling, Agents tab removed ([`5963963`](https://github.com/Vit129/kouen-terminal/commit/59639639c92a4b2a69fec4d38942b924b1131943))
+- Drop Review Agent Work action, Agents tab removed ([`bfbba02`](https://github.com/Vit129/kouen-terminal/commit/bfbba02e79db137722e1c6cce036a8a7e55acffa))
 
 ### Documentation
-- Migrate stale Claude Code auto-memory into portable agent-memory ([`8ce6b61`](https://github.com/Vit129/kouen-terminal/commit/8ce6b61d466be2316608464f5706c4a41a51db1b))
-- Update parseWorktreePorcelain comment after Agents tab removal ([`d764b95`](https://github.com/Vit129/kouen-terminal/commit/d764b9502a6644dc05a3a209af9e4fdc6c88c1b8))
-- Record Agents tab removal decision (redundant with Board/Worktrees, 2026-08-06) ([`c8208fc`](https://github.com/Vit129/kouen-terminal/commit/c8208fcaace55b0616bc628d173ee7f1a389eea5))
-- Design doc — session-spawn CLI routing (scope-corrected from Warp's model router) ([`7dd1521`](https://github.com/Vit129/kouen-terminal/commit/7dd1521a48b0472c36c44eb33d389c0fdf3f9e75))
-- Task progress — closed, build/test/robot green, live-check owed ([`8b09020`](https://github.com/Vit129/kouen-terminal/commit/8b09020af4abeef1e8420525bc0562360d0dd325))
-- Design doc — visual-preview-only, no source-file round-trip (scope cut) ([`288641e`](https://github.com/Vit129/kouen-terminal/commit/288641e19872c09f54c91f5a07bab9f8790872b4))
-- Task progress — closed, build/test/robot green, live-check owed ([`7c2d4f8`](https://github.com/Vit129/kouen-terminal/commit/7c2d4f82da806358947e62a5027eb3805ae44334))
-- Task progress — closed, shape-only (no ratio/process restore) ([`59a5657`](https://github.com/Vit129/kouen-terminal/commit/59a5657e577f291dec28d3a6a020b9f03e4c0279))
-- Task progress — closed, advisory-only (fires after command finishes) ([`85b1cfe`](https://github.com/Vit129/kouen-terminal/commit/85b1cfe63c68d132623685a9426f6b63502117f3))
-- Design doc — reuses each CLI's own native fork flag, claude-code/codex only ([`88271cd`](https://github.com/Vit129/kouen-terminal/commit/88271cdaf6619472501936edfec457ece79a8164))
-- Task progress — closed, build/test green, live-check owed ([`699b0ec`](https://github.com/Vit129/kouen-terminal/commit/699b0ec7dc952df796d520b76842b485771cbf23))
-- Task progress — closed, human-triggered ask-only (no auto-capture/paste-back) ([`8cce333`](https://github.com/Vit129/kouen-terminal/commit/8cce3334f9522c916141543861e3132488bc9864))
-- Task progress — closed, extends existing P39 G3 merge picker ([`d93237c`](https://github.com/Vit129/kouen-terminal/commit/d93237c9ffd68e899df1c207c3f6297189c84f2d))
-- Task progress — closed, @file mention cut (documented, not built) ([`049d15e`](https://github.com/Vit129/kouen-terminal/commit/049d15e78c264fa9edeef0cff40c42a6503ecfd9))
-- Define M2-M9 vocabulary (Agent Routing Rule, Design Mode, Fork Conversation, Saved Layout, Risky Command Advisory, Request Peer Review, Merge Waiver, Slash Command Picker) ([`eacf7c5`](https://github.com/Vit129/kouen-terminal/commit/eacf7c5f7100d90cf180a6d448af30e1081cedc4))
-- Wayfinder map — M2-M9 competitive-gap features, all 8 tickets closed 2026-08-05 ([`1a003ac`](https://github.com/Vit129/kouen-terminal/commit/1a003acb317a9e39b994974350cfcafa13fedf4a))
-- Record user approval to build all 8 M2-M9 gaps despite no per-feature usage signal ([`dda8086`](https://github.com/Vit129/kouen-terminal/commit/dda8086430177a515c8cfcfa82f5da4b245cd892))
-- Index M2-M9 plan files and wayfinder map ([`3bf851f`](https://github.com/Vit129/kouen-terminal/commit/3bf851f5dc029a5042e2755d5df5c574627e522d))
-- Index m2-m9-competitive-build-decision and agents-tab-removed memory files ([`6f3f08b`](https://github.com/Vit129/kouen-terminal/commit/6f3f08b499467e706187f8c1088267582f7182e8))
-- Flag broken [[review-new-features-against-lessons]] link for follow-up ([`9368729`](https://github.com/Vit129/kouen-terminal/commit/936872913988e07a0087cb49395c70cf99c6435f))
-- Flag broken [[feedback_review-new-features-against-lessons]] link for follow-up ([`669858b`](https://github.com/Vit129/kouen-terminal/commit/669858bc37d970320492e50583566f2125e602ff))
-- Record 2026-08-02 scheduled memory-maintenance run results ([`f505e96`](https://github.com/Vit129/kouen-terminal/commit/f505e9664ad398f2a8e210ab4863f72d91f877b9))
-- Open gate for kouen-browser-mcp-intermittent-unresponsive investigation ([`a712142`](https://github.com/Vit129/kouen-terminal/commit/a7121424a089b288aecc3975fc7766f029c0cb7f))
-- Forbid nested git worktrees inside .kouen-worktrees/ ([`b2c2ae8`](https://github.com/Vit129/kouen-terminal/commit/b2c2ae8139a9943c89df8a8ed43b0133d23f0043))
+- Migrate stale Claude Code auto-memory into portable agent-memory ([`aeea3e7`](https://github.com/Vit129/kouen-terminal/commit/aeea3e7a0a4739cf14b60da0f4349e5549d0e1aa))
+- Update parseWorktreePorcelain comment after Agents tab removal ([`c28fca3`](https://github.com/Vit129/kouen-terminal/commit/c28fca3439810b653c924b7c78ab093622a81335))
+- Record Agents tab removal decision (redundant with Board/Worktrees, 2026-08-06) ([`597da09`](https://github.com/Vit129/kouen-terminal/commit/597da09ebdcc73c401f9fe7a24107222e12a4292))
+- Design doc — session-spawn CLI routing (scope-corrected from Warp's model router) ([`723ae60`](https://github.com/Vit129/kouen-terminal/commit/723ae6032e02cee01c93243642b960e16831487e))
+- Task progress — closed, build/test/robot green, live-check owed ([`6d8d171`](https://github.com/Vit129/kouen-terminal/commit/6d8d1718eec2737694fe68b6c8f10970b2dc0d56))
+- Design doc — visual-preview-only, no source-file round-trip (scope cut) ([`be96d23`](https://github.com/Vit129/kouen-terminal/commit/be96d23cf87b9ddf12247d211b592fe929c0ef67))
+- Task progress — closed, build/test/robot green, live-check owed ([`4706020`](https://github.com/Vit129/kouen-terminal/commit/4706020589fcfbd31271fca3345d041c0a6fed0d))
+- Task progress — closed, shape-only (no ratio/process restore) ([`3195e36`](https://github.com/Vit129/kouen-terminal/commit/3195e3609c6306627587b43d71a1c9f65abcbf57))
+- Task progress — closed, advisory-only (fires after command finishes) ([`7a5cb99`](https://github.com/Vit129/kouen-terminal/commit/7a5cb99e3b7b37ed8580990d73d3d641e207e074))
+- Design doc — reuses each CLI's own native fork flag, claude-code/codex only ([`6ce1035`](https://github.com/Vit129/kouen-terminal/commit/6ce1035d123c1d37f227dadf9c427862f602836b))
+- Task progress — closed, build/test green, live-check owed ([`93f2b6f`](https://github.com/Vit129/kouen-terminal/commit/93f2b6faf7d7420e0e59dbdaf8455f8674afbe73))
+- Task progress — closed, human-triggered ask-only (no auto-capture/paste-back) ([`dff7428`](https://github.com/Vit129/kouen-terminal/commit/dff7428ea8f5012f8823fcff743ceebe64ac4bfe))
+- Task progress — closed, extends existing P39 G3 merge picker ([`6912b9d`](https://github.com/Vit129/kouen-terminal/commit/6912b9d47b74954cf24fd5f6dc735a06cad75eb5))
+- Task progress — closed, @file mention cut (documented, not built) ([`6df1e8d`](https://github.com/Vit129/kouen-terminal/commit/6df1e8d3d762f285ebc7a1d9ba7076632b4034d6))
+- Define M2-M9 vocabulary (Agent Routing Rule, Design Mode, Fork Conversation, Saved Layout, Risky Command Advisory, Request Peer Review, Merge Waiver, Slash Command Picker) ([`aa70e24`](https://github.com/Vit129/kouen-terminal/commit/aa70e2441c8cb9744f02ab3a736c64e269421893))
+- Wayfinder map — M2-M9 competitive-gap features, all 8 tickets closed 2026-08-05 ([`7d90631`](https://github.com/Vit129/kouen-terminal/commit/7d90631ea8a04b073e810f4b509cfd546912a8f0))
+- Record user approval to build all 8 M2-M9 gaps despite no per-feature usage signal ([`5885603`](https://github.com/Vit129/kouen-terminal/commit/588560329c21b84bb48c2239c74d3ba909ca2cea))
+- Index M2-M9 plan files and wayfinder map ([`357525a`](https://github.com/Vit129/kouen-terminal/commit/357525a065136f8adaf445fd9181236268d3be92))
+- Index m2-m9-competitive-build-decision and agents-tab-removed memory files ([`64465c2`](https://github.com/Vit129/kouen-terminal/commit/64465c2cdb8ada28a6dd3812ce3716a44fe9fa99))
+- Flag broken [[review-new-features-against-lessons]] link for follow-up ([`df9ca7f`](https://github.com/Vit129/kouen-terminal/commit/df9ca7fd443c04833102600e887c39cc989f2dde))
+- Flag broken [[feedback_review-new-features-against-lessons]] link for follow-up ([`b4d2e2e`](https://github.com/Vit129/kouen-terminal/commit/b4d2e2ea0203447482a45b5aedf7667cff6e3e6d))
+- Record 2026-08-02 scheduled memory-maintenance run results ([`4eb5454`](https://github.com/Vit129/kouen-terminal/commit/4eb5454bbaed9cf7752f489700d7af24fab051bf))
+- Open gate for kouen-browser-mcp-intermittent-unresponsive investigation ([`a4d757f`](https://github.com/Vit129/kouen-terminal/commit/a4d757f2f5d980679133057325e944eb952eec9d))
+- Forbid nested git worktrees inside .kouen-worktrees/ ([`1e78819`](https://github.com/Vit129/kouen-terminal/commit/1e788199114509b1450c604f2f996d6661c6af7b))
 
 ### Fixed
-- Guard stale file-tree scan from clobbering active session's root ([`3b7b78e`](https://github.com/Vit129/kouen-terminal/commit/3b7b78ec6cbc9d42fc7f30cee8a513fd8a393a39))
+- Guard stale file-tree scan from clobbering active session's root ([`795736f`](https://github.com/Vit129/kouen-terminal/commit/795736f013e65296b3682d8a1e3844267a9b4493))
 
 ## [4.9.3] - 2026-07-31
 
 ### Fixed
-- Reload board columns on metadata-only snapshot pushes (release v4.9.3) ([`42ee2f8`](https://github.com/Vit129/kouen-terminal/commit/42ee2f8c0d066fecc6ef63bde4a25b4786bb657c))
+- Reload board columns on metadata-only snapshot pushes (release v4.9.3) ([`8715c54`](https://github.com/Vit129/kouen-terminal/commit/8715c54b7066cdf5e037a82e57615d903fecc8eb))
 
 ## [4.9.2] - 2026-07-29
 
 ### Fixed
-- Clamp persisted sidebar width so Cmd+\ toggle can't get stuck at zero-delta (release v4.9.2) ([`ffe984d`](https://github.com/Vit129/kouen-terminal/commit/ffe984d53d59e372111f14825af499cd0f776b1e))
+- Clamp persisted sidebar width so Cmd+\ toggle can't get stuck at zero-delta (release v4.9.2) ([`c42b0c0`](https://github.com/Vit129/kouen-terminal/commit/c42b0c0552fc9a3633df90222ee4ba40ec2d43b0))
 
 ## [4.9.1] - 2026-07-27
 
 ### Added
-- AppIntents/Shortcuts (Phase 7), sidebar-width persistence (Phase 5) ([`da59c2a`](https://github.com/Vit129/kouen-terminal/commit/da59c2ae112f18cd628e645944845d1054ff8cce))
+- AppIntents/Shortcuts (Phase 7), sidebar-width persistence (Phase 5) ([`c583a5b`](https://github.com/Vit129/kouen-terminal/commit/c583a5b000c7aa476566dcf7a73062565ada6247))
 
 ### Documentation
-- Fix stale Phase 5 note, record why Phases 4/6/10/11/12 are deliberately deferred ([`1d3a227`](https://github.com/Vit129/kouen-terminal/commit/1d3a22705af90cc158449e4cc01819410dcd1c16))
-- Close P8 and P37, archive completed plan docs ([`7beb315`](https://github.com/Vit129/kouen-terminal/commit/7beb315713a19cce21a081520f0d1e7b674cc5af))
+- Fix stale Phase 5 note, record why Phases 4/6/10/11/12 are deliberately deferred ([`4f50fe2`](https://github.com/Vit129/kouen-terminal/commit/4f50fe20eae13c18aa4f3a646d0252f281518594))
+- Close P8 and P37, archive completed plan docs ([`d8e3673`](https://github.com/Vit129/kouen-terminal/commit/d8e36737b1c689956dfc755b7cbb6debbd593599))
 
 ### Fixed
-- Resync GeneratedReleaseNotes.swift; test(notch): fix stale peek-size assertions ([`fa8a08c`](https://github.com/Vit129/kouen-terminal/commit/fa8a08cfd911a12352431751d170392c3547f26d))
-- Prevent FSEventStream teardown race crash in FileTreeWatcher ([`e6d84f8`](https://github.com/Vit129/kouen-terminal/commit/e6d84f8f914297fc32de531fb3b4b814d85a2cb2))
-- Resolve sidebar toggle window via NSApp.windows loop, not keyWindow chain ([`7d76e18`](https://github.com/Vit129/kouen-terminal/commit/7d76e18324fe1b3ba45e0304bc00d5b0eed77798))
+- Resync GeneratedReleaseNotes.swift; test(notch): fix stale peek-size assertions ([`82fc709`](https://github.com/Vit129/kouen-terminal/commit/82fc7094c528c550de1dfbb74477ac98e9a8789c))
+- Prevent FSEventStream teardown race crash in FileTreeWatcher ([`4cd5d46`](https://github.com/Vit129/kouen-terminal/commit/4cd5d466b47abacde7f31dc23a5ccb058087c3e2))
+- Resolve sidebar toggle window via NSApp.windows loop, not keyWindow chain ([`0a71a0b`](https://github.com/Vit129/kouen-terminal/commit/0a71a0b9425cf6b227877198d6da372dbef049dd))
 
 ## [4.9.0] - 2026-07-26
 
 ### Added
-- Approve/deny, quick-reply, exact-pane jump, per-event sounds ([`d590786`](https://github.com/Vit129/kouen-terminal/commit/d59078689bc404f8e9bb9977176e3de2212f3fad))
+- Approve/deny, quick-reply, exact-pane jump, per-event sounds ([`1aaa5f3`](https://github.com/Vit129/kouen-terminal/commit/1aaa5f3e206fd1a96c0ab13cb4e599acf1654196))
 
 ### Fixed
-- Restore Liquid Glass transparency pipeline and finish browser-pane chrome ([`157e5aa`](https://github.com/Vit129/kouen-terminal/commit/157e5aa6477ffa30540d6719bfb6d5f15474dd2b))
-- Enable arrow-key line editing in release-pipeline prompts ([`cc60fc3`](https://github.com/Vit129/kouen-terminal/commit/cc60fc3484cd057b53052a8aff24c6499d2e24e2))
-- Guard MobileBridgeServer reference for platforms without Network ([`9f7297f`](https://github.com/Vit129/kouen-terminal/commit/9f7297ff046b34daf8b613c50851153ca0cc2fbd))
+- Restore Liquid Glass transparency pipeline and finish browser-pane chrome ([`ef055ad`](https://github.com/Vit129/kouen-terminal/commit/ef055ad6a94f67b5e641e1aadabb6e32b8ada5d8))
+- Enable arrow-key line editing in release-pipeline prompts ([`16b1a41`](https://github.com/Vit129/kouen-terminal/commit/16b1a415e8eb0b4e9b442bc55d5e42b5fd4a35cf))
+- Guard MobileBridgeServer reference for platforms without Network ([`aa89f1b`](https://github.com/Vit129/kouen-terminal/commit/aa89f1bb844cc55345a93979e01fe68cc5dd2b4a))
 
 ## [4.8.0] - 2026-07-25
 
 ### Added
-- Adopt macOS 27 plan additions and window quick wins ([`2ef888d`](https://github.com/Vit129/kouen-terminal/commit/2ef888d63b99b586e248ce154cc8f4d22c1a15d0))
-- Add actionable notification category with Focus Pane, Rerun Command, and Copy Output ([`cf042ed`](https://github.com/Vit129/kouen-terminal/commit/cf042ed15488896c926e367c0a488a40ae1ec859))
-- Make session row title semi-bold only when selected ([`1fbdacf`](https://github.com/Vit129/kouen-terminal/commit/1fbdacf82f54bdaacf5c50abaa0ffc72da7fd10e))
-- Add ActivityAssertionManager to prevent App Nap during builds/agent runs ([`bfd5e09`](https://github.com/Vit129/kouen-terminal/commit/bfd5e09039f7e14ffd1b697f82548eec63650f30))
-- Adopt NSViewCornerConfiguration and .containerConcentric on overlays ([`ea4b348`](https://github.com/Vit129/kouen-terminal/commit/ea4b34816b4ffd7d11f68591f756748f8a38980f))
-- Support macOS27 beta 4 first version ([`4d2498b`](https://github.com/Vit129/kouen-terminal/commit/4d2498b8a52d40b5557fca26df1ca3924a287187))
+- Adopt macOS 27 plan additions and window quick wins ([`d9c510c`](https://github.com/Vit129/kouen-terminal/commit/d9c510cad7a55fa0906c2bf23730e6f832b0d03e))
+- Add actionable notification category with Focus Pane, Rerun Command, and Copy Output ([`70a0c94`](https://github.com/Vit129/kouen-terminal/commit/70a0c9474a10a226a49596a0c808c3d36299da4a))
+- Make session row title semi-bold only when selected ([`713072b`](https://github.com/Vit129/kouen-terminal/commit/713072bec16ca2e72543cccbba92a07342b8b00c))
+- Add ActivityAssertionManager to prevent App Nap during builds/agent runs ([`cbc4d5e`](https://github.com/Vit129/kouen-terminal/commit/cbc4d5efa8ed7d16b07b08c9300c0453fba31cf8))
+- Adopt NSViewCornerConfiguration and .containerConcentric on overlays ([`b3e077a`](https://github.com/Vit129/kouen-terminal/commit/b3e077a4ca296c2e419d05eab59596c3e755a6a6))
+- Support macOS27 beta 4 first version ([`a4a6480`](https://github.com/Vit129/kouen-terminal/commit/a4a64806327501342e61a372fa2437d3fe08e49d))
 
 ### Documentation
-- Add Scheduled Memory Maintenance Job term to LANGUAGE.md ([`42a2426`](https://github.com/Vit129/kouen-terminal/commit/42a242646c7a5593af175c1de21212f3acc1fa96))
-- Rename LANGUAGE.md to GLOSSARY.md ([`4d3dc08`](https://github.com/Vit129/kouen-terminal/commit/4d3dc08e70823c9c9f275ac2ff6b1aeca44f791f))
-- Record Xcode 27 beta compatibility findings for Phase 1 ([`edda070`](https://github.com/Vit129/kouen-terminal/commit/edda070866dd8dfd59cfe0a647b7e5bfa28422d7))
+- Add Scheduled Memory Maintenance Job term to LANGUAGE.md ([`604056a`](https://github.com/Vit129/kouen-terminal/commit/604056a119a5fe4b596737fa87aa496fae45c5f2))
+- Rename LANGUAGE.md to GLOSSARY.md ([`6680d0d`](https://github.com/Vit129/kouen-terminal/commit/6680d0d48c4ac1e7c13e03f5905cb3fe943070b5))
+- Record Xcode 27 beta compatibility findings for Phase 1 ([`559b46f`](https://github.com/Vit129/kouen-terminal/commit/559b46f41aa4e49e2083b085fd838036f9d6d844))
 
 ### Fixed
-- Guard UNUserNotificationCenter calls when bundle identifier is nil ([`c6feec1`](https://github.com/Vit129/kouen-terminal/commit/c6feec186067b923027da0438fdc1d58a4127a7b))
-- Safely handle UNUserNotificationCenter in xctest runner environment ([`861e959`](https://github.com/Vit129/kouen-terminal/commit/861e9592c7610dbf5f39f233f4672c736b41f3b7))
-- Guard updateTrackingAreas against window==nil in TabOverviewController/ContentAreaViewController ([`9b5d2c2`](https://github.com/Vit129/kouen-terminal/commit/9b5d2c2ca81c85352f2b12c15815745bb5fe8b03))
-- Replace unsafe MainActor.assumeIsolated with Task { @MainActor in } ([`82816f9`](https://github.com/Vit129/kouen-terminal/commit/82816f99abea3adf7a411056813f21ac2845fc73))
+- Guard UNUserNotificationCenter calls when bundle identifier is nil ([`79c1e2a`](https://github.com/Vit129/kouen-terminal/commit/79c1e2a5e4d008a30df925366ed63dfc0433aed7))
+- Safely handle UNUserNotificationCenter in xctest runner environment ([`cc76905`](https://github.com/Vit129/kouen-terminal/commit/cc7690547f8656b6623fb0ff80c98c941c152930))
+- Guard updateTrackingAreas against window==nil in TabOverviewController/ContentAreaViewController ([`4f023e2`](https://github.com/Vit129/kouen-terminal/commit/4f023e299892784e48ca3599a2b50e6ba3ffb1be))
+- Replace unsafe MainActor.assumeIsolated with Task { @MainActor in } ([`9d11f68`](https://github.com/Vit129/kouen-terminal/commit/9d11f6866599c3f2fc42506ea72579b25e48c448))
 
 ## [4.7.4] - 2026-07-23
 
 ### Fixed
-- Stop daemon-side pane changes from being silently discarded while a browser pane is open (release v4.7.4) ([`6c14a8a`](https://github.com/Vit129/kouen-terminal/commit/6c14a8a7e96a98bb7b8832c23dd8380db208a1fd))
+- Stop daemon-side pane changes from being silently discarded while a browser pane is open (release v4.7.4) ([`c3cef05`](https://github.com/Vit129/kouen-terminal/commit/c3cef05dce46471c3503406e1520166d3c188b01))
 
 ## [4.7.3] - 2026-07-23
 
 ### Fixed
-- Raise daemon-routed git request timeout from 2s to 30s (fetch/pull/push were silently timing out on ordinary network latency) (release v4.7.3) ([`c6e8cf7`](https://github.com/Vit129/kouen-terminal/commit/c6e8cf72a71ada16249f3de8345766334930990c))
+- Raise daemon-routed git request timeout from 2s to 30s (fetch/pull/push were silently timing out on ordinary network latency) (release v4.7.3) ([`080808d`](https://github.com/Vit129/kouen-terminal/commit/080808d0e8cd154b1b85235993b1daeb3b62c6d4))
 
 ## [4.7.2] - 2026-07-23
 
 ### Added
-- MAW-style merge validate gate + agent handoff surfacing (human review + agent-to-agent spawn seed) (release v4.7.2) ([`c788cf8`](https://github.com/Vit129/kouen-terminal/commit/c788cf8141cce3a64fe845ea3a9925c8813ad172))
+- MAW-style merge validate gate + agent handoff surfacing (human review + agent-to-agent spawn seed) (release v4.7.2) ([`8e70a64`](https://github.com/Vit129/kouen-terminal/commit/8e70a645b15759a253c001f03a57dfafc4f3a2e2))
 
 ## [4.7.1] - 2026-07-22
 
 ### Added
-- Ghq-style wake command, signal-file agent routing, graphify LSP hover (release v4.7.0) ([`8280e1c`](https://github.com/Vit129/kouen-terminal/commit/8280e1cc3e9933a8b06e34ca2394ac2eff422e7c))
+- Ghq-style wake command, signal-file agent routing, graphify LSP hover (release v4.7.0) ([`f87dec3`](https://github.com/Vit129/kouen-terminal/commit/f87dec32fa9b0585f008029b55971abd0c09eb94))
 
 ### Fixed
-- Replace Harness placeholder logo with Kouen brand mark ([`60b749d`](https://github.com/Vit129/kouen-terminal/commit/60b749d8e5f9404f3273343fa97e42edb9ff0cd3))
-- Closed notch pill no longer forced to a 100pt floor on non-notch Macs ([`a3cd3e3`](https://github.com/Vit129/kouen-terminal/commit/a3cd3e3916faaba9cf49c5fbb8a8f293571cff2f))
-- Stop swallowing gh release create/edit errors in full-cycle.sh ([`3e0f86d`](https://github.com/Vit129/kouen-terminal/commit/3e0f86de8e5c0e6974c237dd68aabcc9a4d42b31))
-- Guard release notes against GitHub's 125000-char body limit ([`33f4f7d`](https://github.com/Vit129/kouen-terminal/commit/33f4f7dca97b5f0600dceae4c117b2d21a6fa5ec))
-- Browser pane always opens in the requesting session's own tab, not whichever tab is focused (release v4.7.1) ([`d712328`](https://github.com/Vit129/kouen-terminal/commit/d712328be65c5365d9752107f629d07e87e61e88))
+- Replace Harness placeholder logo with Kouen brand mark ([`aba004e`](https://github.com/Vit129/kouen-terminal/commit/aba004e4d6091b2ae92e2a3d23aac237c0aafa87))
+- Closed notch pill no longer forced to a 100pt floor on non-notch Macs ([`a8e3cc7`](https://github.com/Vit129/kouen-terminal/commit/a8e3cc7e526482e488d8a856f572a47521dbdbfd))
+- Stop swallowing gh release create/edit errors in full-cycle.sh ([`01322f5`](https://github.com/Vit129/kouen-terminal/commit/01322f5f0d37e2e986a8c82ea6bd92a17fa0901d))
+- Guard release notes against GitHub's 125000-char body limit ([`ae57497`](https://github.com/Vit129/kouen-terminal/commit/ae57497f862488d9a3ed0cdb7af62a4c4e0e9e72))
+- Browser pane always opens in the requesting session's own tab, not whichever tab is focused (release v4.7.1) ([`312d940`](https://github.com/Vit129/kouen-terminal/commit/312d940e1539610cb92d5df319afcaa873cf095e))
 
 ## [4.6.1] - 2026-07-18
 
 ### Added
-- Group Task Dashboard by project, auto-delete tasks on done ([`9c3053b`](https://github.com/Vit129/kouen-terminal/commit/9c3053bbfd86c4caf101fa8cbfb19c8b76d7f2b2))
+- Group Task Dashboard by project, auto-delete tasks on done ([`90c9d82`](https://github.com/Vit129/kouen-terminal/commit/90c9d82500758e3253090c1cc31caa8796fbe1c5))
 
 ### Fixed
-- Emit task createdAt/updatedAt in UTC+7 instead of UTC ([`ddc1cad`](https://github.com/Vit129/kouen-terminal/commit/ddc1cad252706e8c8f3409d657cd2e798e099c99))
-- Route markdown through syntax view, restore file preview copy/find (release v4.6.1) ([`f1d8dce`](https://github.com/Vit129/kouen-terminal/commit/f1d8dce7a08db32e55dffa0f5203a6d1541dbc13))
+- Emit task createdAt/updatedAt in UTC+7 instead of UTC ([`2341efd`](https://github.com/Vit129/kouen-terminal/commit/2341efd32aadfc529276404f91c48c7970240ed3))
+- Route markdown through syntax view, restore file preview copy/find (release v4.6.1) ([`d725578`](https://github.com/Vit129/kouen-terminal/commit/d7255785f2ac840f5a6722809bee0eff4bc5ae7d))
 
 ## [4.6.0] - 2026-07-17
 
 ### Added
-- Dedupe open-tab repo roots into kouenProjectsList MCP tool (release v4.6.0) ([`b3cffa6`](https://github.com/Vit129/kouen-terminal/commit/b3cffa65a9d4c001dae8ecf47016e39c9bb9a217))
+- Dedupe open-tab repo roots into kouenProjectsList MCP tool (release v4.6.0) ([`e0e5fd0`](https://github.com/Vit129/kouen-terminal/commit/e0e5fd03ee6e34b1a8a63f02b617e08e2d54c033))
 
 ## [4.5.5] - 2026-07-16
 
 ### Fixed
-- Forward arrow keys through doCommandBy when input routes via marked-text/IME (release v4.5.5) ([`7b335c0`](https://github.com/Vit129/kouen-terminal/commit/7b335c05f79d1f9e176e9ada644205d4f1074bad))
+- Forward arrow keys through doCommandBy when input routes via marked-text/IME (release v4.5.5) ([`14d012e`](https://github.com/Vit129/kouen-terminal/commit/14d012e95e6eaf20c95334a84e9c4a096e3485ee))
 
 ## [4.5.4] - 2026-07-16
 
 ### Fixed
-- Restore path-insert as default terminal drop (⌥-drag opts into file preview) (release v4.5.4) ([`732491c`](https://github.com/Vit129/kouen-terminal/commit/732491ce8e3deb33667a1328134f9e7e3762c963))
+- Restore path-insert as default terminal drop (⌥-drag opts into file preview) (release v4.5.4) ([`26b7d4f`](https://github.com/Vit129/kouen-terminal/commit/26b7d4f20537ae357d077b28e5bc8e3cf62fc0ef))
 
 ## [4.5.3] - 2026-07-16
 
 ### Added
-- Group Recipes & History picker by originating pane ([`266b74c`](https://github.com/Vit129/kouen-terminal/commit/266b74c349ce5b1995ec08dda419971cd3fc02a1))
-- Add Codex MCP config support (config.toml, not JSON) ([`04a0e19`](https://github.com/Vit129/kouen-terminal/commit/04a0e197812f8e6b47dc4e6fdfc1f16724b6ff01))
-- Add Antigravity (agy) Stop hook support ([`886ab94`](https://github.com/Vit129/kouen-terminal/commit/886ab9476a4404825ee359c2571c6fc656ff5f5e))
-- Check for newer git-clone version at launch, confirm before pull ([#53](https://github.com/Vit129/kouen-terminal/pull/53)) ([`c23b715`](https://github.com/Vit129/kouen-terminal/commit/c23b7157610dd7fc2be0639ef2960fada7075d73))
-- Drag-and-drop file support (terminal open-preview, sidebar copy-in) (release v4.5.3) ([`4becc8b`](https://github.com/Vit129/kouen-terminal/commit/4becc8b98ab6f02629b8e92aa5d23b34fe3254c1))
+- Group Recipes & History picker by originating pane ([`4bf668f`](https://github.com/Vit129/kouen-terminal/commit/4bf668f0ad76e6e2905243ef0ea88ba0b0a973a4))
+- Add Codex MCP config support (config.toml, not JSON) ([`e2880c5`](https://github.com/Vit129/kouen-terminal/commit/e2880c5b107660902e01587201584d717b2fa0f4))
+- Add Antigravity (agy) Stop hook support ([`7797811`](https://github.com/Vit129/kouen-terminal/commit/77978114c2c73fa0a2b752ac8aff6dca7f9c2117))
+- Check for newer git-clone version at launch, confirm before pull ([#53](https://github.com/Vit129/kouen-terminal/pull/53)) ([`7168498`](https://github.com/Vit129/kouen-terminal/commit/716849804b32609cd8872b39fd743c85e1d2712c))
+- Drag-and-drop file support (terminal open-preview, sidebar copy-in) (release v4.5.3) ([`1a2606c`](https://github.com/Vit129/kouen-terminal/commit/1a2606c193055be31a1a52095cce366e3c576c67))
 
 ### Fixed
-- Scope kouenBrowserOpen pane reuse to the target tab ([`7fbdd61`](https://github.com/Vit129/kouen-terminal/commit/7fbdd611edc1314f49b2990fcd4ee3e9e2df5ce6))
-- Show checkmark when agent hooks are installed ([`3952882`](https://github.com/Vit129/kouen-terminal/commit/39528824012684c97a9114fb73a40b00b2d78dff))
+- Scope kouenBrowserOpen pane reuse to the target tab ([`17ca4fe`](https://github.com/Vit129/kouen-terminal/commit/17ca4fe97dcb56faac7a73c34b2190de615ba865))
+- Show checkmark when agent hooks are installed ([`d28e15d`](https://github.com/Vit129/kouen-terminal/commit/d28e15de36ea82d100e31a1b6de98f5d4e87b948))
 
 ## [4.5.1] - 2026-07-15
 
 ### Fixed
-- Actually call WorktreeAutoIsolateService.shared.start() ([`6a3ebf9`](https://github.com/Vit129/kouen-terminal/commit/6a3ebf9c2aa7f49a6bd5467663362feb1412f776))
+- Actually call WorktreeAutoIsolateService.shared.start() ([`8b72ae3`](https://github.com/Vit129/kouen-terminal/commit/8b72ae3d29ead59df5130466c16e30b0527c77ce))
 
 ## [4.5.0] - 2026-07-15
 
 ### Added
-- Subagent visibility badge on tab/sidebar (P38 Phase B) ([`1ff21c9`](https://github.com/Vit129/kouen-terminal/commit/1ff21c9c532e7942c4144285e2b5327c723740e6))
-- Merge command-history into the Recipes picker (P38 Phase C) ([`463e161`](https://github.com/Vit129/kouen-terminal/commit/463e16115bb3b49c27457f6bc8e73852eb413679))
-- Kitty Graphics protocol conformance slice (P38 Phase D) ([`b56cbe3`](https://github.com/Vit129/kouen-terminal/commit/b56cbe307941e1147f2d6e5b7ec1dabe3451603e))
+- Subagent visibility badge on tab/sidebar (P38 Phase B) ([`958c383`](https://github.com/Vit129/kouen-terminal/commit/958c3839719716433959f82368ffbc37e14e645d))
+- Merge command-history into the Recipes picker (P38 Phase C) ([`3ccfb9a`](https://github.com/Vit129/kouen-terminal/commit/3ccfb9a0abf7d456d075a6ae2c4a6961d72103c8))
+- Kitty Graphics protocol conformance slice (P38 Phase D) ([`3327cb9`](https://github.com/Vit129/kouen-terminal/commit/3327cb92cd65bc1b51a8700c2bf72737ee7e2d83))
 
 ### Documentation
-- Update P38 status across all phases in plans index ([`6c61169`](https://github.com/Vit129/kouen-terminal/commit/6c61169529a208375c161dd490111fb38432fb4a))
+- Update P38 status across all phases in plans index ([`afc3b4f`](https://github.com/Vit129/kouen-terminal/commit/afc3b4fdac9bb7b59b4a650a38bb48b2d7c2ea23))
 
 ### Fixed
-- Dispatch paneCreated/paneRemoved lifecycle hooks (P38 Phase E) ([`e4c72cc`](https://github.com/Vit129/kouen-terminal/commit/e4c72cc0759453aa59552c75358aa54773353ed5))
-- Auto-isolate background tabs, not just the focused one ([`da3a988`](https://github.com/Vit129/kouen-terminal/commit/da3a988c2ffd550f0906f3dc1a56eedb6b8766e3))
+- Dispatch paneCreated/paneRemoved lifecycle hooks (P38 Phase E) ([`214d621`](https://github.com/Vit129/kouen-terminal/commit/214d621f9ea0436c1558a393f939759e75d97cd7))
+- Auto-isolate background tabs, not just the focused one ([`f8b9ec4`](https://github.com/Vit129/kouen-terminal/commit/f8b9ec4f52ca373ddc2850c93a429bc40332a33f))
 
 ## [4.4.4] - 2026-07-14
 
 ### Fixed
-- Switch panel view + tag worktreePath on click-to-worktree navigation (release v4.4.4) ([`c405a3a`](https://github.com/Vit129/kouen-terminal/commit/c405a3a19042e47188e7bb3cafdbac95ef0565aa))
+- Switch panel view + tag worktreePath on click-to-worktree navigation (release v4.4.4) ([`e99d916`](https://github.com/Vit129/kouen-terminal/commit/e99d91628398014a98ca2e4e941646f8f62fc790))
 
 ## [4.4.3] - 2026-07-14
 
 ### Added
-- Mobile terminal keyboard toolbar (Esc/Tab/Ctrl-C/Ctrl-D/arrows) ([`9c4706f`](https://github.com/Vit129/kouen-terminal/commit/9c4706f36bd8fa6101180a0aab4c1f979b23a8d5))
-- Mobile terminal @ file-path autocomplete (P37 Phase G1) ([`3fcd94d`](https://github.com/Vit129/kouen-terminal/commit/3fcd94d1b82e32078393a493cfb765ebf91d3673))
-- Mobile terminal shell tab-completion suggestion strip (P37 Phase G2) ([`26ab0d5`](https://github.com/Vit129/kouen-terminal/commit/26ab0d5e9ad9ec3830022d4edffd56b88ecfcc81))
-- Mobile terminal AI command suggestion via claude CLI (P37 Phase G3) ([`ebc4e77`](https://github.com/Vit129/kouen-terminal/commit/ebc4e77be88e2d8765798c93277291c43dd3c424))
-- Capture creating session's cwd on Kouen Task create ([`308f7df`](https://github.com/Vit129/kouen-terminal/commit/308f7df0da4269eaadd51aca0d1d1816ec5783e5))
-- Add cross-repo Agents review dashboard + merge flow, fix worktree card navigation (release v4.4.3) ([`8ce31e3`](https://github.com/Vit129/kouen-terminal/commit/8ce31e3e92bf69857b4d24d6ef786df974236400))
+- Mobile terminal keyboard toolbar (Esc/Tab/Ctrl-C/Ctrl-D/arrows) ([`075f081`](https://github.com/Vit129/kouen-terminal/commit/075f081c56e42bc45100d1fea65a946658130aa4))
+- Mobile terminal @ file-path autocomplete (P37 Phase G1) ([`d1dafe5`](https://github.com/Vit129/kouen-terminal/commit/d1dafe5476f388eadd9da65057005160b8cb6d1d))
+- Mobile terminal shell tab-completion suggestion strip (P37 Phase G2) ([`92e6d99`](https://github.com/Vit129/kouen-terminal/commit/92e6d999dba202af9277d3803cdd0237f7085c6e))
+- Mobile terminal AI command suggestion via claude CLI (P37 Phase G3) ([`ab34833`](https://github.com/Vit129/kouen-terminal/commit/ab348337b80732766bd776137a44688ba8dce0d5))
+- Capture creating session's cwd on Kouen Task create ([`0e536f9`](https://github.com/Vit129/kouen-terminal/commit/0e536f9ee631ce7504c9717fbd82d15c5d528ac3))
+- Add cross-repo Agents review dashboard + merge flow, fix worktree card navigation (release v4.4.3) ([`71bebac`](https://github.com/Vit129/kouen-terminal/commit/71bebac368e613f08a2870f92d81927e0bfb03d0))
 
 ### Documentation
-- Record F2 keyboard toolbar shipped + F3 already-true in Phase F ([`de71279`](https://github.com/Vit129/kouen-terminal/commit/de71279aa61ee7196f7d6fbb8a05c40d96765115))
-- Design + task breakdown for P37 Phase G (autocomplete) ([`b911803`](https://github.com/Vit129/kouen-terminal/commit/b9118032ad1a7f3ea27f87ec7b7fce4a285a9fa3))
-- Defer P37 F5 (share-sheet upload) pending web-based mobile bridge completion ([`4909fad`](https://github.com/Vit129/kouen-terminal/commit/4909fad2509f077240eb879105819f5438b22841))
-- Caveman-compress CLAUDE.md to cut input tokens ([`bdbe80c`](https://github.com/Vit129/kouen-terminal/commit/bdbe80c4104154c0ff037886861f86d03d958344))
-- Record today's P39/P40 verification pass, refresh graphify ([`46e7508`](https://github.com/Vit129/kouen-terminal/commit/46e75083c82d216f560a72252fbb3db87b20b8fa))
+- Record F2 keyboard toolbar shipped + F3 already-true in Phase F ([`e0f9401`](https://github.com/Vit129/kouen-terminal/commit/e0f94013bb2e932af4a451f501b3c5b2ed6dee02))
+- Design + task breakdown for P37 Phase G (autocomplete) ([`471b406`](https://github.com/Vit129/kouen-terminal/commit/471b406d87c912b4e3955f92ecd8ab97bc25dd35))
+- Defer P37 F5 (share-sheet upload) pending web-based mobile bridge completion ([`953c320`](https://github.com/Vit129/kouen-terminal/commit/953c3201e1443a8cb3c5b14e1d96641157f858b2))
+- Caveman-compress CLAUDE.md to cut input tokens ([`32fb624`](https://github.com/Vit129/kouen-terminal/commit/32fb6242f166438e6846300d33c959d2ff85bc23))
+- Record today's P39/P40 verification pass, refresh graphify ([`4f98d53`](https://github.com/Vit129/kouen-terminal/commit/4f98d53b2780a56d7ae1ffce6a007cfb91363951))
 
 ### Fixed
-- G3 newline auto-execute, pipe deadlock risk, stale AI suggestion state ([`a98c94a`](https://github.com/Vit129/kouen-terminal/commit/a98c94a86383967d9e34224163dbbbe4b0093ede))
-- Cmd+\ sidebar toggle raced window's launch-time resize-to-real-size, causing stuck squeeze/black panel ([`3a047d0`](https://github.com/Vit129/kouen-terminal/commit/3a047d09e647821d1dcf2427af796f0cb884c883))
-- Browser open reuses existing pane as new tab instead of splitting a second pane ([`0a421c8`](https://github.com/Vit129/kouen-terminal/commit/0a421c8bf93da44e022b12ba705d3dbf83bfaa7c))
-- Mobile bridge terminal double-wrap on real phone width, upload picker no-op, add copy-path ([`1c24562`](https://github.com/Vit129/kouen-terminal/commit/1c2456209bda92e989dbbe99bcebd93a0b7902fc))
-- Mobile bridge reconnect trusts a stale readyState and never retries an active drop (P37 F4) ([`54c5df8`](https://github.com/Vit129/kouen-terminal/commit/54c5df82cba5bddb13cd57b1227fb1c3e503f65d))
+- G3 newline auto-execute, pipe deadlock risk, stale AI suggestion state ([`a5edcd5`](https://github.com/Vit129/kouen-terminal/commit/a5edcd534e7a9ca58347088f1a0405838f9667ca))
+- Cmd+\ sidebar toggle raced window's launch-time resize-to-real-size, causing stuck squeeze/black panel ([`050c5a6`](https://github.com/Vit129/kouen-terminal/commit/050c5a6702caa66c8c86dfa6927d2c02da710ab1))
+- Browser open reuses existing pane as new tab instead of splitting a second pane ([`ce7ef5a`](https://github.com/Vit129/kouen-terminal/commit/ce7ef5a75e34daec09b1dde6f88cb53ab871c155))
+- Mobile bridge terminal double-wrap on real phone width, upload picker no-op, add copy-path ([`61db127`](https://github.com/Vit129/kouen-terminal/commit/61db1278cbb0de74926cdde45f067fdde51dc250))
+- Mobile bridge reconnect trusts a stale readyState and never retries an active drop (P37 F4) ([`04aa4c1`](https://github.com/Vit129/kouen-terminal/commit/04aa4c12bb4beadbe259520634a241646faf2384))
 
 ## [4.4.2] - 2026-07-13
 
 ### Added
-- Mobile-triggered Mac window focus + protect native window from phone resize votes ([`43b8265`](https://github.com/Vit129/kouen-terminal/commit/43b826582b72dc1a52ddf150f2e65c06f3decadf))
-- Mobile bridge readFile/listDirectory for read-only file preview (P37 Phase D1, server-side) ([`338f898`](https://github.com/Vit129/kouen-terminal/commit/338f898405d92b112a1cf9e9e47a5adbeaa5e13f))
-- Mobile bridge file preview UI — files sheet + text/image preview view (P37 Phase D1, client-side) ([`2313885`](https://github.com/Vit129/kouen-terminal/commit/2313885e0a8de70d1e5b49d77e3929ad9513175d))
-- Mobile bridge file/image attach (upload) — server + client (P37 Phase D2) ([`b3c03f9`](https://github.com/Vit129/kouen-terminal/commit/b3c03f9c9aa71bb726818a24017a4bfbc4e1b284))
-- Mobile bridge browser mirror — navigate/snapshot/interact/screenshot (P37 Phase D3) ([`0c5cd26`](https://github.com/Vit129/kouen-terminal/commit/0c5cd2626f86ed4ad27538a9f47649efe0d15463))
-- Mobile bridge unified preview tab-strip + tablet layout (P37 Phase E) ([`2f516b4`](https://github.com/Vit129/kouen-terminal/commit/2f516b4f4f1328dd5a9021cecacbefb200e9bb5a))
+- Mobile-triggered Mac window focus + protect native window from phone resize votes ([`912d9c3`](https://github.com/Vit129/kouen-terminal/commit/912d9c3f608b9f23bd95b43b3f396e54864ca802))
+- Mobile bridge readFile/listDirectory for read-only file preview (P37 Phase D1, server-side) ([`b19b9c5`](https://github.com/Vit129/kouen-terminal/commit/b19b9c52ba9b488c00e8e8ceb7b1909e9d81ffe8))
+- Mobile bridge file preview UI — files sheet + text/image preview view (P37 Phase D1, client-side) ([`afdd16a`](https://github.com/Vit129/kouen-terminal/commit/afdd16ac40bca4cbed823564a22131ed32d01a23))
+- Mobile bridge file/image attach (upload) — server + client (P37 Phase D2) ([`4598906`](https://github.com/Vit129/kouen-terminal/commit/45989063982e96ddbdc7c4ece650b35777cfb6a7))
+- Mobile bridge browser mirror — navigate/snapshot/interact/screenshot (P37 Phase D3) ([`caf3330`](https://github.com/Vit129/kouen-terminal/commit/caf3330b6782e43386e7dca0176561ecfb86c79d))
+- Mobile bridge unified preview tab-strip + tablet layout (P37 Phase E) ([`3f39ad0`](https://github.com/Vit129/kouen-terminal/commit/3f39ad0679045cb3eb919a59357394e589266ced))
 
 ### Documentation
-- Record second Opus review pass + fixes in Phase E task doc ([`7e095bf`](https://github.com/Vit129/kouen-terminal/commit/7e095bffcb1ffb2a5bc44a42688318d7635415a2))
+- Record second Opus review pass + fixes in Phase E task doc ([`1787d47`](https://github.com/Vit129/kouen-terminal/commit/1787d47236a4d48fe618df223c4fa00e6649ad27))
 
 ### Fixed
-- Browser interact used a different element list than snapshot, could click the wrong element ([`bdfbb0b`](https://github.com/Vit129/kouen-terminal/commit/bdfbb0b636f0250e326ee034a6bab29ba2f2eed4))
-- Phase E's #term-empty leaked onto phone, browser back/forward/reload raced the page load ([`4a782d6`](https://github.com/Vit129/kouen-terminal/commit/4a782d699ceb9c20d973baac5546fea0f089db38))
-- Resync sidebar-side layout when Settings toggles Sidebar-on-right, preventing stuck black panel on next Cmd+\ (release v4.4.2) ([`6ca22d8`](https://github.com/Vit129/kouen-terminal/commit/6ca22d8a884a067fc04b7b13447e9f76921eec29))
+- Browser interact used a different element list than snapshot, could click the wrong element ([`35e520d`](https://github.com/Vit129/kouen-terminal/commit/35e520d40d433bcb34728996ac302a0c70e0f0f6))
+- Phase E's #term-empty leaked onto phone, browser back/forward/reload raced the page load ([`1e2470d`](https://github.com/Vit129/kouen-terminal/commit/1e2470dada5cb696be41f4a84633fc6088f09f1a))
+- Resync sidebar-side layout when Settings toggles Sidebar-on-right, preventing stuck black panel on next Cmd+\ (release v4.4.2) ([`a3c0912`](https://github.com/Vit129/kouen-terminal/commit/a3c091238e4a6002d825c4b3b68d3cca8172eedb))
 
 ## [4.4.1] - 2026-07-12
 
 ### Added
-- Reveal cat/view'd files in the sidebar file tree (OSC 7736) ([`4ae745a`](https://github.com/Vit129/kouen-terminal/commit/4ae745a57493f7f30017f7dfa969d06e1148de37))
+- Reveal cat/view'd files in the sidebar file tree (OSC 7736) ([`62907cb`](https://github.com/Vit129/kouen-terminal/commit/62907cba3be34262f7e4ffcbedd170f866c43547))
 
 ### Fixed
-- Copy-mode yank leaked kouen-cat line numbers past the SGR 73/74 exclude marker ([`4989bc0`](https://github.com/Vit129/kouen-terminal/commit/4989bc0ac5c664ba9326ff8aa6118dc0f60cb622))
-- Mobile-created sessions register as real tabs so they show and stay selectable; enable iOS predictive text in mobile terminal (release v4.4.1) ([`ea1568b`](https://github.com/Vit129/kouen-terminal/commit/ea1568b6c28df8ba64522a503bf5fd263be025b9))
+- Copy-mode yank leaked kouen-cat line numbers past the SGR 73/74 exclude marker ([`3081f32`](https://github.com/Vit129/kouen-terminal/commit/3081f327500808f8fad3dbf080dd81b0f9c864a3))
+- Mobile-created sessions register as real tabs so they show and stay selectable; enable iOS predictive text in mobile terminal (release v4.4.1) ([`662b25b`](https://github.com/Vit129/kouen-terminal/commit/662b25bd2ae02062fcd9bb0f6ed8896fe83c9a83))
 
 ## [4.4.0] - 2026-07-11
 
 ### Added
-- P39 competitive-gap closes — SSH agent forwarding, sidebar port badge, git hunk staging, in-app PR merge, fleet visibility badge ([`4e6549e`](https://github.com/Vit129/kouen-terminal/commit/4e6549e948b31bbc8589902da765d52c6fdd551a))
-- Add Tasks/Worktree/Hosts MCP tools and Automations scheduler (release v5.0.0) ([`97180fd`](https://github.com/Vit129/kouen-terminal/commit/97180fd03897b155eec66f1c33024db6dca0d265))
+- P39 competitive-gap closes — SSH agent forwarding, sidebar port badge, git hunk staging, in-app PR merge, fleet visibility badge ([`3de6c1b`](https://github.com/Vit129/kouen-terminal/commit/3de6c1b4f9d72e5b07217a16b279df1a6e07c294))
+- Add Tasks/Worktree/Hosts MCP tools and Automations scheduler (release v5.0.0) ([`93a50da`](https://github.com/Vit129/kouen-terminal/commit/93a50da38140fb540a737389f39c30e256d6ae11))
 
 ### Fixed
-- Reload MCP tool policy on every check, not once at construction ([`7678351`](https://github.com/Vit129/kouen-terminal/commit/7678351f8e715667de72a3a05a0f167317673410))
-- Move Cmd+F find bar below pane's browser/split/close icon row ([`1d796a5`](https://github.com/Vit129/kouen-terminal/commit/1d796a5774ec5173fa4393ba2f72a5b89d6f815e))
-- Mobile pairing rejected every real device because the token rotated out before connect ([`c8bd2bc`](https://github.com/Vit129/kouen-terminal/commit/c8bd2bc2d272fbec2e8afc3f6bd23ef7141002f8))
-- Browser pane sends a real Safari UA so Google/Apple OAuth doesn't reject it ([`e955924`](https://github.com/Vit129/kouen-terminal/commit/e955924494f177336e1925ca17414e5c01c18e9f))
-- Correct release to v4.4.0 (was mistakenly major-bumped) and scope kouenBrowserOpen to the calling agent's own session ([`eed2a9f`](https://github.com/Vit129/kouen-terminal/commit/eed2a9fd972c0de3e01fc50c398afc6472501361))
+- Reload MCP tool policy on every check, not once at construction ([`ac866cb`](https://github.com/Vit129/kouen-terminal/commit/ac866cbeca5f743149661147411b103b2f01c78c))
+- Move Cmd+F find bar below pane's browser/split/close icon row ([`825db24`](https://github.com/Vit129/kouen-terminal/commit/825db24f817f9196b0fc6eaa382c9ca84f2a6bc1))
+- Mobile pairing rejected every real device because the token rotated out before connect ([`ee35d81`](https://github.com/Vit129/kouen-terminal/commit/ee35d81c2a2bf8b813102a800582f5585ddb3cd4))
+- Browser pane sends a real Safari UA so Google/Apple OAuth doesn't reject it ([`33a58d8`](https://github.com/Vit129/kouen-terminal/commit/33a58d885116b388e37f9bce25aa0894d4a2113f))
+- Correct release to v4.4.0 (was mistakenly major-bumped) and scope kouenBrowserOpen to the calling agent's own session ([`06598f7`](https://github.com/Vit129/kouen-terminal/commit/06598f7409059ede306e7b93a26d760af7ac9d1c))
 
 ## [4.3.1] - 2026-07-10
 
 ### Fixed
-- Stop worktree branch cache clobbering, silent terminal file-link failures, and uncapped git panel history (release v4.3.1) ([`a60766d`](https://github.com/Vit129/kouen-terminal/commit/a60766dc6e1a5822ff8dd954a0fc6d9ee30ec745))
+- Stop worktree branch cache clobbering, silent terminal file-link failures, and uncapped git panel history (release v4.3.1) ([`9c0304d`](https://github.com/Vit129/kouen-terminal/commit/9c0304df829b04773d5a24a2548a0a6d5a405a25))
 
 ## [4.3.0] - 2026-07-10
 
 ### Added
-- Mobile bridge Settings toggle no longer restarts daemon + P37 Phase C real terminal client (release v4.3.0) ([`36d09db`](https://github.com/Vit129/kouen-terminal/commit/36d09db783b1bebdd633481a09849aab84313117))
+- Mobile bridge Settings toggle no longer restarts daemon + P37 Phase C real terminal client (release v4.3.0) ([`02c64fe`](https://github.com/Vit129/kouen-terminal/commit/02c64feafd47ad0f32d0fdf6375ded04aa5371c7))
 
 ## [4.2.0] - 2026-07-09
 
 ### Added
-- P37 mobile-bridge hardening + S1 daemon-restart fix (release v4.2.0) ([`fb70d91`](https://github.com/Vit129/kouen-terminal/commit/fb70d91c02f4cc8239c58f5dd330c5e915971b6d))
+- P37 mobile-bridge hardening + S1 daemon-restart fix (release v4.2.0) ([`d2b4992`](https://github.com/Vit129/kouen-terminal/commit/d2b4992ec436b4a50306bd1274bbb8f81d3ac998))
 
 ## [4.1.0] - 2026-07-08
 
 ### Added
-- Add QuickTerminalController, a visor-style ⌥Space terminal panel ([`c800173`](https://github.com/Vit129/kouen-terminal/commit/c800173bae53c4ace9967c270a1bdd3eda366dc2))
-- Darken app icon green + add dark-mode Dock icon via runtime swap ([`7be5721`](https://github.com/Vit129/kouen-terminal/commit/7be572185b3bd60eeee37633b7740d6c03bb1c2b))
-- P25 mobile pairing bridge — pairing MVP + production wiring (build 195) ([`97afd2e`](https://github.com/Vit129/kouen-terminal/commit/97afd2e48da2fd83e6697a590b42680fe10e5ab5))
+- Add QuickTerminalController, a visor-style ⌥Space terminal panel ([`5299db6`](https://github.com/Vit129/kouen-terminal/commit/5299db6ae8ffb30ed6594c7c8d9d7d2b9f6f2f19))
+- Darken app icon green + add dark-mode Dock icon via runtime swap ([`66e182f`](https://github.com/Vit129/kouen-terminal/commit/66e182f956a673f7a1cefbcabc37a4e321e9de49))
+- P25 mobile pairing bridge — pairing MVP + production wiring (build 195) ([`b6b54f0`](https://github.com/Vit129/kouen-terminal/commit/b6b54f08c9fae7925a67a37d3e48a1a823d12407))
 
 ### Documentation
-- Add fork maintainer's copyright to LICENSE ([`c88785d`](https://github.com/Vit129/kouen-terminal/commit/c88785d55941b737638b796205f7d1ba9e5927c4))
-- Update agent memory notes ([`c9d9736`](https://github.com/Vit129/kouen-terminal/commit/c9d9736d21f2422a5f07183e4929cef2b0815682))
+- Add fork maintainer's copyright to LICENSE ([`bd413ab`](https://github.com/Vit129/kouen-terminal/commit/bd413ab15bf86937648e1e73b533a0494a5128ee))
+- Update agent memory notes ([`a7ba739`](https://github.com/Vit129/kouen-terminal/commit/a7ba7393458eccc6d8a707c04ad509d16bac138c))
 
 ### Fixed
-- Bump CI's pinned Xcode from 16 to 26.5 to match the dev toolchain ([`4c494e0`](https://github.com/Vit129/kouen-terminal/commit/4c494e0111ffa8c4ce26beacb39fa1467ff6801f))
-- Guard UserNotifications import for Linux headless daemon build ([`ae55714`](https://github.com/Vit129/kouen-terminal/commit/ae557146e1c5781fcf3727eca5e3f3f05e951eb1))
-- Use the existing kouenStderr/new kouenStdout idiom in CLI install-tools/agent ([`56e5c35`](https://github.com/Vit129/kouen-terminal/commit/56e5c3509cb27c7911de0e3a64da4875a9e3b20d))
-- Pad dark Dock icon to match light icon's OS-auto-shrunk size ([`e6a1316`](https://github.com/Vit129/kouen-terminal/commit/e6a13163394bd4f9e7fc3ff867473e50394a37e9))
-- OAuth login and nested-iframe scroll in embedded browser pane ([`db5c34d`](https://github.com/Vit129/kouen-terminal/commit/db5c34d9188d69b013890af223814337d0bde065))
-- Prune legacy harness-cli hook entries on agent reinstall ([`57936a3`](https://github.com/Vit129/kouen-terminal/commit/57936a3f24b2738fd3aafb4937fa56c2f369203d))
-- Stop QuickLook preview flicker loop from self-triggered attrib events ([`9bca6ab`](https://github.com/Vit129/kouen-terminal/commit/9bca6abcceef322744413628cd37536490ef1825))
-- Clean up git panel error toast for push/fetch/pull failures ([`c7a675a`](https://github.com/Vit129/kouen-terminal/commit/c7a675a04bae56fae331d72f7745e15056d33303))
+- Bump CI's pinned Xcode from 16 to 26.5 to match the dev toolchain ([`4d2f9bc`](https://github.com/Vit129/kouen-terminal/commit/4d2f9bcdbc021463632644d242201ea16216af13))
+- Guard UserNotifications import for Linux headless daemon build ([`589e9d0`](https://github.com/Vit129/kouen-terminal/commit/589e9d058c3a844a0218f4edec177087e3ac39fb))
+- Use the existing kouenStderr/new kouenStdout idiom in CLI install-tools/agent ([`ec7260d`](https://github.com/Vit129/kouen-terminal/commit/ec7260dcd72b6754b3e8e1a6770ef147cb402c57))
+- Pad dark Dock icon to match light icon's OS-auto-shrunk size ([`2cd359b`](https://github.com/Vit129/kouen-terminal/commit/2cd359b66dbe77b0a32bde68879165bac5d0cc99))
+- OAuth login and nested-iframe scroll in embedded browser pane ([`83a345b`](https://github.com/Vit129/kouen-terminal/commit/83a345bca9e8eb5748df61f7763b5cff5a6fd447))
+- Prune legacy harness-cli hook entries on agent reinstall ([`5674ba5`](https://github.com/Vit129/kouen-terminal/commit/5674ba50c3cd96611393b25ffea3e02d3592f306))
+- Stop QuickLook preview flicker loop from self-triggered attrib events ([`6142a1b`](https://github.com/Vit129/kouen-terminal/commit/6142a1b370d31236e71cce3785e27a4b53af5aee))
+- Clean up git panel error toast for push/fetch/pull failures ([`3695e83`](https://github.com/Vit129/kouen-terminal/commit/3695e8340581cd100f70ce2a5cf2e9f57f4df15d))
 
 ## [4.0.0] - 2026-07-06
 
 ### Added
-- Rename product from Harness to Kouen ([#43](https://github.com/Vit129/kouen-terminal/pull/43)) ([`94c4f2c`](https://github.com/Vit129/kouen-terminal/commit/94c4f2c83d77b366d36afef6c778e3a625ff1425))
-- KOUEN_HOME env var, sentinel migration, v4.0.0 bump ([#45](https://github.com/Vit129/kouen-terminal/pull/45)) ([`b94c653`](https://github.com/Vit129/kouen-terminal/commit/b94c6535dc96cc839507674d2c626f4417677c1e))
-- Migrate the App Support data root from Harness to Kouen ([#48](https://github.com/Vit129/kouen-terminal/pull/48)) ([`24f7b06`](https://github.com/Vit129/kouen-terminal/commit/24f7b062f9174212effbb34c4e5b7aa5ade27bf3))
-- Rename all internal Swift modules, directories, and identifiers to Kouen ([#49](https://github.com/Vit129/kouen-terminal/pull/49)) ([`704ad48`](https://github.com/Vit129/kouen-terminal/commit/704ad48a21d73d6c60a37518942717531bb45edd))
+- Rename product from Harness to Kouen ([#43](https://github.com/Vit129/kouen-terminal/pull/43)) ([`2bc7925`](https://github.com/Vit129/kouen-terminal/commit/2bc7925119cf1b50fdf7361fe7dfde6682ae31e3))
+- KOUEN_HOME env var, sentinel migration, v4.0.0 bump ([#45](https://github.com/Vit129/kouen-terminal/pull/45)) ([`19e8093`](https://github.com/Vit129/kouen-terminal/commit/19e809387e29e77692346cc0c8a62847930d7d1a))
+- Migrate the App Support data root from Harness to Kouen ([#48](https://github.com/Vit129/kouen-terminal/pull/48)) ([`741dcdd`](https://github.com/Vit129/kouen-terminal/commit/741dcddd123b7df937fe3b80e212489a34540608))
+- Rename all internal Swift modules, directories, and identifiers to Kouen ([#49](https://github.com/Vit129/kouen-terminal/pull/49)) ([`d2eec67`](https://github.com/Vit129/kouen-terminal/commit/d2eec6723d7b21ba8682650bbb76974e43327188))
 
 ### Documentation
-- Add "What's different from upstream" section to README ([`daabced`](https://github.com/Vit129/kouen-terminal/commit/daabcedd2b710d654d9d56be5c300709ccd32989))
-- Trim "What's different from upstream" to link existing sections ([`9041960`](https://github.com/Vit129/kouen-terminal/commit/9041960f8090186d88f8decadc2f951748e0375a))
-- State explicitly that this fork isn't affiliated with upstream ([#40](https://github.com/Vit129/kouen-terminal/pull/40)) ([`2e76384`](https://github.com/Vit129/kouen-terminal/commit/2e76384fe63e3eaf62cd9fbe7dfb3d330e27ef7b))
-- Trim README's upstream mention to one, fix stale repo links ([#47](https://github.com/Vit129/kouen-terminal/pull/47)) ([`5538f8b`](https://github.com/Vit129/kouen-terminal/commit/5538f8b404ebb65b62378d7b6543b79beac2442d))
-- Capture P35 plan — Google/OAuth login fails in embedded browser ([#42](https://github.com/Vit129/kouen-terminal/pull/42)) ([`1d77cdf`](https://github.com/Vit129/kouen-terminal/commit/1d77cdf88ad7433887fb83c3a9ba3f7b27b6e1e8))
+- Add "What's different from upstream" section to README ([`5aaa78e`](https://github.com/Vit129/kouen-terminal/commit/5aaa78e377245791e85f766af9302638c97164da))
+- Trim "What's different from upstream" to link existing sections ([`4a55d8f`](https://github.com/Vit129/kouen-terminal/commit/4a55d8fc5a3570e230df7d2b55a5f36188cc5c2e))
+- State explicitly that this fork isn't affiliated with upstream ([#40](https://github.com/Vit129/kouen-terminal/pull/40)) ([`6174f26`](https://github.com/Vit129/kouen-terminal/commit/6174f2682a6e5dfae3f8471d237d15cac710ba42))
+- Trim README's upstream mention to one, fix stale repo links ([#47](https://github.com/Vit129/kouen-terminal/pull/47)) ([`ca71cbf`](https://github.com/Vit129/kouen-terminal/commit/ca71cbfb828e47f077e53edcd838060711dededb))
+- Capture P35 plan — Google/OAuth login fails in embedded browser ([#42](https://github.com/Vit129/kouen-terminal/pull/42)) ([`20f5e2d`](https://github.com/Vit129/kouen-terminal/commit/20f5e2d661805842229d3b834d74cda68ed935cf))
 
 ### Fixed
-- Rebrand bundle identifier off upstream, disable Sparkle appcast ([#41](https://github.com/Vit129/kouen-terminal/pull/41)) ([`d1ca64f`](https://github.com/Vit129/kouen-terminal/commit/d1ca64f6821189e9bbd14dd9ac2d47f1e07fd2b3))
-- Rename the release/packaging pipeline and revert App Support path drift ([#46](https://github.com/Vit129/kouen-terminal/pull/46)) ([`b8cf6e9`](https://github.com/Vit129/kouen-terminal/commit/b8cf6e9863521f0cf6dc6f4030a515731a899e1b))
-- Rename the tracked Xcode project and entitlements file ([#50](https://github.com/Vit129/kouen-terminal/pull/50)) ([`b9c0c73`](https://github.com/Vit129/kouen-terminal/commit/b9c0c73fd697623a7cefd88c9eef384738f417e7))
-- Rename remaining tooling configs missed by every previous pass ([#51](https://github.com/Vit129/kouen-terminal/pull/51)) ([`4d43c7e`](https://github.com/Vit129/kouen-terminal/commit/4d43c7ecc027fb1449248b359ea72f1fdd31e0eb))
+- Rebrand bundle identifier off upstream, disable Sparkle appcast ([#41](https://github.com/Vit129/kouen-terminal/pull/41)) ([`37867d5`](https://github.com/Vit129/kouen-terminal/commit/37867d59459c0a457422bcc4f5e233c0fdcfc4b2))
+- Rename the release/packaging pipeline and revert App Support path drift ([#46](https://github.com/Vit129/kouen-terminal/pull/46)) ([`982a05d`](https://github.com/Vit129/kouen-terminal/commit/982a05d2366c56913fb2a43e9f3d859524e6e9dc))
+- Rename the tracked Xcode project and entitlements file ([#50](https://github.com/Vit129/kouen-terminal/pull/50)) ([`b3538b3`](https://github.com/Vit129/kouen-terminal/commit/b3538b3c8ea2841a22596c7f0bae9dc0435ccdb4))
+- Rename remaining tooling configs missed by every previous pass ([#51](https://github.com/Vit129/kouen-terminal/pull/51)) ([`e550fda`](https://github.com/Vit129/kouen-terminal/commit/e550fda3e0b4aa67ccaa4f98a5bd2e6831efe2b8))
 
 ## [3.14.0] - 2026-07-04
 
 ### Added
-- Open every http/https link in the in-app Browser Pane ([`36ea9b6`](https://github.com/Vit129/kouen-terminal/commit/36ea9b6a546741a7661ba32002ff66c6478e97b3))
-- Route web links to the in-app browser pane, fix popup crash (release v3.14.0) ([`2c98e9e`](https://github.com/Vit129/kouen-terminal/commit/2c98e9ec6dc2b700faeb97c0de81dfc6f8d4277f))
+- Open every http/https link in the in-app Browser Pane ([`6513fc2`](https://github.com/Vit129/kouen-terminal/commit/6513fc2f24caf83bd29ee75071adbf9c3744937c))
+- Route web links to the in-app browser pane, fix popup crash (release v3.14.0) ([`5b12a5a`](https://github.com/Vit129/kouen-terminal/commit/5b12a5a3a6b11e001a549ab1c9288a8d4042da18))
 
 ### Fixed
-- Respect sound toggle in foreground and route banner clicks to their pane ([`2202305`](https://github.com/Vit129/kouen-terminal/commit/2202305e8c5f296450ef2fd599d0e70861c01612))
-- Prevent crash when a browser popup reuses the opener's WKWebViewConfiguration ([`149d28b`](https://github.com/Vit129/kouen-terminal/commit/149d28ba8c639bbaa8d7f63633157077e65baf10))
+- Respect sound toggle in foreground and route banner clicks to their pane ([`0460a6c`](https://github.com/Vit129/kouen-terminal/commit/0460a6c54dc2c6c7fef6172650d0549eb90ec212))
+- Prevent crash when a browser popup reuses the opener's WKWebViewConfiguration ([`626b9b1`](https://github.com/Vit129/kouen-terminal/commit/626b9b14680dffeb65f232ad57105f0865ba7325))
 
 ## [3.13.3] - 2026-07-04
 
 ### Added
-- Render local .html files in the embedded browser pane on double-click (release v3.13.3) ([`70ba89c`](https://github.com/Vit129/kouen-terminal/commit/70ba89ce0a9954d0cab6c11561d58cf577caaf78))
+- Render local .html files in the embedded browser pane on double-click (release v3.13.3) ([`74c7913`](https://github.com/Vit129/kouen-terminal/commit/74c79138e2cd408d5ec11aeb376cf2dc74d85512))
 
 ### Fixed
-- Auto-tag commit message when Info.plist is staged ([`e4d8d51`](https://github.com/Vit129/kouen-terminal/commit/e4d8d51693ab8b863ebdb50777300db022c893eb))
+- Auto-tag commit message when Info.plist is staged ([`ca80fb1`](https://github.com/Vit129/kouen-terminal/commit/ca80fb1e25d7e6d3b4ff560f89a44b2007cc9227))
 
 ## [3.13.2] - 2026-07-03
 
 ### Added
-- Wire auto-rebuild hook + gitignore wiki/log bloat ([`3ee42f8`](https://github.com/Vit129/kouen-terminal/commit/3ee42f822bc15fc3bf4ed6aad54f5597c9027bcb))
+- Wire auto-rebuild hook + gitignore wiki/log bloat ([`6cffd78`](https://github.com/Vit129/kouen-terminal/commit/6cffd781d2afbaafecebb06bb8792686961136cd))
 
 ### Fixed
-- Notification Step 1, S1 daemon-reuse install, H5 bootout quoting bug ([`85354d2`](https://github.com/Vit129/kouen-terminal/commit/85354d23e192f1ba5d7ae70bef39c751cac29b80))
-- Notification Step 1, S1 daemon-reuse install, H5 bootout quoting bug (v3.13.2) ([`8a9fcf7`](https://github.com/Vit129/kouen-terminal/commit/8a9fcf7d3a9529faf3b02804acbab077dee656af))
+- Notification Step 1, S1 daemon-reuse install, H5 bootout quoting bug ([`003e313`](https://github.com/Vit129/kouen-terminal/commit/003e313249b9beeb709cac2ed1851a6b5dc69d8f))
+- Notification Step 1, S1 daemon-reuse install, H5 bootout quoting bug (v3.13.2) ([`9668ed8`](https://github.com/Vit129/kouen-terminal/commit/9668ed8c22514d1c75e69d9e3e2a6ec2c603ea02))
 
 ## [3.13.1] - 2026-07-02
 
 ### Added
-- Support non-interactive option with patch version bump ([`5dbb64e`](https://github.com/Vit129/kouen-terminal/commit/5dbb64eacb5f4d1c6fef7f22ae0fda6e558e26fd))
+- Support non-interactive option with patch version bump ([`9af3946`](https://github.com/Vit129/kouen-terminal/commit/9af3946500bdc6c58854eb3ca5744123ef70ff9a))
 
 ### Documentation
-- Drop hardcoded release version from README ([`c7fb340`](https://github.com/Vit129/kouen-terminal/commit/c7fb3403052e2a918c774c97515d800167e7a17a))
+- Drop hardcoded release version from README ([`e2ca7ba`](https://github.com/Vit129/kouen-terminal/commit/e2ca7baec359b89bfeb8ad7c22c656cce99ccc16))
 
 ### Fixed
-- Preserve selection on reload, fix clicking agent tool-call paths ([`587fa90`](https://github.com/Vit129/kouen-terminal/commit/587fa906c3ae07eb4e9018861b6ab6220716ef3f))
+- Preserve selection on reload, fix clicking agent tool-call paths ([`d3f5d40`](https://github.com/Vit129/kouen-terminal/commit/d3f5d40521ad9172e953c67e7023f74b51f4874d))
 
 ## [3.13.0] - 2026-07-02
 
 ### Added
-- Visible divider between panes + 3-way corner drag ([`b83773e`](https://github.com/Vit129/kouen-terminal/commit/b83773e99b7f5e67ba2e5a28cde58ae7074e23ae))
-- Visible divider between panes + 3-way corner drag ([`b556b4f`](https://github.com/Vit129/kouen-terminal/commit/b556b4fede55ab3ff9e50a74f296f36430ec6e79))
-- SSH socket auto-detect for remote host manager (P23/PBI-SSH-008) ([`a634720`](https://github.com/Vit129/kouen-terminal/commit/a6347206a6e4da3896b36807c76b718f296de362))
-- Explicit New Agent Task command palette flow (P32 Phase 1) ([`5641273`](https://github.com/Vit129/kouen-terminal/commit/5641273f9c4708843229105cd7a73af85272dcda))
-- Task metadata + sidebar UI for agent task tabs (P32 Phase 2) ([`d9c1ad1`](https://github.com/Vit129/kouen-terminal/commit/d9c1ad1a8c3635cc40e22ddc2db788dcb029e6d3))
-- Wire archiveScript teardown hook + close out P32 (Phase 3+4) ([`a9317c6`](https://github.com/Vit129/kouen-terminal/commit/a9317c6c8dabe0179cae92a4ec8d7bc01b254863))
-- Surface agent notification text in sidebar (P33 Phase 2) ([`001da1e`](https://github.com/Vit129/kouen-terminal/commit/001da1ef686bbd68ae0778d45cc61e6f549bf1c1))
-- Color git-change file previews like the diff instead of raw unified text ([`c238bc0`](https://github.com/Vit129/kouen-terminal/commit/c238bc016d08a3b321bfe7591b73f45ea2d4df00))
-- Scope file preview tabs per terminal Tab ([`b405e32`](https://github.com/Vit129/kouen-terminal/commit/b405e321ac04143be9a1ed8d7d891e536cc698f4))
-- Expand editor LSP + syntax highlighting to 21 languages ([`9838134`](https://github.com/Vit129/kouen-terminal/commit/98381347ec727f64ab092b15a9ad1f904135905e))
-- Capture exact command text on OSC 133 command boundary (P34 F1 slice 1) ([`2ca7fbb`](https://github.com/Vit129/kouen-terminal/commit/2ca7fbb860a30559cec72394c97b1fec9d1d8c40))
-- Block copy actions + MCP block access (P34 F2/F3) ([`8049605`](https://github.com/Vit129/kouen-terminal/commit/8049605ed45c90fee90e30ba065b7267c1c0802c))
-- Add setPaneLabel MCP tool for per-pane purpose labels ([`965f7b3`](https://github.com/Vit129/kouen-terminal/commit/965f7b3e821727446642b723c9b7afa6ecafd2e1))
-- Let spawnSession/splitPane set a pane label atomically ([`c9ee32c`](https://github.com/Vit129/kouen-terminal/commit/c9ee32ce99ced761e6d912cc2af4ebcf6d26283a))
-- Link worktree cards to running agents, add diff-vs-main ([`301e838`](https://github.com/Vit129/kouen-terminal/commit/301e838d52ef489ae09aa895fbcc53ec171d3475))
+- Visible divider between panes + 3-way corner drag ([`f80731b`](https://github.com/Vit129/kouen-terminal/commit/f80731b10b9479a93513bbd8bc2b8bd1d6d6a4e3))
+- Visible divider between panes + 3-way corner drag ([`64e09f2`](https://github.com/Vit129/kouen-terminal/commit/64e09f2d7619532a3f611ccb74d057965548a6e1))
+- SSH socket auto-detect for remote host manager (P23/PBI-SSH-008) ([`9c5d31f`](https://github.com/Vit129/kouen-terminal/commit/9c5d31f973afeb9858a40b900ce5997a039e7ee7))
+- Explicit New Agent Task command palette flow (P32 Phase 1) ([`3fa72c7`](https://github.com/Vit129/kouen-terminal/commit/3fa72c7c44bf1072b95653ee4e92f3bfbbb67b51))
+- Task metadata + sidebar UI for agent task tabs (P32 Phase 2) ([`4e85c9c`](https://github.com/Vit129/kouen-terminal/commit/4e85c9ce9d9fa5c33a8bdb3aaeeb20001c173d22))
+- Wire archiveScript teardown hook + close out P32 (Phase 3+4) ([`79305fc`](https://github.com/Vit129/kouen-terminal/commit/79305fc6e395d61949ff082d0141bf06cee36e57))
+- Surface agent notification text in sidebar (P33 Phase 2) ([`73040c6`](https://github.com/Vit129/kouen-terminal/commit/73040c64adbbaef87ff2283a8ff024678907c6ee))
+- Color git-change file previews like the diff instead of raw unified text ([`93d6d5c`](https://github.com/Vit129/kouen-terminal/commit/93d6d5c6e3bf4e0be95b77cd69558fb704d42ff4))
+- Scope file preview tabs per terminal Tab ([`f48f33c`](https://github.com/Vit129/kouen-terminal/commit/f48f33c5deee28ebd3ab1c853f98fe9519f826c0))
+- Expand editor LSP + syntax highlighting to 21 languages ([`59b682d`](https://github.com/Vit129/kouen-terminal/commit/59b682de5fc3d5196f9b348d7e2f489175b59907))
+- Capture exact command text on OSC 133 command boundary (P34 F1 slice 1) ([`f904a2e`](https://github.com/Vit129/kouen-terminal/commit/f904a2e99afd4158fe9a18e497c9742ca176e6f0))
+- Block copy actions + MCP block access (P34 F2/F3) ([`cee04bf`](https://github.com/Vit129/kouen-terminal/commit/cee04bf783866a6eeb6e5bbdfc18b39bfe3f868c))
+- Add setPaneLabel MCP tool for per-pane purpose labels ([`90ee6fc`](https://github.com/Vit129/kouen-terminal/commit/90ee6fc7f30b77bb1298f43d678f7ae1dc885246))
+- Let spawnSession/splitPane set a pane label atomically ([`e35d529`](https://github.com/Vit129/kouen-terminal/commit/e35d529eae84f033e49dd967a2d948a25479b33f))
+- Link worktree cards to running agents, add diff-vs-main ([`22cb2fb`](https://github.com/Vit129/kouen-terminal/commit/22cb2fb7c7f40725820d264135f2052993c0af95))
 
 ### Changed
-- Replace ⌘-click block action bar with right-click context menu ([`1723136`](https://github.com/Vit129/kouen-terminal/commit/17231362f9594c2b99af58981844f1ced6e8cd2d))
+- Replace ⌘-click block action bar with right-click context menu ([`f0b7492`](https://github.com/Vit129/kouen-terminal/commit/f0b7492c4ebcb736bcb3289ea939eb0d87a95ac7))
 
 ### Documentation
-- V3.12.0 accuracy pass — remove stale inline AI chat claims, verify MCP/browser round-trip fixed, fix P33 status, add feature-provenance + P34 plan ([`ead9f57`](https://github.com/Vit129/kouen-terminal/commit/ead9f5795786f01a2d4e95d837bb3265869bd99b))
-- Fix CONTEXT.md commit-status note for P34 F2/F3 ([`a2b6c38`](https://github.com/Vit129/kouen-terminal/commit/a2b6c38ffd09ce35ca15254eda211aeb26f561b4))
-- Log two backlog decisions from P34 follow-up discussion ([`84ac1aa`](https://github.com/Vit129/kouen-terminal/commit/84ac1aa2a6b6442603c50c660bfaf950f09efc23))
-- Archive P32 setPaneLabel + P34 right-click backlog items as shipped ([`8506b36`](https://github.com/Vit129/kouen-terminal/commit/8506b36f4c4fbd533ea97828a1d30fa41b2d641b))
-- Archive atomic pane-label-on-create follow-up as shipped ([`a52b923`](https://github.com/Vit129/kouen-terminal/commit/a52b923204162dfc47505f887b8cf891ef030057))
+- V3.12.0 accuracy pass — remove stale inline AI chat claims, verify MCP/browser round-trip fixed, fix P33 status, add feature-provenance + P34 plan ([`d836bd4`](https://github.com/Vit129/kouen-terminal/commit/d836bd47125aa1e4c285968ea4069dd63865125c))
+- Fix CONTEXT.md commit-status note for P34 F2/F3 ([`de45354`](https://github.com/Vit129/kouen-terminal/commit/de4535411957cfc365cba2ca06d3cdb1d14eff6c))
+- Log two backlog decisions from P34 follow-up discussion ([`ff2f98c`](https://github.com/Vit129/kouen-terminal/commit/ff2f98cea54e67ff443ca55484588a7682b689af))
+- Archive P32 setPaneLabel + P34 right-click backlog items as shipped ([`a1cdd8e`](https://github.com/Vit129/kouen-terminal/commit/a1cdd8e508cd6d49d677e56b26c44fd86ed83af5))
+- Archive atomic pane-label-on-create follow-up as shipped ([`a2c17f3`](https://github.com/Vit129/kouen-terminal/commit/a2c17f3f450cc1c04dddc07482857054ec40180f))
 
 ### Fixed
-- Repair swift test build broken by ACP removal ([`ec22918`](https://github.com/Vit129/kouen-terminal/commit/ec22918cf65c759ee7b069c175191e15dc0a2e9b))
-- Surface addAgentTask errors via NSAlert instead of silent no-op (P32 Phase 2) ([`36cf813`](https://github.com/Vit129/kouen-terminal/commit/36cf813bcf78c438292bc8d960a2354c8aecbbb1))
-- Pin sidebar width against proportional resize; smaller default + always-open ([`80b82db`](https://github.com/Vit129/kouen-terminal/commit/80b82db38455a973b506d1ce41932822c5920153))
-- Unify running/status classification + replace dot with agent icon ([`eb0c89b`](https://github.com/Vit129/kouen-terminal/commit/eb0c89bde4c87ed1a8c4fb3ec1e21b188031adf3))
-- Unify Board status classification/color + fix Board tab layout ([`49a67ba`](https://github.com/Vit129/kouen-terminal/commit/49a67babfaa5ce3d61819dfd3e26d76c71de9d65))
-- Show PR checks status dot, remove dead PR poller (P33 Phase 1) ([`20b521b`](https://github.com/Vit129/kouen-terminal/commit/20b521b6910e792ab5b7096d3b5d90fcaed67347))
-- NSSplitView first-reveal blank panel + wire diff popover (P33 Phase 3) ([`0aa1326`](https://github.com/Vit129/kouen-terminal/commit/0aa1326b2cade5f0f968fbc7405e47ad8a144081))
-- Address 4 findings from Opus code review ([`575e864`](https://github.com/Vit129/kouen-terminal/commit/575e864b53ded1c5917b67e65727c3f66f61975a))
-- Stop blanket .git/ FSEvent filter from swallowing external commit/push ([`405021e`](https://github.com/Vit129/kouen-terminal/commit/405021e53b7e9d41d2568d46daa6780f5055b8af))
+- Repair swift test build broken by ACP removal ([`b7f0fbc`](https://github.com/Vit129/kouen-terminal/commit/b7f0fbc466cbd440636413a742f0f8361dbe912d))
+- Surface addAgentTask errors via NSAlert instead of silent no-op (P32 Phase 2) ([`ee0a270`](https://github.com/Vit129/kouen-terminal/commit/ee0a2706cf15c0098207df20256f74b114822e7a))
+- Pin sidebar width against proportional resize; smaller default + always-open ([`2a7a307`](https://github.com/Vit129/kouen-terminal/commit/2a7a307a07f970b083b300a7c4c5a19f341acda5))
+- Unify running/status classification + replace dot with agent icon ([`66b87c2`](https://github.com/Vit129/kouen-terminal/commit/66b87c2f3d3713a3df1ff0c7f3f3263ccb31f652))
+- Unify Board status classification/color + fix Board tab layout ([`e18051b`](https://github.com/Vit129/kouen-terminal/commit/e18051bb24824e0c591dc6e07456ed453f4e4814))
+- Show PR checks status dot, remove dead PR poller (P33 Phase 1) ([`01609a2`](https://github.com/Vit129/kouen-terminal/commit/01609a2fa765a06295cc5a9316e4cadf13cf5a47))
+- NSSplitView first-reveal blank panel + wire diff popover (P33 Phase 3) ([`7571084`](https://github.com/Vit129/kouen-terminal/commit/7571084c62e10064b28f6cc34a64a089351c6294))
+- Address 4 findings from Opus code review ([`908a8c7`](https://github.com/Vit129/kouen-terminal/commit/908a8c77d22d47b7f67337b525b08ed824371b43))
+- Stop blanket .git/ FSEvent filter from swallowing external commit/push ([`3390db2`](https://github.com/Vit129/kouen-terminal/commit/3390db2896cd64dc4ed4474c1e87c62abb197aef))
 
 ## [3.12.0] - 2026-06-30
 
 ### Added
-- Board + Spaces tabs + openDiffReview MCP tool ([`78af4a4`](https://github.com/Vit129/kouen-terminal/commit/78af4a49e1c559e1d223d5a0d73a91659d1a0602))
-- Show Needs Attention text inline in session rows ([`73258c5`](https://github.com/Vit129/kouen-terminal/commit/73258c531532e9e6db1ca383a99a694f377aed0e))
-- Board toggle, inline agent status, openDiffReview; bump version 3.12.0 ([`0277c32`](https://github.com/Vit129/kouen-terminal/commit/0277c3268f53e5e19ada91281e233b10a91e0e20))
+- Board + Spaces tabs + openDiffReview MCP tool ([`6bfb154`](https://github.com/Vit129/kouen-terminal/commit/6bfb1547bacc7513f777ef7b732c175813802e91))
+- Show Needs Attention text inline in session rows ([`7d8f528`](https://github.com/Vit129/kouen-terminal/commit/7d8f5283ded3d5f17fea82791f039a2adc579310))
+- Board toggle, inline agent status, openDiffReview; bump version 3.12.0 ([`c5a6f6d`](https://github.com/Vit129/kouen-terminal/commit/c5a6f6d0a716804e68d9ed4df1e7a3d0930d0a71))
 
 ### Changed
-- Merge Board into Sessions tab with list/board toggle ([`fd7a294`](https://github.com/Vit129/kouen-terminal/commit/fd7a29417114999b1fd37ac2600a7e12d0b8aff8))
-- Inline board status in session rows, drop Spaces tab ([`08014e8`](https://github.com/Vit129/kouen-terminal/commit/08014e87676974ab74de6a3e7f0ac01076cd1284))
+- Merge Board into Sessions tab with list/board toggle ([`5fd71e3`](https://github.com/Vit129/kouen-terminal/commit/5fd71e38e219540a1d75f9c85aeb8308c41e1968))
+- Inline board status in session rows, drop Spaces tab ([`3448635`](https://github.com/Vit129/kouen-terminal/commit/344863536f2aaf9d202135c04617f640677c3e8c))
 
 ### Documentation
-- Record CASE-057 — CC 2.1.195 rejects whole settings.json on one invalid value ([`793b9ae`](https://github.com/Vit129/kouen-terminal/commit/793b9ae6c556d1a00641339aa66f08c129e0aea0))
-- Record live perf profile — CPU = SwiftUI .repeatForever ViewGraph storm, memory clean ([`b188a4b`](https://github.com/Vit129/kouen-terminal/commit/b188a4b0902ad72f460d1da9f0cb0afbb4e9bf0e))
-- Mark .repeatForever CPU fix done (dd7a78c) in knowledge ([`1905af0`](https://github.com/Vit129/kouen-terminal/commit/1905af041107d779ff34d9a10d39f9d75684445c))
+- Record CASE-057 — CC 2.1.195 rejects whole settings.json on one invalid value ([`1798ce5`](https://github.com/Vit129/kouen-terminal/commit/1798ce5131f10708acb94e0ecacf7bac9b739e86))
+- Record live perf profile — CPU = SwiftUI .repeatForever ViewGraph storm, memory clean ([`1f9870f`](https://github.com/Vit129/kouen-terminal/commit/1f9870f81a6b0c232a907b56cb1333a71f13b72e))
+- Mark .repeatForever CPU fix done (aa17c55) in knowledge ([`36910a1`](https://github.com/Vit129/kouen-terminal/commit/36910a1f6c4778222e85c70a3f8c2e650a1653eb))
 
 ### Fixed
-- Status line hidden on plain mode after SwiftUI settings migration ([`71e3c05`](https://github.com/Vit129/kouen-terminal/commit/71e3c05bf3e33153b858ca594fba68c1de7e30ca))
-- Contain Metal layer islands so status bar stays on top ([`2a5b3f0`](https://github.com/Vit129/kouen-terminal/commit/2a5b3f053c86a129f0df361a6a80896c6ec9139e))
-- Eliminate CPU spikes from FSEvent storm during agent writes ([`f6ffb0a`](https://github.com/Vit129/kouen-terminal/commit/f6ffb0a3c9a24ca39f8171025bdafbe289d66a65))
-- Move working/notch pulse off SwiftUI .repeatForever to CALayer (CPU) ([`dd7a78c`](https://github.com/Vit129/kouen-terminal/commit/dd7a78c37e74215800d1ca391f2d530f71a465be))
-- Add openGitPanel stub to SurfaceRegistry exhaustive switch ([`4596a86`](https://github.com/Vit129/kouen-terminal/commit/4596a8695effb73f59560ab74dac95138b78c1ed))
-- Kill in-flight CADisplayLink before reading frame width ([`ac77280`](https://github.com/Vit129/kouen-terminal/commit/ac772801d68a6fb95bef3bae690128df761ddf23))
+- Status line hidden on plain mode after SwiftUI settings migration ([`53370b1`](https://github.com/Vit129/kouen-terminal/commit/53370b16d73099eccdd3cb1f8c3a40d2f29fc9e1))
+- Contain Metal layer islands so status bar stays on top ([`68a9a3b`](https://github.com/Vit129/kouen-terminal/commit/68a9a3b87ceecf0905f7943e5e57ab34029ac0e4))
+- Eliminate CPU spikes from FSEvent storm during agent writes ([`d827f61`](https://github.com/Vit129/kouen-terminal/commit/d827f619394b40aeefe72467e1a905aaef586607))
+- Move working/notch pulse off SwiftUI .repeatForever to CALayer (CPU) ([`aa17c55`](https://github.com/Vit129/kouen-terminal/commit/aa17c55e19d769149d0bac4aa3326f9d3524f1eb))
+- Add openGitPanel stub to SurfaceRegistry exhaustive switch ([`3e148c8`](https://github.com/Vit129/kouen-terminal/commit/3e148c868f58b306b986731e04420d58659815cc))
+- Kill in-flight CADisplayLink before reading frame width ([`6348ea1`](https://github.com/Vit129/kouen-terminal/commit/6348ea13c2eda8390f8a848ca23a76e18f984051))
 
 ## [3.11.7] - 2026-06-29
 
 ### Changed
-- Skip Phase-1 revision pings in all UI snapshot observers ([`5cbbe82`](https://github.com/Vit129/kouen-terminal/commit/5cbbe828007342f2594014065a573f063fe6f509))
-- Coalesce burst pings in SessionCoordinator; cap FrecencyDirectoryStore at 500 ([`ffb059a`](https://github.com/Vit129/kouen-terminal/commit/ffb059a9d4f2a521ac51a6e4b56f9a18449cdf1e))
+- Skip Phase-1 revision pings in all UI snapshot observers ([`6202c72`](https://github.com/Vit129/kouen-terminal/commit/6202c7207eabb1abd7a94013ac37a6fe31d5f611))
+- Coalesce burst pings in SessionCoordinator; cap FrecencyDirectoryStore at 500 ([`78f6073`](https://github.com/Vit129/kouen-terminal/commit/78f6073947de6892c02b72d3027230e37c2700f9))
 
 ## [3.11.6] - 2026-06-29
 
 ### Added
-- Inline image paste & drag-drop via Kitty graphics; perf: remove SurfaceShellTracker full-process-table walk ([`7b5ff01`](https://github.com/Vit129/kouen-terminal/commit/7b5ff018da4aee8946306227ba2fc3997197b834))
-- Image paste & drag-drop inserts file path instead of Kitty bytes ([`bc14a2c`](https://github.com/Vit129/kouen-terminal/commit/bc14a2c07ab8d5e64ddf46e5f8a14090c6019785))
+- Inline image paste & drag-drop via Kitty graphics; perf: remove SurfaceShellTracker full-process-table walk ([`fbda8e5`](https://github.com/Vit129/kouen-terminal/commit/fbda8e5b151cc87937e6040696374dd9906c9a34))
+- Image paste & drag-drop inserts file path instead of Kitty bytes ([`9dd326c`](https://github.com/Vit129/kouen-terminal/commit/9dd326c0808b6f50466df967459e3fadafe144d7))
 
 ### Documentation
-- Update README — agent workspace positioning, browser MCP, multi-agent statusline ([`eb5a4a7`](https://github.com/Vit129/kouen-terminal/commit/eb5a4a795c8462638b80b342d345806016b7238e))
-- Update README to v3.11.5 + keyboard shortcuts; CHANGELOG otty features ([`f3efcd5`](https://github.com/Vit129/kouen-terminal/commit/f3efcd527c72e254eaa913ba81df9c8fd9e1e4fa))
-- Remove [Unreleased] section; mark otty-features closed in CHANGELOG ([`3505fa3`](https://github.com/Vit129/kouen-terminal/commit/3505fa3ade4a3c84051dc2147f905c2c187b9e64))
-- Remove otty-features comment from CHANGELOG ([`9eb0028`](https://github.com/Vit129/kouen-terminal/commit/9eb0028b9476a9d85dfd9cc113e007c8ab4b7899))
-- Record tab-switch black-screen root cause analysis in knowledge base ([`cc67abd`](https://github.com/Vit129/kouen-terminal/commit/cc67abdb3e41f274e99d9ecf453c3876a3c9dabe))
+- Update README — agent workspace positioning, browser MCP, multi-agent statusline ([`d3ca9d9`](https://github.com/Vit129/kouen-terminal/commit/d3ca9d9c9307b52b684da5f035aeeaa31ad0a283))
+- Update README to v3.11.5 + keyboard shortcuts; CHANGELOG otty features ([`d814220`](https://github.com/Vit129/kouen-terminal/commit/d814220ecf31f39b920648da353a75431510b117))
+- Remove [Unreleased] section; mark otty-features closed in CHANGELOG ([`00b0864`](https://github.com/Vit129/kouen-terminal/commit/00b0864dcd787fb85eddcc0b9cbde5851d8e3a04))
+- Remove otty-features comment from CHANGELOG ([`e3844fd`](https://github.com/Vit129/kouen-terminal/commit/e3844fdf7c2831a3c8f32787eb63e67313ec33e9))
+- Record tab-switch black-screen root cause analysis in knowledge base ([`4d4e8d5`](https://github.com/Vit129/kouen-terminal/commit/4d4e8d5774f8b6282033cacf0c953af576896bb3))
 
 ### Fixed
-- Daemon stop command with built-in 2-second timeout ([`7e3793c`](https://github.com/Vit129/kouen-terminal/commit/7e3793c4b371d092a4078668f4a578bb72bdeaed))
-- Black screen on tab switch — wake Metal renderer after isHidden restore ([`7310f42`](https://github.com/Vit129/kouen-terminal/commit/7310f42482fc65db402bb353adff40e031efe1c5))
-- Tab-switch black screen — keep hosts in cached container ([`4b5be7b`](https://github.com/Vit129/kouen-terminal/commit/4b5be7b262f67ede64b571664cb2951b754900e1))
-- Restore Metal rendering after display switch ([`c58621a`](https://github.com/Vit129/kouen-terminal/commit/c58621a9696e35cf93f54cfc932a49b3186033e2))
-- Tab-switch black screen — keep hosts in cached container ([`7dd9000`](https://github.com/Vit129/kouen-terminal/commit/7dd9000e21e9299059e9fdccd6e38ef764a59462))
-- Synchronous repaint on tab-switch fast-path reveal ([`da03968`](https://github.com/Vit129/kouen-terminal/commit/da03968c564c9c5e36ec7d42b36177a6fd7de17f))
-- Evict cached container on force rebuild to prevent black-on-revisit ([`06daab6`](https://github.com/Vit129/kouen-terminal/commit/06daab6254975f64e69f699c815cd6bde0bf59af))
-- Validate cached hosts before fast-path reveal; plug cache-overwrite leak ([`3d839a1`](https://github.com/Vit129/kouen-terminal/commit/3d839a19299df0983f4b20328425fc24409ca3fa))
-- Performance and black screen when switch tab ([`9d49488`](https://github.com/Vit129/kouen-terminal/commit/9d4948827230405e3c36713c1c59b03fefb8f402))
+- Daemon stop command with built-in 2-second timeout ([`109e06e`](https://github.com/Vit129/kouen-terminal/commit/109e06e8b32ac5765afe7b261dec0d3d91fa2354))
+- Black screen on tab switch — wake Metal renderer after isHidden restore ([`aab2599`](https://github.com/Vit129/kouen-terminal/commit/aab2599fdc83dd6254f25b05982c12fb52ab4258))
+- Tab-switch black screen — keep hosts in cached container ([`46373d1`](https://github.com/Vit129/kouen-terminal/commit/46373d14812b086976f7252467ce33f37f4689f5))
+- Restore Metal rendering after display switch ([`0df4a0e`](https://github.com/Vit129/kouen-terminal/commit/0df4a0ee66a9ebc1a74716583942068e0da77d58))
+- Tab-switch black screen — keep hosts in cached container ([`eb9ff64`](https://github.com/Vit129/kouen-terminal/commit/eb9ff6408c474db797c77f618ea684c863748fc9))
+- Synchronous repaint on tab-switch fast-path reveal ([`a595724`](https://github.com/Vit129/kouen-terminal/commit/a595724fc8dc265e40b00762937da135c78b1039))
+- Evict cached container on force rebuild to prevent black-on-revisit ([`5dbe867`](https://github.com/Vit129/kouen-terminal/commit/5dbe867da023c4ee5b7aa925a7d481c83a4a526c))
+- Validate cached hosts before fast-path reveal; plug cache-overwrite leak ([`5aca818`](https://github.com/Vit129/kouen-terminal/commit/5aca818e5dbd87758eff582822c34e7d43553215))
+- Performance and black screen when switch tab ([`518d094`](https://github.com/Vit129/kouen-terminal/commit/518d09443accbde7cc372aa4f9a108901b9d6ff9))
 
 ## [3.11.4] - 2026-06-28
 
 ### Added
-- Add Option 3 — Fix version to re-sync all 4 version files ([`e17e1b9`](https://github.com/Vit129/kouen-terminal/commit/e17e1b9399347e29b7a72fb8e65305a8bb35dc00))
-- Add graceful install — preserve session layout across updates ([`9537a78`](https://github.com/Vit129/kouen-terminal/commit/9537a78346c3be1d3ab79bd343f8d5c359d7996e))
+- Add Option 3 — Fix version to re-sync all 4 version files ([`a53a29f`](https://github.com/Vit129/kouen-terminal/commit/a53a29fb554f5a800ae9c4f43bbeab92bbf32aa5))
+- Add graceful install — preserve session layout across updates ([`04e7fce`](https://github.com/Vit129/kouen-terminal/commit/04e7fce3673103840b9ace99f610206b64615c5a))
 
 ### Fixed
-- Critical bugs in action buttons and status line visibility ([`32f03d7`](https://github.com/Vit129/kouen-terminal/commit/32f03d7a6f111fcbdabe26107bd0711f156d06fb))
-- BlockActionBar buttons unresponsive + skip redundant scroll redraws ([`bc69cd6`](https://github.com/Vit129/kouen-terminal/commit/bc69cd6f28f334c8007640350f41671e274a70d1))
-- Shell injection in directory picker + floating panel guards ([`c13ece9`](https://github.com/Vit129/kouen-terminal/commit/c13ece96e96c6fb2ac1326b23c90ce0d07743d2c))
-- Remove duplicate shellQuoted extension + Self in stored property initializer ([`33b0b93`](https://github.com/Vit129/kouen-terminal/commit/33b0b933afdfae228cca319a14436257e85f4bda))
-- Store and remove NotificationCenter observers in FloatingPaneController ([`ff381cc`](https://github.com/Vit129/kouen-terminal/commit/ff381cc102854ba6fd62db68b07973d9f321f93c))
-- Vi mode breaks Esc + 3 audit bugs from otty-features wave ([`d432fc9`](https://github.com/Vit129/kouen-terminal/commit/d432fc99b8db39b4d44ed670637a22e0bb04a3d7))
-- Group header '...' button silent since June 22 SwiftUI migration ([`1b6adfe`](https://github.com/Vit129/kouen-terminal/commit/1b6adfe1329be4ee5f8b1133f6d39edbb37b4238))
-- ShowStatusLine orphaned gate hides status line permanently ([`ebc2e17`](https://github.com/Vit129/kouen-terminal/commit/ebc2e17d0875b0baee648cd53fe07a04ce590c1f))
-- 4 bugs from wave-2 SwiftUI migration + Open With + harness view ([`411ee6d`](https://github.com/Vit129/kouen-terminal/commit/411ee6d79b6713652e19d2da60da8b9951413346))
-- CommandPalette cd silently fails for paths with spaces ([`f0d75fe`](https://github.com/Vit129/kouen-terminal/commit/f0d75fe31ea2bb6587705b809cd44a04b3acda86))
-- 5 SwiftUI migration bugs + perf improvements ([`ce16dbb`](https://github.com/Vit129/kouen-terminal/commit/ce16dbbdd0ec95a883a612c0b7e37ec166ab0752))
-- Add timeout to harness-cli daemon stop to prevent hang ([`3a12fad`](https://github.com/Vit129/kouen-terminal/commit/3a12fad8ade55160bbfcbb4ad5c234e0c4274ef3))
+- Critical bugs in action buttons and status line visibility ([`b412452`](https://github.com/Vit129/kouen-terminal/commit/b41245234e234c5b8465b247264db29e0528f9b4))
+- BlockActionBar buttons unresponsive + skip redundant scroll redraws ([`ab9fa6c`](https://github.com/Vit129/kouen-terminal/commit/ab9fa6c6bb0ccb39c60b8db7fd6b003cb2312906))
+- Shell injection in directory picker + floating panel guards ([`bacf239`](https://github.com/Vit129/kouen-terminal/commit/bacf239468e6f8b75500d9faa783607d9eeb7022))
+- Remove duplicate shellQuoted extension + Self in stored property initializer ([`fdd28ab`](https://github.com/Vit129/kouen-terminal/commit/fdd28ab989b8a4969a1466d194d948b338f9a25e))
+- Store and remove NotificationCenter observers in FloatingPaneController ([`64ad4fc`](https://github.com/Vit129/kouen-terminal/commit/64ad4fc8e450dc2e9a5a35afa39e6e1b231ebf24))
+- Vi mode breaks Esc + 3 audit bugs from otty-features wave ([`4928811`](https://github.com/Vit129/kouen-terminal/commit/492881171835a6282a6823b2d44335d91b52d250))
+- Group header '...' button silent since June 22 SwiftUI migration ([`75c1cc1`](https://github.com/Vit129/kouen-terminal/commit/75c1cc1684ddfc90ea20c697c0d0442a8698b520))
+- ShowStatusLine orphaned gate hides status line permanently ([`b357ee2`](https://github.com/Vit129/kouen-terminal/commit/b357ee2108dd7577e1dbd21582416ee07a49860a))
+- 4 bugs from wave-2 SwiftUI migration + Open With + harness view ([`59018ea`](https://github.com/Vit129/kouen-terminal/commit/59018eabb9fd3a1a4869dcc33ff4df340b1711a5))
+- CommandPalette cd silently fails for paths with spaces ([`5d96970`](https://github.com/Vit129/kouen-terminal/commit/5d9697087963c390089cfa216241579b188f0d3b))
+- 5 SwiftUI migration bugs + perf improvements ([`a4c7493`](https://github.com/Vit129/kouen-terminal/commit/a4c74930ab6d177dcb35c9ef9f64a9041a0ebf2c))
+- Add timeout to harness-cli daemon stop to prevent hang ([`bf755ac`](https://github.com/Vit129/kouen-terminal/commit/bf755ac71dcf591fb4172da6594033a62e84b122))
 
 ## [3.11.2] - 2026-06-28
 
 ### Changed
-- Debounce status line refresh + skip redundant NSAttributedString rebuilds ([`a0a343b`](https://github.com/Vit129/kouen-terminal/commit/a0a343b3292c02457ef93506cc46a8d8495d3924))
-- Hoist process-table build out of per-surface agent scan loop ([`8076204`](https://github.com/Vit129/kouen-terminal/commit/8076204ce43d6760c35c6724b2296ec504f5b7a0))
+- Debounce status line refresh + skip redundant NSAttributedString rebuilds ([`85852fd`](https://github.com/Vit129/kouen-terminal/commit/85852fde4ba299e8e67db7ba779a1e569aa63184))
+- Hoist process-table build out of per-surface agent scan loop ([`9d21184`](https://github.com/Vit129/kouen-terminal/commit/9d21184d4ec4617f67ea76e87b13af254f82bfc4))
 
 ### Fixed
-- Remove NotificationCenter observer leaks on window/pane teardown ([`a3f437d`](https://github.com/Vit129/kouen-terminal/commit/a3f437d45f74c6033bab019524aaea0019f3a113))
-- Browser routing, GUI-disconnect hang, stale runSurface Ctrl-C, per-chunk alloc ([`d2fa7f5`](https://github.com/Vit129/kouen-terminal/commit/d2fa7f5f4c30aa1f47124adc12dbe120ca239148))
-- Shell-quote model/effort in spawnCommand + browser routing + invariant tests ([`1b2628c`](https://github.com/Vit129/kouen-terminal/commit/1b2628cc11ecc7358294f125f4e92a478411dff1))
-- 5 Opus round-2 findings — snapshot reconnect, timer leak, progress, network capture, reconnect probe ([`c641239`](https://github.com/Vit129/kouen-terminal/commit/c64123976b110d45afe2149a892c94235792b776))
-- PromptQueue surface-key leak + AppIdleThrottle double-install guard ([`2e6fdd0`](https://github.com/Vit129/kouen-terminal/commit/2e6fdd039815292d8b927f3bc02908c2ebf55df7))
-- Status line Settings toggle bound to wrong field for non-full modes ([`2159a77`](https://github.com/Vit129/kouen-terminal/commit/2159a774e85f202613afc45b9f2d3e2b5a79a4a9))
+- Remove NotificationCenter observer leaks on window/pane teardown ([`ebddab3`](https://github.com/Vit129/kouen-terminal/commit/ebddab36794d9b8efbc7996c0d9b46546cb94977))
+- Browser routing, GUI-disconnect hang, stale runSurface Ctrl-C, per-chunk alloc ([`954135d`](https://github.com/Vit129/kouen-terminal/commit/954135d5018680a6d844f7fea14e63e0303b5349))
+- Shell-quote model/effort in spawnCommand + browser routing + invariant tests ([`d2bbd37`](https://github.com/Vit129/kouen-terminal/commit/d2bbd3777d2a11563d4fad49791f19857c3dbe0e))
+- 5 Opus round-2 findings — snapshot reconnect, timer leak, progress, network capture, reconnect probe ([`404a314`](https://github.com/Vit129/kouen-terminal/commit/404a314e9970e66e5d317ca6fa5779879e35e2b8))
+- PromptQueue surface-key leak + AppIdleThrottle double-install guard ([`d3b1763`](https://github.com/Vit129/kouen-terminal/commit/d3b176315dbfeadde8eee2cfccb8a14f279a103e))
+- Status line Settings toggle bound to wrong field for non-full modes ([`996941d`](https://github.com/Vit129/kouen-terminal/commit/996941d9548858edb99972847a1b2e99956511fc))
 
 ## [3.11.0] - 2026-06-28
 
 ### Added
-- Implement Phase 11 - Recipes command picker ([`87eeabb`](https://github.com/Vit129/kouen-terminal/commit/87eeabbdc60765f8cfb06f219585d95684a13589))
-- Phase 10 — Quick Terminal ⌥Space (NSPanel + dedicated workspace) ([`a823fff`](https://github.com/Vit129/kouen-terminal/commit/a823fff6b0126d76fec19c5d33b9986bd0d7f878))
-- Phase 2 — Vi modal editing (Esc/hjkl/wb/x/i/a/A) with ⌘⌃V toggle ([`5a7eb10`](https://github.com/Vit129/kouen-terminal/commit/5a7eb10688303e19a699783e9dfb7398b9f6abf2))
-- Phase 12 — block output: prompt gutter on by default, ⌘-click selects OSC 133 block ([`196c362`](https://github.com/Vit129/kouen-terminal/commit/196c362c6c23a0c429b8bc3ca73db33344f1d5be))
-- Phase 14 — Floating Terminal ⌘⌥F (NSPanel, persisted frame) + Phase 15 — Tab Overview ⌘⇧\ (thumbnail grid, click to switch) ([`68c4906`](https://github.com/Vit129/kouen-terminal/commit/68c490655d93c82a3d3b87f2a42bf856e17c5e55))
-- ⌘↩ opens new tab in dir picker + zoxide as data source ([`e64bbc8`](https://github.com/Vit129/kouen-terminal/commit/e64bbc8d9f1edbe90fcee936fbb63b170defbcb1))
-- Block output tint + AI explain action bar (Phase 12b) ([`0e608ce`](https://github.com/Vit129/kouen-terminal/commit/0e608ce2472ce8bc5ba78752ea2a2e2dd506ac0d))
-- Block border, collapse/expand, re-run button (Phase 12c) ([`49d25b2`](https://github.com/Vit129/kouen-terminal/commit/49d25b21d45031d24a1cfef5a73c3b44942c8dc9))
-- OSC 26 agent protocol + Fork Tab + approval bar ([`b6154c2`](https://github.com/Vit129/kouen-terminal/commit/b6154c2ea3ba2d3c2c95608b2dbc1e7c4f674a74))
+- Implement Phase 11 - Recipes command picker ([`a33dc49`](https://github.com/Vit129/kouen-terminal/commit/a33dc49e218c55143d6e2cbb60f9b38d63e68c38))
+- Phase 10 — Quick Terminal ⌥Space (NSPanel + dedicated workspace) ([`b71ab9e`](https://github.com/Vit129/kouen-terminal/commit/b71ab9eaa35299be31a6d84b06fba66812b33ba5))
+- Phase 2 — Vi modal editing (Esc/hjkl/wb/x/i/a/A) with ⌘⌃V toggle ([`0263389`](https://github.com/Vit129/kouen-terminal/commit/0263389494d42d1d0198b2c4bdf18e6a1a86385a))
+- Phase 12 — block output: prompt gutter on by default, ⌘-click selects OSC 133 block ([`ff848cd`](https://github.com/Vit129/kouen-terminal/commit/ff848cd4328ba0af019376f1730a8fd3f2dbf677))
+- Phase 14 — Floating Terminal ⌘⌥F (NSPanel, persisted frame) + Phase 15 — Tab Overview ⌘⇧\ (thumbnail grid, click to switch) ([`11d30a5`](https://github.com/Vit129/kouen-terminal/commit/11d30a5bc33d35f6207cc6004890b3b3c343ed92))
+- ⌘↩ opens new tab in dir picker + zoxide as data source ([`dc95a1d`](https://github.com/Vit129/kouen-terminal/commit/dc95a1d2167cbb07ef293b8e8d091a5e064674d0))
+- Block output tint + AI explain action bar (Phase 12b) ([`7bb63c7`](https://github.com/Vit129/kouen-terminal/commit/7bb63c7bbbb2b7059f4b79e7b67d31df733f0bab))
+- Block border, collapse/expand, re-run button (Phase 12c) ([`7d66db9`](https://github.com/Vit129/kouen-terminal/commit/7d66db98d7f231fd1599e109bf55bbda0dff6a1e))
+- OSC 26 agent protocol + Fork Tab + approval bar ([`b4ca5f5`](https://github.com/Vit129/kouen-terminal/commit/b4ca5f523a3818eeca2e37a54d022f1da2a4ccdf))
 
 ### Changed
-- Defer tab thumbnail renders + add OSC 26 hook payloads ([`372886a`](https://github.com/Vit129/kouen-terminal/commit/372886addfa4535758b571af75e17dd5bf3a7f37))
+- Defer tab thumbnail renders + add OSC 26 hook payloads ([`f04a7c9`](https://github.com/Vit129/kouen-terminal/commit/f04a7c994d9860fd01ca784485bb46be0d837b9b))
 
 ### Documentation
-- Mark medium phases 10, 11, 18, 19 complete in PLAN + CONTEXT ([`584f31d`](https://github.com/Vit129/kouen-terminal/commit/584f31dede22e2bce4321b661fdbe1201051a6b4))
-- Mark Phase 2 + 12 done in PLAN + CONTEXT ([`acf399b`](https://github.com/Vit129/kouen-terminal/commit/acf399b244e2c531d422bfd97959304a3cf98219))
-- Mark Phase 14 + 15 done — otty-features complete ([`4d41ca3`](https://github.com/Vit129/kouen-terminal/commit/4d41ca3cffd44dd350a414591ea0da5cc85282f9))
-- Add agent-terminal AIDLC planning + update otty-features PLAN ([`e41a344`](https://github.com/Vit129/kouen-terminal/commit/e41a3445bf2cebf45855595ad3c625726721c961))
+- Mark medium phases 10, 11, 18, 19 complete in PLAN + CONTEXT ([`173f976`](https://github.com/Vit129/kouen-terminal/commit/173f976b1e57991faf0a504aa8069aff79133148))
+- Mark Phase 2 + 12 done in PLAN + CONTEXT ([`38a879b`](https://github.com/Vit129/kouen-terminal/commit/38a879b55223aa4e0d452bc40dcffb36f47caeec))
+- Mark Phase 14 + 15 done — otty-features complete ([`b6fcea7`](https://github.com/Vit129/kouen-terminal/commit/b6fcea7d6601aca1971eb4ea3e67e2f059b2df50))
+- Add agent-terminal AIDLC planning + update otty-features PLAN ([`85ba62f`](https://github.com/Vit129/kouen-terminal/commit/85ba62f9605e3798f02186c8a84499f885598809))
 
 ### Fixed
-- Deinit in extension SyntaxTextView — move to class body ([`cac75c5`](https://github.com/Vit129/kouen-terminal/commit/cac75c5aeb35bf100c39aee898a304e909b0eaeb))
-- Full-cycle uses make install (prod+install) before tag/release ([`710580b`](https://github.com/Vit129/kouen-terminal/commit/710580bd8959614fb38ab53529aaeabbcac0c6c4))
-- Approval bar freeze + ProMotion render-rate cap ([`6083086`](https://github.com/Vit129/kouen-terminal/commit/608308635fcbc20a945ce453909980c0a4b0c393))
+- Deinit in extension SyntaxTextView — move to class body ([`404cac3`](https://github.com/Vit129/kouen-terminal/commit/404cac33f30c73804e292a8d402217409e7dd828))
+- Full-cycle uses make install (prod+install) before tag/release ([`401e368`](https://github.com/Vit129/kouen-terminal/commit/401e368b6becf37ab4cd69c574f134382ff8403d))
+- Approval bar freeze + ProMotion render-rate cap ([`92f8802`](https://github.com/Vit129/kouen-terminal/commit/92f8802a63ad0d8579740c433061cf457d4d45f2))
 
 ## [3.10.1] - 2026-06-27
 
 ### Added
-- Full-cycle --no-bump flag + start.mjs asks version bump before full run ([`10346cb`](https://github.com/Vit129/kouen-terminal/commit/10346cb36c4f607e32a17cea05611a3c83a0a432))
-- Send selection to AI chat via right-click context menu ([`b104eed`](https://github.com/Vit129/kouen-terminal/commit/b104eed9b1e0875167370339d978e98acef7b84b))
-- Wire ⌘F scrollback search — find bar was implemented but unbound ([`5fac8a7`](https://github.com/Vit129/kouen-terminal/commit/5fac8a7ae23b0c35fff61a4cb3946ba15683096d))
-- Click-to-move shell cursor on single click (Phase 5) ([`ee002b8`](https://github.com/Vit129/kouen-terminal/commit/ee002b826f8cd399647bd04fbf1e214f3dcec096))
-- Auto secure input on password prompts (Phase 6) ([`99643bc`](https://github.com/Vit129/kouen-terminal/commit/99643bcc7d0666d58122f36a17c0239908e4ec90))
-- Ctrl+C copies selection when text is selected (Phase 7) ([`844b9c2`](https://github.com/Vit129/kouen-terminal/commit/844b9c220e28db7ae27fbeafd5d1bffdb66bee3f))
-- Show git branch in tab immediately on cd (Phase 17) ([`be60091`](https://github.com/Vit129/kouen-terminal/commit/be60091588775b3c05442711f63c698ae43298fe))
-- Composer panel for multi-line PTY commands ⌘⇧E (Phase 8) ([`f753a14`](https://github.com/Vit129/kouen-terminal/commit/f753a146b49773a255af54d1c19be0104b58596f))
-- Prompt queue — sequential command runner (Phase 9) ([`d9e74b9`](https://github.com/Vit129/kouen-terminal/commit/d9e74b91591f6f5fb33ffb85a7249377c5e66016))
+- Full-cycle --no-bump flag + start.mjs asks version bump before full run ([`87cfbc2`](https://github.com/Vit129/kouen-terminal/commit/87cfbc2c039b788df4adb518d4b6ce00eba162e4))
+- Send selection to AI chat via right-click context menu ([`f0698e9`](https://github.com/Vit129/kouen-terminal/commit/f0698e9f177cecbd2c403adebda130fedad0d36d))
+- Wire ⌘F scrollback search — find bar was implemented but unbound ([`c76df49`](https://github.com/Vit129/kouen-terminal/commit/c76df495caa6e0dffaa90ce7f045c13835a96521))
+- Click-to-move shell cursor on single click (Phase 5) ([`bdde688`](https://github.com/Vit129/kouen-terminal/commit/bdde688e3d1b950e0e70acd87c34f26d874cd324))
+- Auto secure input on password prompts (Phase 6) ([`eedd9d0`](https://github.com/Vit129/kouen-terminal/commit/eedd9d0a231f1fe2b532b9b4885b974c5637ba6e))
+- Ctrl+C copies selection when text is selected (Phase 7) ([`40cca9c`](https://github.com/Vit129/kouen-terminal/commit/40cca9c8bc74d81620181b35af3837cbfad15334))
+- Show git branch in tab immediately on cd (Phase 17) ([`49767b5`](https://github.com/Vit129/kouen-terminal/commit/49767b585e9707e3b5c7d17c1fe5ec3f0f713958))
+- Composer panel for multi-line PTY commands ⌘⇧E (Phase 8) ([`ada7744`](https://github.com/Vit129/kouen-terminal/commit/ada7744c298b8db36c692b9fe88a5e8afa8c8534))
+- Prompt queue — sequential command runner (Phase 9) ([`f0e0e86`](https://github.com/Vit129/kouen-terminal/commit/f0e0e864a3a8a14d0671abc2b8b0bb307de42182))
 
 ### Changed
-- Prevent redundant UI rebuilds and memory leaks in GitPanelView ([`8841cc7`](https://github.com/Vit129/kouen-terminal/commit/8841cc71c09a665ca330fda0cfa10808289fd42f))
+- Prevent redundant UI rebuilds and memory leaks in GitPanelView ([`972fa07`](https://github.com/Vit129/kouen-terminal/commit/972fa0781d6c5182327d84bc404d5231f9ea4b0c))
 
 ### Documentation
-- Release workflow + version sync rule in CLAUDE.md ([`7dcac54`](https://github.com/Vit129/kouen-terminal/commit/7dcac543a81fa3d5732bae1ae45ae86033c0ad86))
-- Expand otty-features PLAN — 6 new features from CMUX/Zellij/iTerm2 research ([`3163e1c`](https://github.com/Vit129/kouen-terminal/commit/3163e1ca46b2c007d1041897053a61af2b98c9f0))
-- Update CHANGELOG, PLAN, CONTEXT for otty-features phases 1/3-9/17/20 ([`9ebe9c4`](https://github.com/Vit129/kouen-terminal/commit/9ebe9c4c4dcf5bdea5b0a75c1d262c130d2a4239))
+- Release workflow + version sync rule in CLAUDE.md ([`f30ff27`](https://github.com/Vit129/kouen-terminal/commit/f30ff271a004b2301fbd42c58597ad0fc9a01702))
+- Expand otty-features PLAN — 6 new features from CMUX/Zellij/iTerm2 research ([`5ba8e39`](https://github.com/Vit129/kouen-terminal/commit/5ba8e39f629179c87afe0fdf4461280f6d2d3b46))
+- Update CHANGELOG, PLAN, CONTEXT for otty-features phases 1/3-9/17/20 ([`ac992a6`](https://github.com/Vit129/kouen-terminal/commit/ac992a6c9dcc6ba7267554f9b4a06ef63ac8e1f8))
 
 ### Fixed
-- Full-cycle step 4 — build+sign only, no open (was dropping session) ([`9ae8d7c`](https://github.com/Vit129/kouen-terminal/commit/9ae8d7c3f63faf79374b0149c64f66d6fc27be00))
-- Trim inactive session scrollback on macOS memory pressure ([`54f6a0b`](https://github.com/Vit129/kouen-terminal/commit/54f6a0b819a7fbe7335f2e20cea3eed79fcb5be1))
-- AI chat streaming reads no output for batch-write agents (⌘I) ([`160d064`](https://github.com/Vit129/kouen-terminal/commit/160d06474e6bf94c31d361542a724421583bea47))
-- Remove NSEvent monitors and NotificationCenter observers on deinit ([`6f9c155`](https://github.com/Vit129/kouen-terminal/commit/6f9c15562044a96dd138176e570b7a7b846c50ec))
+- Full-cycle step 4 — build+sign only, no open (was dropping session) ([`ba66a41`](https://github.com/Vit129/kouen-terminal/commit/ba66a41cb3d725f0258a798539486d04538c01b7))
+- Trim inactive session scrollback on macOS memory pressure ([`7e236b5`](https://github.com/Vit129/kouen-terminal/commit/7e236b5d530c0da8499a6bee7bb0a483c6947f08))
+- AI chat streaming reads no output for batch-write agents (⌘I) ([`91a02ab`](https://github.com/Vit129/kouen-terminal/commit/91a02ab11e694c2b599563392d09b6c8459613f2))
+- Remove NSEvent monitors and NotificationCenter observers on deinit ([`8b88808`](https://github.com/Vit129/kouen-terminal/commit/8b888084158ac9db8d04b3b895d0308aaa65a529))
 
 ## [3.10.0] - 2026-06-27
 
 ### Added
-- SwiftUI settings foundation — SettingsModel + Terminal page ([`4435619`](https://github.com/Vit129/kouen-terminal/commit/443561969f40a6a153afa21beb37eef2fa7179f7))
-- SwiftUI Settings — Appearance page (S2) ([`dd1ca45`](https://github.com/Vit129/kouen-terminal/commit/dd1ca45b688e7694b664b1bee1bab18be14fe45b))
-- SwiftUI Settings S3–S5 — Colors, Keys, Agents pages ([`c572ed4`](https://github.com/Vit129/kouen-terminal/commit/c572ed4cf723d5ce22fe57ec5fef5e773e2704cb))
-- SwiftUI Settings S6–S9 — Advanced, Remote, root wiring, AppKit deleted ([`94c9491`](https://github.com/Vit129/kouen-terminal/commit/94c94913c260e4fbca555f575e0f215d4ce1c5c4))
-- Migrate WorkspacePillButton to SwiftUI ([`204dcf2`](https://github.com/Vit129/kouen-terminal/commit/204dcf2d2ddd5e7c0299320117a1594540322c6d))
-- Migrate sidebar section label + footer to SwiftUI ([`a072edf`](https://github.com/Vit129/kouen-terminal/commit/a072edf56bdd051951a6ae9e4a1a0e26c6e988b6))
-- Migrate sidebar tab bar from NSSegmentedControl to SwiftUI Picker ([`a6d59a9`](https://github.com/Vit129/kouen-terminal/commit/a6d59a9ce4549c1a080584bb981a268af569ac46))
-- Open With Harness for source files + file preview routing ([`36fde38`](https://github.com/Vit129/kouen-terminal/commit/36fde383ef6d6f6ab5ec19bff05800fbfa81e1b0))
-- Open With file → terminal at git root + tree reveals file ([`cabcb86`](https://github.com/Vit129/kouen-terminal/commit/cabcb86707bdc001cc590c11986e9a2f206176b5))
-- File tree roots at git root, expands to CWD on cd ([`d3a700f`](https://github.com/Vit129/kouen-terminal/commit/d3a700f3d4d9c1fd55e005079cd5aea2de2de130))
-- AppKit → SwiftUI wave 2 — 4 UI components migrated ([`760705a`](https://github.com/Vit129/kouen-terminal/commit/760705a092f877d78eacb5419e3e777ae4f3bfee))
+- SwiftUI settings foundation — SettingsModel + Terminal page ([`7427c6c`](https://github.com/Vit129/kouen-terminal/commit/7427c6c6ec8cdcdd2aa2929bb8a7ee3570b69af6))
+- SwiftUI Settings — Appearance page (S2) ([`20d9c46`](https://github.com/Vit129/kouen-terminal/commit/20d9c465874573ca5657b605e61c76d9ed28e0dc))
+- SwiftUI Settings S3–S5 — Colors, Keys, Agents pages ([`981a5ef`](https://github.com/Vit129/kouen-terminal/commit/981a5efb449a80d7ca1b96ff6c2fb50f97c1ca3d))
+- SwiftUI Settings S6–S9 — Advanced, Remote, root wiring, AppKit deleted ([`6f42487`](https://github.com/Vit129/kouen-terminal/commit/6f424876f965c842b0dd8835d0f9451337701e1c))
+- Migrate WorkspacePillButton to SwiftUI ([`49005b6`](https://github.com/Vit129/kouen-terminal/commit/49005b6c6a45ffc612cd45383ff63974d985d390))
+- Migrate sidebar section label + footer to SwiftUI ([`eec6861`](https://github.com/Vit129/kouen-terminal/commit/eec6861aa669ecd3c797af6491e0362b2a2db31c))
+- Migrate sidebar tab bar from NSSegmentedControl to SwiftUI Picker ([`763e5e9`](https://github.com/Vit129/kouen-terminal/commit/763e5e94d91be87c797c401223637791537b9006))
+- Open With Harness for source files + file preview routing ([`8d6e4da`](https://github.com/Vit129/kouen-terminal/commit/8d6e4da8d5ab4d77bc922fa41ecd0e23a3882753))
+- Open With file → terminal at git root + tree reveals file ([`9234774`](https://github.com/Vit129/kouen-terminal/commit/9234774e60babf18d6ee36067a61f3fcee64408b))
+- File tree roots at git root, expands to CWD on cd ([`d424dcd`](https://github.com/Vit129/kouen-terminal/commit/d424dcd0dbe2faa16762b6fd283688d3ab588186))
+- AppKit → SwiftUI wave 2 — 4 UI components migrated ([`4bbd469`](https://github.com/Vit129/kouen-terminal/commit/4bbd46910cc73ec7fc7d16bfc478059b575e3a54))
 
 ### Changed
-- Migrate Toast+About to SwiftUI, delete dead NotificationBellButton + DragReorder stub ([`94f4d54`](https://github.com/Vit129/kouen-terminal/commit/94f4d541b44ac728aeb58ade876edfbec84dd3b9))
+- Migrate Toast+About to SwiftUI, delete dead NotificationBellButton + DragReorder stub ([`3d0bd54`](https://github.com/Vit129/kouen-terminal/commit/3d0bd54bf037fabbd7159cbafd9b7aa7edf131f0))
 
 ### Documentation
-- Update knowledge — CASE-042/043 + cwd-worktree-bleed companion fix + memory decisions ([`c67a980`](https://github.com/Vit129/kouen-terminal/commit/c67a980f668cb32497eecd1db8103242d3c53d10))
-- Update CONTEXT — SwiftUI Settings S6–S9 complete ([`654fe82`](https://github.com/Vit129/kouen-terminal/commit/654fe820b0d8676f657d20487c8c2acdcfc8c74f))
-- Update CONTEXT, knowledge, plans, graphify after sidebar SwiftUI wave 2 ([`95290db`](https://github.com/Vit129/kouen-terminal/commit/95290dbc140413bcb42db54896d81dfae6dd836e))
-- Update CONTEXT — SwiftUI wave 2 complete (4 components, −424 lines) ([`139ab6a`](https://github.com/Vit129/kouen-terminal/commit/139ab6a04662f976d791c78a550172d902d57547))
+- Update knowledge — CASE-042/043 + cwd-worktree-bleed companion fix + memory decisions ([`9f546bc`](https://github.com/Vit129/kouen-terminal/commit/9f546bc3fe6aab399b5b85342a7209bae28d5387))
+- Update CONTEXT — SwiftUI Settings S6–S9 complete ([`bab69a2`](https://github.com/Vit129/kouen-terminal/commit/bab69a2a4059f965f54f22953d9cd762fd78eee8))
+- Update CONTEXT, knowledge, plans, graphify after sidebar SwiftUI wave 2 ([`96bed89`](https://github.com/Vit129/kouen-terminal/commit/96bed898f2f7cb01bc68c7b92ffb9022d194fa0c))
+- Update CONTEXT — SwiftUI wave 2 complete (4 components, −424 lines) ([`fca6fbf`](https://github.com/Vit129/kouen-terminal/commit/fca6fbf369a332b5192d0f87b6be05fd396b3eb9))
 
 ### Fixed
-- Flush NSHostingView layout after sidebar animation completes ([`bef888a`](https://github.com/Vit129/kouen-terminal/commit/bef888a9b06d0ef1a5cfd549c1a571a7a56b70da))
-- Sidebar animation frames drop on macOS 26 — Task {@MainActor} → assumeIsolated ([`d5833b0`](https://github.com/Vit129/kouen-terminal/commit/d5833b0deed13b73942eec00e52f2fcc4e1b8541))
-- Sync Metal terminal frames with CA during sidebar animation ([`28d0233`](https://github.com/Vit129/kouen-terminal/commit/28d02337fb1a55d0605cc352a021d9b337d6771b))
-- Point Bug 1 robot guard to BrowserIntegrationController where removeValue lives ([`ad792c9`](https://github.com/Vit129/kouen-terminal/commit/ad792c9ca0753023088bd8f9b1e278c27a77e83d))
-- Remove presentsWithTransaction from animated sidebar — was blocking main thread every vsync ([`b9f94cd`](https://github.com/Vit129/kouen-terminal/commit/b9f94cd7a49e0d767443a858c59d5e8f4332ec9e))
-- Panel to response slow and move pane to left/right corner ([`0f71782`](https://github.com/Vit129/kouen-terminal/commit/0f7178285d13542c1f639f84cf3d0932cf25105c))
+- Flush NSHostingView layout after sidebar animation completes ([`1b158b0`](https://github.com/Vit129/kouen-terminal/commit/1b158b01a057f98d194dc9f362f471d3294de2f5))
+- Sidebar animation frames drop on macOS 26 — Task {@MainActor} → assumeIsolated ([`5b61af7`](https://github.com/Vit129/kouen-terminal/commit/5b61af7175357ea9e56ae90446c9b4dfe5ff5870))
+- Sync Metal terminal frames with CA during sidebar animation ([`2826876`](https://github.com/Vit129/kouen-terminal/commit/28268767eeeec5df3aaab741a7213bc43f0dbfd7))
+- Point Bug 1 robot guard to BrowserIntegrationController where removeValue lives ([`3528463`](https://github.com/Vit129/kouen-terminal/commit/3528463f4780fb8fe402bcaf5cc8548cf23efef5))
+- Remove presentsWithTransaction from animated sidebar — was blocking main thread every vsync ([`bc64b4a`](https://github.com/Vit129/kouen-terminal/commit/bc64b4a20e9aa532e249b31e7940e6611ce07e52))
+- Panel to response slow and move pane to left/right corner ([`90917a5`](https://github.com/Vit129/kouen-terminal/commit/90917a53e71c73decd3a23909cb2adb3272b5016))
 
 ## [3.9.5] - 2026-06-26
 
 ### Added
-- Vimium-style hint mode (Cmd+Shift+U) for keyboard link opening ([`cba7cdc`](https://github.com/Vit129/kouen-terminal/commit/cba7cdce553b4fec0dbef6bb72dd5a0553ab6333))
-- Harness view opens sidebar file viewer via OSC 7735 ([`8913672`](https://github.com/Vit129/kouen-terminal/commit/8913672e8acb9d8fa558cea8cdf1c0ab8edae36c))
-- Harness cat shows line numbers that are excluded from copy ([`22f4dd5`](https://github.com/Vit129/kouen-terminal/commit/22f4dd5c88e59ed897689c0869e57f51781cedc9))
-- Add Commit & Push to Sync menu ([`e902d2e`](https://github.com/Vit129/kouen-terminal/commit/e902d2e54d0434cfbc57d3b6056a60bf8e98144e))
+- Vimium-style hint mode (Cmd+Shift+U) for keyboard link opening ([`0495089`](https://github.com/Vit129/kouen-terminal/commit/0495089f996b905940af9f48a605a47048dfc456))
+- Harness view opens sidebar file viewer via OSC 7735 ([`bbbadc7`](https://github.com/Vit129/kouen-terminal/commit/bbbadc7eef34897e9cca03637a5dc1b87de46bbc))
+- Harness cat shows line numbers that are excluded from copy ([`4e45d98`](https://github.com/Vit129/kouen-terminal/commit/4e45d98003dee43b46257ece68421fd6c59b7fed))
+- Add Commit & Push to Sync menu ([`f965b9f`](https://github.com/Vit129/kouen-terminal/commit/f965b9f343c35e7365558a87f8071c516c9bdbbd))
 
 ### Documentation
-- Update agent-memory with RL-056/057/058 and CASE-039/040/041 ([`4b9eb22`](https://github.com/Vit129/kouen-terminal/commit/4b9eb2249a281bc05774e9ed819abdb317824216))
-- Strip global-duplicate sections from CLAUDE.md ([`7bb5578`](https://github.com/Vit129/kouen-terminal/commit/7bb55781617016e728b7cee146bc60932a121174))
-- Record memory-leak audit findings + onRetire fix pattern ([`8af2790`](https://github.com/Vit129/kouen-terminal/commit/8af27904ddc03dd7c803067db2729a11b81ecc25))
-- Add memory-leak-audit case study + update graphify for v3.9.4 ([`120acf3`](https://github.com/Vit129/kouen-terminal/commit/120acf3b20caf34ac8af9c2100a350aeba7b0eaa))
-- Bump version to v3.9.4 + note Commit & Push shortcut in README ([`5720d01`](https://github.com/Vit129/kouen-terminal/commit/5720d0149b940a41aa00ce75371104866d8a0d54))
-- Note long-session memory stability in README ([`53aefa9`](https://github.com/Vit129/kouen-terminal/commit/53aefa9b4667cbc28519c5349cc11c5ec3185229))
+- Update agent-memory with RL-056/057/058 and CASE-039/040/041 ([`eff8fc3`](https://github.com/Vit129/kouen-terminal/commit/eff8fc32ff383ddbf808431e21dab00d92e55322))
+- Strip global-duplicate sections from CLAUDE.md ([`c7e6254`](https://github.com/Vit129/kouen-terminal/commit/c7e6254518c639cc74c6426a73c3ee86996018e9))
+- Record memory-leak audit findings + onRetire fix pattern ([`d969198`](https://github.com/Vit129/kouen-terminal/commit/d9691988a1386c6a78538a359582c06bc2ccecc9))
+- Add memory-leak-audit case study + update graphify for v3.9.4 ([`6306ea2`](https://github.com/Vit129/kouen-terminal/commit/6306ea20e6b6e2cdb3b89dbdb29934a3dc6057cf))
+- Bump version to v3.9.4 + note Commit & Push shortcut in README ([`9326095`](https://github.com/Vit129/kouen-terminal/commit/93260951723bdd04e473f2723de7de488102285f))
+- Note long-session memory stability in README ([`ff24a14`](https://github.com/Vit129/kouen-terminal/commit/ff24a1426cd7450bd0e3c37955e3da039eb5c151))
 
 ### Fixed
-- Fix button hit-testing, sidebar toggle, and browser log freeze ([`aeadae9`](https://github.com/Vit129/kouen-terminal/commit/aeadae9d3f45c2e883ad202739d4599240112d25))
-- Remove adjustSubviews() calls that caused terminal blink regression ([`b55cc62`](https://github.com/Vit129/kouen-terminal/commit/b55cc6299c4241e70201d58efc782c4f051f60a2))
-- Browser cannot show in cmd+b and browser button ([`e530205`](https://github.com/Vit129/kouen-terminal/commit/e53020518bf1356cf2c1ac1ee84779c10d0735b8))
-- Browser pane reuse guidance and skill routing paths ([`9bd07a4`](https://github.com/Vit129/kouen-terminal/commit/9bd07a4afedd1f3380a384456d847b5ceb330b3c))
-- Replace graphify CLI trigger with graph-report skill ([`528c166`](https://github.com/Vit129/kouen-terminal/commit/528c1661a85d0dcf6bb08c35ed2b20b9d070229a))
-- Cmd+W closes browser pane (intercept before WKWebView consumes it) ([`02e49cd`](https://github.com/Vit129/kouen-terminal/commit/02e49cd553cf2172ea6e88ef0e29205ecb544d15))
-- Disarm prefix key on mouse click to prevent swallowing Cmd+\ ([`fd7a5f0`](https://github.com/Vit129/kouen-terminal/commit/fd7a5f075e7abf1dc1b2d69bd5638ba9ba72873d))
-- Prevent git panel double-refresh blink after commit/push ([`c9dc884`](https://github.com/Vit129/kouen-terminal/commit/c9dc884c487a3b89f2188566ca1afc4a20507ef4))
-- Prevent git push from hanging in daemon ([`1ddc27d`](https://github.com/Vit129/kouen-terminal/commit/1ddc27d31485e753a3182097e8f654329f755be4))
-- Release unclaimed TerminalHostViews after PaneContainerView build ([`0430ed8`](https://github.com/Vit129/kouen-terminal/commit/0430ed879698facf0720935029e6a18f3197b206))
-- Stop per-pane AI controllers and browser network log from leaking ([`e642997`](https://github.com/Vit129/kouen-terminal/commit/e64299781218c800fa52b220ad1e766d83e911d2))
-- Memory leak audit — pane lifecycle + AI controller cleanup ([`38fa427`](https://github.com/Vit129/kouen-terminal/commit/38fa4273c85187230dca073db3eff93b44597987))
-- Don't fail make install when open has no window server ([`9d7de27`](https://github.com/Vit129/kouen-terminal/commit/9d7de27a34b693d2a776695676af195800c81d7f))
-- Pin session worktree to shell cwd, not deepest foreground descendant ([`8ad328d`](https://github.com/Vit129/kouen-terminal/commit/8ad328d98c431cea72275fae931f82cbd0e6652e))
+- Fix button hit-testing, sidebar toggle, and browser log freeze ([`d95f142`](https://github.com/Vit129/kouen-terminal/commit/d95f142b21506b3e00d1ad73aa11ea0acd09298b))
+- Remove adjustSubviews() calls that caused terminal blink regression ([`62e41d7`](https://github.com/Vit129/kouen-terminal/commit/62e41d7fc3b26f073fe16efb1e2c36c3978627f1))
+- Browser cannot show in cmd+b and browser button ([`9c0809c`](https://github.com/Vit129/kouen-terminal/commit/9c0809c97e9bf37673657d52c3f88b7646f8f7a3))
+- Browser pane reuse guidance and skill routing paths ([`a928e89`](https://github.com/Vit129/kouen-terminal/commit/a928e894d459e8ac64176c186e0b2f87d640a2f9))
+- Replace graphify CLI trigger with graph-report skill ([`9d26a3d`](https://github.com/Vit129/kouen-terminal/commit/9d26a3db0391beb9545ac3a71bc08171b20b322a))
+- Cmd+W closes browser pane (intercept before WKWebView consumes it) ([`2d469a4`](https://github.com/Vit129/kouen-terminal/commit/2d469a40cfaddf61602aa84439831528fac9bd4d))
+- Disarm prefix key on mouse click to prevent swallowing Cmd+\ ([`e487ce3`](https://github.com/Vit129/kouen-terminal/commit/e487ce3749d094a100980d2088bfdb7f236af643))
+- Prevent git panel double-refresh blink after commit/push ([`a40f05f`](https://github.com/Vit129/kouen-terminal/commit/a40f05f3a426480ad01b63d695a2aabcafb4d647))
+- Prevent git push from hanging in daemon ([`d1150bd`](https://github.com/Vit129/kouen-terminal/commit/d1150bd2de47f175d7e94b3d6a761df78d839e9f))
+- Release unclaimed TerminalHostViews after PaneContainerView build ([`03b9da1`](https://github.com/Vit129/kouen-terminal/commit/03b9da15ec5a4489400a67938687801db7c9f7d0))
+- Stop per-pane AI controllers and browser network log from leaking ([`89f653e`](https://github.com/Vit129/kouen-terminal/commit/89f653e37969120c7e100e0808ff0f14a7ee0864))
+- Memory leak audit — pane lifecycle + AI controller cleanup ([`4ce9532`](https://github.com/Vit129/kouen-terminal/commit/4ce953287edc2acd0f23d57562a047079ef34260))
+- Don't fail make install when open has no window server ([`36c78c8`](https://github.com/Vit129/kouen-terminal/commit/36c78c8b29cfe54236029c8272cb357e2c15c173))
+- Pin session worktree to shell cwd, not deepest foreground descendant ([`84d83a7`](https://github.com/Vit129/kouen-terminal/commit/84d83a79ef7840722844549f920d25515382b693))
 
 ## [3.9.2] - 2026-06-22
 
 ### Documentation
-- CHANGELOG for v3.10.0 — terminal flash fix ([`0fc4fd9`](https://github.com/Vit129/kouen-terminal/commit/0fc4fd9585a0d5383969a87b84ca6ec613d20c3e))
+- CHANGELOG for v3.10.0 — terminal flash fix ([`4e00523`](https://github.com/Vit129/kouen-terminal/commit/4e005236100dc60af92cb95cadd9357e16a593c1))
 
 ### Fixed
-- Prevent hover flickering between shortcut and close button ([`f140efb`](https://github.com/Vit129/kouen-terminal/commit/f140efb94dfe414dbe33a85bb1ef8c70e939c587))
-- Terminal flicker on ⌘\ — remove layoutSubtreeIfNeeded, use split.layout() ([`bf96fd1`](https://github.com/Vit129/kouen-terminal/commit/bf96fd111f1ca418958c4921dc7f82a7043f14a6))
-- File preview open/close flicker — replace layoutSubtreeIfNeeded with layout() ([`ce0603f`](https://github.com/Vit129/kouen-terminal/commit/ce0603f7cf390e494f8b203aac357bc9e441123a))
-- Eliminate tab switch flash — cache PaneContainerView per tab, hide/show instead of rebuild ([`de39a37`](https://github.com/Vit129/kouen-terminal/commit/de39a37c8d5718ed2bce51b94969108291e3f762))
-- Eliminate terminal flash on sidebar, tab switch, split, and file preview ([`6dc94fe`](https://github.com/Vit129/kouen-terminal/commit/6dc94fe325ad45bd22a593e9cc02e4b8ac0a3ab7))
+- Prevent hover flickering between shortcut and close button ([`45df90e`](https://github.com/Vit129/kouen-terminal/commit/45df90e7766ce9c8e42e7d94e9e69dc560079fb1))
+- Terminal flicker on ⌘\ — remove layoutSubtreeIfNeeded, use split.layout() ([`7473da5`](https://github.com/Vit129/kouen-terminal/commit/7473da58c76bba102ce70f10fbd9c6fb7ed48de8))
+- File preview open/close flicker — replace layoutSubtreeIfNeeded with layout() ([`385a2e9`](https://github.com/Vit129/kouen-terminal/commit/385a2e96fab395e7cb5bd3d8720c88a169816d99))
+- Eliminate tab switch flash — cache PaneContainerView per tab, hide/show instead of rebuild ([`ec3a862`](https://github.com/Vit129/kouen-terminal/commit/ec3a862a6f56d5007dbba3e9925f78036bd713b7))
+- Eliminate terminal flash on sidebar, tab switch, split, and file preview ([`5b4785a`](https://github.com/Vit129/kouen-terminal/commit/5b4785ae8675a8b8585509165d9fac2e96ea384c))
 
 ## [3.9.1] - 2026-06-22
 
 ### Added
-- Sessions tab shows only idle worktrees (active ones already have sessions) ([`f5b78aa`](https://github.com/Vit129/kouen-terminal/commit/f5b78aab2ad9f9a1bf7154cc5fb1885fa4361c4c))
-- Worktrees collapsed by default in Sessions sidebar ([`b990f64`](https://github.com/Vit129/kouen-terminal/commit/b990f6412b41b7c03d9e75cd65c5c7842714e17a))
-- Enable Worktrees tab in Git panel (was hidden, code already existed) ([`8e55be6`](https://github.com/Vit129/kouen-terminal/commit/8e55be6c80ea0f1656ef752b3a558289aec6f9aa))
-- Git worktree panel — fix click conflict, add merged status indicator ([`78badf8`](https://github.com/Vit129/kouen-terminal/commit/78badf89c37e3b23ff3e12e142d8c3035ed274c9))
+- Sessions tab shows only idle worktrees (active ones already have sessions) ([`d5a992f`](https://github.com/Vit129/kouen-terminal/commit/d5a992f2fd046207733a991b1fe00cd5fc0c18b1))
+- Worktrees collapsed by default in Sessions sidebar ([`9ac7e2d`](https://github.com/Vit129/kouen-terminal/commit/9ac7e2dabd21683ef4db9c03911cc65a6674a07b))
+- Enable Worktrees tab in Git panel (was hidden, code already existed) ([`2d7b0a5`](https://github.com/Vit129/kouen-terminal/commit/2d7b0a580257778325e1c51469459c4d71fa52de))
+- Git worktree panel — fix click conflict, add merged status indicator ([`9e64f98`](https://github.com/Vit129/kouen-terminal/commit/9e64f9833ec6dcd207ab8abde951a8e999c3cbbb))
 
 ### Changed
-- Remove worktrees from Sessions sidebar — now lives in Git tab only ([`ffec772`](https://github.com/Vit129/kouen-terminal/commit/ffec7720fa5f50f896356d8f33d6463d5aa733f3))
+- Remove worktrees from Sessions sidebar — now lives in Git tab only ([`ed6e73f`](https://github.com/Vit129/kouen-terminal/commit/ed6e73f7c512cbd50d2c39b18ab7564ed4a97258))
 
 ### Documentation
-- Archive completed plans (P28, sidebar SwiftUI, core split) ([`3718eb0`](https://github.com/Vit129/kouen-terminal/commit/3718eb004249024cc36a68fe78c51a97549f5e5f))
-- Update plans INDEX — archive P26/P27, add SwiftUI migration as active ([`c009000`](https://github.com/Vit129/kouen-terminal/commit/c00900075578e17e1c63a816604e0bb9da92d052))
-- Add RL-052/053 lessons + sidebar SwiftUI knowledge (MainActor freeze, @Observable loop) ([`3e43b89`](https://github.com/Vit129/kouen-terminal/commit/3e43b893de559b60ae3ffe067775da4e88c867df))
+- Archive completed plans (P28, sidebar SwiftUI, core split) ([`ccf4224`](https://github.com/Vit129/kouen-terminal/commit/ccf4224b160f9462b20651a5d4dd32af83c1836f))
+- Update plans INDEX — archive P26/P27, add SwiftUI migration as active ([`9a13993`](https://github.com/Vit129/kouen-terminal/commit/9a13993bb1c2320dca570df46ccddca2b64c9398))
+- Add RL-052/053 lessons + sidebar SwiftUI knowledge (MainActor freeze, @Observable loop) ([`454d538`](https://github.com/Vit129/kouen-terminal/commit/454d53854c7f5e2fad422d79d8c04991087df04c))
 
 ### Fixed
-- Sidebar hang on z/cd — add re-entrancy guard to rebuildRows ([`36319f9`](https://github.com/Vit129/kouen-terminal/commit/36319f99ce8f506b162d3f7bf5da947ee7eb90ba))
-- Sidebar freeze on z/cd — move Process.waitUntilExit off main thread ([`0d2196a`](https://github.com/Vit129/kouen-terminal/commit/0d2196a07d7e9689b40712ed3d7415f1d206b15a))
-- Sidebar infinite re-render loop — @ObservationIgnored on gitMetadataCache ([`5587b02`](https://github.com/Vit129/kouen-terminal/commit/5587b02acfad03eb10deb5e0068ef058c6eb6e99))
-- Worktree remove button — double-click for cd, single-click for ✕ button ([`92456d5`](https://github.com/Vit129/kouen-terminal/commit/92456d50b7232027994f2695678f5f741d816641))
-- Worktree remove — confirmation alert, --force flag, proper error capture ([`fc60a68`](https://github.com/Vit129/kouen-terminal/commit/fc60a68d75a97ca67faeca1f38d7ce283ada4bfb))
-- Worktree single-click cd + skip click on ✕ button area ([`fcd9032`](https://github.com/Vit129/kouen-terminal/commit/fcd90328f8dd4fae90af5b626b2f7a35b14dbec5))
-- Worktree remove button — use SoftIconButton (same pattern as working browser tab close) ([`eb5e565`](https://github.com/Vit129/kouen-terminal/commit/eb5e5657d8ce49529380be8ceaa70e6bb9d00284))
-- Worktree card — use mouseUp pattern (same as BrowserTabButton) for reliable click handling ([`1e7d389`](https://github.com/Vit129/kouen-terminal/commit/1e7d3893c0c2464caf0402ef51b6f5b0670ceeb6))
-- Worktree panel flicker — cache output, skip rebuild if unchanged ([`333d352`](https://github.com/Vit129/kouen-terminal/commit/333d3520c76307f5c8f4fb6cc19115f4146cc363))
-- V3.9.1 — sidebar freeze fix, git worktree panel, click handling ([`74ae012`](https://github.com/Vit129/kouen-terminal/commit/74ae01214ecb9be26b20a60ace4d4b7d775415f2))
+- Sidebar hang on z/cd — add re-entrancy guard to rebuildRows ([`7fb5dec`](https://github.com/Vit129/kouen-terminal/commit/7fb5dec3f78f24212e7c9748048ccd0f61d0eec3))
+- Sidebar freeze on z/cd — move Process.waitUntilExit off main thread ([`ba61619`](https://github.com/Vit129/kouen-terminal/commit/ba61619fb0bcc3e6cac9430c646f5f557022628d))
+- Sidebar infinite re-render loop — @ObservationIgnored on gitMetadataCache ([`5f4db25`](https://github.com/Vit129/kouen-terminal/commit/5f4db254e49baa9a8bd0211becb3d202344aed70))
+- Worktree remove button — double-click for cd, single-click for ✕ button ([`004e503`](https://github.com/Vit129/kouen-terminal/commit/004e5036dc18be5f7398d654c25fdddb1d7ebc72))
+- Worktree remove — confirmation alert, --force flag, proper error capture ([`32b4ad2`](https://github.com/Vit129/kouen-terminal/commit/32b4ad201aabca4deaf5040373b5337e1955c1d4))
+- Worktree single-click cd + skip click on ✕ button area ([`c12c8d7`](https://github.com/Vit129/kouen-terminal/commit/c12c8d75f84b270f70ce154ea6d013464b0fd359))
+- Worktree remove button — use SoftIconButton (same pattern as working browser tab close) ([`1cecc2e`](https://github.com/Vit129/kouen-terminal/commit/1cecc2e21d732f0c3d55fd26113766fbcb23dbfc))
+- Worktree card — use mouseUp pattern (same as BrowserTabButton) for reliable click handling ([`950b7a1`](https://github.com/Vit129/kouen-terminal/commit/950b7a19cffbad2cd61e70acec183a464bd6f00d))
+- Worktree panel flicker — cache output, skip rebuild if unchanged ([`7524147`](https://github.com/Vit129/kouen-terminal/commit/752414707229d290fddf018181e6596b9342c14c))
+- V3.9.1 — sidebar freeze fix, git worktree panel, click handling ([`e741852`](https://github.com/Vit129/kouen-terminal/commit/e7418525d27214eac52ffedb5d90e28368bab528))
 
 ## [3.9.0] - 2026-06-22
 
 ### Added
-- Wire git-cliff into full-cycle.sh for auto CHANGELOG + release notes ([`a95f257`](https://github.com/Vit129/kouen-terminal/commit/a95f2570747460fc08c2b09bd98cda54e854655e))
-- Replace NSTableView with SwiftUI List (Option B) ([`72cf712`](https://github.com/Vit129/kouen-terminal/commit/72cf71253865fbb3cbbab4d96dad809de12cbce1))
+- Wire git-cliff into full-cycle.sh for auto CHANGELOG + release notes ([`02403c7`](https://github.com/Vit129/kouen-terminal/commit/02403c718af9bc8fb1ee214187a87bea5675e028))
+- Replace NSTableView with SwiftUI List (Option B) ([`d79cff3`](https://github.com/Vit129/kouen-terminal/commit/d79cff387c6fae7323b172646c56a5674891a66a))
 
 ### Changed
-- Extract HarnessCommands + HarnessSettings from HarnessCore ([`fdcbd58`](https://github.com/Vit129/kouen-terminal/commit/fdcbd58bd20c4a465dce030e5ee90a70c3e0a26f))
+- Extract HarnessCommands + HarnessSettings from HarnessCore ([`113f91e`](https://github.com/Vit129/kouen-terminal/commit/113f91e9e328d4ad0573923573e9adaa0b36c96a))
 
 ### Documentation
-- Update agent-memory with RL-051 (table row crash) + harness-mcp completion ([`1cc11b0`](https://github.com/Vit129/kouen-terminal/commit/1cc11b04491239ec968d6f1d74264bb26d7ee596))
-- Add sidebar race fix plan + update CONTEXT.md ([`9147e79`](https://github.com/Vit129/kouen-terminal/commit/9147e7912727c8ac2f837cda150cf589b36f7644))
-- Add sidebar SwiftUI List migration plan (Option B) ([`23965f4`](https://github.com/Vit129/kouen-terminal/commit/23965f49c1157d3c11664edaca0555317c0fbc33))
-- Update agent-memory indexes, regenerate graphify summary (post-migration) ([`dd26bde`](https://github.com/Vit129/kouen-terminal/commit/dd26bde979e1b58b4c39f662692e5387356a32e2))
-- Add SwiftUI migration plan (Phase 1/2/3 component map) ([`39a32e0`](https://github.com/Vit129/kouen-terminal/commit/39a32e040931cd14a1159b38d901de587838c520))
+- Update agent-memory with RL-051 (table row crash) + harness-mcp completion ([`03eb3cd`](https://github.com/Vit129/kouen-terminal/commit/03eb3cd387f8456c246a5280c415c8def9113384))
+- Add sidebar race fix plan + update CONTEXT.md ([`1786603`](https://github.com/Vit129/kouen-terminal/commit/1786603a549d7d49e848e992eb1b0f32cbcb9ad7))
+- Add sidebar SwiftUI List migration plan (Option B) ([`78ca923`](https://github.com/Vit129/kouen-terminal/commit/78ca9232b956fbc6d78c9c7cfb1cb8a3f675ca25))
+- Update agent-memory indexes, regenerate graphify summary (post-migration) ([`fbd324c`](https://github.com/Vit129/kouen-terminal/commit/fbd324c1c0cf1327a6b6cd3e1fb18c92a5ef0661))
+- Add SwiftUI migration plan (Phase 1/2/3 component map) ([`9cfc9bc`](https://github.com/Vit129/kouen-terminal/commit/9cfc9bc75609cfeed11c3a80f9d55022dc626984))
 
 ### Fixed
-- Sidebar crash on z/cd/⌘\ — reloadData before accessing table rows ([`e611e78`](https://github.com/Vit129/kouen-terminal/commit/e611e7886bbf7e0dfaa672fb3673bf4d813a8508))
+- Sidebar crash on z/cd/⌘\ — reloadData before accessing table rows ([`d9b583d`](https://github.com/Vit129/kouen-terminal/commit/d9b583deac514433f414e2080ae61787bc26a870))
 
 ## [3.8.0] - 2026-06-22
 
 ### Added
-- CLI infrastructure — permissions, skill-trigger hook, graphify hint ([`502e5ec`](https://github.com/Vit129/kouen-terminal/commit/502e5ecb08f46dce9b28766a5b87624a8bfbb9c3))
-- CLI infrastructure ([`4e2d43a`](https://github.com/Vit129/kouen-terminal/commit/4e2d43a5dcfa4393b7a6186b56b1806dc0145b99))
-- Finalize Git tab with auto-staging by default ([`377da37`](https://github.com/Vit129/kouen-terminal/commit/377da370e3c8f8d51a8471cdb3905a8e66a33211))
-- Route Git commands via IPC to HarnessDaemon ([`88a89f7`](https://github.com/Vit129/kouen-terminal/commit/88a89f742120dd2c3420c4b82de1fd48048f24ed))
-- Fix crashes + worktree isolation + harness-mcp browser tools complete ([`b8c26ea`](https://github.com/Vit129/kouen-terminal/commit/b8c26ea3666a200290f602f7fd626798a4a697da))
-- Add IPC protocol versioning to identifyClient handshake ([`a0bc5a0`](https://github.com/Vit129/kouen-terminal/commit/a0bc5a03f40ebec41781f6733e210e6cc788dbd6))
+- CLI infrastructure — permissions, skill-trigger hook, graphify hint ([`a37ec9a`](https://github.com/Vit129/kouen-terminal/commit/a37ec9ae5834bb7a432c61c321067e4d4493f0e7))
+- CLI infrastructure ([`2dc01fd`](https://github.com/Vit129/kouen-terminal/commit/2dc01fd03e2bdc96bbbeb3573bdce15a24d81d02))
+- Finalize Git tab with auto-staging by default ([`06d7c15`](https://github.com/Vit129/kouen-terminal/commit/06d7c15e5f805fda4b61a5dc163aca2620c86202))
+- Route Git commands via IPC to HarnessDaemon ([`36c1227`](https://github.com/Vit129/kouen-terminal/commit/36c1227d400d2b304c0c9ff1f97243ff4d4b8b5a))
+- Fix crashes + worktree isolation + harness-mcp browser tools complete ([`5180dc2`](https://github.com/Vit129/kouen-terminal/commit/5180dc2aba9fb6aaf09eca85c672c0ae80bb5589))
+- Add IPC protocol versioning to identifyClient handshake ([`6169aa7`](https://github.com/Vit129/kouen-terminal/commit/6169aa795455eb5666d5f0800556b45f2f6f2b3c))
 
 ### Changed
-- Decompose ContentAreaViewController into three focused coordinators ([`feaab9b`](https://github.com/Vit129/kouen-terminal/commit/feaab9b528a4892b13c711bbe3c5ee33c939129a))
-- Centralize zombie-hold pattern into ZombieHoldRegistry ([`3d09e11`](https://github.com/Vit129/kouen-terminal/commit/3d09e114ff8a14393d565d8efc8b112a8eeec5da))
-- Replace stringly-typed snapshotChanged userInfo with SnapshotChangedPayload ([`3302026`](https://github.com/Vit129/kouen-terminal/commit/3302026d8ace2891124da9a78db3fb8b733b7de2))
-- Harness-terminal ([`0faeab2`](https://github.com/Vit129/kouen-terminal/commit/0faeab285585b57f0558f767858990202093223f))
+- Decompose ContentAreaViewController into three focused coordinators ([`d76f740`](https://github.com/Vit129/kouen-terminal/commit/d76f74012c08984daaa10ae68e40a6fe981acf50))
+- Centralize zombie-hold pattern into ZombieHoldRegistry ([`d7d0097`](https://github.com/Vit129/kouen-terminal/commit/d7d0097e7c935dcfaee0d1190dd5689434edfaa8))
+- Replace stringly-typed snapshotChanged userInfo with SnapshotChangedPayload ([`b443a8a`](https://github.com/Vit129/kouen-terminal/commit/b443a8a1c08a62769ab8bc3b87b21acfb1c1f93c))
+- Harness-terminal ([`ddad262`](https://github.com/Vit129/kouen-terminal/commit/ddad26294fddb1b8bd932f1e5bb3e6e25ab03ef1))
 
 ### Documentation
-- CONTEXT.md — P28 complete (all 3 phases + RL-048) + CLI infrastructure ([`80c8f1f`](https://github.com/Vit129/kouen-terminal/commit/80c8f1f89fee121b9a3263d75cb39914e3450141))
-- CONTEXT.md P28 completion ([`0381090`](https://github.com/Vit129/kouen-terminal/commit/03810900e98ec1d48a137b83864307372f6760f9))
+- CONTEXT.md — P28 complete (all 3 phases + RL-048) + CLI infrastructure ([`bdc177b`](https://github.com/Vit129/kouen-terminal/commit/bdc177b1f0fbfd7a64c1acc5d747ca3e89dfbe1a))
+- CONTEXT.md P28 completion ([`a3dd120`](https://github.com/Vit129/kouen-terminal/commit/a3dd1201ffdcd8a39b5060b93779ba453f9ea70b))
 
 ### Fixed
-- Full-cycle push only new tag, not all tags — prevents rejection of existing tags ([`4f9b77f`](https://github.com/Vit129/kouen-terminal/commit/4f9b77f0d21ce9cf8cac2fa1f28ec996065b71c9))
-- Full-cycle tag push fix ([`2b44272`](https://github.com/Vit129/kouen-terminal/commit/2b44272c71c90412a5321a0fa6f36e7d3d76aeb1))
-- Warn + prompt when CHANGELOG entry missing before gh release ([`17dad96`](https://github.com/Vit129/kouen-terminal/commit/17dad961380206577d348074aa709acabd22ca6c))
-- Full-cycle CHANGELOG guard ([`cdbc56b`](https://github.com/Vit129/kouen-terminal/commit/cdbc56b17f4a80e317fdddbd39e53c95341e5d31))
-- Replace bash-only ${confirm,,} with tr for zsh compatibility ([`9fbe9bd`](https://github.com/Vit129/kouen-terminal/commit/9fbe9bde7945f2b02af56df436ae8f3b6d73db46))
+- Full-cycle push only new tag, not all tags — prevents rejection of existing tags ([`c9737f4`](https://github.com/Vit129/kouen-terminal/commit/c9737f4a62373922e8c9a8d43f65268fdf2222ef))
+- Full-cycle tag push fix ([`62da73b`](https://github.com/Vit129/kouen-terminal/commit/62da73b0596735b821c5498864ce2cfab6abef5f))
+- Warn + prompt when CHANGELOG entry missing before gh release ([`eca71cf`](https://github.com/Vit129/kouen-terminal/commit/eca71cfd1d687a99fca1a728514870c951a24e64))
+- Full-cycle CHANGELOG guard ([`0876d01`](https://github.com/Vit129/kouen-terminal/commit/0876d019ce777e88b81a13393c4bb3126385a663))
+- Replace bash-only ${confirm,,} with tr for zsh compatibility ([`9b25583`](https://github.com/Vit129/kouen-terminal/commit/9b2558304df255a4dcde49362e273a5960f9a09f))
 
 ## [3.7.0] - 2026-06-21
 
 ### Added
-- P28 AI browser control — snapshot/network/storage + round-trip fix ([`d28042f`](https://github.com/Vit129/kouen-terminal/commit/d28042f5ab0e924f7f2fca5e9ffa0f37ca3f8463))
+- P28 AI browser control — snapshot/network/storage + round-trip fix ([`eae5957`](https://github.com/Vit129/kouen-terminal/commit/eae5957caa232ab4d6b8a8dbb846627f41adbf70))
 
 ## [3.6.2] - 2026-06-21
 
 ### Added
-- Pane drag-and-drop — model, IPC, coordinator, UI ([`9321449`](https://github.com/Vit129/kouen-terminal/commit/9321449dca016fbc90c0e966f1749c5ea9cfab44))
-- Add MCP status and Add/Remove MCP button to agent list ([`5d3a0bb`](https://github.com/Vit129/kouen-terminal/commit/5d3a0bbd41945cbb701fae8789319a91f96593af))
-- Bundle harness-mcp in Harness.app and add harness-cli mcp command ([`34788e1`](https://github.com/Vit129/kouen-terminal/commit/34788e1ead840b34509c6268c280a0935f591b98))
-- Add ⌘I inline terminal AI chat (P26 Path B) ([`201f47d`](https://github.com/Vit129/kouen-terminal/commit/201f47d61501a242d8c03bf7007bf5d65e89b48f))
-- AI chat agent selector (⌘I pill click) + bump 3.6.1 build 162 ([`20895ea`](https://github.com/Vit129/kouen-terminal/commit/20895ea592a853f3750f73bbce643acd96233c6b))
+- Pane drag-and-drop — model, IPC, coordinator, UI ([`b0f542b`](https://github.com/Vit129/kouen-terminal/commit/b0f542bcdd50bea2ebe38909cc6946646784fda5))
+- Add MCP status and Add/Remove MCP button to agent list ([`a13eeef`](https://github.com/Vit129/kouen-terminal/commit/a13eeef3aa17c068b4313be87299c26511d27e7c))
+- Bundle harness-mcp in Harness.app and add harness-cli mcp command ([`50969b6`](https://github.com/Vit129/kouen-terminal/commit/50969b6b7b17e0bc95e215ab683240fb94bccf83))
+- Add ⌘I inline terminal AI chat (P26 Path B) ([`ece7cc8`](https://github.com/Vit129/kouen-terminal/commit/ece7cc8158989676bbb28b103c9aa7ba412ede52))
+- AI chat agent selector (⌘I pill click) + bump 3.6.1 build 162 ([`71ec856`](https://github.com/Vit129/kouen-terminal/commit/71ec856232c6c827bea55449762ca91685cb8c2c))
 
 ### Documentation
-- Update split shortcuts to ⌘D/⌘⇧D across all references ([`91cb040`](https://github.com/Vit129/kouen-terminal/commit/91cb040204c333df22800848f9a4a52b4820f096))
-- P27 plan — pane drag-and-drop reorder ([`8db5717`](https://github.com/Vit129/kouen-terminal/commit/8db5717bcce7a9f141bb17a150f2af1083f89b3d))
-- Correct P8 nonisolated rule, update MCP tool count, add P26 terminal chat design ([`1bd43b0`](https://github.com/Vit129/kouen-terminal/commit/1bd43b07cad23b44dfc64155358c81a7eb58dcdb))
-- Simplify terminal chat to use CLI print mode directly ([`635d0dc`](https://github.com/Vit129/kouen-terminal/commit/635d0dc96f5924f7f290e7345b033bf2dc0defd2))
-- Add MCP setup guide to AGENT-HANDBOOK + update P26 plan ([`acf3937`](https://github.com/Vit129/kouen-terminal/commit/acf3937b5b7aea6835361f250e078c999f72883d))
-- Update mcp-server.md — 27 tools, 6 categories, agent config wiring ([`cc80dc3`](https://github.com/Vit129/kouen-terminal/commit/cc80dc344bc68c830dc6633001d6887bc15b5bb1))
-- Fix last lowercase agent-memory ref in AGENTS.md ([`87ddeeb`](https://github.com/Vit129/kouen-terminal/commit/87ddeeb45fff5be01c37bf49d6c9b4c3fce10fde))
-- Update knowledge, CONTEXT, MEMORY, graphify for browser redesign session ([`76f0c97`](https://github.com/Vit129/kouen-terminal/commit/76f0c972eb89a485557bd6351146dbb18465f719))
-- Update competitive position to v3.6.1 — gaps closed, new USPs ([`be15d3a`](https://github.com/Vit129/kouen-terminal/commit/be15d3a6a2a2fefdb5d2699565abd8daf830aede))
-- Honest assessment — MCP and AI chat are partial, not fully functional yet ([`ab96468`](https://github.com/Vit129/kouen-terminal/commit/ab96468f2a19ea361dbab06e989e70e4a70b7017))
+- Update split shortcuts to ⌘D/⌘⇧D across all references ([`a427a02`](https://github.com/Vit129/kouen-terminal/commit/a427a029a6c6dd5181c833c614508582b8a43511))
+- P27 plan — pane drag-and-drop reorder ([`d7245f5`](https://github.com/Vit129/kouen-terminal/commit/d7245f5ddae4e92f6caec6d5a1a0c9e52e17a523))
+- Correct P8 nonisolated rule, update MCP tool count, add P26 terminal chat design ([`e665ddf`](https://github.com/Vit129/kouen-terminal/commit/e665ddfa572d5a133a9554a2ba904d0f28cdbd8e))
+- Simplify terminal chat to use CLI print mode directly ([`175b3b8`](https://github.com/Vit129/kouen-terminal/commit/175b3b8d1e80e696282ee99dfd0a6ad6d1e81216))
+- Add MCP setup guide to AGENT-HANDBOOK + update P26 plan ([`499c96c`](https://github.com/Vit129/kouen-terminal/commit/499c96c23fb77249a71306fb15376c17c847370f))
+- Update mcp-server.md — 27 tools, 6 categories, agent config wiring ([`3275de7`](https://github.com/Vit129/kouen-terminal/commit/3275de7e1472c9cc791f02eabd3ed46396dcf763))
+- Fix last lowercase agent-memory ref in AGENTS.md ([`4990fcc`](https://github.com/Vit129/kouen-terminal/commit/4990fcc0dc4001b8b132673b428c04f369ea9b30))
+- Update knowledge, CONTEXT, MEMORY, graphify for browser redesign session ([`9a1dc99`](https://github.com/Vit129/kouen-terminal/commit/9a1dc9978e6e27535faba0f699b95a9fe3490ea2))
+- Update competitive position to v3.6.1 — gaps closed, new USPs ([`bb80aaf`](https://github.com/Vit129/kouen-terminal/commit/bb80aaf60963d367c076be01d4cd0b5850d27270))
+- Honest assessment — MCP and AI chat are partial, not fully functional yet ([`2e780f2`](https://github.com/Vit129/kouen-terminal/commit/2e780f276c2a8e8c600d15b58cfaaffb108f30c0))
 
 ### Fixed
-- Terminal blinks on ⌘D split / ⌘W close / tab switch (CASE-025)\n\nThe pane rebuild path (reloadIfNeeded) didn't wrap the structural\nchange with presentsWithTransaction like the file editor split does.\nMetal presents an empty frame between remove-old-container and\nnew-container-first-layout. Fix: set presentsWithTransaction=true\nbefore rebuild, release in CATransaction completion block after\nthe first layout pass. ([`f7b1381`](https://github.com/Vit129/kouen-terminal/commit/f7b13811f60e104aafec0e8494c6e3c4322c3186))
-- Browser tab close button unclickable (CASE-038)\n\nNSClickGestureRecognizer on BrowserTabButton intercepts the close\nNSButton's mouse events even with delaysPrimaryMouseButtonEvents=false.\nFix: override hitTest to return closeBtn directly when the click is\nwithin its frame, bypassing the gesture recognizer entirely. ([`d08c668`](https://github.com/Vit129/kouen-terminal/commit/d08c668d84e27ce171c4077e20e69a9be1544a0a))
-- Window not showing on launch + remove built-in AI chat/search panels ([`ccfcc6a`](https://github.com/Vit129/kouen-terminal/commit/ccfcc6ae5b0dd8e4a78730c107c16cecc999ae9c))
-- Extend zombie-hold durations and plug event monitor leak ([`61d5ff6`](https://github.com/Vit129/kouen-terminal/commit/61d5ff63700abe11d64993ac1393fa186b57ef2c))
-- Crash on ⌘⇧Arrow split + hang on fetchRepoName ([`b706ed1`](https://github.com/Vit129/kouen-terminal/commit/b706ed10eaef519a57aaa47a049299fb9bfc99e3))
-- Wire notch notifications and split placement ([`0dbc69d`](https://github.com/Vit129/kouen-terminal/commit/0dbc69dd60c8338ee25bf0cc045c7f888b32bc9b))
-- Wire missing command prompt verbs (z, view, edit, agent, shell tools) ([`fe0a2ad`](https://github.com/Vit129/kouen-terminal/commit/fe0a2adbf2714fa05ed94a22bf0ccdd10e85f751))
-- Replace button with mouseDown drag grip for pane reorder ([`ce4bbc2`](https://github.com/Vit129/kouen-terminal/commit/ce4bbc26392366f050be2e13eb44e4048df1d06c))
-- Smoother drop zone + disable center swap for 2-pane layout ([`7a8aac3`](https://github.com/Vit129/kouen-terminal/commit/7a8aac3def0045df4a35d29fcf4c5d7528e0d67d))
-- Tab bar shows wrong branch when agent uses worktree ([`d98cf58`](https://github.com/Vit129/kouen-terminal/commit/d98cf58e51ebbc6aadb820daf9377f017995afd3))
-- Split pane inherits worktree path instead of repo root ([`d25d3f8`](https://github.com/Vit129/kouen-terminal/commit/d25d3f8fdfbfdb4501c5bd91192c224024140788))
-- Browser pane opens at root level (right of all terminals) ([`e258542`](https://github.com/Vit129/kouen-terminal/commit/e2585422cfbd6de726256f9025fe2d0a4efe72a7))
-- Widen pane/sidebar dividers from 1px to 2px (centralized) ([`7021fce`](https://github.com/Vit129/kouen-terminal/commit/7021fce1c0a39ecf143d62d1692840f13b6e79c1))
-- Browser pane auto-retries when localhost server disconnects ([`2a8dd99`](https://github.com/Vit129/kouen-terminal/commit/2a8dd99c12b35c9ab052f81c7da20464a8d22bb0))
-- Browser auto-close after 30s unreachable (10 retries × 3s) ([`00a1a69`](https://github.com/Vit129/kouen-terminal/commit/00a1a69e7ccd390cb81b711e117e2c6c6d2aa189))
-- Update release notes to 3.6.1 ([`701fe1d`](https://github.com/Vit129/kouen-terminal/commit/701fe1df8bdcf317781c8b0f72323d9f9f1d4970))
-- Install missing NSEvent monitor + retire-hold in detachHosts ([`b616164`](https://github.com/Vit129/kouen-terminal/commit/b616164be35b8bc8cadcc09cbd4e6df623363acd))
-- Universal retire-hold via removeFromSuperview override — covers all free paths ([`7d6f6fa`](https://github.com/Vit129/kouen-terminal/commit/7d6f6fae187c32cbd32339320776eee2ad981243))
-- Remove workaround section from kiro plan ([`70d6310`](https://github.com/Vit129/kouen-terminal/commit/70d6310e879a6b9de4cced1f19de30d750ee9ecd))
-- Browser toolbar URL field not expanding + translucent blur (CMUX-style) ([`df2fb60`](https://github.com/Vit129/kouen-terminal/commit/df2fb6078c00443764b48fcb8a5cbc060ebd42e4))
-- Browser tab bar translucent blur + always visible + close last tab closes pane ([`4b1c59f`](https://github.com/Vit129/kouen-terminal/commit/4b1c59f4e11bf6eb53d3d4826610fbccff17010c))
-- Browser tab close button hit target 14px→20px ([`7e38fea`](https://github.com/Vit129/kouen-terminal/commit/7e38feadee9b542357c077573c39e7f2f6af7fd3))
-- Close last browser tab calls closeBrowserPane directly + debug logs ([`5aea5b9`](https://github.com/Vit129/kouen-terminal/commit/5aea5b9b576085ecf94d7d0d6da7f71183bb4054))
-- Browser tab close — add mouseUp override, keep gesture as backup ([`1ac0a6e`](https://github.com/Vit129/kouen-terminal/commit/1ac0a6e99c2b14a9bde5d525d45f75b0b783db58))
-- Browser tab close — replace NSScrollView with plain NSView (scroll view eats mouse events) ([`83939be`](https://github.com/Vit129/kouen-terminal/commit/83939bed5250bedcf56f9702aee527053c6e8f0a))
-- Browser tab close button — use SoftIconButton (same as working close pane button) ([`2bf59cb`](https://github.com/Vit129/kouen-terminal/commit/2bf59cbb728f1a62cd14d3001d53c9c7b8e5490c))
-- Tab close — handle in mouseUp directly (button action never fires with isTransparent) ([`c68f9c2`](https://github.com/Vit129/kouen-terminal/commit/c68f9c27b780a3551d0ac2f8d39661769adf8d4f))
-- REMOVE gesture recognizer from BrowserTabButton — it consumed all clicks before mouseUp ([`32071eb`](https://github.com/Vit129/kouen-terminal/commit/32071ebc490842d0406525d69f5cbbf00dd56f1e))
-- Nonisolated on keyDown/keyUp/displayTick, retire-hold on TabBar+FlippedView ([`45c386e`](https://github.com/Vit129/kouen-terminal/commit/45c386e67edc1e47c3c4f5703e5bba578708c346))
+- Terminal blinks on ⌘D split / ⌘W close / tab switch (CASE-025)\n\nThe pane rebuild path (reloadIfNeeded) didn't wrap the structural\nchange with presentsWithTransaction like the file editor split does.\nMetal presents an empty frame between remove-old-container and\nnew-container-first-layout. Fix: set presentsWithTransaction=true\nbefore rebuild, release in CATransaction completion block after\nthe first layout pass. ([`ee51260`](https://github.com/Vit129/kouen-terminal/commit/ee5126077cb98c1522917b868667eeaf4bddce4c))
+- Browser tab close button unclickable (CASE-038)\n\nNSClickGestureRecognizer on BrowserTabButton intercepts the close\nNSButton's mouse events even with delaysPrimaryMouseButtonEvents=false.\nFix: override hitTest to return closeBtn directly when the click is\nwithin its frame, bypassing the gesture recognizer entirely. ([`846ce7d`](https://github.com/Vit129/kouen-terminal/commit/846ce7dd8a31f3acd8e8da74df5325da55288aa2))
+- Window not showing on launch + remove built-in AI chat/search panels ([`f3e45c7`](https://github.com/Vit129/kouen-terminal/commit/f3e45c72aa0c1a89b0de33b570be21a363fce745))
+- Extend zombie-hold durations and plug event monitor leak ([`d135321`](https://github.com/Vit129/kouen-terminal/commit/d1353212cbb3b8ea0fbd6decebaf13e4bdbf358f))
+- Crash on ⌘⇧Arrow split + hang on fetchRepoName ([`dac90a7`](https://github.com/Vit129/kouen-terminal/commit/dac90a703bec1cd09a71f94bcc8c58edc74658c2))
+- Wire notch notifications and split placement ([`cbb296a`](https://github.com/Vit129/kouen-terminal/commit/cbb296aa11583dd9808091ab13fecc959d82bfaf))
+- Wire missing command prompt verbs (z, view, edit, agent, shell tools) ([`d713a5e`](https://github.com/Vit129/kouen-terminal/commit/d713a5eb099310ff9906a9009b0d4419b87e0302))
+- Replace button with mouseDown drag grip for pane reorder ([`515a21b`](https://github.com/Vit129/kouen-terminal/commit/515a21bebf1f26e0ea31f5555fcc151cb90d3d84))
+- Smoother drop zone + disable center swap for 2-pane layout ([`16a0d6c`](https://github.com/Vit129/kouen-terminal/commit/16a0d6ccba36e995e6b5b7bf6db51b0f73877ea3))
+- Tab bar shows wrong branch when agent uses worktree ([`6883e8a`](https://github.com/Vit129/kouen-terminal/commit/6883e8a657bd6646f13d68ed8399264627ab04df))
+- Split pane inherits worktree path instead of repo root ([`94a231f`](https://github.com/Vit129/kouen-terminal/commit/94a231f8392b5668561fb106ded6b1cf087b2ff1))
+- Browser pane opens at root level (right of all terminals) ([`afe5c81`](https://github.com/Vit129/kouen-terminal/commit/afe5c817459b307997c21e4bacf6d972c3b5ba88))
+- Widen pane/sidebar dividers from 1px to 2px (centralized) ([`410fe01`](https://github.com/Vit129/kouen-terminal/commit/410fe01c8b7285f74f85d541f3fe9e8d270b864f))
+- Browser pane auto-retries when localhost server disconnects ([`bc6e7c7`](https://github.com/Vit129/kouen-terminal/commit/bc6e7c7cbf1765edf65a81082d6cd95e5299e946))
+- Browser auto-close after 30s unreachable (10 retries × 3s) ([`15694e0`](https://github.com/Vit129/kouen-terminal/commit/15694e0d7dde90be16271e33978c6dafbf471641))
+- Update release notes to 3.6.1 ([`618affd`](https://github.com/Vit129/kouen-terminal/commit/618affd9eea857061f1a6c70140687c1476b9053))
+- Install missing NSEvent monitor + retire-hold in detachHosts ([`95b9dd6`](https://github.com/Vit129/kouen-terminal/commit/95b9dd681fe588afbbc71fff902785f486c577fd))
+- Universal retire-hold via removeFromSuperview override — covers all free paths ([`4223f2d`](https://github.com/Vit129/kouen-terminal/commit/4223f2d9ffd4fb9573b47cb242bd8a36a36c4cdc))
+- Remove workaround section from kiro plan ([`2b79d0f`](https://github.com/Vit129/kouen-terminal/commit/2b79d0f6aca4ebbe7b43f584ba3e046b71afe77d))
+- Browser toolbar URL field not expanding + translucent blur (CMUX-style) ([`ecc64cb`](https://github.com/Vit129/kouen-terminal/commit/ecc64cb061fa4e8d934514a69251688bb60396ab))
+- Browser tab bar translucent blur + always visible + close last tab closes pane ([`16f26a9`](https://github.com/Vit129/kouen-terminal/commit/16f26a9de59a94658cfc0180346da04373d50c40))
+- Browser tab close button hit target 14px→20px ([`57ca130`](https://github.com/Vit129/kouen-terminal/commit/57ca130d726ce002e158fbc5c8bd1f1bfd5f5f0c))
+- Close last browser tab calls closeBrowserPane directly + debug logs ([`6f05a1d`](https://github.com/Vit129/kouen-terminal/commit/6f05a1d21f931f22a2ff2004ceae4ad335eca83a))
+- Browser tab close — add mouseUp override, keep gesture as backup ([`2a6c7f5`](https://github.com/Vit129/kouen-terminal/commit/2a6c7f524585e2836eb5b75d15ae59506b4db517))
+- Browser tab close — replace NSScrollView with plain NSView (scroll view eats mouse events) ([`6f0a731`](https://github.com/Vit129/kouen-terminal/commit/6f0a731f4288743990592cff792fbf4c6d607005))
+- Browser tab close button — use SoftIconButton (same as working close pane button) ([`ea77ece`](https://github.com/Vit129/kouen-terminal/commit/ea77ecef2a2a879a97da0b08768f474c868172ad))
+- Tab close — handle in mouseUp directly (button action never fires with isTransparent) ([`4311fd8`](https://github.com/Vit129/kouen-terminal/commit/4311fd88f7d629d0225bf43a303add8109f61549))
+- REMOVE gesture recognizer from BrowserTabButton — it consumed all clicks before mouseUp ([`12b077d`](https://github.com/Vit129/kouen-terminal/commit/12b077d364b34cc343dcc6fafe276fd538118fc0))
+- Nonisolated on keyDown/keyUp/displayTick, retire-hold on TabBar+FlippedView ([`850675a`](https://github.com/Vit129/kouen-terminal/commit/850675a6558e0535be225c6af64d24e0d4984b62))
 
 ## [3.5.1] - 2026-06-20
 
 ### Added
-- Implement 6 competitive-gap features vs Warp/iTerm2 ([`016bc9a`](https://github.com/Vit129/kouen-terminal/commit/016bc9ab645472365956c64d6ad76177642a4442))
-- Modernize browser pane + add harnessSpawnAgent MCP tool ([`d64fe89`](https://github.com/Vit129/kouen-terminal/commit/d64fe89d2b471652432a6a5b07ae842189a08d2a))
-- Metal shader overlay effects (scanlines, grain, vignette, crt) ([`a1f0520`](https://github.com/Vit129/kouen-terminal/commit/a1f05203eddde748cf99bf4faa626077861e4aac))
-- Wire shaderEffect from HarnessSettings and add inline AI completion (⌥Space) ([`ded8dfd`](https://github.com/Vit129/kouen-terminal/commit/ded8dfdda7f183b5b7b0ab421a9f976628dc891a))
-- AI chat, block terminal, plugins, settings export, browser modernization, MCP agent spawn, Metal shaders, inline AI completion ([`e5aad88`](https://github.com/Vit129/kouen-terminal/commit/e5aad888c73d1279d1a73c243bcba31d9d17b313))
-- P23 SSH remote host manager UI — Settings Remote page + window title strip ([`5377a73`](https://github.com/Vit129/kouen-terminal/commit/5377a73e50e3c7fae730cbe51c71b75e16a1c19d))
+- Implement 6 competitive-gap features vs Warp/iTerm2 ([`3396ea8`](https://github.com/Vit129/kouen-terminal/commit/3396ea8e21460de68110d8df13868dc4edf688b1))
+- Modernize browser pane + add harnessSpawnAgent MCP tool ([`3e4467a`](https://github.com/Vit129/kouen-terminal/commit/3e4467ad8ad130531219b31e553a3e46ece8fc4b))
+- Metal shader overlay effects (scanlines, grain, vignette, crt) ([`6469cd4`](https://github.com/Vit129/kouen-terminal/commit/6469cd42054ad1f19ed4f2fe018200204e35f0e7))
+- Wire shaderEffect from HarnessSettings and add inline AI completion (⌥Space) ([`b46fa04`](https://github.com/Vit129/kouen-terminal/commit/b46fa04af4f20189fb5a909104231271307302fc))
+- AI chat, block terminal, plugins, settings export, browser modernization, MCP agent spawn, Metal shaders, inline AI completion ([`4a61bec`](https://github.com/Vit129/kouen-terminal/commit/4a61beceea78e5f80c2c1448b0beb4016a511a84))
+- P23 SSH remote host manager UI — Settings Remote page + window title strip ([`11ce93d`](https://github.com/Vit129/kouen-terminal/commit/11ce93d2d2f3b148556354ddf9fedc8e397e9c4a))
 
 ### Documentation
-- Update P4/ACP/MCP index, archive, and competitive position ([`3c23f8a`](https://github.com/Vit129/kouen-terminal/commit/3c23f8a0bc5f82236bcb95323c79c1fddaa1658e))
+- Update P4/ACP/MCP index, archive, and competitive position ([`9a38819`](https://github.com/Vit129/kouen-terminal/commit/9a3881945676d63a881da407787e27d9af9cc0d0))
 
 ### Fixed
-- RL-040 zombie crashes + tab branch probe + sidebar height + notification icon ([`8c55757`](https://github.com/Vit129/kouen-terminal/commit/8c55757aa676e0fbb31bddde45a369a55e5e6475))
-- CWD tracking — skip shell-only poll when subprocess holds foreground ([`f60542a`](https://github.com/Vit129/kouen-terminal/commit/f60542ad3582806ce0f7c70decba2a59e927e9f4))
-- Resolve 6 RL-040 zombie crashes on macOS 26 / Swift 6.3.2\n\nAll crashes share the same root cause: @objc thunk executor check\n(swift_task_isCurrentExecutorWithFlagsImpl) dereferences freed self.\n`nonisolated` does NOT suppress this on Swift 6.3.2.\n\nFixes:\n- HarnessTerminalSurfaceView: stopDisplayLink() in viewWillMove(toWindow:nil)\n- TerminalTabBarView: static retiredBars[] retire-hold (500ms)\n- HarnessWindow: static retiredWindows[] on close() + early contentView guard\n- PrefixKeymap: nonisolated(unsafe) capture bypasses executor check\n\nAlso fixes pre-existing Sendable compile errors in ClaudeDirectClient,\nInlineAICompletionController, and HarnessAIChatView. ([`80c49fb`](https://github.com/Vit129/kouen-terminal/commit/80c49fbf30d3997b24b6e043ec965f644e1b489c))
-- Resolve 14 bugs in Remote settings, WindowTitleStripView, RemoteHostsService\n\n- hitTest() now passes through to child NSButtons (remoteBadge clickable)\n- saveRemoteHostClicked: duplicate-name guard + reconnect on rename of active host\n- connectRemoteHostClicked: no longer overwrites saved config for existing hosts\n- sshArgValue(after:) supports glued arg form (-p2222)\n- Connect button enabled for new unsaved hosts when form is filled\n- Settings VC observes activeHostDidChange (replaces stale 0.5s timer)\n- Remove ambiguous 'identity' keyword from Advanced page search\n- Guard constraint activation in buildRemotePage (no accumulation)\n- disconnect() only posts notification when state actually changed\n- Replace magic index 6 with SettingsWindowController.pageRemote constant\n- uniqueRemoteName() reads live store instead of stale in-memory list\n- Remove redundant refreshRemoteBadge() from applyChrome()\n- Remove dead initial build of pages 5/6 in layoutShell() ([`da3a2b4`](https://github.com/Vit129/kouen-terminal/commit/da3a2b436fdd510eb8486f5511acfa5a5c5d6f00))
-- RL-040 crash in ContentAreaViewController.installCopySelectionToast()\n\nSame pattern: @Sendable closure's _checkExpectedExecutor crashes on\nzombie event chain. Use nonisolated(unsafe) capture to bypass the\nexecutor check (safe: NSEvent monitors always fire on main thread). ([`9d2b547`](https://github.com/Vit129/kouen-terminal/commit/9d2b547b042232ae7b203281cac26184b75025e8))
-- Notification attributed to Script Editor instead of Harness\n\nOn macOS 26 where UNUserNotificationCenter is disabled (crash),\n`tell application id \"com.robert.harness\"` via osascript doesn't\nattribute the notification to our app (shows under Script Editor\nin System Settings). Switch to `tell application \"Harness\"` (by\nname) which macOS resolves correctly. ([`7b8cdd3`](https://github.com/Vit129/kouen-terminal/commit/7b8cdd36b60564f1b774522a2e985ff1daa920fb))
+- RL-040 zombie crashes + tab branch probe + sidebar height + notification icon ([`1116700`](https://github.com/Vit129/kouen-terminal/commit/11167001f13ce0fc4e77a2618e2166c34b7778f5))
+- CWD tracking — skip shell-only poll when subprocess holds foreground ([`4ee334b`](https://github.com/Vit129/kouen-terminal/commit/4ee334b8fc326d59e2e78faf59af64b754a2b731))
+- Resolve 6 RL-040 zombie crashes on macOS 26 / Swift 6.3.2\n\nAll crashes share the same root cause: @objc thunk executor check\n(swift_task_isCurrentExecutorWithFlagsImpl) dereferences freed self.\n`nonisolated` does NOT suppress this on Swift 6.3.2.\n\nFixes:\n- HarnessTerminalSurfaceView: stopDisplayLink() in viewWillMove(toWindow:nil)\n- TerminalTabBarView: static retiredBars[] retire-hold (500ms)\n- HarnessWindow: static retiredWindows[] on close() + early contentView guard\n- PrefixKeymap: nonisolated(unsafe) capture bypasses executor check\n\nAlso fixes pre-existing Sendable compile errors in ClaudeDirectClient,\nInlineAICompletionController, and HarnessAIChatView. ([`afe64c4`](https://github.com/Vit129/kouen-terminal/commit/afe64c4048b381ee077c5468bf2e30e4bfb4d985))
+- Resolve 14 bugs in Remote settings, WindowTitleStripView, RemoteHostsService\n\n- hitTest() now passes through to child NSButtons (remoteBadge clickable)\n- saveRemoteHostClicked: duplicate-name guard + reconnect on rename of active host\n- connectRemoteHostClicked: no longer overwrites saved config for existing hosts\n- sshArgValue(after:) supports glued arg form (-p2222)\n- Connect button enabled for new unsaved hosts when form is filled\n- Settings VC observes activeHostDidChange (replaces stale 0.5s timer)\n- Remove ambiguous 'identity' keyword from Advanced page search\n- Guard constraint activation in buildRemotePage (no accumulation)\n- disconnect() only posts notification when state actually changed\n- Replace magic index 6 with SettingsWindowController.pageRemote constant\n- uniqueRemoteName() reads live store instead of stale in-memory list\n- Remove redundant refreshRemoteBadge() from applyChrome()\n- Remove dead initial build of pages 5/6 in layoutShell() ([`2f41921`](https://github.com/Vit129/kouen-terminal/commit/2f4192168f6d4bd8b780e8be40a2dadf4e2b823e))
+- RL-040 crash in ContentAreaViewController.installCopySelectionToast()\n\nSame pattern: @Sendable closure's _checkExpectedExecutor crashes on\nzombie event chain. Use nonisolated(unsafe) capture to bypass the\nexecutor check (safe: NSEvent monitors always fire on main thread). ([`477831e`](https://github.com/Vit129/kouen-terminal/commit/477831eb2f80a949def04f7d10ac57453c9c7e42))
+- Notification attributed to Script Editor instead of Harness\n\nOn macOS 26 where UNUserNotificationCenter is disabled (crash),\n`tell application id \"com.robert.harness\"` via osascript doesn't\nattribute the notification to our app (shows under Script Editor\nin System Settings). Switch to `tell application \"Harness\"` (by\nname) which macOS resolves correctly. ([`899dbd8`](https://github.com/Vit129/kouen-terminal/commit/899dbd8bbba87cff78c978a236be4a0654f337d7))
 
 ## [3.5.0] - 2026-06-20
 
 ### Added
-- Sidebar 2-line layout (branch + cwd) + top bar always shows branch ([`d104eeb`](https://github.com/Vit129/kouen-terminal/commit/d104eeb99adda79d9c275c37b730a5e02a98eca8))
-- ⌘I opens Agent Notch panel — select notifying agent directly ([`804b876`](https://github.com/Vit129/kouen-terminal/commit/804b87647423171170ba9c3602a276d7a474f8bc))
-- Persistent notch peek — stays until user clicks, no auto-dismiss ([`0b03021`](https://github.com/Vit129/kouen-terminal/commit/0b0302196fd937c1dbc3bae896d6ab8e716a43fb))
-- Harness-cli install-tools — one command to install all shell tools ([`340fc4e`](https://github.com/Vit129/kouen-terminal/commit/340fc4ee224f27eb071f852e14d6dfe61708e4b4))
-- File click action setting + tab pill branch-first + worktree grouping fix ([`c1543e9`](https://github.com/Vit129/kouen-terminal/commit/c1543e9b2fa84a71ede3e7f5254e2784463c37ae))
+- Sidebar 2-line layout (branch + cwd) + top bar always shows branch ([`860458e`](https://github.com/Vit129/kouen-terminal/commit/860458e653021241f81d29b19762c173f47567a6))
+- ⌘I opens Agent Notch panel — select notifying agent directly ([`a827c25`](https://github.com/Vit129/kouen-terminal/commit/a827c2593b9a43c2d93dc6728260dabdb6711006))
+- Persistent notch peek — stays until user clicks, no auto-dismiss ([`66f6646`](https://github.com/Vit129/kouen-terminal/commit/66f66467c6eaae3a30ea452de80d81566cdf99e3))
+- Harness-cli install-tools — one command to install all shell tools ([`1036df8`](https://github.com/Vit129/kouen-terminal/commit/1036df8e9eded025bfdb7b0f074e340555414da1))
+- File click action setting + tab pill branch-first + worktree grouping fix ([`fcf9c3e`](https://github.com/Vit129/kouen-terminal/commit/fcf9c3e699816dcc91bfec5a97c40682ef4cb18b))
 
 ### Documentation
-- Add sidebar 2-line + top bar branch to knowledge/ui/tab-bar.md ([`51faac6`](https://github.com/Vit129/kouen-terminal/commit/51faac619d36e0986b512990ab2e32194157080e))
-- Add P25 iOS/iPadOS support plan ([`b9b4559`](https://github.com/Vit129/kouen-terminal/commit/b9b45591b06282b6a50c0965aed2966d4d618cca))
-- Add competitive position, git branch isolation to knowledge ([`5c9eace`](https://github.com/Vit129/kouen-terminal/commit/5c9eace60b6cb7993af007f526825eac3f9fc1bc))
+- Add sidebar 2-line + top bar branch to knowledge/ui/tab-bar.md ([`0b071c6`](https://github.com/Vit129/kouen-terminal/commit/0b071c684287b854f19d86fd6ebcb5897a1d125d))
+- Add P25 iOS/iPadOS support plan ([`33c98e9`](https://github.com/Vit129/kouen-terminal/commit/33c98e964abd1f4cab2c37aa9ef486eae9ca71ea))
+- Add competitive position, git branch isolation to knowledge ([`1a7d335`](https://github.com/Vit129/kouen-terminal/commit/1a7d335e4c76bc79b1c6c3a72803844d83c62ad2))
 
 ### Fixed
-- Enable macOS toast notifications via osascript fallback ([`7d18722`](https://github.com/Vit129/kouen-terminal/commit/7d18722e016082b5e018f80aeb1169a8db37ca39))
-- Always auto-isolate into worktree on branch switch ([`63a5278`](https://github.com/Vit129/kouen-terminal/commit/63a52788641d0c4e9ff205cc182164869a6b278b))
+- Enable macOS toast notifications via osascript fallback ([`8470736`](https://github.com/Vit129/kouen-terminal/commit/8470736e26ac09c289fddc8d74fadc40ea441330))
+- Always auto-isolate into worktree on branch switch ([`d2c5c23`](https://github.com/Vit129/kouen-terminal/commit/d2c5c23e10e96aaff9d1ddeff59ef306a076cf90))
 
 ## [3.4.0] - 2026-06-19
 
 ### Added
-- F4 git worktree sidebar + F6 session row density ([`1ef8b28`](https://github.com/Vit129/kouen-terminal/commit/1ef8b28b8737a40ff59b06e66565379924fac01d))
-- Harness.json + agent auto-start + ⌘R/⌘. run scripts ([`fa5cc73`](https://github.com/Vit129/kouen-terminal/commit/fa5cc73143bb8c9a6914ba84815721e2be22d50e))
-- Worktree-per-session model — group by repo, CLI --worktree ([`0f62a4c`](https://github.com/Vit129/kouen-terminal/commit/0f62a4cbfc3a0960ba5073550ced6f5894f1997f))
-- Worktree-per-session isolation model ([`0ed9030`](https://github.com/Vit129/kouen-terminal/commit/0ed9030a4ff74ce411edaeee70c9f1ecf96057ff))
-- P24 Phase 3 — GitHub PR/CI integration + browser multi-tab ([`86f99cf`](https://github.com/Vit129/kouen-terminal/commit/86f99cf17f90ab16f4a89b00b44b7f9b9c7355ba))
-- Enable LSP integration in FileViewerViewController preview ([`cf40de5`](https://github.com/Vit129/kouen-terminal/commit/cf40de58243b27425236b5d676ae780487196e6f))
-- P24 Phase 2+4 complete — worktree auto-isolate/archive + polish ([`944b2be`](https://github.com/Vit129/kouen-terminal/commit/944b2bec47a7ebf5f6ec8f885bf6795b9e1e12f0))
+- F4 git worktree sidebar + F6 session row density ([`c55e92c`](https://github.com/Vit129/kouen-terminal/commit/c55e92c007cec04faabea767b13691b87cb004b2))
+- Harness.json + agent auto-start + ⌘R/⌘. run scripts ([`6a71479`](https://github.com/Vit129/kouen-terminal/commit/6a714799f62bcbfbb8bad2b30f698ea22606128a))
+- Worktree-per-session model — group by repo, CLI --worktree ([`adcdb20`](https://github.com/Vit129/kouen-terminal/commit/adcdb202c3497451b5e2f22a47b6f464c4249657))
+- Worktree-per-session isolation model ([`cd2b5e8`](https://github.com/Vit129/kouen-terminal/commit/cd2b5e83cdf83aac57b18655239da75352c318a9))
+- P24 Phase 3 — GitHub PR/CI integration + browser multi-tab ([`09dd0bf`](https://github.com/Vit129/kouen-terminal/commit/09dd0bf50701993a2324bcfc992111c6e77aefb5))
+- Enable LSP integration in FileViewerViewController preview ([`7930a78`](https://github.com/Vit129/kouen-terminal/commit/7930a78285524d5c6b68347d638e31e8a4012017))
+- P24 Phase 2+4 complete — worktree auto-isolate/archive + polish ([`38d123a`](https://github.com/Vit129/kouen-terminal/commit/38d123aca96f6127728deb0bedc881c3801f0ff7))
 
 ### Documentation
-- Update agent-memory, knowledge index, graphify for P24 completion ([`641530c`](https://github.com/Vit129/kouen-terminal/commit/641530c8afa14e2116ed81c7c41e3d7ad3a9bd06))
+- Update agent-memory, knowledge index, graphify for P24 completion ([`062472b`](https://github.com/Vit129/kouen-terminal/commit/062472bb77e42b84eb0e84d9891849e6a238925f))
 
 ### Fixed
-- Prevent self-kill in make start + remove close confirmations ([`8dca1b6`](https://github.com/Vit129/kouen-terminal/commit/8dca1b65fec00ad9b4ba55a0312d8f686ed2e3cf))
-- Improve text contrast visibility with transparent windows ([`fe39de7`](https://github.com/Vit129/kouen-terminal/commit/fe39de70aeb93d296d20afbadba7ce65b0a1a0e1))
-- RL-040 zombie surface view use-after-free on macOS 26.5\n\n- Add `guard window != nil` to mouseMoved (matches keyDown/keyUp)\n- Hold detached hosts 500ms during pane tree rebuild so in-flight\n  AppKit events (tracking area mouseMoved, queued keyDown) drain\n  before ARC frees unreused hosts\n\nAddresses EXC_BAD_ACCESS in swift_task_isCurrentExecutorWithFlagsImpl\nat @objc thunk boundary when AppKit dispatches events to freed\nHarnessTerminalSurfaceView instances. ([`c09618d`](https://github.com/Vit129/kouen-terminal/commit/c09618deb009e237cee4be0a322c46342d8f1ed0))
-- Restore active pane focus on tab switch back ([`6004f7f`](https://github.com/Vit129/kouen-terminal/commit/6004f7ff761644eb32542d9b4a182c1e1d2863c8))
-- Sidebar agent icon uses branding color instead of status color ([`e9e8c48`](https://github.com/Vit129/kouen-terminal/commit/e9e8c48ecfb4c25814488bac694b350d4f8a5a8e))
-- Sidebar agent icon uses centralized settings color (same as tab pill) ([`44ad734`](https://github.com/Vit129/kouen-terminal/commit/44ad73475f2bb91ad7f6334aad2de443df0c6415))
-- Git branch probe now updates all tabs sharing same cwd ([`79af190`](https://github.com/Vit129/kouen-terminal/commit/79af190ef85d755e975bd1680953b6f6a1313ba9))
-- Invalidate NSTextInputContext on view removal (RL-040) ([`228c9a6`](https://github.com/Vit129/kouen-terminal/commit/228c9a6d4023bcedf4a2d594b3b52b374d458c50))
-- Prevent zombie view crashes on macOS 26 / Swift 6.3 ([`df98148`](https://github.com/Vit129/kouen-terminal/commit/df98148562325392ad94a3d8b80b670e79b6ba8b))
-- Suppress selectPane feedback during session switch ([`061ecb3`](https://github.com/Vit129/kouen-terminal/commit/061ecb31bb7818b6d0d720ca9ea04a0335d76dc9))
-- Retain removed FileTreeNodes across render cycle ([`295bf1d`](https://github.com/Vit129/kouen-terminal/commit/295bf1dc1eeb4cdb5b13575efc7d13a301cd0791))
-- Detect relative file paths not starting with / ~ or . ([`55e1df9`](https://github.com/Vit129/kouen-terminal/commit/55e1df9fb8d006eb3488e0710d905487d4a81852))
+- Prevent self-kill in make start + remove close confirmations ([`2f09750`](https://github.com/Vit129/kouen-terminal/commit/2f0975058565d9f1dc91f993f182959afd73d91f))
+- Improve text contrast visibility with transparent windows ([`3ec0705`](https://github.com/Vit129/kouen-terminal/commit/3ec07051399a110e7094da3eb587ee4af7688e88))
+- RL-040 zombie surface view use-after-free on macOS 26.5\n\n- Add `guard window != nil` to mouseMoved (matches keyDown/keyUp)\n- Hold detached hosts 500ms during pane tree rebuild so in-flight\n  AppKit events (tracking area mouseMoved, queued keyDown) drain\n  before ARC frees unreused hosts\n\nAddresses EXC_BAD_ACCESS in swift_task_isCurrentExecutorWithFlagsImpl\nat @objc thunk boundary when AppKit dispatches events to freed\nHarnessTerminalSurfaceView instances. ([`8ecac6b`](https://github.com/Vit129/kouen-terminal/commit/8ecac6bd660eb45004597dad0641d469cb4ff026))
+- Restore active pane focus on tab switch back ([`09bf4f3`](https://github.com/Vit129/kouen-terminal/commit/09bf4f3fb3c8569e0de87bb889325f7da0634cb9))
+- Sidebar agent icon uses branding color instead of status color ([`1dc0bb1`](https://github.com/Vit129/kouen-terminal/commit/1dc0bb15e33053318f130e215640d59af3e9c4e5))
+- Sidebar agent icon uses centralized settings color (same as tab pill) ([`5476f83`](https://github.com/Vit129/kouen-terminal/commit/5476f83a8c6f4d9305fd8cb88e108500d7e7ecb0))
+- Git branch probe now updates all tabs sharing same cwd ([`ea804a9`](https://github.com/Vit129/kouen-terminal/commit/ea804a9aa27119e9952eebcb93bf434371a218ad))
+- Invalidate NSTextInputContext on view removal (RL-040) ([`08f7103`](https://github.com/Vit129/kouen-terminal/commit/08f710313899303225507a07bd4bfac068121cdb))
+- Prevent zombie view crashes on macOS 26 / Swift 6.3 ([`f1193e6`](https://github.com/Vit129/kouen-terminal/commit/f1193e611d5cdf40629090b1caa668c2b7b0f3ca))
+- Suppress selectPane feedback during session switch ([`42ce563`](https://github.com/Vit129/kouen-terminal/commit/42ce563ffd16d8c1b98aac4d8b019b377bb8907c))
+- Retain removed FileTreeNodes across render cycle ([`a92072d`](https://github.com/Vit129/kouen-terminal/commit/a92072d35b967c8de9cc4447f60eab9de4eea92d))
+- Detect relative file paths not starting with / ~ or . ([`1397d52`](https://github.com/Vit129/kouen-terminal/commit/1397d52906a02985b54132e8084932ca80bcfe4f))
 
 ## [3.3.0] - 2026-06-18
 
 ### Added
-- Output triggers + notch peek when active ([`a9822a8`](https://github.com/Vit129/kouen-terminal/commit/a9822a8409b887a32c76bb30dcb1add4d43b8003))
-- Graphify auto-load via GRAPH_SUMMARY.md ([`5885bf3`](https://github.com/Vit129/kouen-terminal/commit/5885bf35d520093ffd749a5077925791fcf53cb4))
-- Liquid Glass adaptive transparency (macOS 26+) ([`a1d73af`](https://github.com/Vit129/kouen-terminal/commit/a1d73af6e1b6fac2d3d457b9ce736e2a330e911b))
-- Add loading state + success/error toast to Fetch/Pull/Push ([`1f30714`](https://github.com/Vit129/kouen-terminal/commit/1f30714d768fe09631a7cc59704483a0dab3369f))
-- Sync button shows ahead/behind count (Push ↑2, Pull ↓1) ([`4e4267a`](https://github.com/Vit129/kouen-terminal/commit/4e4267a23597f165d2892259707065fe598a9158))
-- Keybinding single source of truth, IDE-like navigation, cheat sheet ([`cf1ae5b`](https://github.com/Vit129/kouen-terminal/commit/cf1ae5ba57239953389167cfadc50dce1ae6981d))
-- Full-cycle now auto-tags + creates GitHub release ([`5507738`](https://github.com/Vit129/kouen-terminal/commit/55077382713622ccd81355c6e7c2019f25dcf845))
+- Output triggers + notch peek when active ([`3f872c2`](https://github.com/Vit129/kouen-terminal/commit/3f872c2610e3bae04483aed096c562f32d7fabf4))
+- Graphify auto-load via GRAPH_SUMMARY.md ([`2247709`](https://github.com/Vit129/kouen-terminal/commit/2247709a9c89239a2c6eabf6ac5d34622c858f8a))
+- Liquid Glass adaptive transparency (macOS 26+) ([`06bdd6b`](https://github.com/Vit129/kouen-terminal/commit/06bdd6b9d6d9f66c5b73f5f2ecb284dc6a6bd467))
+- Add loading state + success/error toast to Fetch/Pull/Push ([`4d021fb`](https://github.com/Vit129/kouen-terminal/commit/4d021fb9e8458cdff8364665b5338495034259ab))
+- Sync button shows ahead/behind count (Push ↑2, Pull ↓1) ([`f206d75`](https://github.com/Vit129/kouen-terminal/commit/f206d7556d5f8fdf6aac088b53e7dd54a700938b))
+- Keybinding single source of truth, IDE-like navigation, cheat sheet ([`9ea5078`](https://github.com/Vit129/kouen-terminal/commit/9ea5078194fea531f12ee643a40fb0760902b979))
+- Full-cycle now auto-tags + creates GitHub release ([`a02fa1d`](https://github.com/Vit129/kouen-terminal/commit/a02fa1ddf03e81d4f4a0d6813dfa4ec4c996b0dc))
 
 ### Changed
-- Scrollback streaming compaction + renderer micro-batch optimizations ([`a5a10ad`](https://github.com/Vit129/kouen-terminal/commit/a5a10ad8d5ba7c844e1aa2639338031907fed0f5))
-- SalvageRowKeys memo + off-main output coalesce; feat: file tree reveal ([`36ab4a9`](https://github.com/Vit129/kouen-terminal/commit/36ab4a91321aec28829999b6ed4eabdf7caabf05))
-- Remove GRAPH_SUMMARY auto-load, use graphify-mcp instead ([`49bbb12`](https://github.com/Vit129/kouen-terminal/commit/49bbb1209152294889b48742316b910862f2da1f))
-- Unify make start as single entry point, remove s1-s4 aliases ([`042e98a`](https://github.com/Vit129/kouen-terminal/commit/042e98add3ef08944853e9db4cf757257a3b6084))
-- Skip BoardViewController rebuild when columns unchanged (fixes NSTextField leak) ([`2d3a577`](https://github.com/Vit129/kouen-terminal/commit/2d3a577889e5d3a234adf83883a564157dc2214f))
-- Unify pane/session shortcuts to ⌘/⌘⇧ only\n\n- ⌘[/⌘] now cycles panes (was session navigation)\n- ⌘⇧[/⌘⇧] now navigates sessions (was ⌘[/⌘])\n- ⌘W closes pane (was ⌘⌥W), ⌘⇧W closes tab (was ⌘W)\n- ⌘⇧Arrow for directional pane focus (was ⌘⌥Arrow)\n- Fix: ⌘⌥Arrow no longer intercepted by readline handler\n- Matches iTerm2/Ghostty/Warp convention: ⌘=pane, ⌘⇧=tab/session ([`f7d4619`](https://github.com/Vit129/kouen-terminal/commit/f7d4619925c575ada623ed4bd8117ef66a4d3cf7))
-- Extract BannerShortcutRegistry as single source of truth\n\nWelcome banner shortcuts now read from BannerShortcutRegistry\ninstead of hardcoded arrays. The registry has a showInBanner flag\nfor each shortcut, so future changes only need one edit. ([`2bc73dc`](https://github.com/Vit129/kouen-terminal/commit/2bc73dc176fbfa4ca5e133877b17823af3a1e2bb))
+- Scrollback streaming compaction + renderer micro-batch optimizations ([`b1ea417`](https://github.com/Vit129/kouen-terminal/commit/b1ea417867402fcb58f54c8ec4d9420ce534ac84))
+- SalvageRowKeys memo + off-main output coalesce; feat: file tree reveal ([`11569fb`](https://github.com/Vit129/kouen-terminal/commit/11569fbc786cf2d724b49f9d4be7edbd271f02c1))
+- Remove GRAPH_SUMMARY auto-load, use graphify-mcp instead ([`36f6d84`](https://github.com/Vit129/kouen-terminal/commit/36f6d849a9abcd9c906b19f98ab7483586bb6fc3))
+- Unify make start as single entry point, remove s1-s4 aliases ([`c98953b`](https://github.com/Vit129/kouen-terminal/commit/c98953bf1e93799c6c10edd31e4c89d9f497abd8))
+- Skip BoardViewController rebuild when columns unchanged (fixes NSTextField leak) ([`2f5e973`](https://github.com/Vit129/kouen-terminal/commit/2f5e9732b4692615caa52905d0888a54ad8bc4a5))
+- Unify pane/session shortcuts to ⌘/⌘⇧ only\n\n- ⌘[/⌘] now cycles panes (was session navigation)\n- ⌘⇧[/⌘⇧] now navigates sessions (was ⌘[/⌘])\n- ⌘W closes pane (was ⌘⌥W), ⌘⇧W closes tab (was ⌘W)\n- ⌘⇧Arrow for directional pane focus (was ⌘⌥Arrow)\n- Fix: ⌘⌥Arrow no longer intercepted by readline handler\n- Matches iTerm2/Ghostty/Warp convention: ⌘=pane, ⌘⇧=tab/session ([`73a3131`](https://github.com/Vit129/kouen-terminal/commit/73a31318fa09f67135d07ef4ae9fc3664d01067b))
+- Extract BannerShortcutRegistry as single source of truth\n\nWelcome banner shortcuts now read from BannerShortcutRegistry\ninstead of hardcoded arrays. The registry has a showInBanner flag\nfor each shortcut, so future changes only need one edit. ([`49915f8`](https://github.com/Vit129/kouen-terminal/commit/49915f831080f037024ae8c5c91632d721f77a72))
 
 ### Documentation
-- Update memory, playbook, graphify for session work ([`b6c97ba`](https://github.com/Vit129/kouen-terminal/commit/b6c97baf8e6275a4644a0cd944552d562309b0ce))
-- Update README + agent-memory; refresh graphify graph ([`2b6cbd8`](https://github.com/Vit129/kouen-terminal/commit/2b6cbd8716f87edc5e0c65fdfcc1a4656f9a5217))
-- Shelve p20/p21 — terminal-first agent flow sufficient for now ([`acec0bc`](https://github.com/Vit129/kouen-terminal/commit/acec0bcfb140dc903cad5fa3181d771cdf5210b2))
-- Close P16 (board) + P22 (perf) — both done ([`e1c7027`](https://github.com/Vit129/kouen-terminal/commit/e1c7027ce93e71b3edeab6a8f4729907cc533e68))
-- Add zombie-crash-macos26 knowledge doc (CASE-034→040 consolidated) ([`267dfc0`](https://github.com/Vit129/kouen-terminal/commit/267dfc0c8cf374a7e2537df1a0ee2b4bf2e71b4e))
-- Add NSTextField leak knowledge doc (P20 perf) ([`dfbacd6`](https://github.com/Vit129/kouen-terminal/commit/dfbacd628437415caf8d4104522e1fbcbaa628bd))
-- Add P23 SSH Remote Host Manager plan ([#23](https://github.com/Vit129/kouen-terminal/pull/23)) ([`6058ffa`](https://github.com/Vit129/kouen-terminal/commit/6058ffa683a918e1a557f8fc012254dfd9a0a484))
-- Add updateTrackingAreas guard to zombie crash knowledge ([`2429edd`](https://github.com/Vit129/kouen-terminal/commit/2429edd813d90838a30fc18a84dc7d9546f87148))
-- Add tableView race guard to knowledge ([`d23caba`](https://github.com/Vit129/kouen-terminal/commit/d23caba14e0035573afe1ee0f8b80d9ec936ab44))
-- Update zombie-crash knowledge with final timeline + script fix + 500ms ([`cb732af`](https://github.com/Vit129/kouen-terminal/commit/cb732af70b7884bbd25ad1181e237e6c9a2a20c4))
-- Add Phase 0 (concurrency safety) to P8 macOS 27 plan — lessons from crash saga ([`4da5075`](https://github.com/Vit129/kouen-terminal/commit/4da5075d2e96ee6dd21ab16a9b8ead5c1bc7a03b))
-- Update knowledge, changelog, graphify for crash fix session ([`059ce22`](https://github.com/Vit129/kouen-terminal/commit/059ce221c01d49ba159469e986ce14633ec6aea2))
+- Update memory, playbook, graphify for session work ([`c50a494`](https://github.com/Vit129/kouen-terminal/commit/c50a494af6bf280d7c2648a92d799db682ac9cdf))
+- Update README + agent-memory; refresh graphify graph ([`057e95c`](https://github.com/Vit129/kouen-terminal/commit/057e95c4c42a66da43884cb0dd60e85be933a3e8))
+- Shelve p20/p21 — terminal-first agent flow sufficient for now ([`23c7163`](https://github.com/Vit129/kouen-terminal/commit/23c71639ec3ae602514eebb2b5d96f149dea10df))
+- Close P16 (board) + P22 (perf) — both done ([`11a5089`](https://github.com/Vit129/kouen-terminal/commit/11a50892e4ea66769a6012c5ff79f456610b081b))
+- Add zombie-crash-macos26 knowledge doc (CASE-034→040 consolidated) ([`9bd91af`](https://github.com/Vit129/kouen-terminal/commit/9bd91af15839b47fcec9330480ee71a8eeed0b5b))
+- Add NSTextField leak knowledge doc (P20 perf) ([`ed9e504`](https://github.com/Vit129/kouen-terminal/commit/ed9e504c3b1a7817bd8d83a2b866b23c2671a75f))
+- Add P23 SSH Remote Host Manager plan ([#23](https://github.com/Vit129/kouen-terminal/pull/23)) ([`b209c08`](https://github.com/Vit129/kouen-terminal/commit/b209c08111356f1f57d205a76ea50a00795cf361))
+- Add updateTrackingAreas guard to zombie crash knowledge ([`40baf33`](https://github.com/Vit129/kouen-terminal/commit/40baf33168a951210c3bc0b709fff66c00ce4139))
+- Add tableView race guard to knowledge ([`5f558bc`](https://github.com/Vit129/kouen-terminal/commit/5f558bcd2e38c090bc8fbf151558de72c9b474e9))
+- Update zombie-crash knowledge with final timeline + script fix + 500ms ([`670052b`](https://github.com/Vit129/kouen-terminal/commit/670052bbe5400befdfa60b876b6f8905fc211313))
+- Add Phase 0 (concurrency safety) to P8 macOS 27 plan — lessons from crash saga ([`4be18a0`](https://github.com/Vit129/kouen-terminal/commit/4be18a0029d37a94e5280e233b66ca93171f4314))
+- Update knowledge, changelog, graphify for crash fix session ([`6a7eebb`](https://github.com/Vit129/kouen-terminal/commit/6a7eebb7367e9967011738cc8db1ecca19f82fb1))
 
 ### Fixed
-- Zombie surface view crashes (CASE-037) + centralize configs ([`1b17b99`](https://github.com/Vit129/kouen-terminal/commit/1b17b99db9be39d37a32fff0c072017f3079d2f5))
-- Zombie crash (CASE-037), perf: renderer micro-batch + scrollback ([`11062e4`](https://github.com/Vit129/kouen-terminal/commit/11062e45c771b7f49052e6d50aa38c4e7c8ea761))
-- Zombie mouseMoved crash — remove NSTrackingArea on detach ([`e825ccf`](https://github.com/Vit129/kouen-terminal/commit/e825ccf58540f4fa31093f9a00b79daea856a981))
-- Terminal content area unreadable at low opacity on bright backgrounds ([`1ee927e`](https://github.com/Vit129/kouen-terminal/commit/1ee927eafa2bf9cde9b8d33ad7ed1732d78ed9e1))
-- Full-cycle builds before bumping version + rollback on failure ([`25998b2`](https://github.com/Vit129/kouen-terminal/commit/25998b25c88fb47ec8a034afca9bd5eb8947ed67))
-- Remove discardCursorRects from deinit (Swift 6 actor warning) + regenerate release notes ([`6c55025`](https://github.com/Vit129/kouen-terminal/commit/6c5502553bbf8809251e4a6284817495435617e2))
-- Restore discardCursorRects in deinit to prevent zombie crash ([`cbfb525`](https://github.com/Vit129/kouen-terminal/commit/cbfb5257b2ebd263ea2e552c056c34f985aefaf0))
-- Eliminate macOS 26.5 zombie crashes — remove nonisolated layout, extend retire() to 100ms, fix Optional.map executor check ([`9102192`](https://github.com/Vit129/kouen-terminal/commit/9102192fc7388fd59759c0eab8667133f0c51351))
-- Guard updateTrackingAreas against re-adding when view has no window ([`53d2e6b`](https://github.com/Vit129/kouen-terminal/commit/53d2e6b20e9eb048455e456f62d91b2366a2ca5f))
-- Image preview blink — reuse QLPreviewView instead of recreating ([`adcafe3`](https://github.com/Vit129/kouen-terminal/commit/adcafe3171ac947cc7d32922e79dd500930252b9))
-- Guard ALL updateTrackingAreas against windowless re-add (18 sites) ([`df619b8`](https://github.com/Vit129/kouen-terminal/commit/df619b884968f06043348558080ee1c823383efd))
-- ⌘\ toggle sidebar works on first launch before initial layout ([`8a14207`](https://github.com/Vit129/kouen-terminal/commit/8a142076b060d53f6801d15d196dc25576ea9a92))
-- Guard sidebar tableView delegate against stale row index ([`f1452f5`](https://github.com/Vit129/kouen-terminal/commit/f1452f59575f9584bd0f4c7a1f9fbdc6296fdfa0))
-- Resign first responder before pane rebuild to prevent zombie keyDown ([`1752d26`](https://github.com/Vit129/kouen-terminal/commit/1752d2685a9c17a4a743d56639982dded437e21b))
-- Increase retire/retiredContainer delay to 500ms ([`b3e3dac`](https://github.com/Vit129/kouen-terminal/commit/b3e3dacf562e94106d94583e907a040e55d81c48))
-- Kill app BEFORE build in prod/install scripts ([`5bffd70`](https://github.com/Vit129/kouen-terminal/commit/5bffd701fab6d3e6cf004d41bebabd876f03af0b))
-- NSEvent local monitor swallows events targeting windowless responders ([`317184f`](https://github.com/Vit129/kouen-terminal/commit/317184f1b44a7e3c0d53cf84ff64c164d4a830b1))
-- BrowserPaneView crash on dealloc — move unregister to viewWillMove ([`a7f35b1`](https://github.com/Vit129/kouen-terminal/commit/a7f35b1a9f3efe259f936ff33f44d698e3eb32d6))
-- ⌘\ sidebar + BrowserPaneView cleanup ([`7f87401`](https://github.com/Vit129/kouen-terminal/commit/7f874014c5bac44b77c518fb5caab770f1e1c9ee))
-- Remove mouseUp/mouseDragged forwarding that caused infinite recursion ([`8e3e8f0`](https://github.com/Vit129/kouen-terminal/commit/8e3e8f0b807a80838c191b25d7104a31bd6a3445))
-- Browser pane reload on tab switch, stale CWD on new tab, blank WKWebView ([`59e56bf`](https://github.com/Vit129/kouen-terminal/commit/59e56bffdc7565b910248e3334b3027e4b5c1c3c))
-- Restore 3.3.0 version after botched non-TTY full-cycle run ([`77c2174`](https://github.com/Vit129/kouen-terminal/commit/77c2174edf351abf1697e503f6a4d1d95062e318))
+- Zombie surface view crashes (CASE-037) + centralize configs ([`85d8a7e`](https://github.com/Vit129/kouen-terminal/commit/85d8a7e01f2f814b02f63e13ea92539a07528bad))
+- Zombie crash (CASE-037), perf: renderer micro-batch + scrollback ([`85eafd7`](https://github.com/Vit129/kouen-terminal/commit/85eafd7500156c8b0104484c39c598875ee267f3))
+- Zombie mouseMoved crash — remove NSTrackingArea on detach ([`f277421`](https://github.com/Vit129/kouen-terminal/commit/f277421415dca77dfa43ab506bf09edbdefb96c2))
+- Terminal content area unreadable at low opacity on bright backgrounds ([`c8cc672`](https://github.com/Vit129/kouen-terminal/commit/c8cc67279702b9e874cb244fedb8a090681eda4e))
+- Full-cycle builds before bumping version + rollback on failure ([`ac2af12`](https://github.com/Vit129/kouen-terminal/commit/ac2af12990815c17833064e948eccc1d22c9d0ea))
+- Remove discardCursorRects from deinit (Swift 6 actor warning) + regenerate release notes ([`15788bb`](https://github.com/Vit129/kouen-terminal/commit/15788bb8cbaac4e2736fbad00fe4c7274d3ddf0c))
+- Restore discardCursorRects in deinit to prevent zombie crash ([`32a4a75`](https://github.com/Vit129/kouen-terminal/commit/32a4a75959567fb8e4cb29599c04e5c3f7e2f4db))
+- Eliminate macOS 26.5 zombie crashes — remove nonisolated layout, extend retire() to 100ms, fix Optional.map executor check ([`7b5b71e`](https://github.com/Vit129/kouen-terminal/commit/7b5b71e6a409e7299206185a8819989aa8d3e96c))
+- Guard updateTrackingAreas against re-adding when view has no window ([`5d08b62`](https://github.com/Vit129/kouen-terminal/commit/5d08b62db9263d52c023f130fd43fbd0c82db51b))
+- Image preview blink — reuse QLPreviewView instead of recreating ([`a33f42d`](https://github.com/Vit129/kouen-terminal/commit/a33f42d1f8a24faf90860d22ee85f30c59b4803e))
+- Guard ALL updateTrackingAreas against windowless re-add (18 sites) ([`36a7b8e`](https://github.com/Vit129/kouen-terminal/commit/36a7b8e3530a2db80a7c94be4ca160f4590aa982))
+- ⌘\ toggle sidebar works on first launch before initial layout ([`c69b3da`](https://github.com/Vit129/kouen-terminal/commit/c69b3dad72bf5f26f5d063e83b250c4f409daa7e))
+- Guard sidebar tableView delegate against stale row index ([`b8ad429`](https://github.com/Vit129/kouen-terminal/commit/b8ad42999cc63c038955dac1159adc9f76a9ac3e))
+- Resign first responder before pane rebuild to prevent zombie keyDown ([`618a1c3`](https://github.com/Vit129/kouen-terminal/commit/618a1c3ef8586afdc82892b0c6f64a7f6e728f68))
+- Increase retire/retiredContainer delay to 500ms ([`c6e1655`](https://github.com/Vit129/kouen-terminal/commit/c6e1655b2eab99b2ed4375debf90210ecd563f31))
+- Kill app BEFORE build in prod/install scripts ([`1b3518e`](https://github.com/Vit129/kouen-terminal/commit/1b3518e1e1a56e27d3ef1769b07529f079ba878f))
+- NSEvent local monitor swallows events targeting windowless responders ([`a1a64ed`](https://github.com/Vit129/kouen-terminal/commit/a1a64edd2b321b3590a58d03ad84c8ff9b80218e))
+- BrowserPaneView crash on dealloc — move unregister to viewWillMove ([`46f1b90`](https://github.com/Vit129/kouen-terminal/commit/46f1b90b0f8c80c4288ea2a5274de284338f598a))
+- ⌘\ sidebar + BrowserPaneView cleanup ([`0e32e94`](https://github.com/Vit129/kouen-terminal/commit/0e32e94338a3e624a53ebe8f0a10b25b0bab7b96))
+- Remove mouseUp/mouseDragged forwarding that caused infinite recursion ([`929d034`](https://github.com/Vit129/kouen-terminal/commit/929d03456ec3919f9b50b804e409b5a678ded962))
+- Browser pane reload on tab switch, stale CWD on new tab, blank WKWebView ([`7c633a4`](https://github.com/Vit129/kouen-terminal/commit/7c633a45a8b9ccd2464637611d95e26778fa2f57))
+- Restore 3.3.0 version after botched non-TTY full-cycle run ([`ed47c1c`](https://github.com/Vit129/kouen-terminal/commit/ed47c1c73543e567d137812de501ea2f48e4ea8f))
 
 ## [3.2.1] - 2026-06-16
 
 ### Added
-- Agent-memory v2 — CONTEXT.md + MEMORY.md, UPPERCASE files ([`aa19b80`](https://github.com/Vit129/kouen-terminal/commit/aa19b806844627c4720ad0f97297d47ec4f1484c))
+- Agent-memory v2 — CONTEXT.md + MEMORY.md, UPPERCASE files ([`79ed7ec`](https://github.com/Vit129/kouen-terminal/commit/79ed7ecef0b8956d0166d71c031130087a910aa8))
 
 ## [3.2.0] - 2026-06-16
 
 ### Changed
-- Cache agent icon in sidebar row, skip duplicate fileTreeView.updateRoot, fix file-preview flash (presentsWithTransaction on open/close) ([`e8573b8`](https://github.com/Vit129/kouen-terminal/commit/e8573b8d22a44c6e2c94930f3881e99166b48ba6))
-- Skip sidebar rebuildSidebarRows+configure when sessions unchanged on metadata refresh ([`d2dfc67`](https://github.com/Vit129/kouen-terminal/commit/d2dfc678de4a6e9558780eac57b3316116c45937))
-- Adaptive SurfaceShellTracker interval (0.5s→2s when idle); skip tabBar.refreshMetadata when tabs unchanged ([`aea6181`](https://github.com/Vit129/kouen-terminal/commit/aea618139b384bef40c29c7fd2f2aba6bfc6a5c6))
-- IsStableEqual for Tab/SessionGroup — ignore volatile fields (currentCommand, lastMCPControlAt) in sidebar/tabbar skip checks ([`e5b3841`](https://github.com/Vit129/kouen-terminal/commit/e5b3841b92a51e87d84a116d5d6ef869a95a16ed))
+- Cache agent icon in sidebar row, skip duplicate fileTreeView.updateRoot, fix file-preview flash (presentsWithTransaction on open/close) ([`eeca480`](https://github.com/Vit129/kouen-terminal/commit/eeca48014c4fa5edfac88995887a546a59505095))
+- Skip sidebar rebuildSidebarRows+configure when sessions unchanged on metadata refresh ([`39b86a5`](https://github.com/Vit129/kouen-terminal/commit/39b86a556385104412a54245c844b8e0b032f5a5))
+- Adaptive SurfaceShellTracker interval (0.5s→2s when idle); skip tabBar.refreshMetadata when tabs unchanged ([`ab020bc`](https://github.com/Vit129/kouen-terminal/commit/ab020bcbc2ca9a81db968878fdc97c6aae28db71))
+- IsStableEqual for Tab/SessionGroup — ignore volatile fields (currentCommand, lastMCPControlAt) in sidebar/tabbar skip checks ([`4735048`](https://github.com/Vit129/kouen-terminal/commit/47350489c341771a4330beed9ffdfe6373759e20))
 
 ### Documentation
-- Update playbook (CASE-032/033), knowledge tab-bar effectiveAgentKind, memory v3.1.5 ([`a950389`](https://github.com/Vit129/kouen-terminal/commit/a9503899b37f70714b91df9be9bc191bc1e9e081))
-- Archive CHANGELOG v1-v2 + Task_Ledger tasks 1-50 to reduce context size ([`393e90b`](https://github.com/Vit129/kouen-terminal/commit/393e90b7c1152324b9425607c4da646410a397c5))
+- Update playbook (CASE-032/033), knowledge tab-bar effectiveAgentKind, memory v3.1.5 ([`2c26e18`](https://github.com/Vit129/kouen-terminal/commit/2c26e1899be9052e3b49f68f16ea4045412381c4))
+- Archive CHANGELOG v1-v2 + Task_Ledger tasks 1-50 to reduce context size ([`8d8bc3b`](https://github.com/Vit129/kouen-terminal/commit/8d8bc3b25ba58cfaf02d5c4d9771f50972c6c72d))
 
 ### Fixed
-- TerminalTabBarView layout() nonisolated crash (CASE-034); perf: skip browser-pane merge + surfaceIndex rebuild when no structure change ([`bbf6efe`](https://github.com/Vit129/kouen-terminal/commit/bbf6efe77e396b3057736cb73f0081a2e0f6947f))
-- Nonisolated + MainActor.assumeIsolated on all override func layout()/viewDidMoveToWindow() in HarnessApp — prevent Swift 6 executor crash ([`ff350f9`](https://github.com/Vit129/kouen-terminal/commit/ff350f98d3f774c6716fc3e761df8097385e5c55))
+- TerminalTabBarView layout() nonisolated crash (CASE-034); perf: skip browser-pane merge + surfaceIndex rebuild when no structure change ([`cb30019`](https://github.com/Vit129/kouen-terminal/commit/cb300190acff88dfc75422ee025d65a2ef779615))
+- Nonisolated + MainActor.assumeIsolated on all override func layout()/viewDidMoveToWindow() in HarnessApp — prevent Swift 6 executor crash ([`6b651a3`](https://github.com/Vit129/kouen-terminal/commit/6b651a3d0281ca53a25ffe0f6f064ccbde6cad1d))
 
 ## [3.1.3] - 2026-06-16
 
 ### Added
-- Show native shortcuts on every new surface; add shortcut section to welcome banner ([`7d2ecd2`](https://github.com/Vit129/kouen-terminal/commit/7d2ecd2e09e28a1060dfd1c0333c9f6f8eff1a3f))
+- Show native shortcuts on every new surface; add shortcut section to welcome banner ([`c941091`](https://github.com/Vit129/kouen-terminal/commit/c94109196ff3d1557d70146ed331b612b774a1b4))
 
 ### Fixed
-- Add deinit to HarnessTerminalSurfaceView; fix CASE-030 sidebar + CASE-031 CADisplayLink ([`e301d8b`](https://github.com/Vit129/kouen-terminal/commit/e301d8be21a448c1dd2990a411b1221665fdacfd))
+- Add deinit to HarnessTerminalSurfaceView; fix CASE-030 sidebar + CASE-031 CADisplayLink ([`a95cb99`](https://github.com/Vit129/kouen-terminal/commit/a95cb99522ce6964c454be6cf7cdcd40983e8265))
 
 ## [3.1.2] - 2026-06-16
 
 ### Added
-- Centralize logic — PathTokenParser (shared path:line:col parser) + AgentBridge (send context to agent pane) ([`d36a1bc`](https://github.com/Vit129/kouen-terminal/commit/d36a1bcde262e1b90954f1e836c2e1ab1422aa87))
-- :agent ex command + harness agent send CLI ([`b3eb87d`](https://github.com/Vit129/kouen-terminal/commit/b3eb87d79ffa106c6f680e6dac26cd97644bdfc0))
-- :agent target by kind (--claude/--codex/--kiro) + prompt when multiple agents ([`54df71b`](https://github.com/Vit129/kouen-terminal/commit/54df71b1df7e42b0b3441f73f98d6a75e5f26f94))
-- :agent auto-spawn + file autocomplete ([`9a7eec4`](https://github.com/Vit129/kouen-terminal/commit/9a7eec4531f52ca3ef5aab93b84e6e2a2eb27a81))
-- Add workbench commands (:view, :agent, :cd) + Robot suite ([`3d3d264`](https://github.com/Vit129/kouen-terminal/commit/3d3d264f88b9b88eee5fa47f715daab606d0e181))
-- AgentCatalog centralized config (claude/codex/kiro/gemini models+effort) ([`3fcf15c`](https://github.com/Vit129/kouen-terminal/commit/3fcf15ccdfcd47851498e003242b9f677730fb27))
+- Centralize logic — PathTokenParser (shared path:line:col parser) + AgentBridge (send context to agent pane) ([`244b1a1`](https://github.com/Vit129/kouen-terminal/commit/244b1a1d2496067c3c607fc8b236440a6f455f20))
+- :agent ex command + harness agent send CLI ([`4896265`](https://github.com/Vit129/kouen-terminal/commit/489626563bcade68c0b0ee0fb90124e4f1bbce7c))
+- :agent target by kind (--claude/--codex/--kiro) + prompt when multiple agents ([`a0a681e`](https://github.com/Vit129/kouen-terminal/commit/a0a681e312a8cb059295971983a564162a040c13))
+- :agent auto-spawn + file autocomplete ([`aede5e4`](https://github.com/Vit129/kouen-terminal/commit/aede5e47e0692a03abc62e0d8c9496e1f656c95f))
+- Add workbench commands (:view, :agent, :cd) + Robot suite ([`50f718c`](https://github.com/Vit129/kouen-terminal/commit/50f718cbe709b422f822241292a5d4978b6e245d))
+- AgentCatalog centralized config (claude/codex/kiro/gemini models+effort) ([`063ffb6`](https://github.com/Vit129/kouen-terminal/commit/063ffb66f396ea78b21da64c46bf000dccac3f15))
 
 ### Changed
-- Eliminate unconditional 5-s sync + snapshot fanout overhead ([`9792410`](https://github.com/Vit129/kouen-terminal/commit/97924108891fc67415167833afb346971e00d5f7))
+- Eliminate unconditional 5-s sync + snapshot fanout overhead ([`be38bab`](https://github.com/Vit129/kouen-terminal/commit/be38bab8c05c9be830fa909c93ee221e039cae41))
 
 ### Documentation
-- P21 plan — ACP re-enable + agent/model/effort selection (terminal-first) ([`fa8cca0`](https://github.com/Vit129/kouen-terminal/commit/fa8cca01eec2ba2508605cddabe3cd59d500a825))
-- Update P20/P21 status — AgentBridge/AgentCatalog/agent commands done, ACP re-enable deferred ([`1f0e9d0`](https://github.com/Vit129/kouen-terminal/commit/1f0e9d0ad4b58063ac04c4c7f794c27d6dd8de92))
-- Merge harness chat branding into P21 PBI-ACP-005 ([`549d3e5`](https://github.com/Vit129/kouen-terminal/commit/549d3e5c6920480edc4544ca0aaca813e5c94058))
-- Integrate Hermes concepts — multi-provider + brain + orchestration + backends ([`4cfb5dd`](https://github.com/Vit129/kouen-terminal/commit/4cfb5ddc3f4baadb4e9d77942a3daf6214dadeb3))
-- Update agent-memory, knowledge, graphify for long-session perf work ([`9c93fa3`](https://github.com/Vit129/kouen-terminal/commit/9c93fa3fbd8528c808aaf31b9c456ac471f17403))
+- P21 plan — ACP re-enable + agent/model/effort selection (terminal-first) ([`41f60a2`](https://github.com/Vit129/kouen-terminal/commit/41f60a223b63415a43c4d45be3d21bacbc0e3976))
+- Update P20/P21 status — AgentBridge/AgentCatalog/agent commands done, ACP re-enable deferred ([`4600aef`](https://github.com/Vit129/kouen-terminal/commit/4600aef0e6bc03a5918bcc81d236d25b31fa9ba6))
+- Merge harness chat branding into P21 PBI-ACP-005 ([`501ddfb`](https://github.com/Vit129/kouen-terminal/commit/501ddfbb87ba856652bf3554edcf578d0bc35989))
+- Integrate Hermes concepts — multi-provider + brain + orchestration + backends ([`2ddefeb`](https://github.com/Vit129/kouen-terminal/commit/2ddefebc0da260ecbe7be728d66462527ab35a3f))
+- Update agent-memory, knowledge, graphify for long-session perf work ([`64f5a5c`](https://github.com/Vit129/kouen-terminal/commit/64f5a5c228a5b0dc7ed484da481757b82f13091f))
 
 ### Fixed
-- Dot after title, branch always visible, cancel drag on reload ([`c754939`](https://github.com/Vit129/kouen-terminal/commit/c754939c4c0327b99b8a7f9f0ca7175880ee5c23))
-- Dot after title, branch always visible, cancel drag on reload ([`fbff175`](https://github.com/Vit129/kouen-terminal/commit/fbff1758fb5ad0f86db9a4e13ebb5e0123f70cce))
+- Dot after title, branch always visible, cancel drag on reload ([`6af3d93`](https://github.com/Vit129/kouen-terminal/commit/6af3d93935cdb51389d486da1c6fddc85f7c5022))
+- Dot after title, branch always visible, cancel drag on reload ([`4bfafc7`](https://github.com/Vit129/kouen-terminal/commit/4bfafc7bb997311766d8652f228f4219844cad99))
 
 ## [3.1.0] - 2026-06-15
 
 ### Added
-- Add status indicator to session card rows (dot + label on right) ([`3f5b283`](https://github.com/Vit129/kouen-terminal/commit/3f5b283efd8ef8b839b721b9c74413ea664d5f07))
-- Central board status dot on top bar session pills + sidebar cards ([`c9303f4`](https://github.com/Vit129/kouen-terminal/commit/c9303f4d3c5e21ba54f861ba688ef7cb9b40e8c7))
-- Bell badge + dropdown include board error/needs-attention sessions ([`4d669da`](https://github.com/Vit129/kouen-terminal/commit/4d669dac21db1988f4d6837f0becf156c88bc8fe))
-- Change notification shortcut ⌘⇧U → ⌘⇧I (Inbox) ([`e8c497b`](https://github.com/Vit129/kouen-terminal/commit/e8c497bc95efb91866472554cec7889980c08c4f))
-- ⌘F opens grep/find-in-files palette (Cmd+Shift+F parity) ([`d7edae8`](https://github.com/Vit129/kouen-terminal/commit/d7edae8435487a905d49adafbed6972bf529f717))
-- Add ⌘P as alias for Command Palette (alongside ⌘K) ([`1957c0d`](https://github.com/Vit129/kouen-terminal/commit/1957c0d92240d75ed6c97e8d4854b1ef4856bc84))
-- Replace ⌘K with ⌘P for Command Palette (VS Code/Cursor/Zed parity) ([`34c9d2a`](https://github.com/Vit129/kouen-terminal/commit/34c9d2ab7dbd9e691d8e43c6a60e020da0faa86d))
+- Add status indicator to session card rows (dot + label on right) ([`9078709`](https://github.com/Vit129/kouen-terminal/commit/9078709c64db26dfea359040f13c39e7a208540a))
+- Central board status dot on top bar session pills + sidebar cards ([`389957b`](https://github.com/Vit129/kouen-terminal/commit/389957b90288c617eedb649d053058d1163f262b))
+- Bell badge + dropdown include board error/needs-attention sessions ([`9d42145`](https://github.com/Vit129/kouen-terminal/commit/9d4214516374299e6de74e68854dc1ad97698c8c))
+- Change notification shortcut ⌘⇧U → ⌘⇧I (Inbox) ([`fe8eaa7`](https://github.com/Vit129/kouen-terminal/commit/fe8eaa793fd510472f89a7d16cbce1e8a165474a))
+- ⌘F opens grep/find-in-files palette (Cmd+Shift+F parity) ([`546447c`](https://github.com/Vit129/kouen-terminal/commit/546447cbe42d27ee16f95b8932c5e7ad09702372))
+- Add ⌘P as alias for Command Palette (alongside ⌘K) ([`94d7e48`](https://github.com/Vit129/kouen-terminal/commit/94d7e48ed0f715c00f7138408886812b81d066b0))
+- Replace ⌘K with ⌘P for Command Palette (VS Code/Cursor/Zed parity) ([`1e60982`](https://github.com/Vit129/kouen-terminal/commit/1e60982aa7ee71c01af21b9f7d1d6ca6b9f68b1a))
 
 ### Changed
-- Centralize board status logic ([`db3c03c`](https://github.com/Vit129/kouen-terminal/commit/db3c03c078800f3323d747b2315397664a3d577f))
+- Centralize board status logic ([`2ab7f63`](https://github.com/Vit129/kouen-terminal/commit/2ab7f63bc2a4937472aa518f8268d2d5d75deb03))
 
 ### Documentation
-- Add IDE-like Terminal Workbench section to USAGE, COMMANDS, KEYBINDINGS ([`0689cfb`](https://github.com/Vit129/kouen-terminal/commit/0689cfb4a0ad0d15dd0e9ee54ca99861cc6ca176))
-- Update README doc index with workbench command references ([`17adcd5`](https://github.com/Vit129/kouen-terminal/commit/17adcd5c10f6ef424637b3492d27a92ddb46462e))
-- Update P11/P15/P16 plan status to reflect actual implementation state ([`9ce125b`](https://github.com/Vit129/kouen-terminal/commit/9ce125b84d50db1cbf0c4233a521533964e81456))
-- Update KEYBINDINGS.md and fix remaining ⌘K/⌘⇧T/⌘⇧⌥W references in docs ([`f54f028`](https://github.com/Vit129/kouen-terminal/commit/f54f02850a3d41bfb0bba691f25421e93195ee35))
-- Consolidate docs — add Modes+Migration summary to USAGE.md, move MANUAL_TEST_PLAN to agent-memory, update README index ([`971500e`](https://github.com/Vit129/kouen-terminal/commit/971500e5b0cba2cb070739cdbc2e533f28ba0666))
+- Add IDE-like Terminal Workbench section to USAGE, COMMANDS, KEYBINDINGS ([`8a8b7be`](https://github.com/Vit129/kouen-terminal/commit/8a8b7be11d01d29b88eee2f8191ed8983baeef4c))
+- Update README doc index with workbench command references ([`1c746f1`](https://github.com/Vit129/kouen-terminal/commit/1c746f12ca70a46d586030ad24c2f9536454778c))
+- Update P11/P15/P16 plan status to reflect actual implementation state ([`32655e2`](https://github.com/Vit129/kouen-terminal/commit/32655e2219e02235fafdd8f671351eb851b39721))
+- Update KEYBINDINGS.md and fix remaining ⌘K/⌘⇧T/⌘⇧⌥W references in docs ([`a8a5023`](https://github.com/Vit129/kouen-terminal/commit/a8a5023b10a3f0ff96e6b253f999b2e0a6096da0))
+- Consolidate docs — add Modes+Migration summary to USAGE.md, move MANUAL_TEST_PLAN to agent-memory, update README index ([`95a90b5`](https://github.com/Vit129/kouen-terminal/commit/95a90b5da92d585c367bcd4dd21e0e21b0cec9ed))
 
 ### Fixed
-- Sidebar group header chevron size and click area ([`352a168`](https://github.com/Vit129/kouen-terminal/commit/352a1689acacec3efeb280bcb2f2fab24a5cbb91))
-- Remove broken ⌘⇧T Reopen Closed Tab; ⌘F opens Command Palette (fuzzy find) instead of browser find bar ([`e95b471`](https://github.com/Vit129/kouen-terminal/commit/e95b471f7e82f02b09ecb3fe19acbf4ac2253252))
-- Close Pane ⌘⇧⌥W → ⌘⌥W (iTerm2 parity, easier to press) ([`81546f4`](https://github.com/Vit129/kouen-terminal/commit/81546f4b8c50fa5172daa7eeb9b44d715b0e9203))
-- Tab bar × button now shows confirmation dialog (same as ⌘W) ([`f362dbd`](https://github.com/Vit129/kouen-terminal/commit/f362dbd1918d96f91e3dfeabdf73b5725b2c592b))
+- Sidebar group header chevron size and click area ([`49cff21`](https://github.com/Vit129/kouen-terminal/commit/49cff212865fa2387770d29e20f5abeceadb49f0))
+- Remove broken ⌘⇧T Reopen Closed Tab; ⌘F opens Command Palette (fuzzy find) instead of browser find bar ([`3e80b7e`](https://github.com/Vit129/kouen-terminal/commit/3e80b7e353cceb14684792fa924d9a6b395c8950))
+- Close Pane ⌘⇧⌥W → ⌘⌥W (iTerm2 parity, easier to press) ([`238068d`](https://github.com/Vit129/kouen-terminal/commit/238068d6f5fe8c34122480daa79eb3f9ada1cabf))
+- Tab bar × button now shows confirmation dialog (same as ⌘W) ([`cc5826a`](https://github.com/Vit129/kouen-terminal/commit/cc5826a26dae5f3252dc11f6c8dd87ce270b0dc6))
 
 ## [3.0.0] - 2026-06-15
 
 ### Added
-- Simplify version-bump flow into install/prod/full-cycle ([`24cadb2`](https://github.com/Vit129/kouen-terminal/commit/24cadb2a8eb6739118db422f27fce1e5c42077fd))
-- Add keyboard navigation to notification dropdown ([`c956319`](https://github.com/Vit129/kouen-terminal/commit/c95631981e6d461fe7331bf7c95c8bbc19fe78dc))
-- Implement spotlight search safety & fix git status update/blinking issues ([`3c043e9`](https://github.com/Vit129/kouen-terminal/commit/3c043e9243fd320fa107f893afe5bd68b610b632))
-- Add interactive arrow-key start menu & auto-prepend release notes to changelog ([`b4d8473`](https://github.com/Vit129/kouen-terminal/commit/b4d84739c9092ef4bab1b147d1452a0d4470d9a2))
-- Show next semantic versions in start menu choices ([`2509dc7`](https://github.com/Vit129/kouen-terminal/commit/2509dc7b67faf37b25ef401934750b3c94d608e4))
-- Restore split-down (top/bottom) parity (P13) ([#10](https://github.com/Vit129/kouen-terminal/pull/10)) ([`e0a35f7`](https://github.com/Vit129/kouen-terminal/commit/e0a35f792407203470850d862ac71dee638406bb))
-- Agent orchestration via MCP (P12 PBI-ORCH-001..005) ([#11](https://github.com/Vit129/kouen-terminal/pull/11)) ([`d8a5e90`](https://github.com/Vit129/kouen-terminal/commit/d8a5e901ab9c204dda4c4afbf745a237b3e08de7))
-- Add terminal-first LSP and file view commands ([`9c54073`](https://github.com/Vit129/kouen-terminal/commit/9c540730245818d380a81bef2690cc02ebf3cdce))
-- Complete vi lsp navigation ([`f251659`](https://github.com/Vit129/kouen-terminal/commit/f251659b24d29bd8c084e1b301442ccd17c20398))
-- Add JavaScriptCore config runtime (P11 PBI-SCRIPT-001..003) ([`24f3968`](https://github.com/Vit129/kouen-terminal/commit/24f396881e9d29e271505e38e1b894429a2b9ec8))
-- P16 Agent/Session Board (PBI-BOARD-001/002/003/005) ([`fa9d893`](https://github.com/Vit129/kouen-terminal/commit/fa9d893b387de31afc03c83b034e3f044489e1e3))
-- Add harness.events bridge (P15 step 3) ([`3ac8afb`](https://github.com/Vit129/kouen-terminal/commit/3ac8afb9d0e79c1bd5f982015c8adf5d35827854))
-- Merge harness.events bridge (step 3) — unblocks P11/P12/P16 ([`4843a69`](https://github.com/Vit129/kouen-terminal/commit/4843a69cae1481a9a615ea316c214214c4630192))
-- PBI-ORCH-005 — MCP-controlled indicator on tab bar ([`0f17d02`](https://github.com/Vit129/kouen-terminal/commit/0f17d0215dbde933ec6ab56a5f4e31d75751be82))
-- Complete PBI-SCRIPT-004/005 + harness.events bridge + test fixes ([`30766ef`](https://github.com/Vit129/kouen-terminal/commit/30766ef550edd14217b579dd270114506e85f4ad))
-- PBI-BOARD-004 live updates + PBI-BOARD-006 dismiss ([`1cdd7d3`](https://github.com/Vit129/kouen-terminal/commit/1cdd7d3bf522f8fb99fbf29a6f4d9df84bedea88))
-- Scripting 004/005 implementation from worktree ([`f67de07`](https://github.com/Vit129/kouen-terminal/commit/f67de073793b9ad539c74b7cbb3c6d06e78b950a))
-- PBI-BROWSER-001..005 — embedded browser pane + MCP tools ([`3b39154`](https://github.com/Vit129/kouen-terminal/commit/3b391544e6d2d0be326c3107555f903d090f0cb1))
-- WB-001 WorkbenchCommand facade + parser ([`33b7960`](https://github.com/Vit129/kouen-terminal/commit/33b7960b7594db0c69716c63a1adce2e7abb21fd))
-- WB-002/003/004/006 ex commands + task detector ([`3bb683f`](https://github.com/Vit129/kouen-terminal/commit/3bb683f3f61c0f3bd917a11ec3d596af0497778e))
-- WB-007 harness.profiles.use('ide-migrant-terminal') ([`f3a8f9d`](https://github.com/Vit129/kouen-terminal/commit/f3a8f9d1cbf5453aabfd9bb71015c2035af498c3))
-- Terminal Workbench — all PBI-WB-001..007 done ([`44577d6`](https://github.com/Vit129/kouen-terminal/commit/44577d6870dccb3f1bb1071c278ae8a074be40bb))
-- Add workbench CLI commands for IDE migrants ([`49b1ede`](https://github.com/Vit129/kouen-terminal/commit/49b1ede56e18233649e9e36474d30a378425a001))
-- Session expand shows tab list with Board status + full CWD ([`3563357`](https://github.com/Vit129/kouen-terminal/commit/356335781b412a726a566892b8e77c635f8b39ba))
-- Add Cmd+B shortcut for Browser Pane + open localhost links in-app ([`9844140`](https://github.com/Vit129/kouen-terminal/commit/9844140e2df73b5bb76eeb46c89b6f5c9a6e2572))
-- Open LAN dev-server links (private IPv4/IPv6) in Browser Pane ([`4bcf3e8`](https://github.com/Vit129/kouen-terminal/commit/4bcf3e85c753a2818612be904c86a3eb94f9df02))
+- Simplify version-bump flow into install/prod/full-cycle ([`78aa2de`](https://github.com/Vit129/kouen-terminal/commit/78aa2de5773c84dff11b346b008171bbc43d61b9))
+- Add keyboard navigation to notification dropdown ([`bfcba37`](https://github.com/Vit129/kouen-terminal/commit/bfcba37798d6a13676cd03848d919bf51827e20c))
+- Implement spotlight search safety & fix git status update/blinking issues ([`3a04116`](https://github.com/Vit129/kouen-terminal/commit/3a04116681c97ff7939ce30fb8d0012ce08dfb02))
+- Add interactive arrow-key start menu & auto-prepend release notes to changelog ([`bfdead7`](https://github.com/Vit129/kouen-terminal/commit/bfdead709fc19b3f16dcb8cadbe72dc3f943eb2e))
+- Show next semantic versions in start menu choices ([`b97c4ea`](https://github.com/Vit129/kouen-terminal/commit/b97c4ea3e01c04ef51fe0a722f96f0632bee8b53))
+- Restore split-down (top/bottom) parity (P13) ([#10](https://github.com/Vit129/kouen-terminal/pull/10)) ([`7ab5fa2`](https://github.com/Vit129/kouen-terminal/commit/7ab5fa2ed02ba478596cfb03844bd34a4f35254b))
+- Agent orchestration via MCP (P12 PBI-ORCH-001..005) ([#11](https://github.com/Vit129/kouen-terminal/pull/11)) ([`6abe384`](https://github.com/Vit129/kouen-terminal/commit/6abe384edf940f2c984eb6b6b35e40cf23436593))
+- Add terminal-first LSP and file view commands ([`d49895a`](https://github.com/Vit129/kouen-terminal/commit/d49895afdf60a00dc4c944a905dfcf70ad08a6ab))
+- Complete vi lsp navigation ([`c1613dd`](https://github.com/Vit129/kouen-terminal/commit/c1613dd9c8390dfca92211b93c9d778f82da13e8))
+- Add JavaScriptCore config runtime (P11 PBI-SCRIPT-001..003) ([`a5fddb3`](https://github.com/Vit129/kouen-terminal/commit/a5fddb3ed071315426742d850572ec8494884dfa))
+- P16 Agent/Session Board (PBI-BOARD-001/002/003/005) ([`a9786b8`](https://github.com/Vit129/kouen-terminal/commit/a9786b8d961316ed00debf0b0f48493782eb7828))
+- Add harness.events bridge (P15 step 3) ([`01c8bfe`](https://github.com/Vit129/kouen-terminal/commit/01c8bfef08267db76455576e18f93ad6ebfac484))
+- Merge harness.events bridge (step 3) — unblocks P11/P12/P16 ([`9b84f59`](https://github.com/Vit129/kouen-terminal/commit/9b84f59bff47842b0cc2f7ade2777521ea18fd7c))
+- PBI-ORCH-005 — MCP-controlled indicator on tab bar ([`e8471aa`](https://github.com/Vit129/kouen-terminal/commit/e8471aaa705fd44909d123dbf747d411e8288066))
+- Complete PBI-SCRIPT-004/005 + harness.events bridge + test fixes ([`d7709ff`](https://github.com/Vit129/kouen-terminal/commit/d7709ffbacc6771ac3613a7cecb7bd1b3321c5ba))
+- PBI-BOARD-004 live updates + PBI-BOARD-006 dismiss ([`2c93aa2`](https://github.com/Vit129/kouen-terminal/commit/2c93aa23f2f4ef45cb5220996e2cac2d46fe11d7))
+- Scripting 004/005 implementation from worktree ([`d903e85`](https://github.com/Vit129/kouen-terminal/commit/d903e8544750ebcb6747e301d84faf6d1e3c62e5))
+- PBI-BROWSER-001..005 — embedded browser pane + MCP tools ([`7b7a5d1`](https://github.com/Vit129/kouen-terminal/commit/7b7a5d12abf8d5fc3d424e72cf96375a78085b76))
+- WB-001 WorkbenchCommand facade + parser ([`b06311a`](https://github.com/Vit129/kouen-terminal/commit/b06311a0e9594181958e61fb717e56c2dcff14fe))
+- WB-002/003/004/006 ex commands + task detector ([`7f31b15`](https://github.com/Vit129/kouen-terminal/commit/7f31b151dd96382bf8780dc47cc616f94c575ae1))
+- WB-007 harness.profiles.use('ide-migrant-terminal') ([`0c7e558`](https://github.com/Vit129/kouen-terminal/commit/0c7e5586114ed5b643e696fa3307aa08bd5fc3fa))
+- Terminal Workbench — all PBI-WB-001..007 done ([`dd9fb69`](https://github.com/Vit129/kouen-terminal/commit/dd9fb6975d41eb950e66d206c0f48381c2557536))
+- Add workbench CLI commands for IDE migrants ([`eba61bf`](https://github.com/Vit129/kouen-terminal/commit/eba61bfb4d85f770859bc80486a00acd484ed2b6))
+- Session expand shows tab list with Board status + full CWD ([`8f86461`](https://github.com/Vit129/kouen-terminal/commit/8f864616515c2ce472a88745c1df362398b018b8))
+- Add Cmd+B shortcut for Browser Pane + open localhost links in-app ([`d3c6f7d`](https://github.com/Vit129/kouen-terminal/commit/d3c6f7d5739e377c928e8128965cc9c2b4ad7c8c))
+- Open LAN dev-server links (private IPv4/IPv6) in Browser Pane ([`fb5896d`](https://github.com/Vit129/kouen-terminal/commit/fb5896d1f106b5b58bf40bfe90f3b7cbb89da178))
 
 ### Changed
-- Restructure dev-loop make targets and start.sh menu ([`9746c5e`](https://github.com/Vit129/kouen-terminal/commit/9746c5e09c2ece9b7061c390aa681b0e709d5fdb))
-- Consolidate menu shortcuts, add git panel toggle, fix preview socket path ([`825302b`](https://github.com/Vit129/kouen-terminal/commit/825302b760a62302aac061900d61958914cb02b8))
-- Remove dead Tab-switch shortcuts, repoint ⌘[/⌘] to session navigation ([`22b6d65`](https://github.com/Vit129/kouen-terminal/commit/22b6d65df672acd0cf1a4b683a785ae06757f8f1))
-- Worktree-aware full-cycle, commit-push-merge helper ([`908179e`](https://github.com/Vit129/kouen-terminal/commit/908179ed41dd3cb89da870f191cb3d529f18927e))
-- Decompose SessionCoordinator → ThemeService + ActivePaneService ([`cb6a295`](https://github.com/Vit129/kouen-terminal/commit/cb6a2958bbc4c37bae78999d0b7c8bd7d094ef51))
-- Complete PBI-REFACTOR-001 — SessionCoordinator 2050→397 LOC ✅ ([`e01aadb`](https://github.com/Vit129/kouen-terminal/commit/e01aadb144da7ba2649d7b3757fc0c76ae7b47cb))
-- Organize UI/ into feature subfolders, shelve ACP behind HARNESS_ACP flag ([`0156e52`](https://github.com/Vit129/kouen-terminal/commit/0156e52d4139a0290a457a1c2848167c50b23ee2))
-- Decompose ViNormalMode.swift into 5 focused files (PBI-REFACTOR-003) ([`c9fa0a5`](https://github.com/Vit129/kouen-terminal/commit/c9fa0a53b19a66fcfe060419c0eb9b930b2f12e5))
+- Restructure dev-loop make targets and start.sh menu ([`0522be4`](https://github.com/Vit129/kouen-terminal/commit/0522be4f2d99e2fa51b69443ce1ab7f4c4056844))
+- Consolidate menu shortcuts, add git panel toggle, fix preview socket path ([`ca1fb4a`](https://github.com/Vit129/kouen-terminal/commit/ca1fb4aa610f1e7610779c5b3579d7f2cab046b9))
+- Remove dead Tab-switch shortcuts, repoint ⌘[/⌘] to session navigation ([`6a8e276`](https://github.com/Vit129/kouen-terminal/commit/6a8e276979bc5e654dfa839cdab0b3731fd8aabf))
+- Worktree-aware full-cycle, commit-push-merge helper ([`9283e8c`](https://github.com/Vit129/kouen-terminal/commit/9283e8c5a35102577db7a821ea53f7d9dc9dd1cf))
+- Decompose SessionCoordinator → ThemeService + ActivePaneService ([`f78c71f`](https://github.com/Vit129/kouen-terminal/commit/f78c71fbda1aedfd38d1974706b35a1c9f5de9a2))
+- Complete PBI-REFACTOR-001 — SessionCoordinator 2050→397 LOC ✅ ([`5e693a9`](https://github.com/Vit129/kouen-terminal/commit/5e693a94268e6fdec2d58ee698867924ab50eb4a))
+- Organize UI/ into feature subfolders, shelve ACP behind HARNESS_ACP flag ([`8250be1`](https://github.com/Vit129/kouen-terminal/commit/8250be17654a0a362299559851f7f3b656514b6f))
+- Decompose ViNormalMode.swift into 5 focused files (PBI-REFACTOR-003) ([`fd7a41f`](https://github.com/Vit129/kouen-terminal/commit/fd7a41f313827fa5b95f958f5e8761b90fbdc4fd))
 
 ### Documentation
-- Update memory to v2.5.2 + add HOW_TO_USE.md ([`06043c2`](https://github.com/Vit129/kouen-terminal/commit/06043c23999a5291152ab79737d143999faba2ad))
-- Update agent-memory and graphify after CASE-028 keybinding cleanup ([`e72a7f4`](https://github.com/Vit129/kouen-terminal/commit/e72a7f459a153562db04ff84e5f575e7d2bf06a1))
-- Add v2.5.3 entry for CASE-028 keybinding cleanup ([`5101183`](https://github.com/Vit129/kouen-terminal/commit/5101183423817d5f237b733a3a19a8737b6b1f89))
-- Remove empty Unreleased heading so 2.5.3 is the top entry ([`bdf48c9`](https://github.com/Vit129/kouen-terminal/commit/bdf48c975940a8e7e0c1714b7b9349f09743967a))
-- Add P11-P13 strategic backlog plans from terminal comparison ([`39e83e0`](https://github.com/Vit129/kouen-terminal/commit/39e83e0020120b49d6a1cd8bb704b54ad3914517))
-- Add P15 integration roadmap and P16 agent/session board plans ([`3ae0b37`](https://github.com/Vit129/kouen-terminal/commit/3ae0b3704f8b7b1cfa1604756903faa5e9085a4d))
-- Document P16 Agent/Session Board, update README and graph ([`687179f`](https://github.com/Vit129/kouen-terminal/commit/687179f09e9a7c24d5194031293ba9c871c9cd27))
-- Refresh plan statuses after PR #10/#13-#19 merges ([`9eb5b47`](https://github.com/Vit129/kouen-terminal/commit/9eb5b47920ac4362c2ca2812145fd897ccd1e7c2))
-- Refine terminal-first roadmap ([`84c6651`](https://github.com/Vit129/kouen-terminal/commit/84c6651252cadcbabdb1ab6de14728ad399466fe))
-- Mark P17 PBI-002/003/005 done in structural-refactor plan ([`696fbaf`](https://github.com/Vit129/kouen-terminal/commit/696fbafee5fb7b2a1ada3ed0b05e186050e6f331))
-- Mark P17 DONE, defer PBI-004 (HarnessCore split) ([`ed1c9cf`](https://github.com/Vit129/kouen-terminal/commit/ed1c9cf98776f0191a6f444b52cdf01d36d6b517))
-- Update graphify, agent-memory, knowledge base ([`68b05b3`](https://github.com/Vit129/kouen-terminal/commit/68b05b3b303e16f4ad31a665bf00b4328b4a070b))
-- Add terminal workbench migration plan ([`01ce2d5`](https://github.com/Vit129/kouen-terminal/commit/01ce2d57761f9228e8508e204f997a2971760d50))
-- Mark P12 DONE, add task 67 to memory ([`2a6fb8b`](https://github.com/Vit129/kouen-terminal/commit/2a6fb8bda3bbd76601b3ccc540ba7f071184adb0))
-- Mark P11 PBI-SCRIPT-004/005 done in memory ([`cd8a9e8`](https://github.com/Vit129/kouen-terminal/commit/cd8a9e84231f1b5cf80d726bd43c64862fbdf487))
-- Mark step 4 (P11 PBI-SCRIPT-004/005) done in integration roadmap ([`71b09bd`](https://github.com/Vit129/kouen-terminal/commit/71b09bd8843122f87e8645097798107d134793de))
-- Update browser pane plan with cmux research + agent control design ([`6f69f46`](https://github.com/Vit129/kouen-terminal/commit/6f69f4652d9c37f739ad5bedce9efcf61f6a1236))
-- Finalize plan + agent prompt for PBI-BROWSER-001/002 ([`3036c6d`](https://github.com/Vit129/kouen-terminal/commit/3036c6d4b4b0de31daa7b8ba90857ea16ea58a54))
-- Add single agent prompt for all PBI-BROWSER-001..005 ([`24becbc`](https://github.com/Vit129/kouen-terminal/commit/24becbcaf38bcf1f081f8c8385a729d1f2e44a61))
-- Davin/Windsurf kanban+CMUX proposal for sessions panel/top bar ([`dda3201`](https://github.com/Vit129/kouen-terminal/commit/dda3201f21ea8f9892c5329c3a5623693d89f3f7))
+- Update memory to v2.5.2 + add HOW_TO_USE.md ([`989d74f`](https://github.com/Vit129/kouen-terminal/commit/989d74fe015cb587748bde1cf9edbf19fa1f5b9a))
+- Update agent-memory and graphify after CASE-028 keybinding cleanup ([`8b4a9a6`](https://github.com/Vit129/kouen-terminal/commit/8b4a9a6780f9d14e3706202cb49871d0cab8b817))
+- Add v2.5.3 entry for CASE-028 keybinding cleanup ([`0defdd4`](https://github.com/Vit129/kouen-terminal/commit/0defdd497e391091da99a3b8cdadc19f266c5872))
+- Remove empty Unreleased heading so 2.5.3 is the top entry ([`14a85d4`](https://github.com/Vit129/kouen-terminal/commit/14a85d4806d0108396e64291ac24da2174cf2b60))
+- Add P11-P13 strategic backlog plans from terminal comparison ([`9d8758b`](https://github.com/Vit129/kouen-terminal/commit/9d8758b4ca750df74b522c56ed43e0361c92c1e0))
+- Add P15 integration roadmap and P16 agent/session board plans ([`3da9720`](https://github.com/Vit129/kouen-terminal/commit/3da972068fae5a82a6b23b9840deb66203bf52b6))
+- Document P16 Agent/Session Board, update README and graph ([`b874f6b`](https://github.com/Vit129/kouen-terminal/commit/b874f6b9424912f5a5d7f53f967c679c1c1cc8d9))
+- Refresh plan statuses after PR #10/#13-#19 merges ([`6770bc6`](https://github.com/Vit129/kouen-terminal/commit/6770bc6bcdcee0fcb2f1e4f83d46bc3d2cdab23d))
+- Refine terminal-first roadmap ([`7283313`](https://github.com/Vit129/kouen-terminal/commit/72833136fa4e2d06f0b665c5bede62e74b4b5d45))
+- Mark P17 PBI-002/003/005 done in structural-refactor plan ([`3464312`](https://github.com/Vit129/kouen-terminal/commit/34643122427cc8ad1ce40df388ca50b85990be2e))
+- Mark P17 DONE, defer PBI-004 (HarnessCore split) ([`b2e0944`](https://github.com/Vit129/kouen-terminal/commit/b2e0944d59ac0a726289eca2e09dd00aa3c6dd0c))
+- Update graphify, agent-memory, knowledge base ([`7aedf38`](https://github.com/Vit129/kouen-terminal/commit/7aedf3882a0e31f47a9cacf66e27d7cb78a0bd75))
+- Add terminal workbench migration plan ([`e577115`](https://github.com/Vit129/kouen-terminal/commit/e577115c2a4c7c0890c7692ea087d1a33ae60722))
+- Mark P12 DONE, add task 67 to memory ([`85f4744`](https://github.com/Vit129/kouen-terminal/commit/85f4744f74afcf7d163f3c71e22db4c9ef36f07d))
+- Mark P11 PBI-SCRIPT-004/005 done in memory ([`d926962`](https://github.com/Vit129/kouen-terminal/commit/d92696259e88afe939be45f89c7e4e1a9ff51c90))
+- Mark step 4 (P11 PBI-SCRIPT-004/005) done in integration roadmap ([`c647023`](https://github.com/Vit129/kouen-terminal/commit/c6470234dd508a17fe19884a902e22cddfae1b33))
+- Update browser pane plan with cmux research + agent control design ([`7376d82`](https://github.com/Vit129/kouen-terminal/commit/7376d8228f7047ec80184e1036edca5a50cf4e5c))
+- Finalize plan + agent prompt for PBI-BROWSER-001/002 ([`4aca3b2`](https://github.com/Vit129/kouen-terminal/commit/4aca3b2a0ade029cc207eb062636ae8e3d16604b))
+- Add single agent prompt for all PBI-BROWSER-001..005 ([`4c6c9c8`](https://github.com/Vit129/kouen-terminal/commit/4c6c9c8d4d50f329e1efcf0ba81e27f7c7adf884))
+- Davin/Windsurf kanban+CMUX proposal for sessions panel/top bar ([`fc09419`](https://github.com/Vit129/kouen-terminal/commit/fc094198da6f7bb6b33490570195d6a2c5af619a))
 
 ### Fixed
-- Kill stale Harness/daemon before relaunching via run.sh ([`e69d31b`](https://github.com/Vit129/kouen-terminal/commit/e69d31b57136f39e531ac3335c7d0c418c976afd))
-- Scope kill_stale to prod release home, guard prepare-release against Unreleased, add version banner + clean-state ([`fa317ea`](https://github.com/Vit129/kouen-terminal/commit/fa317eacd0629d5ddffcea0d1a1cc686ea85be75))
-- Swift build -c release builds all products, not just the last --product flag ([`17f79e0`](https://github.com/Vit129/kouen-terminal/commit/17f79e0b102ec4afd0c881246641db82ccb01f97))
-- Keep text selection stable across scroll ([`578178a`](https://github.com/Vit129/kouen-terminal/commit/578178a2279d0d51019fce229394aef794e7bdfb))
-- Fix diff deadlock, add notification rings, preview build badge ([`0845ea5`](https://github.com/Vit129/kouen-terminal/commit/0845ea5426e6cc0e929d954f83049cc50423473d))
-- Make ⌘\ a pure sidebar toggle, decoupled from file-editor split ([`1fcc4c3`](https://github.com/Vit129/kouen-terminal/commit/1fcc4c3b7a112a2f2f92eb8f257fce84e700dc67))
-- Close button bug, idle throttle, session short ID, P4 tests, P17/P18 plans ([`06f0d56`](https://github.com/Vit129/kouen-terminal/commit/06f0d56b5b19aad2381b061ce818d3db830955be))
-- Guard NSApp nil in updateDockBadge, fix flaky board count assertion ([`1a177c7`](https://github.com/Vit129/kouen-terminal/commit/1a177c71b3537dda8cc261f2c75620ed818af213))
-- Wire WorkbenchMRU.add + :copy-path callbacks in FileEditorView ([`4ffccaf`](https://github.com/Vit129/kouen-terminal/commit/4ffccaf58a87172f25506fdf58b702afbe328b21))
-- Browser pane persists across daemon syncs ([`0ba5759`](https://github.com/Vit129/kouen-terminal/commit/0ba575961acf250dbc6d16f841571493d447e550))
-- Stop browser pane blink loop ([`a86ce70`](https://github.com/Vit129/kouen-terminal/commit/a86ce70f8d6554abde67433a0ea77f140f935854))
-- Add close (×) button to browser toolbar + closeBrowserPane ([`440317e`](https://github.com/Vit129/kouen-terminal/commit/440317e696449ddfb70f2ad6d3ee2fd2465d9e96))
-- Wire closePaneButton → closeBrowserPane correctly ([`3f1ac4e`](https://github.com/Vit129/kouen-terminal/commit/3f1ac4e13adc129f19581dbc17ccb0c81882d20d))
-- Expand arrow stays visible using insertRows/removeRows ([`d555e24`](https://github.com/Vit129/kouen-terminal/commit/d555e2426eb781103b1441a2c8899c1630c56d81))
-- Browser close button + prompt file for Agy ([`97d6154`](https://github.com/Vit129/kouen-terminal/commit/97d6154b7d02a2927b41586b0f9c2d71103170e1))
-- Browser toolbar close/refresh fix, branch-aware tabs ([`f0bdce0`](https://github.com/Vit129/kouen-terminal/commit/f0bdce0efd5c91f10d795c62b2cc712825ba0b73))
-- Hide collapsed error banner to stop it intercepting toolbar clicks; add hit-test/action tests for close+refresh buttons ([`1db38e5`](https://github.com/Vit129/kouen-terminal/commit/1db38e59afd00723a56eb9dbf6f5cd7b500e2134))
-- Keep group-header expand arrow visible after collapse/re-expand ([`a6f2ed7`](https://github.com/Vit129/kouen-terminal/commit/a6f2ed7a72694c41efd4562fe6a639422c645665))
-- Stop applyLocalSnapshot from re-injecting closed browser panes ([`b76fb0d`](https://github.com/Vit129/kouen-terminal/commit/b76fb0dd006b9cf29a8a19b1f829f26bf0fce940))
-- Apply initial sidebar visibility after first layout pass ([`21b7cc4`](https://github.com/Vit129/kouen-terminal/commit/21b7cc40e389fe8b7c349a9ad84d70e6a2b71ac5))
+- Kill stale Harness/daemon before relaunching via run.sh ([`8194c89`](https://github.com/Vit129/kouen-terminal/commit/8194c89962785ba2097b036d4aeb62f48cfda782))
+- Scope kill_stale to prod release home, guard prepare-release against Unreleased, add version banner + clean-state ([`5f8b0ef`](https://github.com/Vit129/kouen-terminal/commit/5f8b0ef0bf722d1df8ce202f1947b1f23268a425))
+- Swift build -c release builds all products, not just the last --product flag ([`d3f725c`](https://github.com/Vit129/kouen-terminal/commit/d3f725cae2362875c34aaa49e1fdffb586fb827f))
+- Keep text selection stable across scroll ([`c4d103c`](https://github.com/Vit129/kouen-terminal/commit/c4d103c6ef228b4b0db8b19d1c900371a600b15c))
+- Fix diff deadlock, add notification rings, preview build badge ([`ab2e9fe`](https://github.com/Vit129/kouen-terminal/commit/ab2e9fee88d1907960890167c750469aee7fc5cc))
+- Make ⌘\ a pure sidebar toggle, decoupled from file-editor split ([`91f7829`](https://github.com/Vit129/kouen-terminal/commit/91f7829bd32df05120e9c5924cb2b8123b27c62d))
+- Close button bug, idle throttle, session short ID, P4 tests, P17/P18 plans ([`74482fd`](https://github.com/Vit129/kouen-terminal/commit/74482fd4b7475dfa34ec5e4cdacc29ca1a980b80))
+- Guard NSApp nil in updateDockBadge, fix flaky board count assertion ([`8741d11`](https://github.com/Vit129/kouen-terminal/commit/8741d119a08d1e18caf1c4e699d547048e938c55))
+- Wire WorkbenchMRU.add + :copy-path callbacks in FileEditorView ([`135f270`](https://github.com/Vit129/kouen-terminal/commit/135f2704da65eb991a736cc9b7d919d6a614ec06))
+- Browser pane persists across daemon syncs ([`4f7b42e`](https://github.com/Vit129/kouen-terminal/commit/4f7b42e74dd30a5235163fad829db1d7321446bd))
+- Stop browser pane blink loop ([`ca2e3f1`](https://github.com/Vit129/kouen-terminal/commit/ca2e3f190cfadba60e1ca90240293e663e85a07a))
+- Add close (×) button to browser toolbar + closeBrowserPane ([`fcbf138`](https://github.com/Vit129/kouen-terminal/commit/fcbf13804fa3c754b7ca65d1bd465e5ac51331c4))
+- Wire closePaneButton → closeBrowserPane correctly ([`ec04ee7`](https://github.com/Vit129/kouen-terminal/commit/ec04ee722ff3e42b43dab030f2fe5984f29fec3a))
+- Expand arrow stays visible using insertRows/removeRows ([`f68da70`](https://github.com/Vit129/kouen-terminal/commit/f68da70461a007a123dade7fb2693eb590618a37))
+- Browser close button + prompt file for Agy ([`8dfdeb8`](https://github.com/Vit129/kouen-terminal/commit/8dfdeb80f9df0c8e2dd8720f1134daecfc109b9c))
+- Browser toolbar close/refresh fix, branch-aware tabs ([`697b84b`](https://github.com/Vit129/kouen-terminal/commit/697b84bfbf16f910b0c122bf01f7f2e75f51eeca))
+- Hide collapsed error banner to stop it intercepting toolbar clicks; add hit-test/action tests for close+refresh buttons ([`6e4d07c`](https://github.com/Vit129/kouen-terminal/commit/6e4d07c9366de300e00ad6de669f350a4087c081))
+- Keep group-header expand arrow visible after collapse/re-expand ([`fa80ec8`](https://github.com/Vit129/kouen-terminal/commit/fa80ec826dab3e3b0a3928589427ce0032da6c22))
+- Stop applyLocalSnapshot from re-injecting closed browser panes ([`4545f9c`](https://github.com/Vit129/kouen-terminal/commit/4545f9c04bac2c74d9d85acc044b9c3ce385ad98))
+- Apply initial sidebar visibility after first layout pass ([`2c02b03`](https://github.com/Vit129/kouen-terminal/commit/2c02b03f6bf0d22d44ec859138e1d251ada91e3b))
 
 ## [2.5.2] - 2026-06-12
 
 ### Fixed
-- Enforce 15% minimum tint on translucent window background ([`c3dfc5c`](https://github.com/Vit129/kouen-terminal/commit/c3dfc5ca790d5311628ecbca932d5aa8dc8c9c1c))
-- Make pasted image handoff readable ([`abc15d7`](https://github.com/Vit129/kouen-terminal/commit/abc15d7697b07e9aaa0726236427c14d1c0ab56b))
-- Select sessions with number shortcuts ([`ff32a69`](https://github.com/Vit129/kouen-terminal/commit/ff32a69670a4a60bc151576c46f778ac0d8ab0e3))
+- Enforce 15% minimum tint on translucent window background ([`54d1fef`](https://github.com/Vit129/kouen-terminal/commit/54d1fefaca256dce648df476382e98f918243fc7))
+- Make pasted image handoff readable ([`1dcc502`](https://github.com/Vit129/kouen-terminal/commit/1dcc502a7426c361e580b94496fcc0e5d1397e63))
+- Select sessions with number shortcuts ([`0704670`](https://github.com/Vit129/kouen-terminal/commit/07046701af83208fb0bf263f5eb184e7e353c2f9))
 
 ## [2.5.1] - 2026-06-12
 
 ### Added
-- Close last tmux gaps — word-separators in copy-mode w/b/e, CLI list-* -F ([`99d4cc2`](https://github.com/Vit129/kouen-terminal/commit/99d4cc25a3b6da4a1bab576d2760d190447f9112))
-- Per-theme-mode background opacity for auto light/dark ([`a50846d`](https://github.com/Vit129/kouen-terminal/commit/a50846d336bf37cb78a699cd96921f401b37d2d0))
-- Per-theme-mode background opacity for auto light/dark ([`1307b48`](https://github.com/Vit129/kouen-terminal/commit/1307b4811c6d2b2347bda0b6e87e78226a60c861))
+- Close last tmux gaps — word-separators in copy-mode w/b/e, CLI list-* -F ([`eed04ee`](https://github.com/Vit129/kouen-terminal/commit/eed04eebcf754005180966c93d7780f044dab6a4))
+- Per-theme-mode background opacity for auto light/dark ([`137d6ea`](https://github.com/Vit129/kouen-terminal/commit/137d6eaadba487acb0bd42a0385514390deca137))
+- Per-theme-mode background opacity for auto light/dark ([`6234652`](https://github.com/Vit129/kouen-terminal/commit/6234652b7b3b707d7077c811fcbd53828689ddf1))
 
 ### Documentation
-- Rewrite README — cleaner structure, no agent-memory/graphify internals ([`4ce1b70`](https://github.com/Vit129/kouen-terminal/commit/4ce1b70641c5d74951dc657df922e25a42cf3b0e))
-- Trim README to 66 lines (A+B style) ([`db974b2`](https://github.com/Vit129/kouen-terminal/commit/db974b2e5405eafd5a2faf4a2693e74000bdd9fe))
-- Add fork attribution to README ([`332e1cc`](https://github.com/Vit129/kouen-terminal/commit/332e1cc1928abd2167af895a9e50eac0e5d451f7))
-- Update CHANGELOG, memory, and knowledge for session fixes and opacity improvements ([`03b447b`](https://github.com/Vit129/kouen-terminal/commit/03b447bac7cf4ab1e91c8b0fc395ca5cb76284d0))
-- Add Apple Liquid Glass / legibility context to knowledge base ([`763a5c3`](https://github.com/Vit129/kouen-terminal/commit/763a5c38fec2cf64928455a21a467d51679cd8f7))
+- Rewrite README — cleaner structure, no agent-memory/graphify internals ([`32812c2`](https://github.com/Vit129/kouen-terminal/commit/32812c2bb31f5a8857efd3f577c3021e25d45f6d))
+- Trim README to 66 lines (A+B style) ([`e3aa6e1`](https://github.com/Vit129/kouen-terminal/commit/e3aa6e11e760906636a09c7457797bf23018c07c))
+- Add fork attribution to README ([`90f66fd`](https://github.com/Vit129/kouen-terminal/commit/90f66fd74d8715b7db82f00ea66f0da6b9338b00))
+- Update CHANGELOG, memory, and knowledge for session fixes and opacity improvements ([`bc4b907`](https://github.com/Vit129/kouen-terminal/commit/bc4b9074bcccba99ace8bf9684b8a79d6df486a7))
+- Add Apple Liquid Glass / legibility context to knowledge base ([`d047630`](https://github.com/Vit129/kouen-terminal/commit/d04763021d42bf456dc8f52b45127463b55c86c2))
 
 ### Fixed
-- Use theme-tinted window background when translucent ([`76018e5`](https://github.com/Vit129/kouen-terminal/commit/76018e5b35d2acaf35da3daa5cf572797ac3db91))
+- Use theme-tinted window background when translucent ([`99475ec`](https://github.com/Vit129/kouen-terminal/commit/99475ec56743775693c1b8faf72059cafc05a493))
 
 ## [2.5.0] - 2026-06-12
 
 ### Added
-- Support wrap-search option and zoxide frecency in command palette ([`72bbd67`](https://github.com/Vit129/kouen-terminal/commit/72bbd67d7ffec2f29c3bf34d5014f4e4bbaa510f))
-- Terminal power-user features — vi mode, tmux parity, LSP, zoxide ([`55c7bff`](https://github.com/Vit129/kouen-terminal/commit/55c7bffef33f9e61a4a3a98b63a65e41db4e8098))
-- Keyboard file tree, vi jump-list/marks/search, tmux window-size/json ([`6cd143d`](https://github.com/Vit129/kouen-terminal/commit/6cd143d38ef94e54efcd103d3efb5e0bd3965b14))
+- Support wrap-search option and zoxide frecency in command palette ([`6250ef8`](https://github.com/Vit129/kouen-terminal/commit/6250ef8960c58032d19f534f8d1590add910fb6a))
+- Terminal power-user features — vi mode, tmux parity, LSP, zoxide ([`8c0f373`](https://github.com/Vit129/kouen-terminal/commit/8c0f3739468f47566d191a9659701caea40ab66e))
+- Keyboard file tree, vi jump-list/marks/search, tmux window-size/json ([`3bb9601`](https://github.com/Vit129/kouen-terminal/commit/3bb960112a962ac6bafb69bf8219a8e6883d9420))
 
 ### Changed
-- Remove Toggle IDE Mode preset shortcut and menu items ([`76ebf70`](https://github.com/Vit129/kouen-terminal/commit/76ebf70a42e7b57bfa5f15e69ce69ee588da58cf))
+- Remove Toggle IDE Mode preset shortcut and menu items ([`536d371`](https://github.com/Vit129/kouen-terminal/commit/536d3713ab6a564301f97d231ae0a86f8f4ec36f))
 
 ### Documentation
-- Clarify design philosophy to Terminal First, IDE Convenient and resolve features duplication ([`c2b3f02`](https://github.com/Vit129/kouen-terminal/commit/c2b3f02408724f97d89bc211cb19374462ddf00f))
-- V2.5.0 — update CHANGELOG, README, memory, TMUX_PARITY, graphify ([`08589c4`](https://github.com/Vit129/kouen-terminal/commit/08589c49a0e2160d23d0d39729d1f286861257ed))
+- Clarify design philosophy to Terminal First, IDE Convenient and resolve features duplication ([`faffb4b`](https://github.com/Vit129/kouen-terminal/commit/faffb4bf5c2040eee6761b47be9b1303867dbcba))
+- V2.5.0 — update CHANGELOG, README, memory, TMUX_PARITY, graphify ([`393bc96`](https://github.com/Vit129/kouen-terminal/commit/393bc9622cb1ac5de09ff5c1a337cbeee8789a20))
 
 ### Fixed
-- Reset Focus Mode state on manual panel toggles to prevent out-of-sync layouts ([`c3c998b`](https://github.com/Vit129/kouen-terminal/commit/c3c998b11bdbae0ce72f3e48beb2f92a5ba69f3c))
+- Reset Focus Mode state on manual panel toggles to prevent out-of-sync layouts ([`9f1eb3e`](https://github.com/Vit129/kouen-terminal/commit/9f1eb3e60e98a7c42a6c4db8e8a0a0535d4d6a29))
 
 ## [2.4.0] - 2026-06-12
 
 ### Added
-- Lazy scrollback reflow, task board sidebar, focus mode (⌘P) ([`4c2fa16`](https://github.com/Vit129/kouen-terminal/commit/4c2fa168a65cf39d1db113d767477ff75b95fa53))
-- Add Switch Project section and worktree-to-tab integration ([`40ecd09`](https://github.com/Vit129/kouen-terminal/commit/40ecd093b355788bb0409ce645f0cc022aacd775))
-- Add fuzzy file quick-open to command palette ([`7106b74`](https://github.com/Vit129/kouen-terminal/commit/7106b74878bbe0435ac805fea424726aaf66657f))
-- Add Ctrl+R interactive command-history search overlay ([`4e4c2d4`](https://github.com/Vit129/kouen-terminal/commit/4e4c2d45708412c9591c6087a1f58f68323f18f9))
-- Layout presets (⌘⌥1-5) and workspace symbol index in command palette ([`1e998ae`](https://github.com/Vit129/kouen-terminal/commit/1e998ae794fd969c4330abd9b89300d0522c5242))
+- Lazy scrollback reflow, task board sidebar, focus mode (⌘P) ([`ccc2b6e`](https://github.com/Vit129/kouen-terminal/commit/ccc2b6e93df30f7baf735592c8f39182891a8099))
+- Add Switch Project section and worktree-to-tab integration ([`5149832`](https://github.com/Vit129/kouen-terminal/commit/5149832b64dc9583f01e9fc0be18e370e3634055))
+- Add fuzzy file quick-open to command palette ([`2626aa0`](https://github.com/Vit129/kouen-terminal/commit/2626aa04ed60ee78a02e3d83be8e2e1e0ae87f0a))
+- Add Ctrl+R interactive command-history search overlay ([`2b8f01c`](https://github.com/Vit129/kouen-terminal/commit/2b8f01c13c593084f5f71c3375624dfe937bab1e))
+- Layout presets (⌘⌥1-5) and workspace symbol index in command palette ([`9333529`](https://github.com/Vit129/kouen-terminal/commit/93335294fa995b95aafbf963f64506ae9a6839f4))
 
 ### Changed
-- Remove task board panel and clean up related code ([`ffca765`](https://github.com/Vit129/kouen-terminal/commit/ffca76592128811427fea4736176c3fd556127f3))
-- Enumerate files off main thread for fuzzy file quick-open ([`2a4d3fa`](https://github.com/Vit129/kouen-terminal/commit/2a4d3fa2108724c84aedf0b443b336c1e3c8b4f2))
+- Remove task board panel and clean up related code ([`19843bd`](https://github.com/Vit129/kouen-terminal/commit/19843bd25786d247a5504df6f3ed628bd8fe5de8))
+- Enumerate files off main thread for fuzzy file quick-open ([`ddbe586`](https://github.com/Vit129/kouen-terminal/commit/ddbe586fdf5cffc101e5000f9fd852dc5af5d6c5))
 
 ### Documentation
-- Add scrollback lazy reflow prompt for P10 agent execution ([`5a45ac9`](https://github.com/Vit129/kouen-terminal/commit/5a45ac9352aa4c3553ca45cff33e6fbaff2d626a))
-- Update memory, playbook, P10 plan; refresh graphify for v2.3.0 post-release ([`3dde732`](https://github.com/Vit129/kouen-terminal/commit/3dde732fc713dca42cadb9f79bd9b808b64b4929))
-- Add fzf-searchable Linux + Vi cheat sheet ([`5970d79`](https://github.com/Vit129/kouen-terminal/commit/5970d795f4e15cb6e961d8badc3cd1f32fdd7583))
-- Update README, KEYBINDINGS, AGENT-HANDBOOK, HARNESS_TMUX_CAPABILITIES ([`4c295cc`](https://github.com/Vit129/kouen-terminal/commit/4c295cc38241198d4cf2d11751e523c1f9c0cfae))
+- Add scrollback lazy reflow prompt for P10 agent execution ([`b7ee562`](https://github.com/Vit129/kouen-terminal/commit/b7ee562ea54ea0a9da64777e1fe15d7f2956cae7))
+- Update memory, playbook, P10 plan; refresh graphify for v2.3.0 post-release ([`10206de`](https://github.com/Vit129/kouen-terminal/commit/10206de6eaaf69cbb9993d930ca920265dc35b5b))
+- Add fzf-searchable Linux + Vi cheat sheet ([`351a321`](https://github.com/Vit129/kouen-terminal/commit/351a32151e80b44ca54cd20b7a11c694f472baf3))
+- Update README, KEYBINDINGS, AGENT-HANDBOOK, HARNESS_TMUX_CAPABILITIES ([`89cca08`](https://github.com/Vit129/kouen-terminal/commit/89cca08bdc5a1deb58cb5c435ec5be34e3a169fd))
 
 ### Fixed
-- Always stop+start display link in viewDidMoveToWindow (CASE-026) ([`50cff4a`](https://github.com/Vit129/kouen-terminal/commit/50cff4a1488eafd285c464dc250b8fad01a14709))
-- CASE-026 black terminal on new session (display link race) ([`4153d76`](https://github.com/Vit129/kouen-terminal/commit/4153d76ba4de9a68ee43348f2883cfa2d1b29e15))
-- Close-pane button closes the clicked pane, not the active one ([`dd3754d`](https://github.com/Vit129/kouen-terminal/commit/dd3754de0f94da27a71345af5965f04b7c57236e))
-- Force child layout after applying split divider positions ([`1ca9bae`](https://github.com/Vit129/kouen-terminal/commit/1ca9bae0c6ae14e7a252b93d8d293ff3e4f733ab))
-- Skip redundant schedule if revision already pending ([`14a12b7`](https://github.com/Vit129/kouen-terminal/commit/14a12b7f59a7ae315a3f6980210b7c9f9e3dee2a))
+- Always stop+start display link in viewDidMoveToWindow (CASE-026) ([`a60bbd3`](https://github.com/Vit129/kouen-terminal/commit/a60bbd3243c1611c90d4c178f2101c5d71cb24c5))
+- CASE-026 black terminal on new session (display link race) ([`41c180f`](https://github.com/Vit129/kouen-terminal/commit/41c180f1a6d688a3521a649655a9549aa5e83095))
+- Close-pane button closes the clicked pane, not the active one ([`9ba147a`](https://github.com/Vit129/kouen-terminal/commit/9ba147a1f543d789ee25ae4772d23d7f87a97b07))
+- Force child layout after applying split divider positions ([`057bae4`](https://github.com/Vit129/kouen-terminal/commit/057bae4475e446d687a2004b260a9229903470b7))
+- Skip redundant schedule if revision already pending ([`75e1d0f`](https://github.com/Vit129/kouen-terminal/commit/75e1d0fbf87df5d9327d6e78cebb44d50410105c))
 
 ## [2.3.0] - 2026-06-11
 
 ### Added
-- Diff syntax coloring, changes click-to-preview, history context menu ([`ea1ec5a`](https://github.com/Vit129/kouen-terminal/commit/ea1ec5a27966ca362138461b0ec19b7b310a45e7))
+- Diff syntax coloring, changes click-to-preview, history context menu ([`d5fcbc9`](https://github.com/Vit129/kouen-terminal/commit/d5fcbc9105e310c49126bc671261dc64b4e97fce))
 
 ### Changed
-- Extract pure logic from HarnessTerminalSurfaceView ([`4f2c1b3`](https://github.com/Vit129/kouen-terminal/commit/4f2c1b305cea1439beed7809f9fd9d2f27d66d53))
-- Extract HarnessCLI handlers and SurfaceRegistry helpers ([`8009775`](https://github.com/Vit129/kouen-terminal/commit/8009775419fe8591e8dad2719e1bb3986f8a9848))
+- Extract pure logic from HarnessTerminalSurfaceView ([`62cc31c`](https://github.com/Vit129/kouen-terminal/commit/62cc31cd849a74a0b546e4be10696e50f53692af))
+- Extract HarnessCLI handlers and SurfaceRegistry helpers ([`e17ddc1`](https://github.com/Vit129/kouen-terminal/commit/e17ddc1346b605fe8bf881713f8559d75959c5c4))
 
 ### Documentation
-- Record P9 extraction task and refresh graphify graph ([`d2e4095`](https://github.com/Vit129/kouen-terminal/commit/d2e4095fdb932b1814c9eb85764f2d91509ca96b))
-- Update for git panel fixes + P10 prompts, refresh graphify ([`8e56978`](https://github.com/Vit129/kouen-terminal/commit/8e56978fc276d60b8a112d610ae2bad80bf4c5b4))
+- Record P9 extraction task and refresh graphify graph ([`ea81af4`](https://github.com/Vit129/kouen-terminal/commit/ea81af4c3f9ca6978d3af2764716353c19e0100b))
+- Update for git panel fixes + P10 prompts, refresh graphify ([`cab5b47`](https://github.com/Vit129/kouen-terminal/commit/cab5b478297fb761cfe6140999d537b551d2a914))
 
 ## [2.2.4] - 2026-06-11
 
 ### Added
-- Add Scripts/install-app.sh with macOS cache clearing ([`857ba90`](https://github.com/Vit129/kouen-terminal/commit/857ba90b36c3f63e1c2fd2dad8297020b27054c9))
-- Redesign AgentInboxPanelView rows to match notch HUD format ([`39acb64`](https://github.com/Vit129/kouen-terminal/commit/39acb649c3db6c910149c3673314d300b9fa9cf9))
-- Add toggles to show hidden files and folders ([`f46b6ca`](https://github.com/Vit129/kouen-terminal/commit/f46b6ca877a09d2f3354e40877ad666c2498fb4c))
-- Expand start.sh menu with commit/push and release-prep options ([`80fdfb6`](https://github.com/Vit129/kouen-terminal/commit/80fdfb6eb99cb5b4568dd711fde3783f2e7d536d))
-- Collapse sidebar by default on fresh installs ([`ae6e2ac`](https://github.com/Vit129/kouen-terminal/commit/ae6e2ac0c41146538af54655fe0cca79dc7222d1))
-- Add Always collapse sidebar on launch option ([`36d2430`](https://github.com/Vit129/kouen-terminal/commit/36d2430bc1c850250c2fb935a54c0d14147ce8d0))
-- Add Excel and CSV support via QuickLook ([`35d0a93`](https://github.com/Vit129/kouen-terminal/commit/35d0a933debc70c86d3bb1dc7fcf752ba221d32a))
+- Add Scripts/install-app.sh with macOS cache clearing ([`5543c82`](https://github.com/Vit129/kouen-terminal/commit/5543c8272060b53150d6ec4349ba3eb1deef5791))
+- Redesign AgentInboxPanelView rows to match notch HUD format ([`0af34e2`](https://github.com/Vit129/kouen-terminal/commit/0af34e2d2094d1d2e5116d801cad2b1c47a77ffd))
+- Add toggles to show hidden files and folders ([`7b34c3e`](https://github.com/Vit129/kouen-terminal/commit/7b34c3e2e16dd41bf7ef2aad1b8ba8d326b4db46))
+- Expand start.sh menu with commit/push and release-prep options ([`7b66e64`](https://github.com/Vit129/kouen-terminal/commit/7b66e64fab757217d3b2d55815d979adfd01ecb4))
+- Collapse sidebar by default on fresh installs ([`4edac61`](https://github.com/Vit129/kouen-terminal/commit/4edac613142847152c3841375d4c435b3afa25e3))
+- Add Always collapse sidebar on launch option ([`3c4fac4`](https://github.com/Vit129/kouen-terminal/commit/3c4fac47a7738e6d18ff0a22df6524b394e18864))
+- Add Excel and CSV support via QuickLook ([`e076989`](https://github.com/Vit129/kouen-terminal/commit/e076989ed22385135fa9bc70364d13e7cad2c919))
 
 ### Changed
-- Move app-only Notch and FileExplorer domains out of HarnessCore ([`9f675c8`](https://github.com/Vit129/kouen-terminal/commit/9f675c88bf75bc9fe082d6cb84a2bc112d2882c3))
-- Split HarnessSidebarPanelViewController into focused files ([`49221fe`](https://github.com/Vit129/kouen-terminal/commit/49221fe42dd208543921ec791ea7e7de23941d6b))
-- Split HarnessTerminalSurfaceView into focused extension files ([`d20453b`](https://github.com/Vit129/kouen-terminal/commit/d20453bc61b4c36d1c02227bcff78ca013131990))
-- Split SettingsViewController into per-page extension files ([`adf06e7`](https://github.com/Vit129/kouen-terminal/commit/adf06e7b2ae633ef9edd582f435407ff713df001))
+- Move app-only Notch and FileExplorer domains out of HarnessCore ([`1b043aa`](https://github.com/Vit129/kouen-terminal/commit/1b043aa4aab28f8e38fed8937e0235d3fcf952ce))
+- Split HarnessSidebarPanelViewController into focused files ([`1003330`](https://github.com/Vit129/kouen-terminal/commit/100333057b3aeaaea77e02a4044e71966b80b675))
+- Split HarnessTerminalSurfaceView into focused extension files ([`adaba9b`](https://github.com/Vit129/kouen-terminal/commit/adaba9b3fa6b3842a4d694c6d39ac17b05a98dac))
+- Split SettingsViewController into per-page extension files ([`a57fcae`](https://github.com/Vit129/kouen-terminal/commit/a57fcae84ef0e5b1968c88343f420db68ed8ddc6))
 
 ### Documentation
-- Add CASE-016..021, FSEvents pattern, RL-007..010, git-panel knowledge update ([`910ad71`](https://github.com/Vit129/kouen-terminal/commit/910ad719b630de553ac0311b6e90a69e51127054))
-- Record CASE-023/024 and refresh graphify graph ([`fb1b558`](https://github.com/Vit129/kouen-terminal/commit/fb1b558d83eafea2ad02b0cd7ad8d5639866c858))
-- Record build/run command preferences ([`491f5ed`](https://github.com/Vit129/kouen-terminal/commit/491f5ed56bc988d1ae721420497090bf1c5c3b3c))
+- Add CASE-016..021, FSEvents pattern, RL-007..010, git-panel knowledge update ([`7baa854`](https://github.com/Vit129/kouen-terminal/commit/7baa854b2048049925074804431c0c30ef3f85e7))
+- Record CASE-023/024 and refresh graphify graph ([`3b633e8`](https://github.com/Vit129/kouen-terminal/commit/3b633e8458146d940a479dde41cef8f8dbfc0c55))
+- Record build/run command preferences ([`abd6f66`](https://github.com/Vit129/kouen-terminal/commit/abd6f6625bcf5a68339d4f9b316f4d517588c236))
 
 ### Fixed
-- Install-app.sh must build release to match package-app.sh release ([`89b2989`](https://github.com/Vit129/kouen-terminal/commit/89b2989cfb367f4f35dc05f612896b37d3611633))
-- Refresh UI after create/delete/rename operations ([`3d3bc65`](https://github.com/Vit129/kouen-terminal/commit/3d3bc656d175f7efac11fdc1e51141722b92ee9a))
-- Resolve file tree watcher, folder expand state, file preview selection, and selection highlight visibility ([`231ab7b`](https://github.com/Vit129/kouen-terminal/commit/231ab7b3949bda6b18cd384c1f211d494daa5c96))
-- Replace DispatchSource watcher with recursive FSEvents stream ([`9191f8f`](https://github.com/Vit129/kouen-terminal/commit/9191f8f67864435aa6051e7f4bcf4c943e25552d))
-- Update branch chip on HEAD change and add FSEvents watcher for working-tree changes ([`71b6371`](https://github.com/Vit129/kouen-terminal/commit/71b6371a85bfd12b20f6c04a7215c89b1e349136))
-- Declare HarnessTerminalEngine dep, sync CLAUDE.md targets, ignore dated graphify dirs ([`7fd1076`](https://github.com/Vit129/kouen-terminal/commit/7fd1076172e26956b3dc046396c1c48ed8698b92))
-- Serialize refresh() to prevent stale staged-state UI ([`d1227df`](https://github.com/Vit129/kouen-terminal/commit/d1227dfdef2b17b45677e39c7e5f2739dae784b9))
-- Make File Preview opacity match Terminal exactly ([`e3f6bac`](https://github.com/Vit129/kouen-terminal/commit/e3f6bacc152f6b9b4fc0eb68c4f4950fa633f0ce))
-- Reset transient modes at shell prompt ([`fa64dbd`](https://github.com/Vit129/kouen-terminal/commit/fa64dbd67d19974d591fe9b1acfb9e7f9c8d220d))
-- Live-reload preview when the underlying file changes ([`3bf42af`](https://github.com/Vit129/kouen-terminal/commit/3bf42af07e39d94929ebaabfcc2e8f713368acba))
-- Sync sidebarVisible when forcing collapse on launch ([`8bfb638`](https://github.com/Vit129/kouen-terminal/commit/8bfb6385b59ab957b967d5fa28435810b9b391a6))
-- Don't clear synchronizedOutput on shell-prompt reset ([`532a96c`](https://github.com/Vit129/kouen-terminal/commit/532a96c944af4d5cd23d36861d61fb0951d575d7))
+- Install-app.sh must build release to match package-app.sh release ([`1a328d1`](https://github.com/Vit129/kouen-terminal/commit/1a328d15e0f64c31d3c83298e945c2f8066c96b7))
+- Refresh UI after create/delete/rename operations ([`1538270`](https://github.com/Vit129/kouen-terminal/commit/153827043d9efc631bae544d64531a4d822d3a5a))
+- Resolve file tree watcher, folder expand state, file preview selection, and selection highlight visibility ([`9ae608e`](https://github.com/Vit129/kouen-terminal/commit/9ae608eebcf12492f586267dacffd3d3c6882226))
+- Replace DispatchSource watcher with recursive FSEvents stream ([`f9c5bee`](https://github.com/Vit129/kouen-terminal/commit/f9c5beee393e4a16b50d4b8f837e271707f1ff2a))
+- Update branch chip on HEAD change and add FSEvents watcher for working-tree changes ([`4ed9803`](https://github.com/Vit129/kouen-terminal/commit/4ed98033fbb03c9d05b7817c6836f579b648ee73))
+- Declare HarnessTerminalEngine dep, sync CLAUDE.md targets, ignore dated graphify dirs ([`7fed132`](https://github.com/Vit129/kouen-terminal/commit/7fed132f891f64c26fd32d82d405e66f6166869a))
+- Serialize refresh() to prevent stale staged-state UI ([`e4ccd5a`](https://github.com/Vit129/kouen-terminal/commit/e4ccd5a7eab3ac41a2e8251082be44da70a03474))
+- Make File Preview opacity match Terminal exactly ([`d44d48b`](https://github.com/Vit129/kouen-terminal/commit/d44d48b27769e162b7d054dcd8f4a813621c3e68))
+- Reset transient modes at shell prompt ([`e124c63`](https://github.com/Vit129/kouen-terminal/commit/e124c6395bdebabb6e7003711468064ee3c4e574))
+- Live-reload preview when the underlying file changes ([`42263bf`](https://github.com/Vit129/kouen-terminal/commit/42263bfc9bb74aff096100375760f01f23696b30))
+- Sync sidebarVisible when forcing collapse on launch ([`ddbacbc`](https://github.com/Vit129/kouen-terminal/commit/ddbacbcddef1f7bf5f598b8255bfa4a54dece68b))
+- Don't clear synchronizedOutput on shell-prompt reset ([`e16259c`](https://github.com/Vit129/kouen-terminal/commit/e16259c84f5bd42429c9c399c0e3a41386d416e5))
 
 ## [2.2.3] - 2026-06-09
 
 ### Added
-- P7 sidebar button style + terminal tab bar background fixes ([`a1ba082`](https://github.com/Vit129/kouen-terminal/commit/a1ba0826d6af72176d4ff7afb93c362e5442979d))
+- P7 sidebar button style + terminal tab bar background fixes ([`928723f`](https://github.com/Vit129/kouen-terminal/commit/928723f6eec0dd60f363215e29b44aacb951fbcb))
 
 ### Documentation
-- Add changelog entry for P7 header button style fix ([`6e72648`](https://github.com/Vit129/kouen-terminal/commit/6e726488f17f5f8cb5c307e06da20d9d3ea5b244))
-- Consolidate P7 + tab bar fixes into 2.2.2 changelog ([`7beab57`](https://github.com/Vit129/kouen-terminal/commit/7beab57cffebf4ca435f43f1289ae484567f16b1))
+- Add changelog entry for P7 header button style fix ([`91b89b7`](https://github.com/Vit129/kouen-terminal/commit/91b89b7f6df6906e65cbc35b62aa6679a3b44cae))
+- Consolidate P7 + tab bar fixes into 2.2.2 changelog ([`18fbd7a`](https://github.com/Vit129/kouen-terminal/commit/18fbd7a63800a08fde81cdb84b4d1eb0ae9d3ed9))
 
 ### Fixed
-- Use SoftIconButton for group header + and ... buttons ([`258e779`](https://github.com/Vit129/kouen-terminal/commit/258e7795d3798c4a91b065d62495edb01b00fca7))
-- Terminal tab bar uses clear background with bottom border ([`51e8f81`](https://github.com/Vit129/kouen-terminal/commit/51e8f81396d7ac8249301b66b92e713e0dc0a5b0))
-- Terminal tab bar background uses terminalBackground instead of clear ([`8fca6e2`](https://github.com/Vit129/kouen-terminal/commit/8fca6e2103490cfbf778bd4c269cf4857d82e8b1))
-- Activate tab bar height constraint ([`2918f15`](https://github.com/Vit129/kouen-terminal/commit/2918f15b390b901bed7f81b13edb37f26169be6e))
-- File editor opacity parity with terminal (P6) ([`1b77e95`](https://github.com/Vit129/kouen-terminal/commit/1b77e957ed272b32e6fc0cfc002a8ebbf83f19df))
+- Use SoftIconButton for group header + and ... buttons ([`25b1525`](https://github.com/Vit129/kouen-terminal/commit/25b1525e142543a68140f693664786474807ff1d))
+- Terminal tab bar uses clear background with bottom border ([`249c9f4`](https://github.com/Vit129/kouen-terminal/commit/249c9f4e1592cbeee717d659d61bf1c3e01b2d75))
+- Terminal tab bar background uses terminalBackground instead of clear ([`254bdd9`](https://github.com/Vit129/kouen-terminal/commit/254bdd91a7aba4f36949005ef9b2375c42e20613))
+- Activate tab bar height constraint ([`46ae757`](https://github.com/Vit129/kouen-terminal/commit/46ae7571d93ebc779fe96650b5d639c227d460e4))
+- File editor opacity parity with terminal (P6) ([`f066e4c`](https://github.com/Vit129/kouen-terminal/commit/f066e4cc5d45305ed31325e2e7f3deaa812c3ab7))
 
 ## [2.2.2] - 2026-06-08
 
 ### Documentation
-- Backfill CHANGELOG for v1.9.0, v2.0.0, v2.1.0 ([`b5da031`](https://github.com/Vit129/kouen-terminal/commit/b5da031449187c347be647d64d0b0acbb368860e))
-- Add P6 plan — editor opacity parity with terminal ([`a807926`](https://github.com/Vit129/kouen-terminal/commit/a807926705bdd75045921497c782c941a0f3d16c))
+- Backfill CHANGELOG for v1.9.0, v2.0.0, v2.1.0 ([`db01e89`](https://github.com/Vit129/kouen-terminal/commit/db01e898acbd5ebd11ba2b01ec043690155f8abe))
+- Add P6 plan — editor opacity parity with terminal ([`bc63129`](https://github.com/Vit129/kouen-terminal/commit/bc631299e39692d91fff33dadedfdc827009825c))
 
 ### Fixed
-- File preview text rendering + draggable editor divider (v2.2.2) ([`80de44c`](https://github.com/Vit129/kouen-terminal/commit/80de44c88ef0c56bddb72c250b29239aab387fb0))
-- Editor panel background matches terminal vibrancy ([`a6113ab`](https://github.com/Vit129/kouen-terminal/commit/a6113ab67fdfb6686ad6171c8d1c332467fdbeca))
-- Editor panel tab bar no longer overlaps terminal tab bar ([`dd38ddf`](https://github.com/Vit129/kouen-terminal/commit/dd38ddfa5d0a2a1f9b446e7dd579f7cf36d7e0a9))
+- File preview text rendering + draggable editor divider (v2.2.2) ([`c697106`](https://github.com/Vit129/kouen-terminal/commit/c697106effc22f2aaa8f959a3b03efff3282d6f1))
+- Editor panel background matches terminal vibrancy ([`e5e2f93`](https://github.com/Vit129/kouen-terminal/commit/e5e2f935435f61205bc2d866939b0a4ced847757))
+- Editor panel tab bar no longer overlaps terminal tab bar ([`b2b894d`](https://github.com/Vit129/kouen-terminal/commit/b2b894d8062f1d3a1e8da712805855f5d2dd41eb))
 
 ## [2.2.1] - 2026-06-08
 
 ### Added
-- Fast CWD tracking via lightweight daemon probe (500ms) ([`29d7c96`](https://github.com/Vit129/kouen-terminal/commit/29d7c96cbc7d55da013b3377b7c335169c183f1a))
-- Add Search panel in sidebar — file name fuzzy search + content grep ([`30c1b09`](https://github.com/Vit129/kouen-terminal/commit/30c1b09f63c4b5bff2c9d85f74ce5ed8fc089e58))
+- Fast CWD tracking via lightweight daemon probe (500ms) ([`4ad7c69`](https://github.com/Vit129/kouen-terminal/commit/4ad7c69a70c78cb641f000a75259be304c0ead66))
+- Add Search panel in sidebar — file name fuzzy search + content grep ([`361ad4c`](https://github.com/Vit129/kouen-terminal/commit/361ad4c53b26cc0a8a0f3cd50a22c5d134abacf9))
 
 ### Documentation
-- Update agent-memory with CWD tracking, file preview, crash fixes ([`45c1044`](https://github.com/Vit129/kouen-terminal/commit/45c1044ca768c898e69f89c7a3ee423dc1a4e40e))
+- Update agent-memory with CWD tracking, file preview, crash fixes ([`dcb23d8`](https://github.com/Vit129/kouen-terminal/commit/dcb23d81dd9c40bbf735e9e5a2f18ca2a8ab520e))
 
 ### Fixed
-- Restore real-time git refresh — DispatchSource watcher on .git dir ([`a044eb0`](https://github.com/Vit129/kouen-terminal/commit/a044eb0a005e5f4f89ede2289f4d77bcfba07dbc))
-- Crash in GitPanelView.startWatching — @MainActor isolation from utility queue ([`6ed3b89`](https://github.com/Vit129/kouen-terminal/commit/6ed3b89ffeb643b3a6a1930d77c18ebef5db752b))
-- GitPanelView watcher crash — bounce to main before accessing self ([`49c37f8`](https://github.com/Vit129/kouen-terminal/commit/49c37f88b15a8cc7560a8eebe63333b22bbe505b))
-- MacOS 26 Swift 6 crash, git diff coloring, file tree perf, preview isolation ([`c307929`](https://github.com/Vit129/kouen-terminal/commit/c3079292e524fe14b81db96d6449c27c9343927f))
-- File preview split ratio 40/60 with layout retry fallback ([`b29ceab`](https://github.com/Vit129/kouen-terminal/commit/b29ceab7f495d8efe3cacbd8b89dc60bde67cf3f))
-- File preview no longer causes black screen + brighter text ([`65df3b8`](https://github.com/Vit129/kouen-terminal/commit/65df3b8c777a03dcb9475b3a286122e89d99d30e))
-- Git panel row alignment + redesigned changes list, restore file preview rendering ([`7acb920`](https://github.com/Vit129/kouen-terminal/commit/7acb92035b367c416a9814ff01c43d78275e36aa))
-- Sidebar session card now mirrors tab bar (icon + live folder title) ([`55dbbae`](https://github.com/Vit129/kouen-terminal/commit/55dbbaee0014d5e688d6b043681dd6e56b660533))
+- Restore real-time git refresh — DispatchSource watcher on .git dir ([`67c5901`](https://github.com/Vit129/kouen-terminal/commit/67c59018d1146b1623e8e54792d4c47b39db86bd))
+- Crash in GitPanelView.startWatching — @MainActor isolation from utility queue ([`3d9b31c`](https://github.com/Vit129/kouen-terminal/commit/3d9b31c51d0c0c8dacdb88415f66740fb541a567))
+- GitPanelView watcher crash — bounce to main before accessing self ([`e67bcec`](https://github.com/Vit129/kouen-terminal/commit/e67bcec3f84fec8f0a87fbc3cac9806481a041f7))
+- MacOS 26 Swift 6 crash, git diff coloring, file tree perf, preview isolation ([`d218c66`](https://github.com/Vit129/kouen-terminal/commit/d218c66c9e290c8e61a725724e9cca3c558ee772))
+- File preview split ratio 40/60 with layout retry fallback ([`da62a18`](https://github.com/Vit129/kouen-terminal/commit/da62a182092b5cda58120951d042a80fbc010e50))
+- File preview no longer causes black screen + brighter text ([`444870c`](https://github.com/Vit129/kouen-terminal/commit/444870c3a7d7e52d5f713c882c97fe8143cdb50f))
+- Git panel row alignment + redesigned changes list, restore file preview rendering ([`db38262`](https://github.com/Vit129/kouen-terminal/commit/db38262ee2c918a554d929423c88a93b7610003d))
+- Sidebar session card now mirrors tab bar (icon + live folder title) ([`deb6396`](https://github.com/Vit129/kouen-terminal/commit/deb63966241e5b60032bf1347c5246c2eba3a01d))
 
 ## [1.8.0] - 2026-06-07
 
 ### Added
-- Add Worktrees tab with add/remove support ([`20d2b80`](https://github.com/Vit129/kouen-terminal/commit/20d2b80e80a295790345c7db6184175a0266891e))
-- Session ID in sidebar, tab reorder fix, session grouping, hide Agent tab ([`825fc5b`](https://github.com/Vit129/kouen-terminal/commit/825fc5bc90dd1bc323b38da0785ff8cceff9d658))
+- Add Worktrees tab with add/remove support ([`cc42852`](https://github.com/Vit129/kouen-terminal/commit/cc4285223e26796a4e2fb1c0be4dbf9dbf6d59e4))
+- Session ID in sidebar, tab reorder fix, session grouping, hide Agent tab ([`efe06aa`](https://github.com/Vit129/kouen-terminal/commit/efe06aab17fb70a90ae93c0d4da6960889de4375))
 
 ### Documentation
-- Add agent-memory/knowledge, update memory + user-profile + graphify ([`0f6162b`](https://github.com/Vit129/kouen-terminal/commit/0f6162b2f5ddbec219c11460d99cfd052f9864dc))
+- Add agent-memory/knowledge, update memory + user-profile + graphify ([`e78a2b4`](https://github.com/Vit129/kouen-terminal/commit/e78a2b4b5fcc010349cf9bd027925120b580ebaa))
 
 ### Fixed
-- Resolve correct ACP binary/args per agent kind in Settings ([`c05c9ae`](https://github.com/Vit129/kouen-terminal/commit/c05c9aef443d407eb5685ad778efa23d47ce621d))
-- Resolve GitPanelView merge — use Worktrees version, add clearRoot stub ([`662e587`](https://github.com/Vit129/kouen-terminal/commit/662e587c54badfe6041e4fc91c2349e37d9b0e92))
-- Suppress DECRPM (mode 2026) and Kitty ?u replies to prevent shell echo race ([`580d49e`](https://github.com/Vit129/kouen-terminal/commit/580d49e045fbe058231122f185622f9a1018642b))
-- Stop replying to DECRQM 2026/2027 and Kitty keyboard queries to avoid echo race ([`24d1aa1`](https://github.com/Vit129/kouen-terminal/commit/24d1aa12a7123a08bd5e74cb8f9007d11947bf2a))
-- Auto-refresh changes view and show commit details on click ([`c788e18`](https://github.com/Vit129/kouen-terminal/commit/c788e18a8c4ff30cd7f5da32d0a00096aeb8ea60))
+- Resolve correct ACP binary/args per agent kind in Settings ([`f530c88`](https://github.com/Vit129/kouen-terminal/commit/f530c880a2c9a0f56a01556baa38b49a1705287e))
+- Resolve GitPanelView merge — use Worktrees version, add clearRoot stub ([`43060e6`](https://github.com/Vit129/kouen-terminal/commit/43060e62c7b70d18e892782a31b3e9a7b1af602b))
+- Suppress DECRPM (mode 2026) and Kitty ?u replies to prevent shell echo race ([`7068396`](https://github.com/Vit129/kouen-terminal/commit/706839677ab8b0a1ac6cfa7f343a32f07f6ff53f))
+- Stop replying to DECRQM 2026/2027 and Kitty keyboard queries to avoid echo race ([`430b629`](https://github.com/Vit129/kouen-terminal/commit/430b629d53eb86c71349a0aaaacd243fab0e306a))
+- Auto-refresh changes view and show commit details on click ([`b3a9145`](https://github.com/Vit129/kouen-terminal/commit/b3a91453348d8370fe4584713d970c28f41f6f99))
 
 ## [1.5.1] - 2026-06-06
 
 ### Added
-- Implement non-blocking async IPC (P2-async) and isolate Prod/Debug/Preview sessions ([`65b0114`](https://github.com/Vit129/kouen-terminal/commit/65b0114b9d28b66352870057e8b862bab15341dc))
+- Implement non-blocking async IPC (P2-async) and isolate Prod/Debug/Preview sessions ([`81be588`](https://github.com/Vit129/kouen-terminal/commit/81be58850143b20adff2ae14859ae9bea6b682bb))
 
 ### Documentation
-- Rewrite README — CMUX + Zed architecture, full feature overview ([`9457ff3`](https://github.com/Vit129/kouen-terminal/commit/9457ff36158dcd90392fdfd3b2b9bf72a4d3d937))
+- Rewrite README — CMUX + Zed architecture, full feature overview ([`ddd6a30`](https://github.com/Vit129/kouen-terminal/commit/ddd6a3026627f3ffcd1832378c6da72e46c2ad0b))
 
 ### Fixed
-- Force file tree + git panel refresh on session switch ([`e80a0f4`](https://github.com/Vit129/kouen-terminal/commit/e80a0f4521eb89b2bd472c968e8d5af3da462d15))
-- Crash in GitPanelView.startWatching — @MainActor isolation from utility queue ([`611f274`](https://github.com/Vit129/kouen-terminal/commit/611f2740990b5061385b2e50766bb64000a00d8b))
+- Force file tree + git panel refresh on session switch ([`1e0c0eb`](https://github.com/Vit129/kouen-terminal/commit/1e0c0eb31c03198d6090d7460d16596af2cffe5d))
+- Crash in GitPanelView.startWatching — @MainActor isolation from utility queue ([`6cafe01`](https://github.com/Vit129/kouen-terminal/commit/6cafe01387bf558ac244e2414788f27248b26ef3))
 
 ## [2.2.0] - 2026-06-07
 
 ### Documentation
-- Update README (graphify, agent-memory, multi-agent sections) + git real-time refresh ([`3634cbf`](https://github.com/Vit129/kouen-terminal/commit/3634cbf99225deac70a3a68c802dfb7900ac8566))
+- Update README (graphify, agent-memory, multi-agent sections) + git real-time refresh ([`e320acc`](https://github.com/Vit129/kouen-terminal/commit/e320acc377fd23cd1e1bb3af49f4f2ec1fad949c))
 
 ## [2.1.0] - 2026-06-07
 
 ### Added
-- Decorate file tree git statuses ([`da39df1`](https://github.com/Vit129/kouen-terminal/commit/da39df1f0a137e4e01ab2b2eb95186a1c964a3c8))
-- Add clickable commit history panel ([`48c49f1`](https://github.com/Vit129/kouen-terminal/commit/48c49f14fd24bc06839979af57a53afa0f7c22fc))
-- Add LSP client package and preview resources ([`cb90c98`](https://github.com/Vit129/kouen-terminal/commit/cb90c98a896c93de40021b1bdb7b545588463a6b))
-- Add syntax and quick look file previews ([`f22016c`](https://github.com/Vit129/kouen-terminal/commit/f22016cf724ddd395366f019ddb783235ce22754))
-- ⌘-click file paths in terminal, branch switcher in Files tab, vi-like edit mode ([`ee37a8b`](https://github.com/Vit129/kouen-terminal/commit/ee37a8b7befa81704e7d638a524c430faf9694be))
-- Add harness-mcp (MCP server for AI agents) ([`08ce231`](https://github.com/Vit129/kouen-terminal/commit/08ce23172a818e0a5541dfcea604fb17be7df386))
-- Add `make install` — build + deploy to /Applications ([`9f98da8`](https://github.com/Vit129/kouen-terminal/commit/9f98da8084b0e3f272e45d4de2033b5d0a02fced))
-- Implement ACP Client — agent chat panel in sidebar ([`7aff448`](https://github.com/Vit129/kouen-terminal/commit/7aff4485bd98ea4e2a9a62353ddd316bc486fb62))
+- Decorate file tree git statuses ([`333ae2f`](https://github.com/Vit129/kouen-terminal/commit/333ae2fe5af569eb7b74be4bf3f9b14019d9896c))
+- Add clickable commit history panel ([`1909259`](https://github.com/Vit129/kouen-terminal/commit/19092596562e44bda1d2f878284cfcba455814c5))
+- Add LSP client package and preview resources ([`d1ccdda`](https://github.com/Vit129/kouen-terminal/commit/d1ccddaa90eb13e9a24df1e3e3c0873898551adb))
+- Add syntax and quick look file previews ([`57f9f22`](https://github.com/Vit129/kouen-terminal/commit/57f9f220882b4d682c41561fa277aa5cb4db024b))
+- ⌘-click file paths in terminal, branch switcher in Files tab, vi-like edit mode ([`b668123`](https://github.com/Vit129/kouen-terminal/commit/b668123402835f256e8c68e288152186dbe5b489))
+- Add harness-mcp (MCP server for AI agents) ([`64a6e8e`](https://github.com/Vit129/kouen-terminal/commit/64a6e8e9d3732025167dd1bafeef1823b5f21edf))
+- Add `make install` — build + deploy to /Applications ([`b85508a`](https://github.com/Vit129/kouen-terminal/commit/b85508a744819ed5045a36080d7062cfc117eec3))
+- Implement ACP Client — agent chat panel in sidebar ([`392efad`](https://github.com/Vit129/kouen-terminal/commit/392efad6635459465b72cf9ee23d6b4832df980f))
 
 ### Documentation
-- Update README with v2.0.0 file editor features ([`d86df99`](https://github.com/Vit129/kouen-terminal/commit/d86df99ec131fd08d3aca09391e516b792d34daa))
+- Update README with v2.0.0 file editor features ([`0bfe02b`](https://github.com/Vit129/kouen-terminal/commit/0bfe02b2312771b1c7a59f262daf880acb1ae335))
 
 ### Fixed
-- Tab reordering, git branch display prefix, and metadata refresh order check ([`31a5c79`](https://github.com/Vit129/kouen-terminal/commit/31a5c7981c891b23ef2f24965c881436fa29138f))
-- Refine preview isolation and session insertion ([`eadad53`](https://github.com/Vit129/kouen-terminal/commit/eadad532f6c86ec47da3dd4682fdd21ebd30807b))
-- Flip gutter coordinate system, default LSP auto-start off ([`1571b74`](https://github.com/Vit129/kouen-terminal/commit/1571b7452ba493a1d82eabc83d08506fc6f38317))
-- Session card title updates dynamically when cwd changes ([`14d5219`](https://github.com/Vit129/kouen-terminal/commit/14d52198b032420d7c4d619ed88f693e98862c57))
+- Tab reordering, git branch display prefix, and metadata refresh order check ([`c676011`](https://github.com/Vit129/kouen-terminal/commit/c676011e960c1ba1baed852c528e7d30a96551eb))
+- Refine preview isolation and session insertion ([`3299962`](https://github.com/Vit129/kouen-terminal/commit/32999620d40238fbcf5bc3ecbd0de0790f15114d))
+- Flip gutter coordinate system, default LSP auto-start off ([`ebff4af`](https://github.com/Vit129/kouen-terminal/commit/ebff4afca16deaadf7a9399af7c8b4e98e38a457))
+- Session card title updates dynamically when cwd changes ([`7c26907`](https://github.com/Vit129/kouen-terminal/commit/7c26907d92f98e1d3d54e6885435273f22e542ca))
 
 ## [2.0.0] - 2026-06-07
 
 ### Added
-- Split panel file editor with tabs, syntax, and file ops ([`3bbedf1`](https://github.com/Vit129/kouen-terminal/commit/3bbedf150811dacd5ec15a7fc6d3ac77ea98ea6f))
-- Editable file editor with save, undo/redo, find/replace ([`f2cad57`](https://github.com/Vit129/kouen-terminal/commit/f2cad57fce2111d4daf5e9d22796493223885102))
-- Vi-like mode (i=insert, Esc=normal) + git diff gutter ([`712999b`](https://github.com/Vit129/kouen-terminal/commit/712999b408f83e3379b758c0c4bbfbcb61c839f3))
+- Split panel file editor with tabs, syntax, and file ops ([`f5dc30d`](https://github.com/Vit129/kouen-terminal/commit/f5dc30d93c04eb40cbbcaf89bf920165a6c6e617))
+- Editable file editor with save, undo/redo, find/replace ([`d6a4502`](https://github.com/Vit129/kouen-terminal/commit/d6a4502fedb6848a8ba40a546f127e396e775d71))
+- Vi-like mode (i=insert, Esc=normal) + git diff gutter ([`e18bd2e`](https://github.com/Vit129/kouen-terminal/commit/e18bd2e0b6e8a6e63ed58a89e7b04835aa3c1f89))
 
 ### Documentation
-- Consolidate completed plans into single archive ([`ad6d3d2`](https://github.com/Vit129/kouen-terminal/commit/ad6d3d29b0b032a469c5ac4e986944c1f4432a66))
-- Add Terminal First, IDE Convenience philosophy to README ([`668389d`](https://github.com/Vit129/kouen-terminal/commit/668389d76de98b634eeee66be7dffdfea8680fff))
+- Consolidate completed plans into single archive ([`abca9e3`](https://github.com/Vit129/kouen-terminal/commit/abca9e3c91365b2243de6c2cd42d649e77dce50d))
+- Add Terminal First, IDE Convenience philosophy to README ([`78763d2`](https://github.com/Vit129/kouen-terminal/commit/78763d228a5fef64c5ecab92ec9c107a5dc0bc7a))
 
 ### Fixed
-- Terminal-first split ratio 30/70 (editor is compact panel) ([`3d2b9ee`](https://github.com/Vit129/kouen-terminal/commit/3d2b9ee5174c134492c0288e2ddb38e19fd0a610))
+- Terminal-first split ratio 30/70 (editor is compact panel) ([`202b4c4`](https://github.com/Vit129/kouen-terminal/commit/202b4c441370a423542855f6845a6fbecad69f4d))
 
 ## [1.6.0] - 2026-06-07
 
 ### Added
-- Dynamic branch display per session (A+B) ([`f50fcb8`](https://github.com/Vit129/kouen-terminal/commit/f50fcb8bc4c0cda70d5227a722724c994be94c51))
-- Merge dynamic branch display (A+B) ([`4f663c7`](https://github.com/Vit129/kouen-terminal/commit/4f663c7fdef7e100a0b1f2d026593ad95265b726))
-- Add read-only file preview to sidebar (P4 Track 1 MVP) ([`a53f24f`](https://github.com/Vit129/kouen-terminal/commit/a53f24fa91d6c86fcef790a65ed7fe66b537f36a))
-- Implement right sidebar layout and document current layout issues ([`6db23a5`](https://github.com/Vit129/kouen-terminal/commit/6db23a579eabad4c147fa6209a311fb5b1c0a22d))
-- Right-click toggle button shows Move Sidebar Left/Right menu ([`4004b9e`](https://github.com/Vit129/kouen-terminal/commit/4004b9ed175b3666e794bbdff2f05abc59199f68))
+- Dynamic branch display per session (A+B) ([`99d161f`](https://github.com/Vit129/kouen-terminal/commit/99d161fcf0dafa0dee7cb261dc9a237091b02c9a))
+- Merge dynamic branch display (A+B) ([`f8cce7b`](https://github.com/Vit129/kouen-terminal/commit/f8cce7b02b1b65c8b9cf338e7d9222b3076b9dd6))
+- Add read-only file preview to sidebar (P4 Track 1 MVP) ([`64469ab`](https://github.com/Vit129/kouen-terminal/commit/64469abf8966036ce82771f1b257296377812fed))
+- Implement right sidebar layout and document current layout issues ([`0301451`](https://github.com/Vit129/kouen-terminal/commit/03014510ae8f8823d9196bd47c792202932e2e61))
+- Right-click toggle button shows Move Sidebar Left/Right menu ([`31afcab`](https://github.com/Vit129/kouen-terminal/commit/31afcab2749ad40843fd91e80290c510fef4b01e))
 
 ### Documentation
-- Add CLAUDE.md developer guide ([`87b8dd6`](https://github.com/Vit129/kouen-terminal/commit/87b8dd693a2a6d5c8cfa3585f4b639964e18b951))
-- Merge CLAUDE.md developer guide ([`eb93369`](https://github.com/Vit129/kouen-terminal/commit/eb93369ed5eab69ca8353a8d8de0f472244a3015))
-- Update playbook (CASE-006 recursion) and P3 plan with progress + cmuxlayer reference ([`2d73340`](https://github.com/Vit129/kouen-terminal/commit/2d733408b6fec04bb22e19f89d295749f9557fbe))
-- Add AGENTS.md for AI coding agents (Codex/Gemini) ([`ce6ec01`](https://github.com/Vit129/kouen-terminal/commit/ce6ec01e1f840f19af850362794bffc300d19d3a))
-- Merge AGENTS.md for AI coding agents ([`4a7533b`](https://github.com/Vit129/kouen-terminal/commit/4a7533b19c1b3a9d7ef07a19a1200babfc43d0ba))
-- Update all docs for sidebar toggle fix and split down removal ([`6125957`](https://github.com/Vit129/kouen-terminal/commit/6125957b00a0e813cbd1e401529d598715b60f8a))
+- Add CLAUDE.md developer guide ([`383937d`](https://github.com/Vit129/kouen-terminal/commit/383937df54e6736dff44653ba5912af376275df5))
+- Merge CLAUDE.md developer guide ([`f6dc243`](https://github.com/Vit129/kouen-terminal/commit/f6dc24327747b3897863534a3626277b27d3ad50))
+- Update playbook (CASE-006 recursion) and P3 plan with progress + cmuxlayer reference ([`a3191f3`](https://github.com/Vit129/kouen-terminal/commit/a3191f33b3f9b6827a07e86816ba3214c73a6072))
+- Add AGENTS.md for AI coding agents (Codex/Gemini) ([`5ebd9ec`](https://github.com/Vit129/kouen-terminal/commit/5ebd9ecd661facf57e2d27965fa021325681456d))
+- Merge AGENTS.md for AI coding agents ([`57832cd`](https://github.com/Vit129/kouen-terminal/commit/57832cd1a59517edb366d9c7b5d29d3d7f75e51d))
+- Update all docs for sidebar toggle fix and split down removal ([`69067cc`](https://github.com/Vit129/kouen-terminal/commit/69067cc03c19fa5834a882e33def2b875f46d569))
 
 ### Fixed
-- N-ary flatten + recursion guard for equal pane sizing ([`225b105`](https://github.com/Vit129/kouen-terminal/commit/225b105e258f90e43cbe306c4af460538f5d780d))
-- Real-time sidebar position toggle without restart ([`b9100ee`](https://github.com/Vit129/kouen-terminal/commit/b9100ee33d7ec87360db428df2e5e357363546d3))
-- Remove Split Down from all context menus, add Move Sidebar option ([`f7acb5e`](https://github.com/Vit129/kouen-terminal/commit/f7acb5e12f9128fb130847597481160fc4326535))
+- N-ary flatten + recursion guard for equal pane sizing ([`2d701aa`](https://github.com/Vit129/kouen-terminal/commit/2d701aa5e01b35901d233e0ae713b8ddeceb46bb))
+- Real-time sidebar position toggle without restart ([`972bb9b`](https://github.com/Vit129/kouen-terminal/commit/972bb9b27e1ff91c56f20cf283c27b8f4c0929be))
+- Remove Split Down from all context menus, add Move Sidebar option ([`fcc3c5e`](https://github.com/Vit129/kouen-terminal/commit/fcc3c5e4b230117c7e64c5d2efada0be9c78e95f))
 
 ## [1.0.0] - 2026-05-31
 
