@@ -230,6 +230,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // "keep my work"), and the next clean quit will reap them. Synchronous + longer-timeout +
         // single retry so a momentarily busy daemon still reaps before the process exits.
         SessionCoordinator.shared.closeEphemeralSessionsBeforeQuit()
+        AIProviderAwakeService.shared.stop()
         ActivityAssertionManager.shared.releaseAll()
     }
 
