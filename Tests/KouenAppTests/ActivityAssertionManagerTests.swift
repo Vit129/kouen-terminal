@@ -138,4 +138,25 @@ final class AIProviderAwakeServiceTests: XCTestCase {
         AIProviderAwakeService(assertions: manager).refresh(enabled: false)
         XCTAssertEqual(manager.activeAssertionCount, 0)
     }
+
+    func testClosedLidTogglesHelperIdempotentlyAndRetriesFailedOff() {
+        var calls: [String] = []
+        var succeed = true
+        let service = AIProviderAwakeService(assertions: ActivityAssertionManager()) { arg in
+            calls.append(arg)
+            return succeed
+        }
+        service.setClosedLid(true)
+        service.setClosedLid(true)
+        XCTAssertEqual(calls, ["on"])
+        XCTAssertTrue(service.closedLidHeld)
+
+        succeed = false
+        service.setClosedLid(false)
+        XCTAssertTrue(service.closedLidHeld, "failed off must stay held so it is retried")
+        succeed = true
+        service.setClosedLid(false)
+        XCTAssertEqual(calls, ["on", "off", "off"])
+        XCTAssertFalse(service.closedLidHeld)
+    }
 }
