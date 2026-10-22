@@ -3,13 +3,13 @@ _Auto-generated from GRAPH_REPORT.md · do not edit manually_
 _Regen: `graphify update .`_
 
 ## Summary
-- 19908 nodes · 56967 edges · 2757 communities (1512 shown, 1245 thin omitted)
+- 19908 nodes · 56967 edges · 2757 communities (1511 shown, 1246 thin omitted)
 - Extraction: 85% EXTRACTED · 15% INFERRED · 0% AMBIGUOUS · INFERRED: 8560 edges (avg confidence: 0.74)
 - Token cost: 0 input · 0 output
 
 
 ## Graph Freshness
-- Built from commit: `12a4dc5d`
+- Built from commit: `ab9efa14`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -34,8 +34,8 @@ ever touching one area. This ranks by how many DIFFERENT communities a
 node's neighbors span, not by raw edge count.
 1. `IPCRequest` - bridges 189 areas (206 edges)
 2. `Command` - bridges 102 areas (108 edges)
-3. `AgentKind` - bridges 84 areas (178 edges)
-4. `t()` - bridges 82 areas (253 edges)
+3. `AgentKind` - bridges 85 areas (178 edges)
+4. `t()` - bridges 81 areas (253 edges)
 5. `IPCResponse` - bridges 80 areas (101 edges)
 6. `KouenTerminalSurfaceView` - bridges 75 areas (345 edges)
 7. `KouenPaths` - bridges 69 areas (150 edges)
