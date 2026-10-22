@@ -5,6 +5,13 @@ All notable changes to Kouen are documented here. The format is based on
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Each released version
 has a matching `vX.Y.Z` tag and a signed, notarized DMG on
 [GitHub Releases](https://github.com/Vit129/kouen-terminal/releases).
+## [4.21.12] - 2026-10-22
+
+### Added
+- Keep Mac awake while AI provider apps run alongside Kouen ([`bf06d3d`](https://github.com/Vit129/kouen-terminal/commit/bf06d3db07f97bab32ab202c5cd78a742c30d2d0))
+- Opt-in closed-lid keep-awake via pmset disablesleep helper ([`a909285`](https://github.com/Vit129/kouen-terminal/commit/a90928539cdbe904ffa253bd9f17470013b69746))
+
+
 ## [4.21.11] - 2026-10-21
 
 ### Added
