@@ -22,10 +22,16 @@ final class ActivityAssertionManager {
     ///   - key: Unique key identifying the workload (e.g. `pty-build:<surfaceID>`)
     ///   - surfaceID: Surface ID to associate with this assertion for pane teardown release
     ///   - reason: Descriptive reason string passed to ProcessInfo
-    func beginActivity(key: String, surfaceID: SurfaceID? = nil, reason: String) {
+    ///   - options: Defaults to App-Nap-only protection; pass `.idleSystemSleepDisabled` to also block idle sleep
+    func beginActivity(
+        key: String,
+        surfaceID: SurfaceID? = nil,
+        reason: String,
+        options: ProcessInfo.ActivityOptions = .userInitiatedAllowingIdleSystemSleep
+    ) {
         guard assertions[key] == nil else { return }
         let token = ProcessInfo.processInfo.beginActivity(
-            options: .userInitiatedAllowingIdleSystemSleep,
+            options: options,
             reason: reason
         )
         assertions[key] = token
@@ -118,7 +124,8 @@ final class ActivityAssertionManager {
         // Reconcile and release any assertions that are no longer active
         let currentKeys = Array(assertions.keys)
         for key in currentKeys {
-            if !liveKeys.contains(key) {
+            // Provider-app assertions are owned by AIProviderAwakeService, not the snapshot.
+            if !liveKeys.contains(key), !key.hasPrefix(AIProviderAwakeService.assertionKeyPrefix) {
                 endActivity(key: key)
             }
         }

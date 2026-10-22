@@ -47,6 +47,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         PrefixKeymap.shared.install()
         FloatingPaneController.shared.install()
         AppIdleThrottle.shared.install()
+        AIProviderAwakeService.shared.start()
 
         // Fix #8 (RL-040): Swallow key/mouse events targeting views that lost their window.
         // On macOS 26.5 + Swift 6.3, the @objc thunk crashes with EXC_BAD_ACCESS
@@ -229,6 +230,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // "keep my work"), and the next clean quit will reap them. Synchronous + longer-timeout +
         // single retry so a momentarily busy daemon still reaps before the process exits.
         SessionCoordinator.shared.closeEphemeralSessionsBeforeQuit()
+        AIProviderAwakeService.shared.stop()
         ActivityAssertionManager.shared.releaseAll()
     }
 

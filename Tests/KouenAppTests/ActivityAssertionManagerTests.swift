@@ -123,3 +123,40 @@ final class ActivityAssertionManagerTests: XCTestCase {
         XCTAssertFalse(manager.isAsserted(key: subagentKey), "Pane teardown must release subagent activity assertion")
     }
 }
+
+@MainActor
+final class AIProviderAwakeServiceTests: XCTestCase {
+    func testProviderMatching() {
+        XCTAssertTrue(AIProviderAwakeService.isProvider(bundleID: "com.microsoft.VSCode", name: nil))
+        XCTAssertTrue(AIProviderAwakeService.isProvider(bundleID: nil, name: "Antigravity"))
+        XCTAssertTrue(AIProviderAwakeService.isProvider(bundleID: "x.y", name: "ChatGPT"))
+        XCTAssertFalse(AIProviderAwakeService.isProvider(bundleID: "com.apple.finder", name: "Finder"))
+    }
+
+    func testRefreshDisabledHoldsNoAssertion() {
+        let manager = ActivityAssertionManager()
+        AIProviderAwakeService(assertions: manager).refresh(enabled: false)
+        XCTAssertEqual(manager.activeAssertionCount, 0)
+    }
+
+    func testClosedLidTogglesHelperIdempotentlyAndRetriesFailedOff() {
+        var calls: [String] = []
+        var succeed = true
+        let service = AIProviderAwakeService(assertions: ActivityAssertionManager()) { arg in
+            calls.append(arg)
+            return succeed
+        }
+        service.setClosedLid(true)
+        service.setClosedLid(true)
+        XCTAssertEqual(calls, ["on"])
+        XCTAssertTrue(service.closedLidHeld)
+
+        succeed = false
+        service.setClosedLid(false)
+        XCTAssertTrue(service.closedLidHeld, "failed off must stay held so it is retried")
+        succeed = true
+        service.setClosedLid(false)
+        XCTAssertEqual(calls, ["on", "off", "off"])
+        XCTAssertFalse(service.closedLidHeld)
+    }
+}
