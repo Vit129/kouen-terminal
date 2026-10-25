@@ -850,34 +850,9 @@ final class GitPanelView: NSView {
     /// has a known crash, see `agent-memory/knowledge/bugs/sidebar-cmdbackslash-toggle.md`) kills
     /// the process and reports failure rather than blocking the merge dialog forever.
     private func runShellCommand(_ executable: String, _ args: [String], in directory: String) async -> GitResult {
-        await withCheckedContinuation { continuation in
-            DispatchQueue.global(qos: .userInitiated).async {
-                let process = Process()
-                if let resolved = Process.resolveExecutablePath(executable) {
-                    process.executableURL = URL(fileURLWithPath: resolved)
-                    process.arguments = args
-                } else {
-                    process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
-                    process.arguments = [executable] + args
-                }
-                process.currentDirectoryURL = URL(fileURLWithPath: directory)
-                let pipe = Pipe()
-                process.standardOutput = pipe
-                process.standardError = pipe
-                do {
-                    try process.run()
-                    let timeout = DispatchWorkItem { if process.isRunning { process.terminate() } }
-                    DispatchQueue.global().asyncAfter(deadline: .now() + 300, execute: timeout)
-                    let data = pipe.fileHandleForReading.readDataToEndOfFile()
-                    process.waitUntilExit()
-                    timeout.cancel()
-                    let combined = String(data: data, encoding: .utf8) ?? ""
-                    continuation.resume(returning: GitResult(output: combined, stderr: combined, success: process.terminationStatus == 0))
-                } catch {
-                    continuation.resume(returning: GitResult(output: "", stderr: error.localizedDescription, success: false))
-                }
-            }
-        }
+        let res = await ProcessRunner.runAsync(executable: executable, arguments: args, in: directory, timeout: 300)
+        let combined = res.stdout.isEmpty ? res.stderr : res.stdout
+        return GitResult(output: combined, stderr: res.stderr, success: res.isSuccess)
     }
 
     /// A3 handoff: plain `git merge` (never `--no-ff`, never rebase — rebase would rewrite the
@@ -2205,28 +2180,9 @@ final class GitPanelView: NSView {
     // MARK: - Git
 
     private func runGit(_ args: [String], in directory: String) async -> String {
-        await withCheckedContinuation { continuation in
-            DispatchQueue.global(qos: .userInitiated).async {
-                let process = Process()
-                process.executableURL = URL(fileURLWithPath: "/usr/bin/git")
-                process.arguments = args
-                process.currentDirectoryURL = URL(fileURLWithPath: directory)
-                let pipe = Pipe()
-                process.standardOutput = pipe
-                process.standardError = FileHandle.nullDevice
-                do {
-                    try process.run()
-                    // Drain stdout before waitUntilExit(): for output >64KB the pipe
-                    // buffer fills and git blocks on write() while we'd be blocked in
-                    // waitUntilExit(), deadlocking (e.g. diffing graphify-out/graph.json).
-                    let data = pipe.fileHandleForReading.readDataToEndOfFile()
-                    process.waitUntilExit()
-                    continuation.resume(returning: String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? "")
-                } catch {
-                    continuation.resume(returning: "")
-                }
-            }
-        }
+        await Task.detached(priority: .userInitiated) {
+            GitRunner.shared.executeOutput(args, in: directory) ?? ""
+        }.value
     }
 
     /// Like `runGit`, but also surfaces stderr on failure instead of discarding it — used only
@@ -2238,44 +2194,15 @@ final class GitPanelView: NSView {
     /// string there risks a git failure rendering as garbage instead of the current graceful
     /// "nothing changed" fallback.
     nonisolated static func runGitDiff(_ args: [String], in directory: String) async -> String {
-        await withCheckedContinuation { continuation in
-            DispatchQueue.global(qos: .userInitiated).async {
-                let process = Process()
-                process.executableURL = URL(fileURLWithPath: "/usr/bin/git")
-                process.arguments = args
-                process.currentDirectoryURL = URL(fileURLWithPath: directory)
-                let outPipe = Pipe()
-                let errPipe = Pipe()
-                process.standardOutput = outPipe
-                process.standardError = errPipe
-                do {
-                    try process.run()
-                    // Drain both pipes concurrently, before waitUntilExit(): reading them
-                    // sequentially deadlocks if the unread one fills its kernel buffer
-                    // first while the child blocks writing to it (e.g. a large diff on
-                    // stdout racing verbose warnings on stderr).
-                    let errBox = DataBox()
-                    let errGroup = DispatchGroup()
-                    errGroup.enter()
-                    DispatchQueue.global(qos: .userInitiated).async {
-                        errBox.value = errPipe.fileHandleForReading.readDataToEndOfFile()
-                        errGroup.leave()
-                    }
-                    let outData = outPipe.fileHandleForReading.readDataToEndOfFile()
-                    errGroup.wait()
-                    process.waitUntilExit()
-                    let out = String(data: outData, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-                    if out.isEmpty, process.terminationStatus != 0 {
-                        let err = String(data: errBox.value, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-                        continuation.resume(returning: err.isEmpty ? "" : "git \(args.first ?? "") failed: \(err)")
-                        return
-                    }
-                    continuation.resume(returning: out)
-                } catch {
-                    continuation.resume(returning: "git \(args.first ?? "") failed: \(error.localizedDescription)")
-                }
+        await Task.detached(priority: .userInitiated) {
+            let res = GitRunner.shared.execute(args, in: directory)
+            let out = res.stdout.trimmingCharacters(in: .whitespacesAndNewlines)
+            if out.isEmpty, !res.isSuccess {
+                let err = res.stderr.trimmingCharacters(in: .whitespacesAndNewlines)
+                return err.isEmpty ? "" : "git \(args.first ?? "") failed: \(err)"
             }
-        }
+            return out
+        }.value
     }
 
     /// Hands a pipe-read result across the `DispatchGroup`-synchronized background read in

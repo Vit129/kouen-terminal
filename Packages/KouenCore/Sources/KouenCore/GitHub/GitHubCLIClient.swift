@@ -177,27 +177,8 @@ public struct GitHubCLIClient: Sendable {
     /// for non-standard installs (MacPorts, asdf/mise shims, etc.) — callers elsewhere (e.g.
     /// `SidebarListModel.cachedGhPath`) already probe availability with this same fallback, so
     /// this must match or the availability check and the actual fetch can silently disagree.
-    private static let cachedGhPath: String? = {
-        let paths = ["/opt/homebrew/bin/gh", "/usr/local/bin/gh", "/usr/bin/gh"]
-        if let found = paths.first(where: { FileManager.default.fileExists(atPath: $0) }) {
-            return found
-        }
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/which")
-        process.arguments = ["gh"]
-        let pipe = Pipe()
-        process.standardOutput = pipe
-        process.standardError = FileHandle.nullDevice
-        do {
-            try process.run()
-            let data = pipe.fileHandleForReading.readDataToEndOfFile()
-            process.waitUntilExit()
-            guard process.terminationStatus == 0,
-                  let path = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines),
-                  !path.isEmpty, FileManager.default.fileExists(atPath: path)
-            else { return nil }
-            return path
-        } catch { return nil }
+    public static let cachedGhPath: String? = {
+        ProcessRunner.resolveBinary("gh")
     }()
 
     private func runGH(_ args: [String], in directory: String? = nil) -> String? {

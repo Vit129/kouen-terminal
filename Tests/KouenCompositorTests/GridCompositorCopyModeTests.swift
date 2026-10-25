@@ -18,6 +18,7 @@ final class GridCompositorCopyModeTests: XCTestCase {
         PaneRect(paneID: UUID(), surfaceID: UUID(), x: 0, y: 0, cols: cols, rows: rows)
     }
 
+    // MARK: - [BE-UT] Copy-Mode Overlay Shading
     func testSelectionShadingEmitsPaletteBackground() {
         let comp = GridCompositor(cols: 20, rows: 6)
         let grid = snapshot(20, 5, "hello world")

@@ -1013,58 +1013,47 @@ extension CommandPaletteController {
     }
 
     nonisolated fileprivate static func grepMatches(query: String, root: String) -> [PaletteGrepMatch] {
-        let rgPath = ["/opt/homebrew/bin/rg", "/usr/local/bin/rg", "/usr/bin/rg"].first { FileManager.default.fileExists(atPath: $0) }
-        let proc = Process()
-        let pipe = Pipe()
-        proc.standardOutput = pipe
-        proc.standardError = FileHandle.nullDevice
-        proc.currentDirectoryURL = URL(fileURLWithPath: root)
-        if let rgPath {
-            proc.executableURL = URL(fileURLWithPath: rgPath)
-            proc.arguments = ["--line-number", "--column", "--no-heading", "--color=never", query, "."]
-        } else {
-            proc.executableURL = URL(fileURLWithPath: "/usr/bin/grep")
-            proc.arguments = ["-rn", query, "."]
-        }
-        do {
-            try proc.run()
-            let data = pipe.fileHandleForReading.readDataToEndOfFile()
-            proc.waitUntilExit()
-            guard let output = String(data: data, encoding: .utf8) else { return [] }
-            var matches: [PaletteGrepMatch] = []
-            var count = 0
-            for line in output.components(separatedBy: "\n") {
-                guard !line.isEmpty else { continue }
-                let parts = line.components(separatedBy: ":")
-                guard parts.count >= 3, let lineNum = Int(parts[1]) else { continue }
-                let relPath = parts[0]
-                let colNum: Int
-                let text: String
-                if parts.count >= 4, let col = Int(parts[2]) {
-                    colNum = col
-                    text = parts.dropFirst(3).joined(separator: ":").trimmingCharacters(in: .whitespacesAndNewlines)
-                } else {
-                    colNum = 1
-                    text = parts.dropFirst(2).joined(separator: ":").trimmingCharacters(in: .whitespacesAndNewlines)
-                }
-                let absPath = (root as NSString).appendingPathComponent(relPath)
-                let filename = (relPath as NSString).lastPathComponent
-                count += 1
-                matches.append(PaletteGrepMatch(
-                    absolutePath: absPath,
-                    relativePath: relPath,
-                    filename: filename,
-                    line: lineNum,
-                    column: colNum,
-                    text: text,
-                    ordinal: count
-                ))
-                if matches.count >= 100 { break }
+        let (exec, args): (String, [String]) = {
+            if let rgPath = ["/opt/homebrew/bin/rg", "/usr/local/bin/rg", "/usr/bin/rg"].first(where: { FileManager.default.fileExists(atPath: $0) }) {
+                return (rgPath, ["--line-number", "--column", "--no-heading", "--color=never", query, "."])
+            } else {
+                return ("/usr/bin/grep", ["-rn", query, "."])
             }
-            return matches
-        } catch {
-            return []
+        }()
+        let res = ProcessRunner.run(executable: exec, arguments: args, in: root, timeout: 15)
+        guard res.isSuccess else { return [] }
+        let output = res.stdout
+        var matches: [PaletteGrepMatch] = []
+        var count = 0
+        for line in output.components(separatedBy: "\n") {
+            guard !line.isEmpty else { continue }
+            let parts = line.components(separatedBy: ":")
+            guard parts.count >= 3, let lineNum = Int(parts[1]) else { continue }
+            let relPath = parts[0]
+            let colNum: Int
+            let text: String
+            if parts.count >= 4, let col = Int(parts[2]) {
+                colNum = col
+                text = parts.dropFirst(3).joined(separator: ":").trimmingCharacters(in: .whitespacesAndNewlines)
+            } else {
+                colNum = 1
+                text = parts.dropFirst(2).joined(separator: ":").trimmingCharacters(in: .whitespacesAndNewlines)
+            }
+            let absPath = (root as NSString).appendingPathComponent(relPath)
+            let filename = (relPath as NSString).lastPathComponent
+            count += 1
+            matches.append(PaletteGrepMatch(
+                absolutePath: absPath,
+                relativePath: relPath,
+                filename: filename,
+                line: lineNum,
+                column: colNum,
+                text: text,
+                ordinal: count
+            ))
+            if matches.count >= 100 { break }
         }
+        return matches
     }
 
     @MainActor
@@ -1112,18 +1101,8 @@ extension Process {
     /// or exits non-zero.
     static func zoxideQueryAll() throws -> String? {
         let binary = resolveExecutablePath("zoxide") ?? "zoxide"
-        let proc = Process()
-        proc.executableURL = URL(fileURLWithPath: binary)
-        proc.arguments = ["query", "-l"]
-        let pipe = Pipe()
-        proc.standardOutput = pipe
-        proc.standardError = FileHandle.nullDevice
-        try proc.run()
-        // Drain stdout before waitUntilExit(): a long zoxide history can exceed the
-        // pipe's kernel buffer, deadlocking if read only happens after the child exits.
-        let data = pipe.fileHandleForReading.readDataToEndOfFile()
-        proc.waitUntilExit()
-        guard proc.terminationStatus == 0 else { return nil }
-        return String(data: data, encoding: .utf8)
+        let res = ProcessRunner.run(executable: binary, arguments: ["query", "-l"], timeout: 10)
+        guard res.isSuccess else { return nil }
+        return res.stdout
     }
 }

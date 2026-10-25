@@ -239,31 +239,8 @@ public final class IssueTrackerService: Sendable {
     /// output on either stream exceeds the pipe buffer. See
     /// agent-memory/knowledge/patterns/process-pipe-deadlock.md.
     private func runProcess(_ executablePath: String, args: [String]) async throws -> (stdout: String, stderr: String, exitCode: Int32) {
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: executablePath)
-        process.arguments = args
-        let outPipe = Pipe()
-        let errPipe = Pipe()
-        process.standardOutput = outPipe
-        process.standardError = errPipe
-        try process.run()
-
-        async let outDataTask = withCheckedContinuation { (continuation: CheckedContinuation<Data, Never>) in
-            DispatchQueue.global(qos: .userInitiated).async {
-                continuation.resume(returning: outPipe.fileHandleForReading.readDataToEndOfFile())
-            }
-        }
-        async let errDataTask = withCheckedContinuation { (continuation: CheckedContinuation<Data, Never>) in
-            DispatchQueue.global(qos: .userInitiated).async {
-                continuation.resume(returning: errPipe.fileHandleForReading.readDataToEndOfFile())
-            }
-        }
-        let (outData, errData) = await (outDataTask, errDataTask)
-        process.waitUntilExit()
-
-        let stdout = String(data: outData, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-        let stderr = String(data: errData, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-        return (stdout, stderr, process.terminationStatus)
+        let res = await ProcessRunner.runAsync(executable: executablePath, arguments: args)
+        return (res.stdout.trimmingCharacters(in: .whitespacesAndNewlines), res.stderr.trimmingCharacters(in: .whitespacesAndNewlines), res.exitCode)
     }
 
     // MARK: - Azure DevOps REST

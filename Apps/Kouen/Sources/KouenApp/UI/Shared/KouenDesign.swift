@@ -160,6 +160,21 @@ enum KouenDesign {
         }
     }
 
+    // MARK: - Color Tokens (Layer 2 Design Tokens Bridge)
+    public enum Colors {
+        public static let hintChipBackground = NSColor(red: 0.98, green: 0.87, blue: 0.18, alpha: 0.93)
+        public static let hintChipBorder = NSColor.black.withAlphaComponent(0.35)
+        public static let hintChipText = NSColor(white: 0.08, alpha: 1)
+
+        public enum SUI {
+            public static let success = Color(red: 0.42, green: 0.85, blue: 0.50)
+            public static let successAction = Color(red: 0.30, green: 0.68, blue: 0.42)
+            public static let error = Color(red: 1.0, green: 0.42, blue: 0.40)
+            public static let errorBadge = Color(red: 1.0, green: 0.45, blue: 0.42)
+            public static let warning = Color.orange
+        }
+    }
+
     /// Drop-shadow recipe presets. Apply with `applyShadow(.elevation1, to: layer)`.
     enum Shadow {
         case none
