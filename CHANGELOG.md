@@ -5,6 +5,12 @@ All notable changes to Kouen are documented here. The format is based on
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Each released version
 has a matching `vX.Y.Z` tag and a signed, notarized DMG on
 [GitHub Releases](https://github.com/Vit129/kouen-terminal/releases).
+## [4.22.1] - 2026-10-25
+
+### Changed
+- Complete Dev-QA pattern (ProcessRunner, ratchet G3 to 0, Rule 2/3 guards, layered test tags) ([`ca7164d`](https://github.com/Vit129/kouen-terminal/commit/ca7164d78d0f1dea08820cd629ed607d3027ee52))
+
+
 ## [4.22.0] - 2026-10-25
 
 ### Changed
