@@ -97,8 +97,8 @@ final class ArchitectureGuardTests: XCTestCase {
             }
         }
 
-        // Ratchet: Current baseline ceiling is 15 (ratcheted down from 19 after KouenGit migration).
-        let maxAllowedProcessCalls = 15
+        // Ratchet: Current baseline ceiling is 12 (ratcheted down from 19 after KouenGit migration).
+        let maxAllowedProcessCalls = 12
         XCTAssertLessThanOrEqual(
             totalCount,
             maxAllowedProcessCalls,
