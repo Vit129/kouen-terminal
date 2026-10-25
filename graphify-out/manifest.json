@@ -960,8 +960,8 @@
     "semantic_hash": ""
   },
   "Packages/KouenCore/Sources/KouenCore/KouenVersion.swift": {
-    "mtime": 1792570405.450168,
-    "ast_hash": "7dae0d8895e8459fede71a1c58e26701",
+    "mtime": 1792666477.77924,
+    "ast_hash": "7a4110400d906f62ed3ea1c292806d52",
     "semantic_hash": ""
   },
   "Packages/KouenCore/Sources/KouenCore/Layouts/LayoutTemplate.swift": {
@@ -1050,8 +1050,8 @@
     "semantic_hash": ""
   },
   "Packages/KouenCore/Sources/KouenCore/ReleaseNotes/GeneratedReleaseNotes.swift": {
-    "mtime": 1792570407.1378963,
-    "ast_hash": "c91f00e1b6e1434fe1bf220e0d9e5d90",
+    "mtime": 1792666484.2951186,
+    "ast_hash": "2136f31ffaaaa3b97d5eed9039f36a0e",
     "semantic_hash": ""
   },
   "Packages/KouenCore/Sources/KouenCore/ReleaseNotes/ReleaseNotes.swift": {
