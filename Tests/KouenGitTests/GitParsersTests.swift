@@ -58,4 +58,43 @@ final class GitParsersTests: XCTestCase {
         XCTAssertEqual(GitParsers.parseRepoRoot(output: "/Users/dev/repo\n"), "/Users/dev/repo")
         XCTAssertNil(GitParsers.parseRepoRoot(output: ""))
     }
+
+    func testParseDiffHunksAndPatchText() {
+        let diff = """
+        diff --git a/file.txt b/file.txt
+        index 1234567..89abcdef 100644
+        --- a/file.txt
+        +++ b/file.txt
+        @@ -1,3 +1,4 @@
+         line 1
+        +line 1.5
+         line 2
+         line 3
+        @@ -10,2 +11,3 @@
+         line 10
+        +line 10.5
+         line 11
+        """
+
+        let (header, hunks) = GitParsers.parseDiffHunks(diff)
+        XCTAssertEqual(header.count, 4)
+        XCTAssertEqual(hunks.count, 2)
+        XCTAssertTrue(hunks[0][0].hasPrefix("@@ -1,3 +1,4 @@"))
+        XCTAssertTrue(hunks[1][0].hasPrefix("@@ -10,2 +11,3 @@"))
+
+        let patch = GitParsers.patchText(header: header, hunk: hunks[0])
+        XCTAssertTrue(patch.hasPrefix("diff --git"))
+        XCTAssertTrue(patch.contains("+line 1.5"))
+    }
+
+    func testErrorSummary() {
+        let stderr = """
+        hint: Updates were rejected because the remote contains work that you do
+        hint: not have locally.
+        error: failed to push some refs to 'origin'
+        fatal: The remote end hung up unexpectedly
+        """
+        let summary = GitParsers.errorSummary(from: stderr)
+        XCTAssertEqual(summary, "error: failed to push some refs to 'origin' fatal: The remote end hung up unexpectedly")
+    }
 }

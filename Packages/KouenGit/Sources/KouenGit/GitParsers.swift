@@ -77,4 +77,43 @@ public enum GitParsers {
         }
         return root
     }
+
+    /// Splits diff output for a single file into the shared file header and individual hunks.
+    public static func parseDiffHunks(_ text: String) -> (header: [String], hunks: [[String]]) {
+        let lines = text.components(separatedBy: "\n")
+        guard let firstHunkIndex = lines.firstIndex(where: { $0.hasPrefix("@@") }) else {
+            return (lines, [])
+        }
+        let header = Array(lines[0..<firstHunkIndex])
+        var hunks: [[String]] = []
+        var current: [String] = []
+        for line in lines[firstHunkIndex...] {
+            if line.hasPrefix("@@") {
+                if !current.isEmpty { hunks.append(current) }
+                current = [line]
+            } else {
+                current.append(line)
+            }
+        }
+        if !current.isEmpty { hunks.append(current) }
+        if hunks.last?.last == "" { hunks[hunks.count - 1].removeLast() }
+        return (header, hunks)
+    }
+
+    /// A single hunk's patch text, valid on its own for `git apply --cached [-R]`.
+    public static func patchText(header: [String], hunk: [String]) -> String {
+        (header + hunk).joined(separator: "\n") + "\n"
+    }
+
+    /// Summarizes git stderr into a single-line toast message.
+    public static func errorSummary(from stderr: String) -> String {
+        let lines = stderr.split(separator: "\n", omittingEmptySubsequences: true)
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter { !$0.hasPrefix("hint:") }
+        let errorLines = lines.filter { $0.hasPrefix("error:") || $0.hasPrefix("fatal:") }
+        let summary = (errorLines.isEmpty ? lines : errorLines).joined(separator: " ")
+        let fallback = summary.isEmpty ? stderr.trimmingCharacters(in: .whitespacesAndNewlines) : summary
+        guard fallback.count > 120 else { return fallback }
+        return String(fallback.prefix(120)) + "…"
+    }
 }

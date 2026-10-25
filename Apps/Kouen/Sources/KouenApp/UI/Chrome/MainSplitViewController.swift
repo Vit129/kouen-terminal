@@ -1,5 +1,6 @@
 import AppKit
 import KouenCore
+import KouenGit
 import QuartzCore
 import os
 
@@ -334,8 +335,8 @@ final class MainSplitViewController: NSViewController {
         let branch = userInfo["branch"] as? String ?? "HEAD"
         let base = userInfo["base"] as? String ?? "main"
         Task {
-            let diff = await GitPanelView.runGitDiff(["diff", "--stat", "--patch", "\(base)...\(branch)"], in: cwd)
-            let content = diff.isEmpty ? await GitPanelView.runGitDiff(["diff", "--stat", "--patch", "HEAD"], in: cwd) : diff
+            let diff = GitRunner.shared.executeOutput(["diff", "--stat", "--patch", "\(base)...\(branch)"], in: cwd) ?? ""
+            let content = diff.isEmpty ? (GitRunner.shared.executeOutput(["diff", "--stat", "--patch", "HEAD"], in: cwd) ?? "") : diff
             let safeName = "\(branch.replacingOccurrences(of: "/", with: "_"))_vs_\(base)"
             let tmpDir = NSTemporaryDirectory() + "kouen-diff/"
             try? FileManager.default.createDirectory(atPath: tmpDir, withIntermediateDirectories: true)
