@@ -28,33 +28,13 @@ final class ArchitectureGuardTests: XCTestCase {
             "Packages/KouenCompositor",
         ]
 
-        let forbiddenImportPatterns = [
-            "import AppKit",
-            "import SwiftUI",
-            "import Cocoa",
-            "import UIKit",
-            "import Metal",
-            "import QuartzCore",
-            "import WebKit",
-            "#if canImport(AppKit)",
-        ]
-
         var violations: [String] = []
 
         for relDir in headlessPackageDirs {
             let dirURL = repoRoot.appendingPathComponent(relDir)
             guard FileManager.default.fileExists(atPath: dirURL.path) else { continue }
-
             let swiftFiles = findSwiftFiles(in: dirURL)
-            for file in swiftFiles {
-                let content = try String(contentsOf: file, encoding: .utf8)
-                for pattern in forbiddenImportPatterns {
-                    if content.contains(pattern) {
-                        let relPath = file.path.replacingOccurrences(of: repoRoot.path + "/", with: "")
-                        violations.append("\(relPath): contains '\(pattern)'")
-                    }
-                }
-            }
+            violations.append(contentsOf: try scanUIImportViolations(in: swiftFiles))
         }
 
         XCTAssertTrue(
@@ -72,30 +52,13 @@ final class ArchitectureGuardTests: XCTestCase {
             "Apps/Kouen/Sources/KouenApp/Settings",
         ]
 
-        var currentViolations: [String: Int] = [:]
         var totalCount = 0
 
         for relDir in uiDirs {
             let dirURL = repoRoot.appendingPathComponent(relDir)
             guard FileManager.default.fileExists(atPath: dirURL.path) else { continue }
-
             let swiftFiles = findSwiftFiles(in: dirURL)
-            for file in swiftFiles {
-                let content = try String(contentsOf: file, encoding: .utf8)
-                let lines = content.components(separatedBy: .newlines)
-                var fileCount = 0
-                for line in lines {
-                    let trimmed = line.trimmingCharacters(in: .whitespaces)
-                    if !trimmed.hasPrefix("//") && trimmed.contains("Process()") {
-                        fileCount += 1
-                    }
-                }
-                if fileCount > 0 {
-                    let relPath = file.path.replacingOccurrences(of: repoRoot.path + "/", with: "")
-                    currentViolations[relPath] = fileCount
-                    totalCount += fileCount
-                }
-            }
+            totalCount += try countProcessCalls(in: swiftFiles)
         }
 
         // Ratchet: Current baseline ceiling is 12 (ratcheted down from 19 after KouenGit migration).
@@ -137,7 +100,11 @@ final class ArchitectureGuardTests: XCTestCase {
 
     // MARK: - G10: Negative Controls (Self-Testing The Guard)
 
-    func testG10_NegativeControlCatchesViolations() {
+    func testG10_NegativeControlCatchesViolations() throws {
+        let tempDir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+
         let badSource = """
         import Foundation
         import AppKit
@@ -149,16 +116,56 @@ final class ArchitectureGuardTests: XCTestCase {
             }
         }
         """
+        let badFile = tempDir.appendingPathComponent("BadFile.swift")
+        try badSource.write(to: badFile, atomically: true, encoding: .utf8)
 
-        let forbiddenImportPatterns = ["import AppKit", "import SwiftUI"]
-        let caughtForbiddenUI = forbiddenImportPatterns.contains { badSource.contains($0) }
-        let caughtProcess = badSource.components(separatedBy: .newlines).contains { line in
-            let trimmed = line.trimmingCharacters(in: .whitespaces)
-            return !trimmed.hasPrefix("//") && trimmed.contains("Process()")
+        let caughtViolations = try scanUIImportViolations(in: [badFile])
+        let caughtProcessCount = try countProcessCalls(in: [badFile])
+
+        XCTAssertFalse(caughtViolations.isEmpty, "Negative control must catch import AppKit using real scanner")
+        XCTAssertEqual(caughtProcessCount, 1, "Negative control must catch exactly 1 un-commented Process() call using real scanner")
+    }
+
+    // MARK: - Helpers
+
+    private func scanUIImportViolations(in files: [URL]) throws -> [String] {
+        let forbiddenImportPatterns = [
+            "import AppKit",
+            "import SwiftUI",
+            "import Cocoa",
+            "import UIKit",
+            "import Metal",
+            "import QuartzCore",
+            "import WebKit",
+            "#if canImport(AppKit)",
+        ]
+
+        var violations: [String] = []
+        for file in files {
+            let content = try String(contentsOf: file, encoding: .utf8)
+            for pattern in forbiddenImportPatterns {
+                if content.contains(pattern) {
+                    let relPath = file.path.replacingOccurrences(of: repoRoot.path + "/", with: "")
+                    violations.append("\(relPath): contains '\(pattern)'")
+                }
+            }
         }
+        return violations
+    }
 
-        XCTAssertTrue(caughtForbiddenUI, "Negative control must catch import AppKit")
-        XCTAssertTrue(caughtProcess, "Negative control must catch un-commented Process()")
+    private func countProcessCalls(in files: [URL]) throws -> Int {
+        var count = 0
+        for file in files {
+            let content = try String(contentsOf: file, encoding: .utf8)
+            let lines = content.components(separatedBy: .newlines)
+            for line in lines {
+                let trimmed = line.trimmingCharacters(in: .whitespaces)
+                if !trimmed.hasPrefix("//") && trimmed.contains("Process()") {
+                    count += 1
+                }
+            }
+        }
+        return count
     }
 
     // MARK: - Helpers
