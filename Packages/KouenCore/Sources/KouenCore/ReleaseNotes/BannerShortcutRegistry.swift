@@ -1,7 +1,4 @@
 import Foundation
-#if canImport(AppKit)
-import AppKit
-#endif
 
 /// Single source of truth for app-wide keyboard shortcuts.
 /// Both `MainMenuBuilder` (menu key equivalents) and the terminal welcome banner
@@ -50,17 +47,6 @@ public struct MenuModifiers: OptionSet, Sendable {
         if contains(.control) { s += "⌃" }
         return s
     }
-
-    #if canImport(AppKit)
-    public var modifierFlags: NSEvent.ModifierFlags {
-        var flags: NSEvent.ModifierFlags = []
-        if contains(.command) { flags.insert(.command) }
-        if contains(.shift)   { flags.insert(.shift) }
-        if contains(.option)  { flags.insert(.option) }
-        if contains(.control) { flags.insert(.control) }
-        return flags
-    }
-    #endif
 }
 
 /// A single keybinding that both menu and banner can consume.

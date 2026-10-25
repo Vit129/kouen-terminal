@@ -1,5 +1,6 @@
 import AppKit
 import KouenCore
+import KouenGit
 import KouenIPC
 import KouenSettings
 import SwiftUI
@@ -1487,29 +1488,14 @@ final class KouenSidebarPanelViewController: NSViewController {
         // Run git off the main actor — readDataToEndOfFile + waitUntilExit block the
         // calling thread, causing a 1s+ hang report when executed on main.
         let repoName: String? = await Task.detached(priority: .utility) {
-            let process = Process()
-            process.executableURL = URL(fileURLWithPath: "/usr/bin/git")
-            process.arguments = ["config", "--get", "remote.origin.url"]
-            process.currentDirectoryURL = URL(fileURLWithPath: path)
-            let pipe = Pipe()
-            process.standardOutput = pipe
-            process.standardError = FileHandle.nullDevice
-            do {
-                try process.run()
-                let data = pipe.fileHandleForReading.readDataToEndOfFile()
-                process.waitUntilExit()
-                if process.terminationStatus == 0,
-                   let urlString = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines),
-                   !urlString.isEmpty {
-                    let lastPathComponent = (urlString as NSString).lastPathComponent
-                    var repo = lastPathComponent
-                    if repo.hasSuffix(".git") {
-                        repo = String(repo.dropLast(4))
-                    }
-                    if !repo.isEmpty { return repo }
-                }
-            } catch {}
-            return nil
+            guard let urlString = GitRunner.shared.executeOutput(["config", "--get", "remote.origin.url"], in: path),
+                  !urlString.isEmpty else { return nil }
+            let lastPathComponent = (urlString as NSString).lastPathComponent
+            var repo = lastPathComponent
+            if repo.hasSuffix(".git") {
+                repo = String(repo.dropLast(4))
+            }
+            return repo.isEmpty ? nil : repo
         }.value
         return repoName ?? folderName
     }

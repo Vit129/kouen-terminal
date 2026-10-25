@@ -1,4 +1,5 @@
 import Foundation
+import KouenGit
 
 /// Git-diff gutter parsing shared by `FileEditorView` (read/write) and
 /// `FileViewerViewController` (read-only sidebar preview) — both render the
@@ -23,20 +24,9 @@ enum GitDiffGutter {
     static func diffLines(for path: String) async -> [Int: SyntaxTextView.DiffLineType] {
         let dir = (path as NSString).deletingLastPathComponent
         let file = (path as NSString).lastPathComponent
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/git")
-        process.arguments = ["diff", "HEAD", "--unified=0", "--", file]
-        process.currentDirectoryURL = URL(fileURLWithPath: dir)
-        let pipe = Pipe()
-        process.standardOutput = pipe
-        process.standardError = FileHandle.nullDevice
-        do { try process.run() } catch { return [:] }
-        // Drain stdout before waitUntilExit(): a large diff can exceed the pipe's kernel
-        // buffer, so reading only after the child exits deadlocks (child blocks on
-        // write(), waitUntilExit() blocks on the child exiting).
-        let data = pipe.fileHandleForReading.readDataToEndOfFile()
-        process.waitUntilExit()
-        guard let output = String(data: data, encoding: .utf8) else { return [:] }
+        guard let output = GitRunner.shared.executeOutput(["diff", "HEAD", "--unified=0", "--", file], in: dir) else {
+            return [:]
+        }
 
         // "-start[,count]" or "+start[,count]" — count defaults to 1 when omitted.
         func parseRange(_ spec: Substring) -> (start: Int, count: Int)? {

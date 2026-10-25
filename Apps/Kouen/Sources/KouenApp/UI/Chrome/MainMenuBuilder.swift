@@ -1,6 +1,17 @@
 import AppKit
 import KouenCore
 
+extension MenuModifiers {
+    var modifierFlags: NSEvent.ModifierFlags {
+        var flags: NSEvent.ModifierFlags = []
+        if contains(.command) { flags.insert(.command) }
+        if contains(.shift)   { flags.insert(.shift) }
+        if contains(.option)  { flags.insert(.option) }
+        if contains(.control) { flags.insert(.control) }
+        return flags
+    }
+}
+
 @MainActor
 enum MainMenuBuilder {
     /// Create an NSMenuItem from a registry Keybinding.

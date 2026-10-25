@@ -74,8 +74,8 @@ let platformTargets: [Target] = [
         ],
         path: "Packages/KouenTerminalKit/Sources/KouenTerminalKit"
     ),
-    // Immersive onboarding wizard — pure SwiftUI/AppKit, no external or first-party
-    // dependencies (deliberately isolated, mirrors install paths via its own helpers).
+    // Immersive onboarding wizard — SwiftUI/AppKit wizard consuming core configuration,
+    // settings, commands, and IPC.
     .target(
         name: "KouenOnboarding",
         dependencies: ["KouenCore", "KouenIPC", "KouenSettings", "KouenCommands"],
@@ -85,6 +85,10 @@ let platformTargets: [Target] = [
         name: "KouenApp",
         dependencies: [
             "KouenCore",
+            "KouenGit",
+            "KouenIPC",
+            "KouenSettings",
+            "KouenCommands",
             // Engine types (e.g. TerminalProgressReport) surface through KouenTerminalKit's
             // public delegate API, so the app consumes the engine module directly.
             "KouenTerminalEngine",
@@ -177,6 +181,7 @@ let package = Package(
         .library(name: "KouenIPC", targets: ["KouenIPC"]),
         .library(name: "KouenSettings", targets: ["KouenSettings"]),
         .library(name: "KouenCommands", targets: ["KouenCommands"]),
+        .library(name: "KouenGit", targets: ["KouenGit"]),
         .library(name: "KouenCore", targets: ["KouenCore"]),
         // Self-contained native terminal engine (VT parser + screen/grid model). Pure
         // Swift, no Metal/AppKit.
@@ -219,9 +224,15 @@ let package = Package(
             path: "Packages/KouenCommands/Sources/KouenCommands",
             swiftSettings: strictFoundationSettings
         ),
+        // Pure headless Git execution runner, models and output parsers.
+        .target(
+            name: "KouenGit",
+            path: "Packages/KouenGit/Sources/KouenGit",
+            swiftSettings: strictFoundationSettings
+        ),
         .target(
             name: "KouenCore",
-            dependencies: ["KouenIPC", "KouenSettings", "KouenCommands"],
+            dependencies: ["KouenIPC", "KouenSettings", "KouenCommands", "KouenGit"],
             path: "Packages/KouenCore/Sources/KouenCore",
             swiftSettings: strictFoundationSettings,
             linkerSettings: coreLinkerSettings
@@ -334,6 +345,16 @@ let package = Package(
             name: "KouenDaemonTests",
             dependencies: ["KouenDaemonCore", "KouenCore", "KouenTerminalEngine"],
             path: "Tests/KouenDaemonTests"
+        ),
+        .testTarget(
+            name: "KouenGitTests",
+            dependencies: ["KouenGit"],
+            path: "Tests/KouenGitTests"
+        ),
+        .testTarget(
+            name: "KouenArchitectureGuardTests",
+            dependencies: [],
+            path: "Tests/KouenArchitectureGuardTests"
         ),
     ] + platformTargets + platformTestTargets
 )

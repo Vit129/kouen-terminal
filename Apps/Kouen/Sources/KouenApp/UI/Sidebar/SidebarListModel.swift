@@ -1,5 +1,6 @@
 import AppKit
 import KouenCore
+import KouenGit
 import Observation
 
 // MARK: - Shared types
@@ -500,28 +501,8 @@ final class SidebarListModel {
     }
 
     private func resolveGitRepoRoot(for path: String) async -> String? {
-        guard !path.isEmpty, FileManager.default.fileExists(atPath: path) else { return nil }
-        return await Task.detached(priority: .utility) {
-            let process = Process()
-            process.executableURL = URL(fileURLWithPath: "/usr/bin/git")
-            process.arguments = ["-C", path, "rev-parse", "--path-format=absolute", "--git-common-dir"]
-            let pipe = Pipe()
-            process.standardOutput = pipe
-            process.standardError = FileHandle.nullDevice
-            do {
-                try process.run()
-                let data = pipe.fileHandleForReading.readDataToEndOfFile()
-                process.waitUntilExit()
-                if process.terminationStatus == 0,
-                   var root = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines),
-                   !root.isEmpty {
-                    if root.hasSuffix("/.git") {
-                        root = (root as NSString).deletingLastPathComponent
-                    }
-                    return root
-                }
-            } catch {}
-            return nil
+        await Task.detached(priority: .utility) {
+            GitService.shared.resolveRepoRoot(for: path)
         }.value
     }
 
@@ -588,22 +569,7 @@ final class SidebarListModel {
 
     private func fetchHasRemote(for path: String) async -> Bool {
         await Task.detached(priority: .utility) {
-            let process = Process()
-            process.executableURL = URL(fileURLWithPath: "/usr/bin/git")
-            process.arguments = ["remote"]
-            process.currentDirectoryURL = URL(fileURLWithPath: path)
-            let pipe = Pipe()
-            process.standardOutput = pipe
-            process.standardError = FileHandle.nullDevice
-            do {
-                try process.run()
-                let data = pipe.fileHandleForReading.readDataToEndOfFile()
-                process.waitUntilExit()
-                if process.terminationStatus == 0 {
-                    return !(String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? "").isEmpty
-                }
-            } catch {}
-            return false
+            GitService.shared.hasRemote(for: path)
         }.value
     }
 
@@ -621,25 +587,9 @@ final class SidebarListModel {
             let prMergeable = pr.map { $0.mergeable }
             let prReviewDecision = pr?.reviewDecision
 
-            var aheadCount: Int? = nil
-            var behindCount: Int? = nil
-            let revProcess = Process()
-            revProcess.executableURL = URL(fileURLWithPath: "/usr/bin/git")
-            revProcess.arguments = ["rev-list", "--left-right", "--count", "HEAD...origin/\(branch)"]
-            revProcess.currentDirectoryURL = URL(fileURLWithPath: path)
-            let revPipe = Pipe()
-            revProcess.standardOutput = revPipe
-            revProcess.standardError = FileHandle.nullDevice
-            do {
-                try revProcess.run()
-                let data = revPipe.fileHandleForReading.readDataToEndOfFile()
-                revProcess.waitUntilExit()
-                if revProcess.terminationStatus == 0,
-                   let output = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines) {
-                    let parts = output.components(separatedBy: "\t")
-                    if parts.count == 2 { aheadCount = Int(parts[0]); behindCount = Int(parts[1]) }
-                }
-            } catch {}
+            let aheadBehind = GitService.shared.aheadBehindCount(for: path, upstreamBranch: branch)
+            let aheadCount = aheadBehind?.ahead
+            let behindCount = aheadBehind?.behind
 
             return RepoGitMetadata(prNumber: prNumber, prURL: prURL, prTitle: prTitle, prBaseBranch: prBaseBranch, prChecksStatus: prChecksStatus, prMergeable: prMergeable, prReviewDecision: prReviewDecision, aheadCount: aheadCount, behindCount: behindCount)
         }.value
@@ -664,49 +614,27 @@ final class SidebarListModel {
     private func fetchWorktrees(for rootPath: String) async -> [SidebarWorktreeEntry] {
         guard !rootPath.isEmpty, FileManager.default.fileExists(atPath: rootPath) else { return [] }
         return await Task.detached(priority: .utility) {
-            let process = Process()
-            process.executableURL = URL(fileURLWithPath: "/usr/bin/git")
-            process.arguments = ["worktree", "list", "--porcelain"]
-            process.currentDirectoryURL = URL(fileURLWithPath: rootPath)
-            let pipe = Pipe()
-            process.standardOutput = pipe
-            process.standardError = FileHandle.nullDevice
-            do {
-                try process.run()
-                let data = pipe.fileHandleForReading.readDataToEndOfFile()
-                process.waitUntilExit()
-                guard process.terminationStatus == 0 else { return [] }
-                let output = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-                let manager = WorktreeManager()
-                return output.components(separatedBy: "\n\n").enumerated().compactMap { index, block in
-                    let lines = block.components(separatedBy: "\n").filter { !$0.isEmpty }
-                    guard let wtLine = lines.first(where: { $0.hasPrefix("worktree ") }),
-                          let headLine = lines.first(where: { $0.hasPrefix("HEAD ") }) else { return nil }
-                    let worktreePath = String(wtLine.dropFirst("worktree ".count))
-                    let head = String(headLine.dropFirst("HEAD ".count))
-                    let branchLine = lines.first(where: { $0.hasPrefix("branch ") })
-                    let branch = branchLine.map { line -> String in
-                        let ref = String(line.dropFirst("branch ".count))
-                        return ref.hasPrefix("refs/heads/") ? String(ref.dropFirst("refs/heads/".count)) : ref
-                    } ?? "detached"
-                    let isLocked = lines.contains { $0 == "locked" || $0.hasPrefix("locked ") }
-                    let isMain = index == 0
-                    let base = isMain ? "main" : (manager.baseBranch(for: branch, in: rootPath) ?? "main")
-                    let div = isMain ? nil : manager.divergence(repoPath: rootPath, branch: branch, base: base)
-                    let isMerged = isMain ? false : manager.isMergedOrSquashed(repoPath: rootPath, branch: branch, base: base)
-                    return SidebarWorktreeEntry(
-                        path: worktreePath,
-                        head: head,
-                        branch: branch,
-                        isMain: isMain,
-                        isLocked: isLocked,
-                        baseBranch: base,
-                        aheadCount: div?.ahead,
-                        behindCount: div?.behind,
-                        isMerged: isMerged
-                    )
-                }
-            } catch { return [] }
+            let infos = GitService.shared.listWorktrees(for: rootPath)
+            guard !infos.isEmpty else { return [] }
+            let manager = WorktreeManager()
+            return infos.enumerated().compactMap { index, wt in
+                let isMain = index == 0
+                let branch = wt.branch ?? "detached"
+                let base = isMain ? "main" : (manager.baseBranch(for: branch, in: rootPath) ?? "main")
+                let div = isMain ? nil : manager.divergence(repoPath: rootPath, branch: branch, base: base)
+                let isMerged = isMain ? false : manager.isMergedOrSquashed(repoPath: rootPath, branch: branch, base: base)
+                return SidebarWorktreeEntry(
+                    path: wt.path,
+                    head: wt.head,
+                    branch: branch,
+                    isMain: isMain,
+                    isLocked: false,
+                    baseBranch: base,
+                    aheadCount: div?.ahead,
+                    behindCount: div?.behind,
+                    isMerged: isMerged
+                )
+            }
         }.value
     }
 }
