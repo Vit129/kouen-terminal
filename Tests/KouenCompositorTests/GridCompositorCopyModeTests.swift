@@ -2,7 +2,7 @@ import Foundation
 import KouenCopyMode
 import KouenCore
 import KouenTerminalEngine
-@testable import KouenTerminalKit
+@testable import KouenCompositor
 import XCTest
 
 /// The compositor's copy-mode overlay: selection / search shading (palette-based so the

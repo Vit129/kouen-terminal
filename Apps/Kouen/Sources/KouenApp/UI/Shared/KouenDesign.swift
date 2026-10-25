@@ -264,69 +264,23 @@ enum KouenDesign {
     }
 
     static func shortenPath(_ path: String) -> String {
-        if path == "/" { return "/" }
-        let home = FileManager.default.homeDirectoryForCurrentUser.path
-        if path == home { return "~" }
-        if path.hasPrefix(home + "/") {
-            return "~" + path.dropFirst(home.count)
-        }
-        return path
+        ProjectGroupResolver.shortenPath(path)
     }
 
     static func pathDisplayName(_ path: String) -> String {
-        let shortened = shortenPath(path)
-        if shortened == "/" || shortened == "~" { return shortened }
-        let last = (shortened as NSString).lastPathComponent
-        return last.isEmpty ? shortened : last
+        ProjectGroupResolver.pathDisplayName(path)
     }
 
     static func projectGroupName(for path: String) -> String {
-        projectGroupDisplayName(forRootPath: projectGroupRootPath(for: path))
+        ProjectGroupResolver.projectGroupName(for: path)
     }
 
     static func projectGroupDisplayName(forRootPath rootPath: String) -> String {
-        let trimmed = rootPath.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return "Sessions" }
-        if trimmed == "Other" || trimmed == "Sessions" { return trimmed }
-
-        let url = URL(fileURLWithPath: trimmed)
-        if url.lastPathComponent == ".git" {
-            return url.deletingLastPathComponent().lastPathComponent
-        }
-        return pathDisplayName(trimmed)
+        ProjectGroupResolver.projectGroupDisplayName(forRootPath: rootPath)
     }
 
     static func projectGroupRootPath(for path: String) -> String {
-        let trimmed = path.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return "Sessions" }
-
-        // If path is inside Kouen's worktree dir, group under the parent repo root
-        if let range = trimmed.range(of: "/.kouen-worktrees") {
-            let parentRoot = String(trimmed[..<range.lowerBound])
-            if !parentRoot.isEmpty { return parentRoot }
-        }
-
-        let manager = FileManager.default
-        var isDirectory: ObjCBool = false
-        let startPath: String
-        if manager.fileExists(atPath: trimmed, isDirectory: &isDirectory), !isDirectory.boolValue {
-            startPath = (trimmed as NSString).deletingLastPathComponent
-        } else {
-            startPath = trimmed
-        }
-
-        var current = (startPath as NSString).standardizingPath
-        while !current.isEmpty {
-            let gitPath = (current as NSString).appendingPathComponent(".git")
-            if manager.fileExists(atPath: gitPath) {
-                return current
-            }
-            let parent = (current as NSString).deletingLastPathComponent
-            if parent == current { break }
-            current = parent
-        }
-
-        return startPath
+        ProjectGroupResolver.projectGroupRootPath(for: path)
     }
 
     /// Soft icon button with circular hover fill — used in footer / workspace bar.
@@ -1039,49 +993,4 @@ extension BoardColumnKind {
     }
 }
 
-// MARK: - TaskSummary + BoardColumnKind helpers (P44b)
-
-import KouenIPC
-import KouenCommands
-
-extension TaskSummary.Status {
-    public var columnKind: BoardColumnKind {
-        switch self {
-        case .open: return .idle
-        case .running: return .running
-        case .ciFailing: return .error
-        case .mergeReady: return .needsAttention
-        case .done: return .done
-        }
-    }
-}
-
-extension Collection where Element == TaskSummary {
-    public var aggregateBoardStatus: BoardColumnKind {
-        if contains(where: { $0.status == .ciFailing }) {
-            return .error
-        }
-        if contains(where: { $0.status == .mergeReady }) {
-            return .needsAttention
-        }
-        if contains(where: { $0.status == .running }) {
-            return .running
-        }
-        if !isEmpty && allSatisfy({ $0.done || $0.status == .done }) {
-            return .done
-        }
-        return .idle
-    }
-
-    public var taskTooltipSummary: String {
-        guard !isEmpty else { return "" }
-        let doneCount = filter(\.done).count
-        let header = "Tasks (\(doneCount)/\(count) done)"
-        let lines = map { task in
-            let marker = task.done ? "✓" : "•"
-            return "\(marker) \(task.title) [\(task.status.rawValue)]"
-        }
-        return ([header] + lines).joined(separator: "\n")
-    }
-}
 

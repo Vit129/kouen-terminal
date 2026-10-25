@@ -1,7 +1,7 @@
 import Foundation
 import KouenCore
 import KouenTerminalEngine
-@testable import KouenTerminalKit
+@testable import KouenCompositor
 import XCTest
 
 final class GridCompositorTests: XCTestCase {

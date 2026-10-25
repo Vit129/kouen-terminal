@@ -106,6 +106,34 @@ final class ArchitectureGuardTests: XCTestCase {
         )
     }
 
+    // MARK: - G7: Zero Cross-Package File Duplication
+
+    func testG7_ZeroCrossPackageFileDuplication() throws {
+        let packagesURL = repoRoot.appendingPathComponent("Packages")
+        guard FileManager.default.fileExists(atPath: packagesURL.path) else { return }
+
+        let swiftFiles = findSwiftFiles(in: packagesURL)
+        var filesByName: [String: [String]] = [:]
+
+        for file in swiftFiles {
+            let filename = file.lastPathComponent
+            let relPath = file.path.replacingOccurrences(of: repoRoot.path + "/", with: "")
+            filesByName[filename, default: []].append(relPath)
+        }
+
+        var duplicates: [String: [String]] = [:]
+        for (name, paths) in filesByName where paths.count > 1 {
+            duplicates[name] = paths
+        }
+
+        XCTAssertTrue(
+            duplicates.isEmpty,
+            "G7 Violation: Duplicate Swift filenames found across Packages/. Each package must own unique modules without copy-pasting:\n" +
+            duplicates.map { "\($0.key): \($0.value.joined(separator: ", "))" }.joined(separator: "\n")
+        )
+    }
+
+
     // MARK: - G10: Negative Controls (Self-Testing The Guard)
 
     func testG10_NegativeControlCatchesViolations() {

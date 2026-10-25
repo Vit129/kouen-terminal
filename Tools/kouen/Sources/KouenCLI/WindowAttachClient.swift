@@ -7,7 +7,7 @@ import Foundation
 import KouenCopyMode
 import KouenCore
 import KouenTerminalEngine
-import KouenTerminalKit
+import KouenCompositor
 
 /// Renders a daemon-owned **window** (a tab's full split layout) into a plain
 /// terminal — the headline `kouen attach` compositor. Unlike `AttachClient`
