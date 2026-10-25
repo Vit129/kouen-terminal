@@ -1,16 +1,24 @@
-// Generated from the CHANGELOG.md [4.21.12] block by Scripts/generate-release-notes.swift.
+// Generated from the CHANGELOG.md [4.22.0] block by Scripts/generate-release-notes.swift.
 // DO NOT EDIT BY HAND — regenerate in release prep after updating CHANGELOG.md:
 //   swift Scripts/generate-release-notes.swift
 // Drift guards: ReleaseNotesGuardTests (version + changelog digest), package-app.sh.
 
 extension ReleaseNotes {
     public static let current = ReleaseNotes(
-        version: "4.21.12",
-        changelogDigest: "2a4727f3a5d4e972",
+        version: "4.22.0",
+        changelogDigest: "a9226930ef0f9819",
         sections: [
-            Section(title: "Added", items: [
-                "Keep Mac awake while AI provider apps run alongside Kouen (bf06d3d)",
-                "Opt-in closed-lid keep-awake via pmset disablesleep helper (a909285)",
+            Section(title: "Changed", items: [
+                "Establish QA architecture guard and extract KouenGit package (f6b40e3)",
+                "Extract KouenCompositor, eliminate onboarding fork, and purify design token logic (2c7640f)",
+                "Decouple MainSplitViewController from GitPanelView and hoist pure parsers to KouenGit (f6400a0)",
+                "Purify KouenIPC, extract MobileBridge web assets, and unify Layer 2 tokens (c95e9eb)",
+            ]),
+            Section(title: "Documentation", items: [
+                "Update copyright notice with co-authors (91f453d)",
+            ]),
+            Section(title: "Fixed", items: [
+                "Resolve claude audit findings (swiftui font import, git background execution, worktree lock parsing) (aa779fb)",
             ]),
         ]
     )

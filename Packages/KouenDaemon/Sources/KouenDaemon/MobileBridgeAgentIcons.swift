@@ -1,5 +1,6 @@
 import Foundation
 import KouenIPC
+import KouenTheme
 
 // Brand marks for the Companion page, built from the same `AgentIconArt` geometry and
 // `AgentKind.dotHex` tint the Mac sidebar uses, so the phone and the app never drift apart.

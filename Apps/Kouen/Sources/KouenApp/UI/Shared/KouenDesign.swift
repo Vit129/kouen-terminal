@@ -1,6 +1,7 @@
 import AppKit
 import KouenCore
 import QuartzCore
+import SwiftUI
 
 /// Layout metrics and chrome helpers; colors come from `KouenChrome.current`.
 @MainActor
@@ -139,6 +140,24 @@ enum KouenDesign {
         static var paletteTitle: NSFont { .systemFont(ofSize: 13.5, weight: .medium) }
         static var paletteHeader: NSFont { .systemFont(ofSize: 10, weight: .heavy) }
         static var settingsHeading: NSFont { .systemFont(ofSize: 11, weight: .semibold) }
+
+        // MARK: - SwiftUI Font Tokens (Layer 2 Design Tokens Bridge)
+        public enum SUI {
+            public static var sidebarLabel: Font { .system(size: FontSize.sidebarLabel, weight: .medium) }
+            public static var rowTitle: Font { sidebarLabel }
+            public static var rowMeta: Font { .system(size: 11, weight: .regular, design: .monospaced) }
+            public static var tabTitle: Font { sidebarLabel }
+            public static var sectionLabel: Font { .system(size: FontSize.sectionLabel, weight: .semibold) }
+            public static var badge: Font { .system(size: 10.5, weight: .semibold, design: .monospaced) }
+            public static var kbd: Font { .system(size: 12, weight: .semibold, design: .monospaced) }
+            public static var paletteTitle: Font { .system(size: 13.5, weight: .medium) }
+            public static var paletteHeader: Font { .system(size: 10, weight: .heavy) }
+            public static var settingsHeading: Font { .system(size: 11, weight: .semibold) }
+            public static var caption: Font { .system(size: 11, weight: .regular) }
+            public static var caption2: Font { .system(size: 9.5, weight: .regular) }
+            public static var body: Font { .system(size: 12, weight: .regular) }
+            public static var bodyStrong: Font { .system(size: 12, weight: .semibold) }
+        }
     }
 
     /// Drop-shadow recipe presets. Apply with `applyShadow(.elevation1, to: layer)`.
@@ -264,69 +283,23 @@ enum KouenDesign {
     }
 
     static func shortenPath(_ path: String) -> String {
-        if path == "/" { return "/" }
-        let home = FileManager.default.homeDirectoryForCurrentUser.path
-        if path == home { return "~" }
-        if path.hasPrefix(home + "/") {
-            return "~" + path.dropFirst(home.count)
-        }
-        return path
+        ProjectGroupResolver.shortenPath(path)
     }
 
     static func pathDisplayName(_ path: String) -> String {
-        let shortened = shortenPath(path)
-        if shortened == "/" || shortened == "~" { return shortened }
-        let last = (shortened as NSString).lastPathComponent
-        return last.isEmpty ? shortened : last
+        ProjectGroupResolver.pathDisplayName(path)
     }
 
     static func projectGroupName(for path: String) -> String {
-        projectGroupDisplayName(forRootPath: projectGroupRootPath(for: path))
+        ProjectGroupResolver.projectGroupName(for: path)
     }
 
     static func projectGroupDisplayName(forRootPath rootPath: String) -> String {
-        let trimmed = rootPath.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return "Sessions" }
-        if trimmed == "Other" || trimmed == "Sessions" { return trimmed }
-
-        let url = URL(fileURLWithPath: trimmed)
-        if url.lastPathComponent == ".git" {
-            return url.deletingLastPathComponent().lastPathComponent
-        }
-        return pathDisplayName(trimmed)
+        ProjectGroupResolver.projectGroupDisplayName(forRootPath: rootPath)
     }
 
     static func projectGroupRootPath(for path: String) -> String {
-        let trimmed = path.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return "Sessions" }
-
-        // If path is inside Kouen's worktree dir, group under the parent repo root
-        if let range = trimmed.range(of: "/.kouen-worktrees") {
-            let parentRoot = String(trimmed[..<range.lowerBound])
-            if !parentRoot.isEmpty { return parentRoot }
-        }
-
-        let manager = FileManager.default
-        var isDirectory: ObjCBool = false
-        let startPath: String
-        if manager.fileExists(atPath: trimmed, isDirectory: &isDirectory), !isDirectory.boolValue {
-            startPath = (trimmed as NSString).deletingLastPathComponent
-        } else {
-            startPath = trimmed
-        }
-
-        var current = (startPath as NSString).standardizingPath
-        while !current.isEmpty {
-            let gitPath = (current as NSString).appendingPathComponent(".git")
-            if manager.fileExists(atPath: gitPath) {
-                return current
-            }
-            let parent = (current as NSString).deletingLastPathComponent
-            if parent == current { break }
-            current = parent
-        }
-
-        return startPath
+        ProjectGroupResolver.projectGroupRootPath(for: path)
     }
 
     /// Soft icon button with circular hover fill — used in footer / workspace bar.
@@ -1039,49 +1012,18 @@ extension BoardColumnKind {
     }
 }
 
-// MARK: - TaskSummary + BoardColumnKind helpers (P44b)
+// MARK: - SwiftUI Font Design Token Convenience
 
-import KouenIPC
-import KouenCommands
-
-extension TaskSummary.Status {
-    public var columnKind: BoardColumnKind {
-        switch self {
-        case .open: return .idle
-        case .running: return .running
-        case .ciFailing: return .error
-        case .mergeReady: return .needsAttention
-        case .done: return .done
-        }
-    }
+extension Font {
+    public static var kouenSidebarLabel: Font { KouenDesign.Typography.SUI.sidebarLabel }
+    public static var kouenSectionLabel: Font { KouenDesign.Typography.SUI.sectionLabel }
+    public static var kouenBadge: Font { KouenDesign.Typography.SUI.badge }
+    public static var kouenKbd: Font { KouenDesign.Typography.SUI.kbd }
+    public static var kouenBody: Font { KouenDesign.Typography.SUI.body }
+    public static var kouenBodyStrong: Font { KouenDesign.Typography.SUI.bodyStrong }
+    public static var kouenCaption: Font { KouenDesign.Typography.SUI.caption }
+    public static var kouenCaption2: Font { KouenDesign.Typography.SUI.caption2 }
+    public static var kouenMono: Font { KouenDesign.Typography.SUI.rowMeta }
 }
 
-extension Collection where Element == TaskSummary {
-    public var aggregateBoardStatus: BoardColumnKind {
-        if contains(where: { $0.status == .ciFailing }) {
-            return .error
-        }
-        if contains(where: { $0.status == .mergeReady }) {
-            return .needsAttention
-        }
-        if contains(where: { $0.status == .running }) {
-            return .running
-        }
-        if !isEmpty && allSatisfy({ $0.done || $0.status == .done }) {
-            return .done
-        }
-        return .idle
-    }
-
-    public var taskTooltipSummary: String {
-        guard !isEmpty else { return "" }
-        let doneCount = filter(\.done).count
-        let header = "Tasks (\(doneCount)/\(count) done)"
-        let lines = map { task in
-            let marker = task.done ? "✓" : "•"
-            return "\(marker) \(task.title) [\(task.status.rawValue)]"
-        }
-        return ([header] + lines).joined(separator: "\n")
-    }
-}
 

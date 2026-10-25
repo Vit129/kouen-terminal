@@ -1,17 +1,8 @@
 import Foundation
+import KouenCommands
 import KouenCopyMode
 import KouenCore
 import KouenTerminalEngine
-
-// NOTE: A simplified copy of this file exists at:
-//   Packages/KouenOnboarding/Sources/KouenOnboarding/TerminalKit/GridCompositor.swift
-// The duplication is INTENTIONAL: the onboarding package uses its own inlined model types
-// (TerminalGridSnapshot stub, ComposedCell, ComposedFrame) to avoid pulling the full
-// KouenTerminalEngine + KouenCopyMode dependency graph into the first-run wizard.
-// The onboarding version is display-only (no damage tracking, no incremental rendering,
-// no real grid access). If shared SGR-emit logic diverges significantly, consider a
-// micro-package (KouenTerminalFormat), but for now the ~400 LOC overlap is preferable
-// to the dependency cost.
 
 /// One pane to composite: where it sits (`rect`, in the pane area) and its
 /// current screen contents (`grid`). `isActive` selects the highlighted border
@@ -60,21 +51,37 @@ public struct CompositorPane: Sendable {
     }
 }
 
+/// The composited frame that Canvas/SwiftUI and GUI renderers consume: a `cols × rows`
+/// row-major cell buffer plus the active pane's cursor position (in frame cell coordinates), or nil when hidden.
+public struct ComposedFrame: Sendable {
+    public let cols: Int
+    public let rows: Int
+    public let cells: [ComposedCell]
+    public let cursor: (x: Int, y: Int)?
+
+    public init(cols: Int, rows: Int, cells: [ComposedCell], cursor: (x: Int, y: Int)?) {
+        self.cols = cols
+        self.rows = rows
+        self.cells = cells
+        self.cursor = cursor
+    }
+}
+
 /// Composites multiple pane grids into a single ANSI frame for a plain terminal
-/// — the core of the `kouen attach` renderer. It builds a `cols x rows` cell
-/// buffer (panes + box-drawing borders + a status row), then emits the minimal
-/// ANSI to transform the previously emitted frame into the new one (back-buffer
-/// diff, for low bandwidth over ssh).
+/// (or a structured `ComposedFrame` for Canvas/SwiftUI rendering).
 ///
-/// Pure and deterministic: feed it panes + a status line, get back a byte string
-/// to write to the TTY. No I/O of its own.
+/// It builds a `cols x rows` cell buffer (panes + box-drawing borders + a status row),
+/// then emits either the minimal ANSI to transform the previously emitted frame into
+/// the new one (back-buffer diff, for low bandwidth over ssh) or the raw composed frame.
+///
+/// Pure and deterministic: no I/O of its own.
 public final class GridCompositor {
     public private(set) var cols: Int
     public private(set) var rows: Int
 
     /// The last emitted frame, for diffing. `nil` until the first render or
     /// after `invalidate()` (which forces a full repaint).
-    private var front: [RenderCell]?
+    private var front: [ComposedCell]?
 
     public init(cols: Int, rows: Int) {
         self.cols = max(1, cols)
@@ -92,6 +99,13 @@ public final class GridCompositor {
     /// outer terminal was cleared or resized underneath us).
     public func invalidate() { front = nil }
 
+    /// Build the composited cell buffer + cursor without emitting ANSI.
+    /// This is what Canvas / SwiftUI / Onboarding renderers consume.
+    public func compose(panes: [CompositorPane], statusLines: [[StyledSegment]]? = nil) -> ComposedFrame {
+        let (buffer, cursor) = build(panes: panes, statusLines: statusLines)
+        return ComposedFrame(cols: cols, rows: rows, cells: buffer, cursor: cursor)
+    }
+
     /// Render `panes` plus an optional `status` line (drawn on the bottom row)
     /// into ANSI. Convenience over `render(panes:statusLines:)` for the single-line
     /// case: styled segments (with `#[…]` spans) take precedence over a plain string.
@@ -100,7 +114,7 @@ public final class GridCompositor {
         if let statusSegments {
             lines = [statusSegments]
         } else if let status {
-            // A plain string is one fully-default segment → the classic inverse band.
+            // A plain string is one fully-default segment -> the classic inverse band.
             lines = [[StyledSegment(text: status)]]
         } else {
             lines = nil
@@ -114,8 +128,16 @@ public final class GridCompositor {
     /// `rows - statusLines.count` rows, so borders and panes never overlap the status
     /// band. `nil`/empty hides the status entirely.
     public func render(panes: [CompositorPane], statusLines: [[StyledSegment]]?) -> String {
+        let (buffer, cursor) = build(panes: panes, statusLines: statusLines)
+        let ansi = emit(buffer: buffer, cursor: cursor)
+        front = buffer
+        return ansi
+    }
+
+    /// Internal cell buffer builder shared by both `render` (ANSI emission) and `compose` (structured frame).
+    public func build(panes: [CompositorPane], statusLines: [[StyledSegment]]?) -> ([ComposedCell], (x: Int, y: Int)?) {
         let statusCount = max(0, min(rows, statusLines?.count ?? 0))
-        var buffer = [RenderCell](repeating: .blank, count: cols * rows)
+        var buffer = [ComposedCell](repeating: .blank, count: cols * rows)
 
         // 1) Borders: fill the pane area with box-drawing lines, then panes
         //    paint their interiors over them. We classify each pane-area cell by
@@ -142,17 +164,14 @@ public final class GridCompositor {
             }
         }
 
-        // 4) Emit a diff (or full frame) and position the real cursor.
-        let ansi = emit(buffer: buffer, cursor: cursor)
-        front = buffer
-        return ansi
+        return (buffer, cursor)
     }
 
     // MARK: - Painting
 
     private func paint(
         pane: CompositorPane,
-        into buffer: inout [RenderCell],
+        into buffer: inout [ComposedCell],
         into cursor: inout (x: Int, y: Int)?
     ) {
         let rect = pane.rect
@@ -169,7 +188,7 @@ public final class GridCompositor {
                 // Skip the spacer that follows a wide character: the wide glyph
                 // already spans two columns when emitted.
                 if cell.width == .spacerTail { continue }
-                var rc = RenderCell(cell)
+                var rc = ComposedCell(cell)
                 // `window-style`/`pane-style` base: substitute the pane's base color into any
                 // cell still using the surface default, so an inactive pane dims uniformly.
                 if pane.baseForeground != .none, rc.fg == .none { rc.fg = pane.baseForeground }
@@ -207,13 +226,13 @@ public final class GridCompositor {
 
     /// Paint styled status segments. A fully-default segment (no fg/bg/attrs) renders as the
     /// classic inverse status band; styled spans honor their `#[fg=…,bg=…,attrs]`.
-    private func paintStatusSegments(_ segments: [StyledSegment], row: Int, into buffer: inout [RenderCell]) {
+    private func paintStatusSegments(_ segments: [StyledSegment], row: Int, into buffer: inout [ComposedCell]) {
         var x = 0
         for seg in segments {
             let plain = seg.fg == nil && seg.bg == nil && !seg.bold && !seg.italic && !seg.underline && !seg.reverse && !seg.dim
             for scalar in seg.text.unicodeScalars {
                 guard x < cols else { break }
-                buffer[row * cols + x] = RenderCell(
+                buffer[row * cols + x] = ComposedCell(
                     codepoint: scalar.value,
                     fg: Self.gridColor(seg.fg),
                     bg: Self.gridColor(seg.bg),
@@ -228,7 +247,7 @@ public final class GridCompositor {
             if x >= cols { break }
         }
         while x < cols {
-            buffer[row * cols + x] = RenderCell(codepoint: 0x20, inverse: true)
+            buffer[row * cols + x] = ComposedCell(codepoint: 0x20, inverse: true)
             x += 1
         }
     }
@@ -236,11 +255,10 @@ public final class GridCompositor {
     /// Draw a `pane-border-format` label centered on `row` within the pane's column span,
     /// over the box-drawing border. The active pane's label is highlighted (bold, brighter)
     /// so the focused pane stands out, matching tmux's pane-active-border accent.
-    private func paintBorderLabel(_ text: String, row: Int, paneX: Int, paneCols: Int, active: Bool, into buffer: inout [RenderCell]) {
+    private func paintBorderLabel(_ text: String, row: Int, paneX: Int, paneCols: Int, active: Bool, into buffer: inout [ComposedCell]) {
         guard row >= 0, row < rows, paneCols > 0 else { return }
         // Center + place by DISPLAY width, not scalar count: a wide glyph occupies two cells and a
         // combining mark zero, so counting scalars mis-centered and over-truncated non-ASCII labels.
-        // (For an all-ASCII label every width is 1, so this is identical to the old scalar loop.)
         let scalars = Array(text.unicodeScalars)
         let displayWidth = scalars.reduce(0) { $0 + CharacterWidth.width(of: $1) }
         let width = min(displayWidth, paneCols)
@@ -261,9 +279,9 @@ public final class GridCompositor {
             }
             guard x >= 0, x + w <= limit else { break }
             let idx = row * cols + x
-            buffer[idx] = RenderCell(codepoint: scalar.value, fg: fg, bold: active)
+            buffer[idx] = ComposedCell(codepoint: scalar.value, fg: fg, bold: active)
             // Blank a wide glyph's continuation cell so the border char beneath it doesn't show.
-            if w == 2, x + 1 < limit { buffer[row * cols + x + 1] = RenderCell(codepoint: 0x20, fg: fg, bold: active) }
+            if w == 2, x + 1 < limit { buffer[row * cols + x + 1] = ComposedCell(codepoint: 0x20, fg: fg, bold: active) }
             lastBaseIdx = idx
             x += w
         }
@@ -284,7 +302,7 @@ public final class GridCompositor {
     /// NOT covered by any pane interior; its glyph is chosen from which of its
     /// 4 neighbors are also borders (so junctions render as ┼ ├ ┤ ┬ ┴ etc).
     private func paintBorders(
-        into buffer: inout [RenderCell],
+        into buffer: inout [ComposedCell],
         panes: [CompositorPane],
         paneAreaRows: Int
     ) {
@@ -311,7 +329,7 @@ public final class GridCompositor {
                 let down = isBorder(x, y + 1)
                 let left = isBorder(x - 1, y)
                 let right = isBorder(x + 1, y)
-                buffer[y * cols + x] = RenderCell(
+                buffer[y * cols + x] = ComposedCell(
                     codepoint: boxGlyph(up: up, down: down, left: left, right: right),
                     fg: .palette(8) // dim grey divider
                 )
@@ -340,7 +358,7 @@ public final class GridCompositor {
 
     // MARK: - ANSI emission
 
-    private func emit(buffer: [RenderCell], cursor: (x: Int, y: Int)?) -> String {
+    private func emit(buffer: [ComposedCell], cursor: (x: Int, y: Int)?) -> String {
         var out = ""
         out += "\u{1b}[?25l" // hide cursor while painting
 
@@ -383,31 +401,27 @@ public final class GridCompositor {
     }
 }
 
-// MARK: - RenderCell
+// MARK: - ComposedCell
 
-/// A flattened cell in the composited frame: a glyph plus the subset of SGR
-/// state we re-emit. `Equatable` drives the back-buffer diff.
-struct RenderCell: Equatable {
-    var codepoint: UInt32
-    /// Stacked combining scalars (0 = none), carried so a remote pane's Thai vowels/tones (and
-    /// pane-label marks) are re-emitted to the client terminal instead of dropped. Part of
-    /// `Equatable` so a combining-only change still repaints in the diff emitter.
-    var combining0: UInt32 = 0
-    var combining1: UInt32 = 0
-    var fg: TerminalGridColor
-    var bg: TerminalGridColor
-    var underlineColor: TerminalGridColor
-    var bold: Bool
-    var dim: Bool
-    var italic: Bool
-    var underline: TerminalGridUnderline
-    var blink: Bool
-    var inverse: Bool
-    var invisible: Bool
-    var strikethrough: Bool
-    var overline: Bool
+/// A flattened cell in the composited frame: a glyph plus its attributes and SGR encoding.
+public struct ComposedCell: Sendable, Equatable {
+    public var codepoint: UInt32
+    public var combining0: UInt32
+    public var combining1: UInt32
+    public var fg: TerminalGridColor
+    public var bg: TerminalGridColor
+    public var underlineColor: TerminalGridColor
+    public var bold: Bool
+    public var dim: Bool
+    public var italic: Bool
+    public var underline: TerminalGridUnderline
+    public var blink: Bool
+    public var inverse: Bool
+    public var invisible: Bool
+    public var strikethrough: Bool
+    public var overline: Bool
 
-    init(
+    public init(
         codepoint: UInt32,
         combining0: UInt32 = 0,
         combining1: UInt32 = 0,
@@ -441,7 +455,7 @@ struct RenderCell: Equatable {
         self.overline = overline
     }
 
-    init(_ c: TerminalGridCell) {
+    public init(_ c: TerminalGridCell) {
         codepoint = c.codepoint
         combining0 = c.combining0
         combining1 = c.combining1
@@ -459,21 +473,18 @@ struct RenderCell: Equatable {
         overline = c.overline
     }
 
-    static let blank = RenderCell(codepoint: 0x20)
+    public static let blank = ComposedCell(codepoint: 0x20)
 
-    /// A guaranteed-valid space scalar; the single audited force-unwrap (U+0020 is
-    /// always a valid scalar) used as the fallback glyph for empty/invalid cells.
     private static let space = Unicode.Scalar(0x20)!
 
     /// The glyph to draw (empty cells render as a space).
-    var scalar: Unicode.Scalar {
+    public var scalar: Unicode.Scalar {
         guard codepoint != 0, let s = Unicode.Scalar(codepoint) else { return Self.space }
         return s
     }
 
-    /// The full grapheme to emit: base scalar plus any combining marks. Empty cells render as a
-    /// space. A no-mark cell yields a single scalar, so ASCII/CJK output is byte-identical.
-    var cluster: String {
+    /// The full grapheme to emit: base scalar plus any combining marks. Empty cells render as a space.
+    public var cluster: String {
         guard codepoint != 0, let base = Unicode.Scalar(codepoint) else { return " " }
         var s = String()
         s.unicodeScalars.append(base)
@@ -482,10 +493,32 @@ struct RenderCell: Equatable {
         return s
     }
 
+    /// Build a `TerminalGridCell` view of this composed cell so `CellColorResolver` can
+    /// resolve its final fg/bg using the exact engine rules.
+    public var asGridCell: TerminalGridCell {
+        TerminalGridCell(
+            codepoint: codepoint,
+            combining0: combining0,
+            combining1: combining1,
+            foreground: fg,
+            background: bg,
+            underlineColor: underlineColor,
+            bold: bold,
+            faint: dim,
+            italic: italic,
+            underline: underline,
+            blink: blink,
+            inverse: inverse,
+            invisible: invisible,
+            strikethrough: strikethrough,
+            overline: overline
+        )
+    }
+
     /// The SGR sequence that establishes this cell's attributes. Always starts
     /// from a reset so it is self-contained (no dependence on prior pen state),
     /// which keeps the diff emitter correct when it skips unchanged cells.
-    var sgr: String {
+    public var sgr: String {
         var codes: [String] = ["0"]
         if bold { codes.append("1") }
         if dim { codes.append("2") }
@@ -504,9 +537,6 @@ struct RenderCell: Equatable {
         return "\u{1b}[\(codes.joined(separator: ";"))m"
     }
 
-    /// SGR underline-style codes. Single is the classic `4`; double is `21`; the
-    /// curly/dotted/dashed styles use the `4:N` substyle form modern terminals
-    /// (mainstream terminals) understand.
     private static func underlineCodes(_ style: TerminalGridUnderline) -> [String] {
         switch style {
         case .none: return []
@@ -540,3 +570,6 @@ struct RenderCell: Equatable {
         }
     }
 }
+
+/// Backwards-compatibility alias for code that previously imported internal RenderCell.
+public typealias RenderCell = ComposedCell

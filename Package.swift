@@ -48,11 +48,10 @@ let platformProducts: [Product] = [
     // Delete this target once the real bridge lands in KouenDaemonCore.
     .executable(name: "MobileBridgeSpike", targets: ["MobileBridgeSpike"]),
 ]
-// `kouen-cli`'s `attach-window` compositor renders through the Metal/AppKit terminal kit, so the
-// kit dependency (and the one source file that uses it) is macOS-only; the rest of the CLI — incl.
-// single-pane `attach` — is headless.
+// `kouen-cli`'s `attach-window` compositor renders through KouenCompositor, so the CLI
+// is now completely headless on both macOS and Linux.
 let cliDependencies: [Target.Dependency] = [
-    "KouenCore", "KouenTerminalEngine", "KouenCopyMode", "KouenTerminalKit", "KouenTheme",
+    "KouenCore", "KouenTerminalEngine", "KouenCopyMode", "KouenCompositor", "KouenTheme",
     "KouenLSP", "CKouenSys",
 ]
 let cliExclude: [String] = []
@@ -71,20 +70,34 @@ let platformTargets: [Target] = [
             "KouenCopyMode",
             "KouenTerminalRenderer",
             "KouenTheme",
+            "KouenCompositor",
         ],
         path: "Packages/KouenTerminalKit/Sources/KouenTerminalKit"
     ),
-    // Immersive onboarding wizard — pure SwiftUI/AppKit, no external or first-party
-    // dependencies (deliberately isolated, mirrors install paths via its own helpers).
+    // Immersive onboarding wizard — SwiftUI/AppKit wizard consuming core configuration,
+    // settings, commands, and IPC.
     .target(
         name: "KouenOnboarding",
-        dependencies: ["KouenCore", "KouenIPC", "KouenSettings", "KouenCommands"],
+        dependencies: [
+            "KouenCore",
+            "KouenIPC",
+            "KouenSettings",
+            "KouenCommands",
+            "KouenTerminalEngine",
+            "KouenTerminalRenderer",
+            "KouenTheme",
+            "KouenCompositor",
+        ],
         path: "Packages/KouenOnboarding/Sources/KouenOnboarding"
     ),
     .executableTarget(
         name: "KouenApp",
         dependencies: [
             "KouenCore",
+            "KouenGit",
+            "KouenIPC",
+            "KouenSettings",
+            "KouenCommands",
             // Engine types (e.g. TerminalProgressReport) surface through KouenTerminalKit's
             // public delegate API, so the app consumes the engine module directly.
             "KouenTerminalEngine",
@@ -126,19 +139,6 @@ let platformTestTargets: [Target] = [
         dependencies: ["KouenOnboarding"],
         path: "Tests/KouenOnboardingTests"
     ),
-    // Drift canary: the onboarding-preview port of GridCompositor must keep composing the
-    // shared subset (layout, borders, junctions, status line) identically to the live one.
-    // Imports both packages so a single fixture is composed through each and compared.
-    .testTarget(
-        name: "GridCompositorParityTests",
-        dependencies: [
-            "KouenTerminalKit",
-            "KouenOnboarding",
-            "KouenCore",
-            "KouenTerminalEngine",
-        ],
-        path: "Tests/GridCompositorParityTests"
-    ),
     .testTarget(
         name: "KouenAppTests",
         dependencies: ["KouenApp"],
@@ -155,6 +155,7 @@ let platformTestTargets: [Target] = [
             "KouenTerminalKit",
             "KouenTerminalRenderer",
             "KouenTheme",
+            "KouenCompositor",
         ],
         path: "Tests/KouenBenchmarks"
     ),
@@ -163,9 +164,9 @@ let platformTestTargets: [Target] = [
 let platformDependencies: [Package.Dependency] = []
 let platformProducts: [Product] = []
 let cliDependencies: [Target.Dependency] = [
-    "KouenCore", "KouenTerminalEngine", "KouenCopyMode", "KouenTheme", "KouenLSP", "CKouenSys",
+    "KouenCore", "KouenTerminalEngine", "KouenCopyMode", "KouenCompositor", "KouenTheme", "KouenLSP", "CKouenSys",
 ]
-let cliExclude: [String] = ["WindowAttachClient.swift"]
+let cliExclude: [String] = []
 let platformTargets: [Target] = []
 let platformTestTargets: [Target] = []
 #endif
@@ -177,6 +178,8 @@ let package = Package(
         .library(name: "KouenIPC", targets: ["KouenIPC"]),
         .library(name: "KouenSettings", targets: ["KouenSettings"]),
         .library(name: "KouenCommands", targets: ["KouenCommands"]),
+        .library(name: "KouenGit", targets: ["KouenGit"]),
+        .library(name: "KouenCompositor", targets: ["KouenCompositor"]),
         .library(name: "KouenCore", targets: ["KouenCore"]),
         // Self-contained native terminal engine (VT parser + screen/grid model). Pure
         // Swift, no Metal/AppKit.
@@ -219,9 +222,15 @@ let package = Package(
             path: "Packages/KouenCommands/Sources/KouenCommands",
             swiftSettings: strictFoundationSettings
         ),
+        // Pure headless Git execution runner, models and output parsers.
+        .target(
+            name: "KouenGit",
+            path: "Packages/KouenGit/Sources/KouenGit",
+            swiftSettings: strictFoundationSettings
+        ),
         .target(
             name: "KouenCore",
-            dependencies: ["KouenIPC", "KouenSettings", "KouenCommands"],
+            dependencies: ["KouenIPC", "KouenSettings", "KouenCommands", "KouenGit"],
             path: "Packages/KouenCore/Sources/KouenCore",
             swiftSettings: strictFoundationSettings,
             linkerSettings: coreLinkerSettings
@@ -239,6 +248,14 @@ let package = Package(
             name: "KouenCopyMode",
             dependencies: ["KouenCore", "KouenTerminalEngine"],
             path: "Packages/KouenCopyMode/Sources/KouenCopyMode"
+        ),
+        // Pure headless terminal grid compositor: composites split panes, borders,
+        // status lines, and labels into ANSI VT diffs or structured frames for Canvas/GUI.
+        .target(
+            name: "KouenCompositor",
+            dependencies: ["KouenCore", "KouenTerminalEngine", "KouenCopyMode", "KouenCommands"],
+            path: "Packages/KouenCompositor/Sources/KouenCompositor",
+            swiftSettings: strictFoundationSettings
         ),
         // Native theme system — pure Swift, no external dependencies.
         .target(
@@ -277,7 +294,7 @@ let package = Package(
             // Depends on the engine so `capture-pane` reconstructs the on-screen grid
             // (faithful overwrites/clears + soft-wrap join), exactly like tmux.
             // KouenSettings for ProjectConfig (P32 F3: archiveScript on worktree close).
-            dependencies: ["KouenCore", "KouenTerminalEngine", "CKouenSys", "KouenSettings"],
+            dependencies: ["KouenCore", "KouenTerminalEngine", "CKouenSys", "KouenSettings", "KouenTheme"],
             path: "Packages/KouenDaemon/Sources/KouenDaemon"
         ),
         .executableTarget(
@@ -334,6 +351,21 @@ let package = Package(
             name: "KouenDaemonTests",
             dependencies: ["KouenDaemonCore", "KouenCore", "KouenTerminalEngine"],
             path: "Tests/KouenDaemonTests"
+        ),
+        .testTarget(
+            name: "KouenGitTests",
+            dependencies: ["KouenGit"],
+            path: "Tests/KouenGitTests"
+        ),
+        .testTarget(
+            name: "KouenCompositorTests",
+            dependencies: ["KouenCompositor", "KouenTerminalEngine", "KouenCore", "KouenCopyMode"],
+            path: "Tests/KouenCompositorTests"
+        ),
+        .testTarget(
+            name: "KouenArchitectureGuardTests",
+            dependencies: [],
+            path: "Tests/KouenArchitectureGuardTests"
         ),
     ] + platformTargets + platformTestTargets
 )

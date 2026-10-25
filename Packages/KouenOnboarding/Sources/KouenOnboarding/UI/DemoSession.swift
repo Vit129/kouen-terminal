@@ -1,4 +1,9 @@
 import SwiftUI
+import KouenCommands
+import KouenCompositor
+import KouenCore
+import KouenIPC
+import KouenTerminalEngine
 
 /// Builds a believable 3-pane Kouen tab (claude-code · zsh · logs) and composes it through
 /// the genuine ported `GridCompositor` — real split geometry (`PaneRectSolver`), real box-drawing

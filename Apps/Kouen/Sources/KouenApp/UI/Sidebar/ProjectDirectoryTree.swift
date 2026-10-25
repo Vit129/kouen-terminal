@@ -1,5 +1,6 @@
 import AppKit
 import KouenCore
+import KouenGit
 import Observation
 import SwiftUI
 
@@ -293,38 +294,13 @@ struct ProjectGitStatus: Sendable {
 func fetchGitStatus(for path: String) async -> ProjectGitStatus? {
     guard FileManager.default.fileExists(atPath: path) else { return nil }
     return await Task.detached(priority: .utility) {
-        func run(_ args: [String]) -> String? {
-            let p = Process()
-            p.executableURL = URL(fileURLWithPath: "/usr/bin/git")
-            p.arguments = args
-            p.currentDirectoryURL = URL(fileURLWithPath: path)
-            let pipe = Pipe()
-            p.standardOutput = pipe
-            // stderr is never inspected here — route to the null device rather than an
-            // undrained Pipe(), which is itself a deadlock risk (see
-            // agent-memory/knowledge/patterns/process-pipe-deadlock.md).
-            p.standardError = FileHandle.nullDevice
-            do {
-                try p.run()
-            } catch {
-                return nil
-            }
-            // Read to EOF BEFORE waitUntilExit(): git status --porcelain on a repo with many
-            // changed/untracked files can exceed the pipe buffer, so waiting for exit first
-            // deadlocks deterministically (child blocks in write(), parent blocks in
-            // waitUntilExit() — same failure mode fixed at 7 other call sites 2026-08-19).
-            let data = (try? pipe.fileHandleForReading.readToEnd()) ?? Data()
-            p.waitUntilExit()
-            guard p.terminationStatus == 0 else { return nil }
-            return String(data: data, encoding: .utf8)?
-                .trimmingCharacters(in: .whitespacesAndNewlines)
-        }
-        guard let branch = run(["-C", path, "branch", "--show-current"]), !branch.isEmpty else {
+        guard let branch = GitRunner.shared.executeOutput(["branch", "--show-current"], in: path),
+              !branch.isEmpty else {
             return nil
         }
-        let dirty = run(["-C", path, "status", "--porcelain"])
-            .map { !$0.isEmpty } ?? false
-        return ProjectGitStatus(branch: branch, isDirty: dirty)
+        let dirtyOutput = GitRunner.shared.executeOutput(["status", "--porcelain"], in: path)
+        let isDirty = (dirtyOutput?.isEmpty == false)
+        return ProjectGitStatus(branch: branch, isDirty: isDirty)
     }.value
 }
 

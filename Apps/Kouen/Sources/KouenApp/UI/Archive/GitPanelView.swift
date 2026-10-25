@@ -8,6 +8,7 @@
 // ponytail: intentionally AppKit — NSAttributedString diffstat rendering + per-file row menus need NSTableView; SwiftUI Table lacks row actions and custom cell editing as of macOS 26.
 import AppKit
 import KouenCore
+import KouenGit
 import KouenIPC
 import CoreServices
 
@@ -1094,30 +1095,12 @@ final class GitPanelView: NSView {
     /// `git apply` to accept it) and each individual `@@ …` hunk's lines. Pure/testable —
     /// no process spawn, no popover.
     nonisolated static func parseDiffHunks(_ text: String) -> (header: [String], hunks: [[String]]) {
-        let lines = text.components(separatedBy: "\n")
-        guard let firstHunkIndex = lines.firstIndex(where: { $0.hasPrefix("@@") }) else {
-            return (lines, [])
-        }
-        let header = Array(lines[0..<firstHunkIndex])
-        var hunks: [[String]] = []
-        var current: [String] = []
-        for line in lines[firstHunkIndex...] {
-            if line.hasPrefix("@@") {
-                if !current.isEmpty { hunks.append(current) }
-                current = [line]
-            } else {
-                current.append(line)
-            }
-        }
-        if !current.isEmpty { hunks.append(current) }
-        // Drop a trailing empty element from the final line's "\n" split — not a real hunk line.
-        if hunks.last?.last == "" { hunks[hunks.count - 1].removeLast() }
-        return (header, hunks)
+        GitParsers.parseDiffHunks(text)
     }
 
     /// A single hunk's patch text, valid on its own for `git apply --cached [-R]`.
     nonisolated static func patchText(header: [String], hunk: [String]) -> String {
-        (header + hunk).joined(separator: "\n") + "\n"
+        GitParsers.patchText(header: header, hunk: hunk)
     }
 
     /// Applies (or reverses) one hunk's patch against the index only, via a temp file — `runGit`
@@ -1378,14 +1361,7 @@ final class GitPanelView: NSView {
     /// the `To <remote>` / `hint:` lines git prints alongside the real failure, and
     /// marks truncation with `…` so a cut string doesn't read as a complete one.
     nonisolated static func toastErrorSummary(_ stderr: String) -> String {
-        let lines = stderr.split(separator: "\n", omittingEmptySubsequences: true)
-            .map { $0.trimmingCharacters(in: .whitespaces) }
-            .filter { !$0.hasPrefix("hint:") }
-        let errorLines = lines.filter { $0.hasPrefix("error:") || $0.hasPrefix("fatal:") }
-        let summary = (errorLines.isEmpty ? lines : errorLines).joined(separator: " ")
-        let fallback = summary.isEmpty ? stderr.trimmingCharacters(in: .whitespacesAndNewlines) : summary
-        guard fallback.count > 120 else { return fallback }
-        return String(fallback.prefix(120)) + "…"
+        GitParsers.errorSummary(from: stderr)
     }
 
     /// `DaemonClient.request()` is synchronous under the hood (blocking queue.sync + poll/read

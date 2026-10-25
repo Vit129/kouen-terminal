@@ -1,5 +1,11 @@
 import SwiftUI
 import AppKit
+import KouenCompositor
+import KouenTerminalEngine
+import KouenTerminalRenderer
+import KouenTheme
+
+private typealias RGBColor = KouenTheme.RGBColor
 
 /// Renders a `ComposedFrame` (produced by the genuine ported `GridCompositor`) into a
 /// SwiftUI `Canvas` with the onboarding Catppuccin Mocha color. One monospaced glyph per cell,
