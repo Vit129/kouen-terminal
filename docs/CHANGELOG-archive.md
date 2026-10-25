@@ -2,6 +2,137 @@
 
 Older releases. See [CHANGELOG.md](../CHANGELOG.md) for recent versions.
 
+## [4.20.16] - 2026-10-08
+
+### Added
+- Update scopes, date grouping and compact two-line rows ([`d501ee1`](https://github.com/Vit129/kouen-terminal/commit/d501ee1083b9eb088b9def204ac7a379867fa85e))
+- Add ranked loose search matching for sessions ([`bafa30c`](https://github.com/Vit129/kouen-terminal/commit/bafa30cc2d617a689b3766c1da6ed2d2d439367c))
+- Add full transcript SQLite FTS5 index and incremental reindexing ([`ac92d23`](https://github.com/Vit129/kouen-terminal/commit/ac92d23b892a1891f87b17951a4ad347ce8195c4))
+- Share one ranker between the sidebar and `kouen history search` ([`0b06135`](https://github.com/Vit129/kouen-terminal/commit/0b061354174745faf6d8fb4d925f4ee12ff24077))
+- Redesign ui and ux in ai session history tab and add kouen-preview when use make preview (release v4.20.16) ([`70eb77e`](https://github.com/Vit129/kouen-terminal/commit/70eb77ee80b52192e96a70b3d81828f28478cc33))
+
+### Fixed
+- Address P52 review findings for repo root freeze, typing lag, FTS limit and tab disambiguation ([`44cb8da`](https://github.com/Vit129/kouen-terminal/commit/44cb8dababc8870ec96d043283907a1fa6491dfe))
+- Weight query words by rarity so common words can't carry a match ([`fc6dc87`](https://github.com/Vit129/kouen-terminal/commit/fc6dc87284794408b4fb1ef33ad46a49c48b798a))
+- Resume and hand-off open a new session, like Cmd+T ([`ff95a33`](https://github.com/Vit129/kouen-terminal/commit/ff95a3392e64f10cbfd64e8872bad96575ffb1c8))
+- Label preview builds "Kouen Preview" in the title bar ([`8951622`](https://github.com/Vit129/kouen-terminal/commit/8951622d446138feb5411010f6f4e2c258b6129f))
+- Expand sidebar width and floor for Kouen Preview header label ([`ea01e9d`](https://github.com/Vit129/kouen-terminal/commit/ea01e9d79cc9b670453085a87cab54d872fb1720))
+
+## [4.20.15] - 2026-10-07
+
+### Added
+- Happy adopt resumes phone-started agy and copilot sessions natively (release v4.20.15) ([`c2aaa2f`](https://github.com/Vit129/kouen-terminal/commit/c2aaa2fe9016ca2553458887c0c22030c5f89e43))
+
+## [4.20.14] - 2026-10-07
+
+### Fixed
+- Keep agy/copilot interactive in remote-control mode; only claude routes through Happy (release v4.20.14) ([`b01506f`](https://github.com/Vit129/kouen-terminal/commit/b01506fe4b98d33cade994fd84412ac53ed536d6))
+
+## [4.20.13] - 2026-10-07
+
+### Fixed
+- Route agy/copilot remote-control launches through Happy without dropping args (release v4.20.13) ([`ade99c9`](https://github.com/Vit129/kouen-terminal/commit/ade99c96f864fb9e11729b64a32699507a6e4952))
+
+## [4.20.12] - 2026-10-07
+
+### Added
+- Enable dual remote access and add daemon mismatch prompt to release cycle ([`008a889`](https://github.com/Vit129/kouen-terminal/commit/008a8891331ac0ca080b0e459e0f66713c736de5))
+
+### Documentation
+- Sync README/ARCHITECTURE/PRODUCT/DESIGN/CONTEXT and docs/* with v4.20.11 ([`be1f2a0`](https://github.com/Vit129/kouen-terminal/commit/be1f2a09f99d6ea7d8b90e2d7272a6eb8de44aff))
+
+### Fixed
+- Route Kouen-launched claude/agy remote-control sessions through Happy (release v4.20.12) ([`ea3f91a`](https://github.com/Vit129/kouen-terminal/commit/ea3f91ad3b7350eaea7ffbc43a042673a2b60a69))
+
+## [4.20.11] - 2026-10-06
+
+### Added
+- Optional `happy` session mode for Claude Code and Antigravity ([`1a58f42`](https://github.com/Vit129/kouen-terminal/commit/1a58f427ac7d2c5c989db787011efef370fe6f7c))
+- Happy mode for Copilot (ACP) and keep the Happy daemon running ([`61c4f36`](https://github.com/Vit129/kouen-terminal/commit/61c4f36ac187177bceae64406a6fefb7d81e9fe6))
+- Happy mode for Codex (`happy codex`) ([`5c80bf4`](https://github.com/Vit129/kouen-terminal/commit/5c80bf4689dc6bcfd978639ceb31fa4e7660cb08))
+- Hand-typed claude/codex run through Happy in `happy` mode ([`9b1616f`](https://github.com/Vit129/kouen-terminal/commit/9b1616fb73ca448b093aa0551999c850f74f6e33))
+- `kouen-cli happy adopt` opens a phone-started Happy session in a pane ([`3fea903`](https://github.com/Vit129/kouen-terminal/commit/3fea903fb6996c98c841904377eaecfa7c7fba70))
+
+### Documentation
+- Happy mode covers Copilot and the always-on Happy daemon ([`cc79fd8`](https://github.com/Vit129/kouen-terminal/commit/cc79fd84f371f2badb09e52b03b4e1b7b1ed7cca))
+
+### Fixed
+- Write the mode-fallback warning via FileHandle, not C stderr ([`7377cd6`](https://github.com/Vit129/kouen-terminal/commit/7377cd65386fa3d1d563efc62244ecc9a4d1d613))
+- Start Happy's daemon whenever Happy is installed and logged in ([`a4f4140`](https://github.com/Vit129/kouen-terminal/commit/a4f4140fc8fd5bed05aad5842a4c3f95c654c127))
+- Give Happy's daemon a usable env; pin claude when adopting; document limits ([`0b239d8`](https://github.com/Vit129/kouen-terminal/commit/0b239d842ce6996c77b8ecd4d706b23a0a718985))
+
+## [4.20.9] - 2026-10-06
+
+### Added
+- Auto-close the browser pane an agent opened once that agent goes idle ([`b8b0d2d`](https://github.com/Vit129/kouen-terminal/commit/b8b0d2d121732f1eff28a40236715eca1a60a888))
+
+## [4.20.8] - 2026-10-06
+
+### Fixed
+- Stop memory-leak guard tests from writing a PIPE file at the repo root ([`736af9d`](https://github.com/Vit129/kouen-terminal/commit/736af9d33493f4804e6313ccd83b5262b4658618))
+
+## [4.20.7] - 2026-10-02
+
+### Fixed
+- Single guarded project auto-registration, missing/relocate for moved projects (release 4.20.7) ([`0284620`](https://github.com/Vit129/kouen-terminal/commit/02846204ca8085652f93d11ef4ca8b2986e19448))
+
+## [4.20.6] - 2026-10-02
+
+### Fixed
+- Stop re-importing stale recents as projects (release 4.20.6) ([`7f8946f`](https://github.com/Vit129/kouen-terminal/commit/7f8946f011ea4516dc96b1569bc58be26bb8472d))
+
+## [4.20.5] - 2026-10-02
+
+### Fixed
+- Only auto-add real git repo roots as projects (release 4.20.5) ([`7af5a33`](https://github.com/Vit129/kouen-terminal/commit/7af5a3365ae5888ee326edff93aa5eaaced4ece5))
+
+## [4.20.4] - 2026-10-02
+
+### Fixed
+- Never replace the app bundle under a running GUI ([#70](https://github.com/Vit129/kouen-terminal/pull/70)) ([`ad0e87b`](https://github.com/Vit129/kouen-terminal/commit/ad0e87bc65941df73c4853dd4a5abdeceebb7bc8))
+- Resume/handoff open and select a real new tab, hide notch when Vorssaint runs, remove Quick Terminal (release 4.20.4) ([`e2e2401`](https://github.com/Vit129/kouen-terminal/commit/e2e2401ef8cbbc90fddfad6a64e4149b49178552))
+
+## [4.20.3] - 2026-10-01
+
+### Fixed
+- Show handoff progress in the tab title and log every step ([#69](https://github.com/Vit129/kouen-terminal/pull/69)) ([`b715bd4`](https://github.com/Vit129/kouen-terminal/commit/b715bd43389480c447764cdabbfccc54338ae856))
+
+## [4.20.2] - 2026-10-01
+
+### Added
+- Double-click tab bar zooms window, centralize zoom helper ([`4241195`](https://github.com/Vit129/kouen-terminal/commit/4241195bcf1f4f8884424c61ba9521bca14e9983))
+- Model ID field and Test Connection for custom endpoints (release v4.20.2) ([`2a7197a`](https://github.com/Vit129/kouen-terminal/commit/2a7197aace29a55068fe054891c7d71c3cff6b7a))
+
+### Documentation
+- Sync README/ARCHITECTURE/PRODUCT/DESIGN with code through v4.20.1 (P40-P50) ([#65](https://github.com/Vit129/kouen-terminal/pull/65)) ([`8db1c1e`](https://github.com/Vit129/kouen-terminal/commit/8db1c1e2a10bd21f58be9caf9fa94955ca1a479d))
+- Fix shortcuts, CLI subcommands, options and MCP tool list ([#66](https://github.com/Vit129/kouen-terminal/pull/66)) ([`7c24f9a`](https://github.com/Vit129/kouen-terminal/commit/7c24f9ae19ce86238cd27a0554b350083fcaad62))
+
+## [4.20.0] - 2026-09-28
+
+### Added
+- Cross-agent handoff & simplified session resume actions ([`8219095`](https://github.com/Vit129/kouen-terminal/commit/8219095f0733bc4294cd64798bf57374c35790db))
+- Reference the transcript instead of copying truncated turns ([`b31edbb`](https://github.com/Vit129/kouen-terminal/commit/b31edbb2bbb93024157954a51db6344fdcedaf9d))
+- Have the source agent write a handoff note first ([`f0759b6`](https://github.com/Vit129/kouen-terminal/commit/f0759b6ff6feedb751e571956c576afc0ad1f1fe))
+- Use agy's installed /handoff skill ([`2d14237`](https://github.com/Vit129/kouen-terminal/commit/2d1423725b796e6d57b5de7b2c365145591ac7fe))
+- Use Codex's installed $handoff skill, drop embedded instructions ([`8ec93d6`](https://github.com/Vit129/kouen-terminal/commit/8ec93d66d6fd782101d6b6f8f6d75e04a8bd5b0c))
+- Target writes the handoff itself when the source can't ([`14052da`](https://github.com/Vit129/kouen-terminal/commit/14052da1688c71c3af807f70c51bb83e02598136))
+- Resume any adapter's session headlessly; handoff uses it ([`a867762`](https://github.com/Vit129/kouen-terminal/commit/a86776295281b3abb1d778e252f7ff1da7f51bc8))
+- Follow-up turns for headless workers via session resume ([`b193fd9`](https://github.com/Vit129/kouen-terminal/commit/b193fd991a450a094300eb3b0146d3e163acb056))
+- VS Code Copilot Chat sessions; hide agy/Codex subagents ([`c74c685`](https://github.com/Vit129/kouen-terminal/commit/c74c685fdb31333a674166f804ad4befce39f57b))
+- Cross-agent handoff, headless worker follow-ups, History for VS Code Copilot Chat (release v4.20.0) ([`8357add`](https://github.com/Vit129/kouen-terminal/commit/8357add171b172694f569444cfec98e78fd1bd5c))
+
+### Changed
+- LaneATask struct; fix flaky SurfaceRegistry prompt test ([`bb7b47b`](https://github.com/Vit129/kouen-terminal/commit/bb7b47b4314766dd0126882612ade3ac1e9ea7d2))
+
+### Fixed
+- File preview is very slow (release v4.19.2) ([`d635900`](https://github.com/Vit129/kouen-terminal/commit/d6359002a3d0bc71a95187e61e15295f906ba2ca))
+- Safe readiness wait and paste-injection guard ([`3772ce0`](https://github.com/Vit129/kouen-terminal/commit/3772ce066186864724474d3aafb404ad6774cf1c))
+- Fall back to repo root when session path is gone ([`25841d1`](https://github.com/Vit129/kouen-terminal/commit/25841d15b954be9d2dfa1d8ae0479919a48449de))
+- Wait for agent to own the pane before pasting ([`71dedac`](https://github.com/Vit129/kouen-terminal/commit/71dedac24e34527c05063f56f7e068f28695efca))
+- Keep only real turns from Antigravity transcripts ([`4a038f3`](https://github.com/Vit129/kouen-terminal/commit/4a038f34c4dcb00729d2d1d17301d8b5436f4050))
+- Reject non-document note output, disable skill-capture hook ([`9d12dca`](https://github.com/Vit129/kouen-terminal/commit/9d12dcaae2a608df911a150d29fa2407eb9ad6ed))
+- Code-review fixes for headless follow-up ([`fdb2bcd`](https://github.com/Vit129/kouen-terminal/commit/fdb2bcd768527080956764794e9e12b47019dc16))
+
 ## [4.19.1] - 2026-09-24
 
 ### Added

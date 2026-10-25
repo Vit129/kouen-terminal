@@ -19,7 +19,6 @@ has a matching `vX.Y.Z` tag and a signed, notarized DMG on
 ### Fixed
 - Resolve claude audit findings (swiftui font import, git background execution, worktree lock parsing) ([`aa779fb`](https://github.com/Vit129/kouen-terminal/commit/aa779fb3290760aac55b46fb2316c6da05b1a80b))
 
-
 ## [4.21.12] - 2026-10-22
 
 ### Added
