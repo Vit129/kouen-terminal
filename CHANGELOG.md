@@ -5,6 +5,21 @@ All notable changes to Kouen are documented here. The format is based on
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Each released version
 has a matching `vX.Y.Z` tag and a signed, notarized DMG on
 [GitHub Releases](https://github.com/Vit129/kouen-terminal/releases).
+## [4.22.0] - 2026-10-25
+
+### Changed
+- Establish QA architecture guard and extract KouenGit package ([`f6b40e3`](https://github.com/Vit129/kouen-terminal/commit/f6b40e3a4fa50d9213372217d215fc400ba8c013))
+- Extract KouenCompositor, eliminate onboarding fork, and purify design token logic ([`2c7640f`](https://github.com/Vit129/kouen-terminal/commit/2c7640f91ac5b1f2a4e58970be4e511d8f12c4a3))
+- Decouple MainSplitViewController from GitPanelView and hoist pure parsers to KouenGit ([`f6400a0`](https://github.com/Vit129/kouen-terminal/commit/f6400a0311e6b87b62fed831f45d8a22d6da647e))
+- Purify KouenIPC, extract MobileBridge web assets, and unify Layer 2 tokens ([`c95e9eb`](https://github.com/Vit129/kouen-terminal/commit/c95e9ebacb742b0baa9753aa5187303bf3e686fa))
+
+### Documentation
+- Update copyright notice with co-authors ([`91f453d`](https://github.com/Vit129/kouen-terminal/commit/91f453da74f44ee2dcb124c7b208401dde43989d))
+
+### Fixed
+- Resolve claude audit findings (swiftui font import, git background execution, worktree lock parsing) ([`aa779fb`](https://github.com/Vit129/kouen-terminal/commit/aa779fb3290760aac55b46fb2316c6da05b1a80b))
+
+
 ## [4.21.12] - 2026-10-22
 
 ### Added
