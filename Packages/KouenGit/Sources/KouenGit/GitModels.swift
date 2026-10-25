@@ -22,13 +22,22 @@ public struct GitWorktreeInfo: Sendable, Equatable {
     public let branch: String?
     public let isBare: Bool
     public let isDetached: Bool
+    public let isLocked: Bool
 
-    public init(path: String, head: String = "", branch: String? = nil, isBare: Bool = false, isDetached: Bool = false) {
+    public init(
+        path: String,
+        head: String = "",
+        branch: String? = nil,
+        isBare: Bool = false,
+        isDetached: Bool = false,
+        isLocked: Bool = false
+    ) {
         self.path = path
         self.head = head
         self.branch = branch
         self.isBare = isBare
         self.isDetached = isDetached
+        self.isLocked = isLocked
     }
 }
 

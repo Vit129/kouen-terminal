@@ -628,7 +628,7 @@ final class SidebarListModel {
                     head: wt.head,
                     branch: branch,
                     isMain: isMain,
-                    isLocked: false,
+                    isLocked: wt.isLocked,
                     baseBranch: base,
                     aheadCount: div?.ahead,
                     behindCount: div?.behind,

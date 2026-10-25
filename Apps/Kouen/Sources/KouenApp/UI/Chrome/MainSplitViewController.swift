@@ -334,7 +334,7 @@ final class MainSplitViewController: NSViewController {
               let cwd = userInfo["cwd"] as? String else { return }
         let branch = userInfo["branch"] as? String ?? "HEAD"
         let base = userInfo["base"] as? String ?? "main"
-        Task {
+        Task.detached(priority: .userInitiated) { [weak self] in
             let diff = GitRunner.shared.executeOutput(["diff", "--stat", "--patch", "\(base)...\(branch)"], in: cwd) ?? ""
             let content = diff.isEmpty ? (GitRunner.shared.executeOutput(["diff", "--stat", "--patch", "HEAD"], in: cwd) ?? "") : diff
             let safeName = "\(branch.replacingOccurrences(of: "/", with: "_"))_vs_\(base)"
@@ -342,7 +342,9 @@ final class MainSplitViewController: NSViewController {
             try? FileManager.default.createDirectory(atPath: tmpDir, withIntermediateDirectories: true)
             let tmpPath = tmpDir + "\(safeName).diff"
             try? content.write(toFile: tmpPath, atomically: true, encoding: .utf8)
-            self.contentVC.openFileTab(path: tmpPath)
+            await MainActor.run {
+                self?.contentVC.openFileTab(path: tmpPath)
+            }
         }
     }
 

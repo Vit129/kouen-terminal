@@ -25,6 +25,7 @@ final class ArchitectureGuardTests: XCTestCase {
             "Packages/KouenDaemon",
             "Packages/KouenCopyMode",
             "Packages/KouenGit",
+            "Packages/KouenCompositor",
         ]
 
         let forbiddenImportPatterns = [
@@ -142,17 +143,22 @@ final class ArchitectureGuardTests: XCTestCase {
         import AppKit
 
         final class LeakyClass {
+            // Process() in comment should be ignored
             func run() {
                 let p = Process()
             }
         }
         """
 
-        let hasForbiddenUI = badSource.contains("import AppKit")
-        let hasProcess = badSource.contains("Process()")
+        let forbiddenImportPatterns = ["import AppKit", "import SwiftUI"]
+        let caughtForbiddenUI = forbiddenImportPatterns.contains { badSource.contains($0) }
+        let caughtProcess = badSource.components(separatedBy: .newlines).contains { line in
+            let trimmed = line.trimmingCharacters(in: .whitespaces)
+            return !trimmed.hasPrefix("//") && trimmed.contains("Process()")
+        }
 
-        XCTAssertTrue(hasForbiddenUI, "Negative control must catch import AppKit")
-        XCTAssertTrue(hasProcess, "Negative control must catch Process()")
+        XCTAssertTrue(caughtForbiddenUI, "Negative control must catch import AppKit")
+        XCTAssertTrue(caughtProcess, "Negative control must catch un-commented Process()")
     }
 
     // MARK: - Helpers

@@ -17,30 +17,44 @@ final class GitParsersTests: XCTestCase {
         HEAD 112233445566
         detached
 
+        worktree /Users/dev/repo/.worktrees/locked-node
+        HEAD deadbeef1234
+        branch refs/heads/fix/locked-task
+        locked reason for locking
+
         worktree /Users/dev/bare-repo
         bare
         """
 
         let entries = GitParsers.parseWorktreeList(porcelain: sample)
-        XCTAssertEqual(entries.count, 4)
+        XCTAssertEqual(entries.count, 5)
 
         XCTAssertEqual(entries[0].path, "/Users/dev/repo")
         XCTAssertEqual(entries[0].head, "a1b2c3d4e5f6")
         XCTAssertEqual(entries[0].branch, "main")
         XCTAssertFalse(entries[0].isBare)
         XCTAssertFalse(entries[0].isDetached)
+        XCTAssertFalse(entries[0].isLocked)
 
         XCTAssertEqual(entries[1].path, "/Users/dev/repo/.worktrees/feature-x")
         XCTAssertEqual(entries[1].head, "9876543210ab")
         XCTAssertEqual(entries[1].branch, "feat/awesome-thing")
         XCTAssertFalse(entries[1].isBare)
         XCTAssertFalse(entries[1].isDetached)
+        XCTAssertFalse(entries[1].isLocked)
 
         XCTAssertEqual(entries[2].path, "/Users/dev/repo/.worktrees/detached-node")
         XCTAssertTrue(entries[2].isDetached)
+        XCTAssertFalse(entries[2].isLocked)
 
-        XCTAssertEqual(entries[3].path, "/Users/dev/bare-repo")
-        XCTAssertTrue(entries[3].isBare)
+        XCTAssertEqual(entries[3].path, "/Users/dev/repo/.worktrees/locked-node")
+        XCTAssertEqual(entries[3].head, "deadbeef1234")
+        XCTAssertEqual(entries[3].branch, "fix/locked-task")
+        XCTAssertTrue(entries[3].isLocked)
+
+        XCTAssertEqual(entries[4].path, "/Users/dev/bare-repo")
+        XCTAssertTrue(entries[4].isBare)
+        XCTAssertFalse(entries[4].isLocked)
     }
 
     func testParseAheadBehind() {

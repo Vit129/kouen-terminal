@@ -1,6 +1,7 @@
 import AppKit
 import KouenCore
 import QuartzCore
+import SwiftUI
 
 /// Layout metrics and chrome helpers; colors come from `KouenChrome.current`.
 @MainActor

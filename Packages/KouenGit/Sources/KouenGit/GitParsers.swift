@@ -10,6 +10,7 @@ public enum GitParsers {
         var currentBranch: String?
         var isBare = false
         var isDetached = false
+        var isLocked = false
 
         func commitCurrent() {
             guard let path = currentPath, !path.isEmpty else { return }
@@ -18,13 +19,15 @@ public enum GitParsers {
                 head: currentHead,
                 branch: currentBranch,
                 isBare: isBare,
-                isDetached: isDetached
+                isDetached: isDetached,
+                isLocked: isLocked
             ))
             currentPath = nil
             currentHead = ""
             currentBranch = nil
             isBare = false
             isDetached = false
+            isLocked = false
         }
 
         let lines = porcelain.components(separatedBy: .newlines)
@@ -50,6 +53,8 @@ public enum GitParsers {
                 isBare = true
             } else if trimmed == "detached" {
                 isDetached = true
+            } else if trimmed == "locked" || trimmed.hasPrefix("locked ") {
+                isLocked = true
             }
         }
         commitCurrent()
