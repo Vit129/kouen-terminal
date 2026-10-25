@@ -5,7 +5,7 @@ import { readFileSync } from "node:fs";
 import vm from "node:vm";
 import assert from "node:assert/strict";
 
-const swift = readFileSync(new URL("../../Packages/KouenDaemon/Sources/KouenDaemon/MobileBridgeServer.swift", import.meta.url), "utf8");
+const swift = readFileSync(new URL("../../Packages/KouenDaemon/Sources/KouenDaemon/MobileBridgeWebAssets.swift", import.meta.url), "utf8");
 const page = swift.slice(swift.indexOf('static let embeddedPageHTML = #"""'), swift.indexOf('"""#', swift.indexOf('static let embeddedPageHTML')));
 // Swift fills \#(agentIconsJS) at runtime; stand in the shape it emits.
 const script = page.slice(page.indexOf("<script>") + 8, page.lastIndexOf("</script>"))

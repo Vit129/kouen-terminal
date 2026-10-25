@@ -294,7 +294,7 @@ let package = Package(
             // Depends on the engine so `capture-pane` reconstructs the on-screen grid
             // (faithful overwrites/clears + soft-wrap join), exactly like tmux.
             // KouenSettings for ProjectConfig (P32 F3: archiveScript on worktree close).
-            dependencies: ["KouenCore", "KouenTerminalEngine", "CKouenSys", "KouenSettings"],
+            dependencies: ["KouenCore", "KouenTerminalEngine", "CKouenSys", "KouenSettings", "KouenTheme"],
             path: "Packages/KouenDaemon/Sources/KouenDaemon"
         ),
         .executableTarget(

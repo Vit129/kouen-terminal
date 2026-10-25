@@ -20,7 +20,7 @@ enum ImmersivePalette {
     static let sidebarBackground = terminalBackground
     static let surfaceElevated: NSColor = foreground.withAlphaComponent(0.07)
 
-    static let border: NSColor = foreground.withAlphaComponent(0.08)
+    static let border: NSColor = foreground.withAlphaComponent(0.07)
     static let borderStrong: NSColor = foreground.withAlphaComponent(0.14)
 
     // "Accent" is monochrome white — energy comes from glass, motion, and contrast,
@@ -58,20 +58,20 @@ enum ImmersivePalette {
 
     // MARK: - Radius (continuous corners everywhere)
     enum Radius {
-        static let card:    CGFloat = 10
-        static let pill:    CGFloat = 6
-        static let badge:   CGFloat = 5
-        static let control: CGFloat = 7
-        static let overlay: CGFloat = 12
+        static let card:    CGFloat = 7
+        static let pill:    CGFloat = 5
+        static let badge:   CGFloat = 4
+        static let control: CGFloat = 6
+        static let overlay: CGFloat = 10
         static let capsule: CGFloat = 999
     }
 
     // MARK: - Motion (short, delightful, springy)
     enum Motion {
-        static let micro: TimeInterval = 0.10
-        static let fast:  TimeInterval = 0.16
-        static let standard: TimeInterval = 0.24
-        static let slow:  TimeInterval = 0.38
+        static let micro: TimeInterval = 0.08
+        static let fast:  TimeInterval = 0.14
+        static let standard: TimeInterval = 0.22
+        static let slow:  TimeInterval = 0.36
 
         /// The signature "glass entrance" spring used for the main panel, cards, and CTAs.
         static let springResponse: Double = 0.48

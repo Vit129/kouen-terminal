@@ -139,6 +139,24 @@ enum KouenDesign {
         static var paletteTitle: NSFont { .systemFont(ofSize: 13.5, weight: .medium) }
         static var paletteHeader: NSFont { .systemFont(ofSize: 10, weight: .heavy) }
         static var settingsHeading: NSFont { .systemFont(ofSize: 11, weight: .semibold) }
+
+        // MARK: - SwiftUI Font Tokens (Layer 2 Design Tokens Bridge)
+        public enum SUI {
+            public static var sidebarLabel: Font { .system(size: FontSize.sidebarLabel, weight: .medium) }
+            public static var rowTitle: Font { sidebarLabel }
+            public static var rowMeta: Font { .system(size: 11, weight: .regular, design: .monospaced) }
+            public static var tabTitle: Font { sidebarLabel }
+            public static var sectionLabel: Font { .system(size: FontSize.sectionLabel, weight: .semibold) }
+            public static var badge: Font { .system(size: 10.5, weight: .semibold, design: .monospaced) }
+            public static var kbd: Font { .system(size: 12, weight: .semibold, design: .monospaced) }
+            public static var paletteTitle: Font { .system(size: 13.5, weight: .medium) }
+            public static var paletteHeader: Font { .system(size: 10, weight: .heavy) }
+            public static var settingsHeading: Font { .system(size: 11, weight: .semibold) }
+            public static var caption: Font { .system(size: 11, weight: .regular) }
+            public static var caption2: Font { .system(size: 9.5, weight: .regular) }
+            public static var body: Font { .system(size: 12, weight: .regular) }
+            public static var bodyStrong: Font { .system(size: 12, weight: .semibold) }
+        }
     }
 
     /// Drop-shadow recipe presets. Apply with `applyShadow(.elevation1, to: layer)`.
@@ -991,6 +1009,20 @@ extension BoardColumnKind {
         case .idle:           return KouenDesign.chrome.idleStatus
         }
     }
+}
+
+// MARK: - SwiftUI Font Design Token Convenience
+
+extension Font {
+    public static var kouenSidebarLabel: Font { KouenDesign.Typography.SUI.sidebarLabel }
+    public static var kouenSectionLabel: Font { KouenDesign.Typography.SUI.sectionLabel }
+    public static var kouenBadge: Font { KouenDesign.Typography.SUI.badge }
+    public static var kouenKbd: Font { KouenDesign.Typography.SUI.kbd }
+    public static var kouenBody: Font { KouenDesign.Typography.SUI.body }
+    public static var kouenBodyStrong: Font { KouenDesign.Typography.SUI.bodyStrong }
+    public static var kouenCaption: Font { KouenDesign.Typography.SUI.caption }
+    public static var kouenCaption2: Font { KouenDesign.Typography.SUI.caption2 }
+    public static var kouenMono: Font { KouenDesign.Typography.SUI.rowMeta }
 }
 
 
