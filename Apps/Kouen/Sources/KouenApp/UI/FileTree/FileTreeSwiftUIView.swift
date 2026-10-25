@@ -2,6 +2,7 @@ import AppKit
 import Observation
 import SwiftUI
 import KouenCore
+import KouenGit
 
 @Observable
 @MainActor
@@ -407,30 +408,9 @@ struct FileTreeSwiftUIView: View {
     private func runGitCommand(arguments: [String]) async -> String? {
         let path = rootPath
         guard !path.isEmpty, FileManager.default.fileExists(atPath: path) else { return nil }
-        return await withCheckedContinuation { continuation in
-            DispatchQueue.global(qos: .userInitiated).async {
-                let process = Process()
-                process.executableURL = URL(fileURLWithPath: "/usr/bin/git")
-                process.arguments = arguments
-                process.currentDirectoryURL = URL(fileURLWithPath: path)
-                let pipe = Pipe()
-                process.standardOutput = pipe
-                process.standardError = FileHandle.nullDevice
-                do {
-                    try process.run()
-                    let data = (try? pipe.fileHandleForReading.readToEnd()) ?? Data()
-                    process.waitUntilExit()
-                    guard process.terminationStatus == 0 else {
-                        continuation.resume(returning: nil)
-                        return
-                    }
-                    let output = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines)
-                    continuation.resume(returning: output?.isEmpty == true ? nil : output)
-                } catch {
-                    continuation.resume(returning: nil)
-                }
-            }
-        }
+        return await Task.detached(priority: .userInitiated) {
+            GitRunner.shared.executeOutput(arguments, in: path)
+        }.value
     }
 
     private func listBranches() async -> [String] {
@@ -1044,18 +1024,13 @@ final class BranchSwitchHelper: NSObject {
     @objc func switchBranch(_ sender: NSMenuItem) {
         guard let pair = sender.representedObject as? (String, String) else { return }
         let (rootPath, branch) = pair
-        Task {
-            let process = Process()
-            process.executableURL = URL(fileURLWithPath: "/usr/bin/git")
-            process.arguments = ["checkout", branch]
-            process.currentDirectoryURL = URL(fileURLWithPath: rootPath)
-            process.standardOutput = Pipe()
-            process.standardError = Pipe()
-            try? process.run()
-            process.waitUntilExit()
-            if process.terminationStatus == 0 {
-                DisplayMessage.show("Switched to \(branch)")
-                SessionCoordinator.shared.syncFromDaemon()
+        Task.detached(priority: .userInitiated) {
+            let res = GitRunner.shared.execute(["checkout", branch], in: rootPath)
+            if res.isSuccess {
+                await MainActor.run {
+                    DisplayMessage.show("Switched to \(branch)")
+                    SessionCoordinator.shared.syncFromDaemon()
+                }
             }
         }
     }

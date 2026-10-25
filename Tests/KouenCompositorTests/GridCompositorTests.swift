@@ -22,6 +22,7 @@ final class GridCompositorTests: XCTestCase {
         )
     }
 
+    // MARK: - [BE-UT] Grid Compositor Rendering
     func testRendersPaneText() {
         let comp = GridCompositor(cols: 80, rows: 24)
         let grid = snapshot(80, 24, "Hello")

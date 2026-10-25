@@ -535,18 +535,7 @@ final class AutomationsFleetModel {
     }
 
     nonisolated private static func isLaunchAgentLoaded(label: String) -> Bool {
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/bin/launchctl")
-        process.arguments = ["print", "gui/\(getuid())/\(label)"]
-        process.standardOutput = FileHandle.nullDevice
-        process.standardError = FileHandle.nullDevice
-        do {
-            try process.run()
-            process.waitUntilExit()
-            return process.terminationStatus == 0
-        } catch {
-            return false
-        }
+        ProcessRunner.run(executable: "/bin/launchctl", arguments: ["print", "gui/\(getuid())/\(label)"]).isSuccess
     }
 
     nonisolated private static func tailLog(path: String, lines: Int) -> String? {
@@ -656,13 +645,7 @@ final class AutomationsFleetModel {
     }
 
     nonisolated private static func runLaunchctl(_ arguments: [String]) {
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/bin/launchctl")
-        process.arguments = arguments
-        process.standardOutput = FileHandle.nullDevice
-        process.standardError = FileHandle.nullDevice
-        try? process.run()
-        process.waitUntilExit()
+        ProcessRunner.run(executable: "/bin/launchctl", arguments: arguments)
     }
 
     func delete(_ item: FleetJobItem) async {

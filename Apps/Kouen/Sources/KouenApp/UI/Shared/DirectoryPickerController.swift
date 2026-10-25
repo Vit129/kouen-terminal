@@ -20,26 +20,9 @@ public enum DirectoryPickerController {
     }
 
     private static func zoxideRanked() async -> [String] {
-        await withCheckedContinuation { continuation in
-            DispatchQueue.global(qos: .userInitiated).async {
-                let task = Process()
-                task.executableURL = URL(fileURLWithPath: "/usr/bin/env")
-                task.arguments = ["zoxide", "query", "--list"]
-                let pipe = Pipe()
-                task.standardOutput = pipe
-                task.standardError = Pipe()
-                do {
-                    try task.run()
-                    task.waitUntilExit()
-                    let data = pipe.fileHandleForReading.readDataToEndOfFile()
-                    let lines = String(data: data, encoding: .utf8)?
-                        .split(separator: "\n").map(String.init).filter { !$0.isEmpty } ?? []
-                    continuation.resume(returning: lines)
-                } catch {
-                    continuation.resume(returning: [])
-                }
-            }
-        }
+        let res = await ProcessRunner.runAsync(executable: "zoxide", arguments: ["query", "--list"])
+        guard res.isSuccess else { return [] }
+        return res.stdout.split(separator: "\n").map(String.init).filter { !$0.isEmpty }
     }
 
     public static func present(relativeTo parent: NSWindow?) {

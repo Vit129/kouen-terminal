@@ -540,31 +540,9 @@ final class SidebarListModel {
     private static func resolveGhPath() async -> String? {
         if hasAttemptedGhResolve { return resolvedGhPath }
         hasAttemptedGhResolve = true
-        for path in knownGhPaths where FileManager.default.fileExists(atPath: path) {
-            resolvedGhPath = path
-            return path
-        }
-        let fallback = await Task.detached(priority: .utility) { () -> String? in
-            let p = Process()
-            p.executableURL = URL(fileURLWithPath: "/usr/bin/which")
-            p.arguments = ["gh"]
-            let pipe = Pipe()
-            p.standardOutput = pipe
-            p.standardError = FileHandle.nullDevice
-            do {
-                try p.run()
-                let data = pipe.fileHandleForReading.readDataToEndOfFile()
-                p.waitUntilExit()
-                if p.terminationStatus == 0,
-                   let path = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines),
-                   !path.isEmpty, FileManager.default.fileExists(atPath: path) {
-                    return path
-                }
-            } catch {}
-            return nil
-        }.value
-        resolvedGhPath = fallback
-        return fallback
+        let path = GitHubCLIClient.cachedGhPath ?? knownGhPaths.first(where: { FileManager.default.fileExists(atPath: $0) }) ?? ProcessRunner.resolveBinary("gh")
+        resolvedGhPath = path
+        return path
     }
 
     private func fetchHasRemote(for path: String) async -> Bool {

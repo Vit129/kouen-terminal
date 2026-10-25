@@ -135,9 +135,9 @@ struct AgentNotchRootView: View {
 
     private func peekReasonColor(_ reason: AgentNotchPeekEvent.Reason) -> Color {
         switch reason {
-        case .needsInput: return .orange
-        case .errored: return Color(red: 1.0, green: 0.42, blue: 0.40)
-        case .finished: return Color(red: 0.42, green: 0.85, blue: 0.50)
+        case .needsInput: return KouenDesign.Colors.SUI.warning
+        case .errored: return KouenDesign.Colors.SUI.error
+        case .finished: return KouenDesign.Colors.SUI.success
         }
     }
 
@@ -394,7 +394,7 @@ private struct NotchOverviewRow: View {
                 .foregroundStyle(.white)
                 .padding(.horizontal, 8)
                 .padding(.vertical, 3)
-                .background(Color(red: 0.30, green: 0.68, blue: 0.42), in: Capsule())
+                .background(KouenDesign.Colors.SUI.successAction, in: Capsule())
             Button("Cancel") { isReplying = false; replyText = "" }
                 .buttonStyle(.plain)
                 .font(.system(size: 9.5, weight: .bold, design: .rounded))
@@ -488,7 +488,7 @@ private struct NotchOverviewRow: View {
                 .foregroundStyle(.white)
                 .padding(.horizontal, 8)
                 .padding(.vertical, 3)
-                .background(Color(red: 0.30, green: 0.68, blue: 0.42), in: Capsule())
+                .background(KouenDesign.Colors.SUI.successAction, in: Capsule())
         }
         .accessibilityElement(children: .contain)
     }
@@ -528,13 +528,13 @@ private struct NotchOverviewRow: View {
             return (row.waitingCount == 1 ? "needs input" : "\(row.waitingCount) need input", .orange)
         }
         if row.agentActivity == .errored {
-            return ("error", Color(red: 1.0, green: 0.45, blue: 0.42))
+            return ("error", KouenDesign.Colors.SUI.errorBadge)
         }
         if row.agentActivity == .working {
             if let percent = progressPercent {
-                return ("\(percent)%", Color(red: 0.42, green: 0.85, blue: 0.50))
+                return ("\(percent)%", KouenDesign.Colors.SUI.success)
             }
-            return ("working", Color(red: 0.42, green: 0.85, blue: 0.50))
+            return ("working", KouenDesign.Colors.SUI.success)
         }
         if row.rowKind == .session, row.tabCount > 1 {
             return ("\(row.tabCount) tabs", .white.opacity(0.7))
@@ -548,7 +548,7 @@ private struct NotchOverviewRow: View {
         if let percent = progressPercent, row.agentActivity == .working {
             GeometryReader { proxy in
                 Capsule()
-                    .fill(Color(red: 0.42, green: 0.85, blue: 0.50).opacity(0.85))
+                    .fill(KouenDesign.Colors.SUI.success.opacity(0.85))
                     .frame(width: max(6, proxy.size.width * CGFloat(percent) / 100), height: 2)
                     .frame(maxHeight: .infinity, alignment: .bottom)
                     .padding(.bottom, 2)

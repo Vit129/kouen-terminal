@@ -3,6 +3,7 @@ import KouenGit
 import XCTest
 
 final class GitRunnerTests: XCTestCase {
+    // MARK: - [BE-UT] GitRunner Binary Execution
     func testGitRunnerVersion() {
         let runner = GitRunner()
         let result = runner.execute(["--version"])
@@ -11,6 +12,7 @@ final class GitRunnerTests: XCTestCase {
         XCTAssertEqual(result.exitCode, 0)
     }
 
+    // MARK: - [BE-UT] GitRunner Output Capture
     func testGitRunnerOutput() {
         let runner = GitRunner()
         let output = runner.executeOutput(["--version"])
@@ -18,6 +20,7 @@ final class GitRunnerTests: XCTestCase {
         XCTAssertTrue(output?.hasPrefix("git version") == true)
     }
 
+    // MARK: - [BE-IT] GitService Repository Discovery
     func testGitServiceHasRemoteInCurrentRepo() {
         let repoRoot = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent() // Tests/KouenGitTests

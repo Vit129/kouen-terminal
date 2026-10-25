@@ -76,13 +76,13 @@ final class HintModeOverlay {
         let box = NSView()
         box.wantsLayer = true
         box.layer?.cornerRadius = 3
-        box.layer?.backgroundColor = NSColor(red: 0.98, green: 0.87, blue: 0.18, alpha: 0.93).cgColor
+        box.layer?.backgroundColor = KouenDesign.Colors.hintChipBackground.cgColor
         box.layer?.borderWidth = 1
-        box.layer?.borderColor = NSColor.black.withAlphaComponent(0.35).cgColor
+        box.layer?.borderColor = KouenDesign.Colors.hintChipBorder.cgColor
 
         let tf = NSTextField(labelWithString: label.uppercased())
         tf.font = .monospacedSystemFont(ofSize: 10, weight: .bold)
-        tf.textColor = NSColor(white: 0.08, alpha: 1)
+        tf.textColor = KouenDesign.Colors.hintChipText
         tf.translatesAutoresizingMaskIntoConstraints = false
         box.addSubview(tf)
         NSLayoutConstraint.activate([
