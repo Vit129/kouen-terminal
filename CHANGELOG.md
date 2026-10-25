@@ -10,7 +10,6 @@ has a matching `vX.Y.Z` tag and a signed, notarized DMG on
 ### Changed
 - Complete Dev-QA pattern (ProcessRunner, ratchet G3 to 0, Rule 2/3 guards, layered test tags) ([`ca7164d`](https://github.com/Vit129/kouen-terminal/commit/ca7164d78d0f1dea08820cd629ed607d3027ee52))
 
-
 ## [4.22.0] - 2026-10-25
 
 ### Changed
