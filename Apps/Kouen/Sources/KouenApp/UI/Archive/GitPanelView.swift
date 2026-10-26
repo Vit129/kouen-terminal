@@ -594,7 +594,7 @@ final class GitPanelView: NSView {
         guard !worktreePath.isEmpty, !branch.isEmpty else { return }
 
         Task {
-            _ = await runGit(["worktree", "add", worktreePath, branch], in: path)
+            _ = await runGit(["worktree", "add", worktreePath, branch], in: path, timeout: nil)
             if FileManager.default.fileExists(atPath: worktreePath) {
                 let coordinator = SessionCoordinator.shared
                 if let workspaceID = coordinator.snapshot.activeWorkspaceID {
@@ -851,8 +851,12 @@ final class GitPanelView: NSView {
     /// the process and reports failure rather than blocking the merge dialog forever.
     private func runShellCommand(_ executable: String, _ args: [String], in directory: String) async -> GitResult {
         let res = await ProcessRunner.runAsync(executable: executable, arguments: args, in: directory, timeout: 300)
-        let combined = res.stdout.isEmpty ? res.stderr : res.stdout
-        return GitResult(output: combined, stderr: res.stderr, success: res.isSuccess)
+        let parts = [
+            res.stdout.trimmingCharacters(in: .whitespacesAndNewlines),
+            res.stderr.trimmingCharacters(in: .whitespacesAndNewlines)
+        ].filter { !$0.isEmpty }
+        let combined = parts.joined(separator: "\n")
+        return GitResult(output: combined, stderr: combined, success: res.isSuccess)
     }
 
     /// A3 handoff: plain `git merge` (never `--no-ff`, never rebase — rebase would rewrite the
@@ -2179,9 +2183,9 @@ final class GitPanelView: NSView {
 
     // MARK: - Git
 
-    private func runGit(_ args: [String], in directory: String) async -> String {
+    private func runGit(_ args: [String], in directory: String, timeout: TimeInterval? = nil) async -> String {
         await Task.detached(priority: .userInitiated) {
-            GitRunner.shared.executeOutput(args, in: directory) ?? ""
+            GitRunner.shared.executeOutput(args, in: directory, timeout: timeout) ?? ""
         }.value
     }
 

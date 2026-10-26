@@ -5,6 +5,12 @@ All notable changes to Kouen are documented here. The format is based on
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Each released version
 has a matching `vX.Y.Z` tag and a signed, notarized DMG on
 [GitHub Releases](https://github.com/Vit129/kouen-terminal/releases).
+## [4.22.2] - 2026-10-26
+
+### Fixed
+- Resolve ProcessRunner regressions in timeouts, output draining, and async concurrency ([`993bfd9`](https://github.com/Vit129/kouen-terminal/commit/993bfd904a44a038f90af64a84009418fb82facd))
+
+
 ## [4.22.1] - 2026-10-25
 
 ### Changed
