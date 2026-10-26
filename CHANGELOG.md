@@ -10,7 +10,6 @@ has a matching `vX.Y.Z` tag and a signed, notarized DMG on
 ### Fixed
 - Resolve ProcessRunner regressions in timeouts, output draining, and async concurrency ([`993bfd9`](https://github.com/Vit129/kouen-terminal/commit/993bfd904a44a038f90af64a84009418fb82facd))
 
-
 ## [4.22.1] - 2026-10-25
 
 ### Changed
