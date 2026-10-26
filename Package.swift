@@ -225,12 +225,13 @@ let package = Package(
         // Pure headless Git execution runner, models and output parsers.
         .target(
             name: "KouenGit",
+            dependencies: ["KouenCore"],
             path: "Packages/KouenGit/Sources/KouenGit",
             swiftSettings: strictFoundationSettings
         ),
         .target(
             name: "KouenCore",
-            dependencies: ["KouenIPC", "KouenSettings", "KouenCommands", "KouenGit"],
+            dependencies: ["KouenIPC", "KouenSettings", "KouenCommands"],
             path: "Packages/KouenCore/Sources/KouenCore",
             swiftSettings: strictFoundationSettings,
             linkerSettings: coreLinkerSettings
