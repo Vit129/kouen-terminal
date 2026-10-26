@@ -138,6 +138,9 @@ final class ScriptingTests: XCTestCase {
 
     @MainActor
     func testReadOnlySnapshotAPIAndNonMutating() throws {
+        // SessionCoordinator.shared is a singleton other tests mutate; seed a known
+        // snapshot (one workspace/session/tab) so this test does not depend on order.
+        SessionCoordinator.shared.daemonSyncService.applyLocalSnapshot(SessionSnapshot())
         let runtime = ScriptRuntime()
 
         #if canImport(JavaScriptCore)
@@ -545,6 +548,9 @@ final class ScriptingTests: XCTestCase {
     /// surface is wired up.
     @MainActor
     func testPaneAndSessionMutatorsAreExposedAsFunctions() throws {
+        // SessionCoordinator.shared is a singleton other tests mutate; seed a known
+        // snapshot (one workspace/session/tab) so this test does not depend on order.
+        SessionCoordinator.shared.daemonSyncService.applyLocalSnapshot(SessionSnapshot())
         let runtime = ScriptRuntime()
 
         #if canImport(JavaScriptCore)

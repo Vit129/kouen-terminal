@@ -137,12 +137,10 @@ final class SessionCoordinator: NSObject {
             .flatMap { $0.sessions }
             .flatMap { $0.tabs }
         let waitingCount = allTabs.filter { $0.status == .waiting }.count
-        if waitingCount > 0 {
-            NSApp.dockTile.badgeLabel = "\(waitingCount)"
-        } else {
-            NSApp.dockTile.badgeLabel = nil
-        }
-        NSApp.dockTile.display()
+        // NSApp is nil when there is no NSApplication (e.g. under xctest).
+        guard let app = NSApp else { return }
+        app.dockTile.badgeLabel = waitingCount > 0 ? "\(waitingCount)" : nil
+        app.dockTile.display()
     }
 
     // MARK: - Remote daemon
