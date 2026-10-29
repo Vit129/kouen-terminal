@@ -1,0 +1,23 @@
+Apps/Kouen/Sources/KouenApp/UI/FileTree/FileTreeSwiftUIView.swift
+  s_8a3c29f50160bf::t_44786422d92ff0 143-144,197-199,270-272,311,318-322,455-459,562-575,619-640,646-653,655-657,659,661-662,684-809,1220
+Apps/Kouen/Sources/KouenApp/UI/Sidebar/KouenSidebarPanelViewController.swift
+  s_8a3c29f50160bf::t_35a207708e7f5b 1260-1265,1317-1322,1325
+Tests/KouenAppTests/WorkspaceFileTreePinTests.swift
+  s_8a3c29f50160bf::t_13cc5c1e262d92 3,138-211
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.3",
+  "base_commit_sha": "2473a54736b553bafecf66051ee07dfcd5f958d4",
+  "prompts": {},
+  "sessions": {
+    "s_8a3c29f50160bf": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "57dbb3e9-bcea-4b8c-8c8c-0dd743721568",
+        "model": "claude-sonnet-5-5"
+      },
+      "human_author": "Vit129 <vitosk129@gmail.com>"
+    }
+  }
+}
