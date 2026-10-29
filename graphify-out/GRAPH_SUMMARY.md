@@ -3,13 +3,13 @@ _Auto-generated from GRAPH_REPORT.md · do not edit manually_
 _Regen: `graphify update .`_
 
 ## Summary
-- 19867 nodes · 57508 edges · 2766 communities (1514 shown, 1252 thin omitted)
-- Extraction: 85% EXTRACTED · 15% INFERRED · 0% AMBIGUOUS · INFERRED: 8761 edges (avg confidence: 0.74)
+- 19889 nodes · 57594 edges · 2748 communities (1500 shown, 1248 thin omitted)
+- Extraction: 85% EXTRACTED · 15% INFERRED · 0% AMBIGUOUS · INFERRED: 8770 edges (avg confidence: 0.74)
 - Token cost: 0 input · 0 output
 
 
 ## Graph Freshness
-- Built from commit: `65a52752`
+- Built from commit: `7f0de73f`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -32,15 +32,15 @@ A high-degree node isn't always architecturally central - a widely-used
 utility/config file can rack up more edges than a real coupler while only
 ever touching one area. This ranks by how many DIFFERENT communities a
 node's neighbors span, not by raw edge count.
-1. `IPCRequest` - bridges 186 areas (208 edges)
-2. `Command` - bridges 101 areas (108 edges)
-3. `AgentKind` - bridges 84 areas (178 edges)
-4. `KouenTerminalSurfaceView` - bridges 77 areas (345 edges)
-5. `t()` - bridges 77 areas (253 edges)
-6. `IPCResponse` - bridges 77 areas (103 edges)
-7. `KouenPaths` - bridges 70 areas (150 edges)
-8. `SessionCoordinator` - bridges 69 areas (235 edges)
-9. `KouenGridTerminal` - bridges 63 areas (117 edges)
+1. `IPCRequest` - bridges 190 areas (208 edges)
+2. `Command` - bridges 100 areas (108 edges)
+3. `AgentKind` - bridges 86 areas (178 edges)
+4. `IPCResponse` - bridges 82 areas (103 edges)
+5. `t()` - bridges 78 areas (253 edges)
+6. `KouenTerminalSurfaceView` - bridges 77 areas (345 edges)
+7. `KouenPaths` - bridges 72 areas (150 edges)
+8. `SessionCoordinator` - bridges 67 areas (235 edges)
+9. `KouenGridTerminal` - bridges 65 areas (117 edges)
 
 ## Surprising Connections (you probably didn't know these)
 - `.selectedHost` --references--> `RemoteHost`  [INFERRED]
