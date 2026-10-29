@@ -377,6 +377,63 @@ final class BrowserPaneViewTests: XCTestCase {
         paneView.reloadStopButton.performClick(nil)
         XCTAssertTrue(mockWebView.stopLoadingCalled)
     }
+
+    func testDidFinishAndCommitFallBackToHostWhenWebViewTitleIsEmptyString() {
+        let mockWebView = MockWebView(frame: .zero, configuration: WKWebViewConfiguration())
+        let testURL = URL(string: "https://github.com/Vit129/space-")!
+        mockWebView.mockURL = testURL
+        // WKWebView returns "" (empty string, not nil) when <title> is missing or not yet parsed.
+        mockWebView.mockTitle = ""
+
+        let paneView = BrowserPaneView(url: testURL, paneID: UUID(), webView: mockWebView)
+        paneView.webView(mockWebView, didFinish: nil)
+
+        XCTAssertEqual(paneView.activeTabTitle, "github.com",
+            "Empty webView.title must fall back to URL host instead of leaving the tab stuck at 'New Tab'")
+    }
+
+    func testProgressLineHidesOnFinishAndFail() {
+        let mockWebView = MockWebView(frame: .zero, configuration: WKWebViewConfiguration())
+        let testURL = URL(string: "https://example.com/test")!
+        mockWebView.mockURL = testURL
+
+        let paneView = BrowserPaneView(url: testURL, paneID: UUID(), webView: mockWebView)
+        paneView.webView(mockWebView, didStartProvisionalNavigation: nil)
+        XCTAssertTrue(paneView.progressLine.isShowingProgress,
+            "didStartProvisionalNavigation must mark progressLine as showing")
+
+        paneView.webView(mockWebView, didFinish: nil)
+        XCTAssertFalse(paneView.progressLine.isShowingProgress,
+            "didFinish must hide progressLine so it does not stay stuck blue after load completes")
+
+        paneView.webView(mockWebView, didStartProvisionalNavigation: nil)
+        XCTAssertTrue(paneView.progressLine.isShowingProgress)
+        paneView.webView(mockWebView, didFailProvisionalNavigation: nil, withError: NSError(domain: NSURLErrorDomain, code: NSURLErrorTimedOut))
+        XCTAssertFalse(paneView.progressLine.isShowingProgress,
+            "didFailProvisionalNavigation must hide progressLine")
+    }
+
+    func testWebViewAndProgressLineSpanFullPaneWidthAfterLayout() {
+        let mockWebView = MockWebView(frame: .zero, configuration: WKWebViewConfiguration())
+        let testURL = URL(string: "https://example.com/test")!
+        mockWebView.mockURL = testURL
+
+        let paneView = BrowserPaneView(url: testURL, paneID: UUID(), webView: mockWebView)
+        let window = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 600, height: 400),
+            styleMask: [.titled],
+            backing: .buffered,
+            defer: false
+        )
+        window.contentView = paneView
+        window.contentView?.layoutSubtreeIfNeeded()
+        paneView.layoutSubtreeIfNeeded()
+
+        XCTAssertEqual(paneView.webView.frame.width, 600, accuracy: 0.5,
+            "webView must be pinned to the full width of mainStack")
+        XCTAssertEqual(paneView.progressLine.frame.width, 600, accuracy: 0.5,
+            "progressLine must be pinned to the full width of mainStack")
+    }
 }
 
 private final class MockWebView: WKWebView {

@@ -125,6 +125,9 @@ if pgrep -x Kouen > /dev/null 2>&1; then
     echo '-- waiting for Kouen GUI to exit'
     for i in \$(seq 1 600); do
       pgrep -x Kouen > /dev/null 2>&1 || break
+      if [[ \$i -eq 50 ]]; then
+        pkill -TERM -x Kouen 2>/dev/null || true
+      fi
       sleep 0.1
     done
     # Never overwrite the bundle under a running GUI: the old process keeps executing from a
@@ -152,8 +155,8 @@ $STOP_DAEMON_LINES
 
   echo "==> Quitting Kouen — will restart with new build momentarily..."
   echo "    (log: $LOG)"
-  osascript -e 'tell application "Kouen" to quit' 2>/dev/null || \
-    pkill -TERM Kouen 2>/dev/null || true
+  osascript -e 'with timeout of 5 seconds' -e 'tell application "Kouen" to quit' -e 'end timeout' 2>/dev/null || \
+    pkill -TERM -x Kouen 2>/dev/null || true
 
 else
   # GUI not running — but a detached daemon (e.g. background agent tasks attached only via
