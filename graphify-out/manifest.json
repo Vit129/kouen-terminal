@@ -320,8 +320,8 @@
     "semantic_hash": ""
   },
   "Apps/Kouen/Sources/KouenApp/UI/Chrome/BrowserPaneView.swift": {
-    "mtime": 1793261994.208911,
-    "ast_hash": "214d260f9f937e6738cd06cc5378e18e",
+    "mtime": 1793269074.9099517,
+    "ast_hash": "eccbbb0e64e4fb1d5fac337cadf198a4",
     "semantic_hash": ""
   },
   "Apps/Kouen/Sources/KouenApp/UI/Chrome/ContentAreaViewController.swift": {
@@ -375,7 +375,7 @@
     "semantic_hash": ""
   },
   "Apps/Kouen/Sources/KouenApp/UI/Chrome/PaneLifecycleManager.swift": {
-    "mtime": 1793260232.966239,
+    "mtime": 1793262742.625446,
     "ast_hash": "ee98e9a5ae96522b3d695cec422c9955",
     "semantic_hash": ""
   },
@@ -475,7 +475,7 @@
     "semantic_hash": ""
   },
   "Apps/Kouen/Sources/KouenApp/UI/FileTree/FileTreeSwiftUIView.swift": {
-    "mtime": 1793262207.4631233,
+    "mtime": 1793262742.6258237,
     "ast_hash": "095fb5f5903650a2a8bd83f77ddbbd38",
     "semantic_hash": ""
   },
@@ -640,7 +640,7 @@
     "semantic_hash": ""
   },
   "Apps/Kouen/Sources/KouenApp/UI/Sidebar/KouenSidebarPanelViewController.swift": {
-    "mtime": 1793262031.8405714,
+    "mtime": 1793262742.6263356,
     "ast_hash": "3e0bc0f874fcce73c46c1eeea3103297",
     "semantic_hash": ""
   },
@@ -960,8 +960,8 @@
     "semantic_hash": ""
   },
   "Packages/KouenCore/Sources/KouenCore/KouenVersion.swift": {
-    "mtime": 1792980913.0628383,
-    "ast_hash": "737dde9a2e7198c92476f241846ea531",
+    "mtime": 1793262742.6273687,
+    "ast_hash": "4a270354867cb4d4c4ef2b2f6b38838d",
     "semantic_hash": ""
   },
   "Packages/KouenCore/Sources/KouenCore/Layouts/LayoutTemplate.swift": {
@@ -1050,8 +1050,8 @@
     "semantic_hash": ""
   },
   "Packages/KouenCore/Sources/KouenCore/ReleaseNotes/GeneratedReleaseNotes.swift": {
-    "mtime": 1792980913.063641,
-    "ast_hash": "a44c72844b3915ca3c18a0843d5c4c7c",
+    "mtime": 1793262742.6276877,
+    "ast_hash": "533a50834ae2f537d373a3759312f982",
     "semantic_hash": ""
   },
   "Packages/KouenCore/Sources/KouenCore/ReleaseNotes/ReleaseNotes.swift": {
@@ -1670,7 +1670,7 @@
     "semantic_hash": ""
   },
   "Packages/KouenTerminalKit/Sources/KouenTerminalKit/PasteController.swift": {
-    "mtime": 1793256293.3419437,
+    "mtime": 1793262742.6280506,
     "ast_hash": "33706a44e0c4b4d926d4e7c3cd6b9aba",
     "semantic_hash": ""
   },
@@ -1890,8 +1890,8 @@
     "semantic_hash": ""
   },
   "Scripts/install-graceful.sh": {
-    "mtime": 1792246211.4882526,
-    "ast_hash": "0d313a3afd43f956c4ad383cd0fda529",
+    "mtime": 1793268954.6644943,
+    "ast_hash": "8c4f93331e9db2c206adc432f74f8c11",
     "semantic_hash": ""
   },
   "Scripts/install-linux.sh": {
@@ -1980,8 +1980,8 @@
     "semantic_hash": ""
   },
   "Tests/KouenAppTests/BrowserPaneViewTests.swift": {
-    "mtime": 1793262229.1857486,
-    "ast_hash": "4a9d3fed6a071de5063b60e2c93526e9",
+    "mtime": 1793269077.4869337,
+    "ast_hash": "4fd06176185ece05298134290697bca7",
     "semantic_hash": ""
   },
   "Tests/KouenAppTests/DaemonLauncherTests.swift": {
@@ -3040,7 +3040,7 @@
     "semantic_hash": ""
   },
   "Tests/robot/mobile_bridge_pairing_bugs.robot": {
-    "mtime": 1793256678.736592,
+    "mtime": 1793262742.629116,
     "ast_hash": "e85402b13ec6f52066eb930e7c279726",
     "semantic_hash": ""
   },
@@ -3280,7 +3280,7 @@
     "semantic_hash": ""
   },
   "AGENTS.md": {
-    "mtime": 1793260555.4545577,
+    "mtime": 1793262742.623625,
     "ast_hash": "e4574f470e95b160f97b46b36aeb01db",
     "semantic_hash": ""
   },
@@ -4595,7 +4595,7 @@
     "semantic_hash": ""
   },
   "Tests/KouenAppTests/WorkspaceFileTreePinTests.swift": {
-    "mtime": 1793256567.2785385,
+    "mtime": 1793262742.6287313,
     "ast_hash": "858ddb1f31c6b9540125237fd4ab34a4",
     "semantic_hash": ""
   },
