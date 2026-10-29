@@ -1257,13 +1257,13 @@ final class KouenSidebarPanelViewController: NSViewController {
                 guard let self else { return }
                 if self.lastFileTreeSessionID == activeSessionID {
                     self.fileTreeView.updateRoot(path: root, sessionID: activeSessionID)
+                    if cwd != self.lastFileTreeCWD {
+                        if !self.fileTreeView.isPinned {
+                            self.fileTreeView.revealFileInTree(path: cwd)
+                        }
+                        self.lastFileTreeCWD = cwd
+                    }
                 }
-            }
-            if cwd != lastFileTreeCWD {
-                if !fileTreeView.isPinned {
-                    fileTreeView.revealFileInTree(path: cwd)
-                }
-                lastFileTreeCWD = cwd
             }
             lastFileTreeSessionID = activeSessionID
             lastFileTreeGitBranch = gitBranch
@@ -1314,10 +1314,15 @@ final class KouenSidebarPanelViewController: NSViewController {
                     guard let self else { return }
                     if self.lastFileTreeSessionID == activeSessionID {
                         self.fileTreeView.updateRoot(path: root, sessionID: activeSessionID)
+                        if cwd != self.lastFileTreeCWD {
+                            if !self.fileTreeView.isPinned {
+                                self.fileTreeView.revealFileInTree(path: cwd)
+                            }
+                            self.lastFileTreeCWD = cwd
+                        }
                     }
                 }
-            }
-            if cwd != lastFileTreeCWD {
+            } else if cwd != lastFileTreeCWD {
                 if !fileTreeView.isPinned {
                     fileTreeView.revealFileInTree(path: cwd)
                 }

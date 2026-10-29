@@ -21,6 +21,7 @@ public enum PasteController {
         do {
             try png.write(to: url)
             try FileManager.default.setAttributes([.posixPermissions: 0o644], ofItemAtPath: url.path)
+            NotificationCenter.default.post(name: Notification.Name("KouenPastedImagesDidChange"), object: nil)
             return url.path
         } catch {
             return nil
