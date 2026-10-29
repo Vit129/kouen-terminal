@@ -315,11 +315,13 @@ struct FileTreeSwiftUIView: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: .fileTreeDidChange)) { _ in
             scheduleLoadRoot()
-            refreshPastedImages()
         }
         .onReceive(NotificationCenter.default.publisher(for: .pastedImagesDidChange)) { _ in
-            refreshPastedImages()
             isPastedImagesExpanded = true
+            refreshPastedImages()
+        }
+        .onChange(of: isPastedImagesExpanded) { _, _ in
+            updateVisiblePaths()
         }
         // React to both path and session changes — different sessions may be on
         // different branches sharing the same rootPath.
@@ -561,18 +563,17 @@ struct FileTreeSwiftUIView: View {
         rootNodes = reconciled
         // Auto-expand single top-level folder so the user isn't faced with a lone collapsed root folder
         if reconciled.count == 1, let singleFolder = reconciled.first, singleFolder.node.isDirectory, !singleFolder.isExpanded {
-            Task { @MainActor in
-                if singleFolder.children == nil || singleFolder.children?.isEmpty == true {
-                    singleFolder.isLoadingChildren = true
-                    if let children = try? await watcher.expand(node: singleFolder.node, gitStatus: currentGitStatus, options: scanOptions) {
-                        singleFolder.children = children.map { FileTreeNode(node: $0) }
-                    }
-                    singleFolder.isLoadingChildren = false
+            if singleFolder.children == nil || singleFolder.children?.isEmpty == true {
+                singleFolder.isLoadingChildren = true
+                if let children = try? await watcher.expand(node: singleFolder.node, gitStatus: currentGitStatus, options: scanOptions),
+                   singleFolder.children == nil || singleFolder.children?.isEmpty == true {
+                    singleFolder.children = children.map { FileTreeNode(node: $0) }
                 }
-                singleFolder.isExpanded = true
-                updateVisiblePaths()
+                singleFolder.isLoadingChildren = false
             }
+            singleFolder.isExpanded = true
         }
+        updateVisiblePaths()
         // RL-040: Keep removed nodes alive until the next render cycle completes,
         // preventing SwiftUI closures from dereferencing freed @Observable objects.
         retiredNodes = Array(existingByID.values.filter { existing in
@@ -684,45 +685,62 @@ struct FileTreeSwiftUIView: View {
 
     // MARK: - Pasted Images
 
+    private static let pastedImageTimeFormatter: DateFormatter = {
+        let df = DateFormatter()
+        df.dateFormat = "HH:mm"
+        return df
+    }()
+
     private func refreshPastedImages() {
         let dir = KouenPaths.pastedImagesDirectory
-        guard let urls = try? FileManager.default.contentsOfDirectory(
-            at: dir,
-            includingPropertiesForKeys: [.contentModificationDateKey],
-            options: [.skipsHiddenFiles]
-        ) else {
-            pastedImageNodes = []
-            return
-        }
-
-        let pngs = urls.filter { $0.pathExtension.lowercased() == "png" }
-            .sorted { lhs, rhs in
-                let dateLhs = (try? lhs.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate ?? .distantPast
-                let dateRhs = (try? rhs.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate ?? .distantPast
-                return dateLhs > dateRhs
+        Task.detached(priority: .userInitiated) {
+            guard let urls = try? FileManager.default.contentsOfDirectory(
+                at: dir,
+                includingPropertiesForKeys: [.contentModificationDateKey],
+                options: [.skipsHiddenFiles]
+            ) else {
+                await MainActor.run {
+                    pastedImageNodes = []
+                    updateVisiblePaths()
+                }
+                return
             }
 
-        let timeFormatter = DateFormatter()
-        timeFormatter.dateFormat = "HH:mm"
+            let datedPNGs: [(url: URL, date: Date?)] = urls
+                .filter { $0.pathExtension.lowercased() == "png" }
+                .map { url in
+                    let date = (try? url.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate
+                    return (url, date)
+                }
+                .sorted { ($0.date ?? .distantPast) > ($1.date ?? .distantPast) }
+                .prefix(50)
+                .map { $0 }
 
-        pastedImageNodes = pngs.map { url in
-            let path = url.path
-            let date = (try? url.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate
-            let displayName: String
-            if let date {
-                displayName = "\(timeFormatter.string(from: date)) · \(url.lastPathComponent)"
-            } else {
-                displayName = url.lastPathComponent
+            await MainActor.run {
+                let existingByID = Dictionary(pastedImageNodes.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+                pastedImageNodes = datedPNGs.map { item in
+                    let path = item.url.path
+                    if let existing = existingByID[path] {
+                        return existing
+                    }
+                    let displayName: String
+                    if let date = item.date {
+                        displayName = "\(Self.pastedImageTimeFormatter.string(from: date)) · \(item.url.lastPathComponent)"
+                    } else {
+                        displayName = item.url.lastPathComponent
+                    }
+                    let fileNode = FileNode(
+                        id: path,
+                        name: displayName,
+                        path: path,
+                        isDirectory: false,
+                        children: nil,
+                        gitStatus: .unmodified
+                    )
+                    return FileTreeNode(node: fileNode)
+                }
+                updateVisiblePaths()
             }
-            let fileNode = FileNode(
-                id: path,
-                name: displayName,
-                path: path,
-                isDirectory: false,
-                children: nil,
-                gitStatus: .unmodified
-            )
-            return FileTreeNode(node: fileNode)
         }
     }
 
@@ -802,8 +820,13 @@ struct FileTreeSwiftUIView: View {
             }
             Divider()
             Button("Move to Trash", role: .destructive) {
-                try? FileManager.default.trashItem(at: URL(fileURLWithPath: node.node.path), resultingItemURL: nil)
-                refreshPastedImages()
+                let path = node.node.path
+                Task.detached(priority: .userInitiated) {
+                    try? FileManager.default.trashItem(at: URL(fileURLWithPath: path), resultingItemURL: nil)
+                    await MainActor.run {
+                        refreshPastedImages()
+                    }
+                }
             }
         }
     }

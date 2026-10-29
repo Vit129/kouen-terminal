@@ -23,7 +23,8 @@ public final class BrowserPaneView: NSView {
     private var consoleLogs: [String] = []
     private var pendingLogLines: [String] = []
     private var logWriteScheduled = false
-    private var compositorKickInFlight = false
+    private var compositorKickBaseMagnification: CGFloat?
+    private var compositorKickWorkItem: DispatchWorkItem?
 
     private let tabBar = NSView()
     private let tabBarStack = NSStackView()
@@ -741,16 +742,26 @@ public final class BrowserPaneView: NSView {
     // fires only when a nested frame exists and its content is laid out — not on a blind
     // timer. P35 investigation, 2026-07-06, see agent-memory/knowledge/ui/browser-pane.md.
     private func kickCompositorRelayout(for webView: WKWebView) {
-        guard webView.allowsMagnification, !compositorKickInFlight else { return }
-        compositorKickInFlight = true
-        let current = webView.magnification
+        guard webView.allowsMagnification else { return }
+        let base = compositorKickBaseMagnification ?? webView.magnification
+        if compositorKickBaseMagnification != nil {
+            compositorKickWorkItem?.cancel()
+            // Reset to base first so the subsequent +0.01 is a real delta for WebKit
+            // rather than being coalesced as a no-op if a prior kick was in flight.
+            webView.setMagnification(base, centeredAt: .zero)
+        } else {
+            compositorKickBaseMagnification = base
+        }
         // Delta must clear WebKit's internal rounding so the scale change is actually
         // applied (a sub-pixel nudge can be coalesced into a no-op that never commits).
-        webView.setMagnification(current + 0.01, centeredAt: .zero)
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { [weak self, weak webView] in
-            webView?.setMagnification(current, centeredAt: .zero)
-            self?.compositorKickInFlight = false
+        webView.setMagnification(base + 0.01, centeredAt: .zero)
+        let workItem = DispatchWorkItem { [weak self, weak webView] in
+            webView?.setMagnification(base, centeredAt: .zero)
+            self?.compositorKickBaseMagnification = nil
+            self?.compositorKickWorkItem = nil
         }
+        compositorKickWorkItem = workItem
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05, execute: workItem)
     }
 
     private func setupNetworkCapture(for webView: WKWebView) {

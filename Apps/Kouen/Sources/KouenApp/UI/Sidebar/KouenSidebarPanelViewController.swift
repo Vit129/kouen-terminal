@@ -1253,20 +1253,20 @@ final class KouenSidebarPanelViewController: NSViewController {
                 lastFileTreeCWD = nil
             }
 
+            let shouldReveal = cwd != lastFileTreeCWD && !fileTreeView.isPinned
+            lastFileTreeSessionID = activeSessionID
+            lastFileTreeGitBranch = gitBranch
+            lastFileTreeCWD = cwd
+
             resolveRepoRoot(for: cwd) { [weak self] root in
                 guard let self else { return }
                 if self.lastFileTreeSessionID == activeSessionID {
                     self.fileTreeView.updateRoot(path: root, sessionID: activeSessionID)
-                    if cwd != self.lastFileTreeCWD {
-                        if !self.fileTreeView.isPinned {
-                            self.fileTreeView.revealFileInTree(path: cwd)
-                        }
-                        self.lastFileTreeCWD = cwd
+                    if shouldReveal {
+                        self.fileTreeView.revealFileInTree(path: cwd)
                     }
                 }
             }
-            lastFileTreeSessionID = activeSessionID
-            lastFileTreeGitBranch = gitBranch
             let home = NSHomeDirectory()
             if cwd != home, cwd != "/" {
                 Self.recordRecentProject(cwd)
@@ -1309,27 +1309,24 @@ final class KouenSidebarPanelViewController: NSViewController {
                 lastFileTreeCWD = nil
             }
             let branchChanged = gitBranch != lastFileTreeGitBranch
+            let cwdChanged = cwd != lastFileTreeCWD
+            let shouldReveal = cwdChanged && !fileTreeView.isPinned
+            lastFileTreeSessionID = activeSessionID
+            lastFileTreeGitBranch = gitBranch
+            lastFileTreeCWD = cwd
             if sessionChanged || branchChanged {
                 resolveRepoRoot(for: cwd) { [weak self] root in
                     guard let self else { return }
                     if self.lastFileTreeSessionID == activeSessionID {
                         self.fileTreeView.updateRoot(path: root, sessionID: activeSessionID)
-                        if cwd != self.lastFileTreeCWD {
-                            if !self.fileTreeView.isPinned {
-                                self.fileTreeView.revealFileInTree(path: cwd)
-                            }
-                            self.lastFileTreeCWD = cwd
+                        if shouldReveal {
+                            self.fileTreeView.revealFileInTree(path: cwd)
                         }
                     }
                 }
-            } else if cwd != lastFileTreeCWD {
-                if !fileTreeView.isPinned {
-                    fileTreeView.revealFileInTree(path: cwd)
-                }
-                lastFileTreeCWD = cwd
+            } else if shouldReveal {
+                fileTreeView.revealFileInTree(path: cwd)
             }
-            lastFileTreeSessionID = activeSessionID
-            lastFileTreeGitBranch = gitBranch
         }
         // Rebuild cache once; iterate the stored result — no redundant recomputation.
         // Skip entirely when session data hasn't changed (common on metadata-only ticks).

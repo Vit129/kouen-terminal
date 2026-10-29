@@ -44,6 +44,30 @@ final class BrowserPaneViewTests: XCTestCase {
             "didCommit should kick the compositor so initial HTML paint is not stuck black waiting for didFinish")
     }
 
+    func testBackToBackCompositorKicksDoNotDropOrDriftMagnification() {
+        let mockWebView = MockWebView(frame: .zero, configuration: WKWebViewConfiguration())
+        let testURL = URL(string: "https://example.com/test")!
+        mockWebView.mockURL = testURL
+        mockWebView.allowsMagnification = true
+
+        let paneView = BrowserPaneView(url: testURL, paneID: UUID(), webView: mockWebView)
+        paneView.webView(mockWebView, didCommit: nil)
+        mockWebView.setMagnificationCalls.removeAll()
+
+        // didFinish arriving immediately (< 50ms) after didCommit must still kick
+        // the compositor rather than being dropped by an in-flight guard.
+        paneView.webView(mockWebView, didFinish: nil)
+        XCTAssertFalse(mockWebView.setMagnificationCalls.isEmpty,
+            "didFinish arriving within 50ms of didCommit must still kick the compositor")
+
+        let settled = expectation(description: "magnification restored to base")
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.08) { settled.fulfill() }
+        wait(for: [settled], timeout: 1)
+
+        XCTAssertEqual(mockWebView.setMagnificationCalls.last?.magnification ?? 0, 1.0, accuracy: 0.0001,
+            "Magnification must restore to the original base value without drifting")
+    }
+
     func testViewDidMoveToWindowTriggersForceRepaint() {
         let mockWebView = MockWebView(frame: .zero, configuration: WKWebViewConfiguration())
         let testURL = URL(string: "https://example.com/test")!
