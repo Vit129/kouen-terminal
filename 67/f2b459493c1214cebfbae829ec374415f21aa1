@@ -1,0 +1,21 @@
+Apps/Kouen/Sources/KouenApp/UI/Chrome/BrowserPaneView.swift
+  s_8a3c29f50160bf::t_5422ab1946431f 20,66,173-184,620-634,1365-1369
+Apps/Kouen/Sources/KouenApp/UI/Chrome/PaneLifecycleManager.swift
+  s_8a3c29f50160bf::t_86996439da0ab8 162-164
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.3",
+  "base_commit_sha": "67f2b459493c1214cebfbae829ec374415f21aa1",
+  "prompts": {},
+  "sessions": {
+    "s_8a3c29f50160bf": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "57dbb3e9-bcea-4b8c-8c8c-0dd743721568",
+        "model": "claude-sonnet-5-5"
+      },
+      "human_author": "Vit129 <vitosk129@gmail.com>"
+    }
+  }
+}
