@@ -159,6 +159,9 @@ final class PaneLifecycleManager {
         }
         containerView.layout()
         CATransaction.commit()
+        // Synchronously wake any browser panes attached in the rebuilt container
+        // once layout is committed so their remote layer does not stay black.
+        container.collectBrowserPanes().values.forEach { $0.forceRepaint() }
     }
 
     // MARK: - Cache Pruning

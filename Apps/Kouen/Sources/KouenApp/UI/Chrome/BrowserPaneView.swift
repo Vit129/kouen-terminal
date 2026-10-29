@@ -17,6 +17,7 @@ public final class BrowserPaneView: NSView {
 
     private var tabs: [BrowserTab] = []
     var tabCount: Int { tabs.count }
+    var activeTabTitle: String? { activeTab?.title }
     private var activeTabIndex: Int = 0
     private var activeTab: BrowserTab? { tabs.indices.contains(activeTabIndex) ? tabs[activeTabIndex] : nil }
     private var consoleLogs: [String] = []
@@ -62,6 +63,7 @@ public final class BrowserPaneView: NSView {
     private var loadStates: [LoadCompletionState] = []
     private let progressLine = BrowserProgressLine()
     private var progressObservation: NSKeyValueObservation?
+    private var titleObservation: NSKeyValueObservation?
 
     // WKWebView's default UA drops the "Version/x.y Safari/605.1.15" suffix real Safari
     // sends, which Google/Apple OAuth's embedded-webview detection keys on (disallowed_useragent).
@@ -166,6 +168,18 @@ public final class BrowserPaneView: NSView {
         // When the browser pane is reattached after a pane tree rebuild, WKWebView
         // may show a blank/pink frame until the next draw cycle.
         forceRepaint()
+    }
+
+    override public func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        // When added to a window (initial creation or container reparenting),
+        // kick compositor immediately and queue a follow-up once layout settles.
+        if window != nil {
+            forceRepaint()
+            DispatchQueue.main.async { [weak self] in
+                self?.forceRepaint()
+            }
+        }
     }
 
     /// Synchronously wake WKWebView's compositor so content repaints immediately.
@@ -601,6 +615,21 @@ public final class BrowserPaneView: NSView {
         progressObservation = webView.observe(\.estimatedProgress, options: []) { [weak self] wv, _ in
             DispatchQueue.main.async {
                 self?.progressLine.setProgress(wv.estimatedProgress, isLoading: wv.isLoading)
+            }
+        }
+        titleObservation = webView.observe(\.title, options: [.new]) { [weak self] wv, _ in
+            DispatchQueue.main.async {
+                self?.updateTabTitle(for: wv)
+            }
+        }
+    }
+
+    private func updateTabTitle(for targetWebView: WKWebView) {
+        if let idx = tabs.firstIndex(where: { $0.webView === targetWebView }) {
+            let title = targetWebView.title ?? targetWebView.url?.host ?? "Tab"
+            if !title.isEmpty && title != "New Tab" {
+                tabs[idx].title = String(title.prefix(20))
+                refreshTabBar()
             }
         }
     }
@@ -1333,6 +1362,11 @@ extension BrowserPaneView: WKNavigationDelegate {
             urlTextField.stringValue = url.absoluteString
             updateViewSourceButtonVisibility(for: url)
         }
+        updateTabTitle(for: webView)
+        // Flush initial paint to screen immediately when HTML commits, preventing
+        // the view from staying pitch black while remaining subresources load.
+        webView.setNeedsDisplay(webView.bounds)
+        kickCompositorRelayout(for: webView)
     }
 
     public func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) {
