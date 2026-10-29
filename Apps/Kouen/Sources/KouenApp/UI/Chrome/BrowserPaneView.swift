@@ -62,9 +62,11 @@ public final class BrowserPaneView: NSView {
     private static let maxRetries = 10  // 10 × 3s = 30s then auto-close
 
     private var loadStates: [LoadCompletionState] = []
-    private let progressLine = BrowserProgressLine()
+    internal let progressLine = BrowserProgressLine()
     private var progressObservation: NSKeyValueObservation?
+    private var isLoadingObservation: NSKeyValueObservation?
     private var titleObservation: NSKeyValueObservation?
+    private var lastLaidOutWebViewSize: CGSize = .zero
 
     // WKWebView's default UA drops the "Version/x.y Safari/605.1.15" suffix real Safari
     // sends, which Google/Apple OAuth's embedded-webview detection keys on (disallowed_useragent).
@@ -101,7 +103,9 @@ public final class BrowserPaneView: NSView {
         } else {
             let config = WKWebViewConfiguration()
             config.limitsNavigationsToAppBoundDomains = false
-            web = WKWebView(frame: .zero, configuration: config)
+            // Initialize with a non-zero viewport frame so WebKit's WebPageProxy allocates
+            // a valid tile backing store even when navigate() is called before first layout.
+            web = WKWebView(frame: NSRect(x: 0, y: 0, width: 800, height: 600), configuration: config)
             web.allowsMagnification = true
             web.allowsBackForwardNavigationGestures = true
             web.customUserAgent = Self.desktopSafariUserAgent
@@ -179,6 +183,17 @@ public final class BrowserPaneView: NSView {
             forceRepaint()
             DispatchQueue.main.async { [weak self] in
                 self?.forceRepaint()
+            }
+        }
+    }
+
+    override public func layout() {
+        super.layout()
+        let size = webView.bounds.size
+        if size.width > 0, size.height > 0, size != lastLaidOutWebViewSize {
+            lastLaidOutWebViewSize = size
+            if window != nil {
+                forceRepaint()
             }
         }
     }
@@ -469,7 +484,10 @@ public final class BrowserPaneView: NSView {
         let isFreshConfiguration = configuration == nil
         let config = configuration ?? WKWebViewConfiguration()
         if isFreshConfiguration { config.limitsNavigationsToAppBoundDomains = false }
-        let newWeb = WKWebView(frame: webView.frame, configuration: config)
+        let initialFrame = webView.bounds.width > 0 ? webView.bounds : NSRect(x: 0, y: 0, width: 800, height: 600)
+        let newWeb = WKWebView(frame: initialFrame, configuration: config)
+        newWeb.setValue(false, forKey: "drawsBackground")
+        newWeb.setValue(NSColor.clear, forKey: "underPageBackgroundColor")
         newWeb.appearance = isWebDarkModeForced ? NSAppearance(named: .darkAqua) : nil
         // Without this, kickCompositorRelayout()'s `guard webView.allowsMagnification`
         // silently no-ops for every tab opened here — the pane's first tab always gets
@@ -551,6 +569,10 @@ public final class BrowserPaneView: NSView {
                 oldWeb.removeFromSuperview()
                 newWeb.translatesAutoresizingMaskIntoConstraints = false
                 mainStack.insertArrangedSubview(newWeb, at: stackIndex)
+                NSLayoutConstraint.activate([
+                    newWeb.leadingAnchor.constraint(equalTo: mainStack.leadingAnchor),
+                    newWeb.trailingAnchor.constraint(equalTo: mainStack.trailingAnchor),
+                ])
             }
             webView = newWeb
             setupProgressObservation()
@@ -595,14 +617,20 @@ public final class BrowserPaneView: NSView {
             mainStack.topAnchor.constraint(equalTo: topAnchor),
             mainStack.leadingAnchor.constraint(equalTo: leadingAnchor),
             mainStack.trailingAnchor.constraint(equalTo: trailingAnchor),
-            // `mainStack.alignment = .width` alone doesn't reliably hold tabBar/toolbar to
+            // `mainStack.alignment = .width` alone doesn't reliably hold arranged rows to
             // the full pane width — they were observed shrinking to content size and
             // drifting off the left edge (NSStackView width-alignment constraints lose out
-            // to the row's own internal layout). Pin explicitly instead of relying on it.
+            // to the row's own internal layout). Pin every row explicitly.
             tabBar.leadingAnchor.constraint(equalTo: mainStack.leadingAnchor),
             tabBar.trailingAnchor.constraint(equalTo: mainStack.trailingAnchor),
             toolbar.leadingAnchor.constraint(equalTo: mainStack.leadingAnchor),
             toolbar.trailingAnchor.constraint(equalTo: mainStack.trailingAnchor),
+            progressLine.leadingAnchor.constraint(equalTo: mainStack.leadingAnchor),
+            progressLine.trailingAnchor.constraint(equalTo: mainStack.trailingAnchor),
+            errorBanner.leadingAnchor.constraint(equalTo: mainStack.leadingAnchor),
+            errorBanner.trailingAnchor.constraint(equalTo: mainStack.trailingAnchor),
+            webView.leadingAnchor.constraint(equalTo: mainStack.leadingAnchor),
+            webView.trailingAnchor.constraint(equalTo: mainStack.trailingAnchor),
             mainStack.bottomAnchor.constraint(equalTo: bottomAnchor),
 
             tabBar.heightAnchor.constraint(equalToConstant: 28),
@@ -618,6 +646,12 @@ public final class BrowserPaneView: NSView {
                 self?.progressLine.setProgress(wv.estimatedProgress, isLoading: wv.isLoading)
             }
         }
+        isLoadingObservation = webView.observe(\.isLoading, options: []) { [weak self] wv, _ in
+            DispatchQueue.main.async {
+                self?.updateReloadStopButton(isLoading: wv.isLoading)
+                self?.progressLine.setProgress(wv.estimatedProgress, isLoading: wv.isLoading)
+            }
+        }
         titleObservation = webView.observe(\.title, options: [.new]) { [weak self] wv, _ in
             DispatchQueue.main.async {
                 self?.updateTabTitle(for: wv)
@@ -627,9 +661,11 @@ public final class BrowserPaneView: NSView {
 
     private func updateTabTitle(for targetWebView: WKWebView) {
         if let idx = tabs.firstIndex(where: { $0.webView === targetWebView }) {
-            let title = targetWebView.title ?? targetWebView.url?.host ?? "Tab"
-            if !title.isEmpty && title != "New Tab" {
-                tabs[idx].title = String(title.prefix(20))
+            let rawTitle = targetWebView.title?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            let fallback = targetWebView.url?.host ?? targetWebView.url?.lastPathComponent ?? ""
+            let resolved = !rawTitle.isEmpty ? rawTitle : fallback
+            if !resolved.isEmpty && resolved != "New Tab" {
+                tabs[idx].title = String(resolved.prefix(20))
                 refreshTabBar()
             }
         }
@@ -1382,23 +1418,20 @@ extension BrowserPaneView: WKNavigationDelegate {
 
     public func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) {
         updateReloadStopButton(isLoading: true)
+        progressLine.setProgress(max(webView.estimatedProgress, 0.1), isLoading: true)
         dismissErrorBanner()
     }
 
     public func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
         updateReloadStopButton(isLoading: false)
+        progressLine.setProgress(1.0, isLoading: false)
         cancelRetry()
         if let url = webView.url {
             urlTextField.stringValue = url.absoluteString
             updateViewSourceButtonVisibility(for: url)
             UserDefaults.standard.set(url.absoluteString, forKey: "browserPane.\(paneID.uuidString).url")
         }
-        // Update tab title
-        if let idx = tabs.firstIndex(where: { $0.webView === webView }) {
-            let title = webView.title ?? webView.url?.host ?? "Tab"
-            tabs[idx].title = String(title.prefix(20))
-            refreshTabBar()
-        }
+        updateTabTitle(for: webView)
         applyWebDarkMode()
         // The nested-iframe scroll fix (kickCompositorRelayout) is driven by the in-frame
         // pointer-move signal, not from here — a blind post-load timer raced the iframe's
@@ -1416,6 +1449,7 @@ extension BrowserPaneView: WKNavigationDelegate {
 
     public func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
         updateReloadStopButton(isLoading: false)
+        progressLine.setProgress(1.0, isLoading: false)
         showErrorBanner(message: error.localizedDescription)
         startRetryIfConnectionError(error)
         completeLoading(error: error)
@@ -1423,6 +1457,7 @@ extension BrowserPaneView: WKNavigationDelegate {
 
     public func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
         updateReloadStopButton(isLoading: false)
+        progressLine.setProgress(1.0, isLoading: false)
         showErrorBanner(message: error.localizedDescription)
         startRetryIfConnectionError(error)
         completeLoading(error: error)
@@ -1471,7 +1506,7 @@ public final class BrowserPaneRegistry {
         guard warmPool.isEmpty else { return }
         let config = WKWebViewConfiguration()
         config.limitsNavigationsToAppBoundDomains = false
-        let web = WKWebView(frame: .zero, configuration: config)
+        let web = WKWebView(frame: NSRect(x: 0, y: 0, width: 800, height: 600), configuration: config)
         web.allowsMagnification = true
         web.allowsBackForwardNavigationGestures = true
         web.customUserAgent = BrowserPaneView.desktopSafariUserAgent
@@ -1593,9 +1628,10 @@ private final class BrowserTabButton: NSView {
 // MARK: - Progress bar
 
 @MainActor
-private final class BrowserProgressLine: NSView {
+internal final class BrowserProgressLine: NSView {
     private let fill = NSView()
     private var fillWidth: NSLayoutConstraint?
+    private(set) var isShowingProgress = false
 
     override init(frame: NSRect) {
         super.init(frame: frame)
@@ -1617,23 +1653,23 @@ private final class BrowserProgressLine: NSView {
     required init?(coder: NSCoder) { fatalError() }
 
     func setProgress(_ progress: Double, isLoading: Bool) {
-        let w = bounds.width > 0 ? bounds.width : superview?.bounds.width ?? 400
+        let superW = superview?.bounds.width ?? 0
+        let w = bounds.width > 0 ? bounds.width : (superW > 0 ? superW : 400)
         let target = w * CGFloat(min(max(progress, 0), 1))
+        isShowingProgress = isLoading
         NSAnimationContext.runAnimationGroup { ctx in
             ctx.duration = 0.2
             fillWidth?.animator().constant = target
         }
         if isLoading {
-            NSAnimationContext.runAnimationGroup { ctx in
-                ctx.duration = 0.1
-                self.animator().alphaValue = 1
-            }
+            alphaValue = 1
         } else {
             NSAnimationContext.runAnimationGroup({ ctx in
                 ctx.duration = 0.2
                 fillWidth?.animator().constant = w
             }, completionHandler: {
-                Task { @MainActor in
+                Task { @MainActor [weak self] in
+                    guard let self, !self.isShowingProgress else { return }
                     NSAnimationContext.runAnimationGroup { ctx in
                         ctx.duration = 0.25
                         self.animator().alphaValue = 0
