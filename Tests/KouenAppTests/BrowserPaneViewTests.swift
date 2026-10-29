@@ -25,6 +25,77 @@ final class BrowserPaneViewTests: XCTestCase {
         XCTAssertEqual(paneView.urlTextField.stringValue, "https://example.com/finish")
     }
 
+    // Regression for the black screen during load: WKWebView is transparent
+    // (drawsBackground=false) so the container's solid terminalBackground canvas shows
+    // through until WebKit actually composites the page. Waiting solely for didFinish
+    // leaves the pane pitch black while heavy subresources (JS bundles, stylesheets)
+    // are being fetched on slow networks or large pages. didCommit must also force
+    // that compositor commit so initial HTML paint appears immediately.
+    func testDidCommitTriggersCompositorKickToForcePaint() {
+        let mockWebView = MockWebView(frame: .zero, configuration: WKWebViewConfiguration())
+        let testURL = URL(string: "https://example.com/test")!
+        mockWebView.mockURL = testURL
+        mockWebView.allowsMagnification = true
+
+        let paneView = BrowserPaneView(url: testURL, paneID: UUID(), webView: mockWebView)
+        paneView.webView(mockWebView, didCommit: nil)
+
+        XCTAssertFalse(mockWebView.setMagnificationCalls.isEmpty,
+            "didCommit should kick the compositor so initial HTML paint is not stuck black waiting for didFinish")
+    }
+
+    func testBackToBackCompositorKicksDoNotDropOrDriftMagnification() {
+        let mockWebView = MockWebView(frame: .zero, configuration: WKWebViewConfiguration())
+        let testURL = URL(string: "https://example.com/test")!
+        mockWebView.mockURL = testURL
+        mockWebView.allowsMagnification = true
+
+        let paneView = BrowserPaneView(url: testURL, paneID: UUID(), webView: mockWebView)
+        paneView.webView(mockWebView, didCommit: nil)
+        mockWebView.setMagnificationCalls.removeAll()
+
+        // didFinish arriving immediately (< 50ms) after didCommit must still kick
+        // the compositor rather than being dropped by an in-flight guard.
+        paneView.webView(mockWebView, didFinish: nil)
+        XCTAssertFalse(mockWebView.setMagnificationCalls.isEmpty,
+            "didFinish arriving within 50ms of didCommit must still kick the compositor")
+
+        let settled = expectation(description: "magnification restored to base")
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.08) { settled.fulfill() }
+        wait(for: [settled], timeout: 1)
+
+        XCTAssertEqual(mockWebView.setMagnificationCalls.last?.magnification ?? 0, 1.0, accuracy: 0.0001,
+            "Magnification must restore to the original base value without drifting")
+    }
+
+    func testViewDidMoveToWindowTriggersForceRepaint() {
+        let mockWebView = MockWebView(frame: .zero, configuration: WKWebViewConfiguration())
+        let testURL = URL(string: "https://example.com/test")!
+        mockWebView.mockURL = testURL
+        mockWebView.allowsMagnification = true
+
+        let paneView = BrowserPaneView(url: testURL, paneID: UUID(), webView: mockWebView)
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 600, height: 400), styleMask: [.titled], backing: .buffered, defer: false)
+        mockWebView.evaluateJavaScriptCalls.removeAll()
+
+        window.contentView?.addSubview(paneView)
+
+        XCTAssertFalse(mockWebView.evaluateJavaScriptCalls.isEmpty,
+            "Moving to window must trigger forceRepaint() to wake WKWebView's compositor")
+    }
+
+    func testDidCommitUpdatesTabTitleWhenAvailable() {
+        let mockWebView = MockWebView(frame: .zero, configuration: WKWebViewConfiguration())
+        let testURL = URL(string: "https://github.com/Vit129/My-Investment-Port/pull/112")!
+        mockWebView.mockURL = testURL
+        mockWebView.mockTitle = "PR #112 · Vit129"
+
+        let paneView = BrowserPaneView(url: testURL, paneID: UUID(), webView: mockWebView)
+        paneView.webView(mockWebView, didCommit: nil)
+
+        XCTAssertEqual(paneView.activeTabTitle, "PR #112 · Vit129")
+    }
+
     // Regression for the intermittent fully-black content area: WKWebView is
     // deliberately transparent (drawsBackground=false) so the container's solid
     // terminalBackground canvas shows through until WebKit actually composites the
@@ -312,6 +383,11 @@ private final class MockWebView: WKWebView {
     var mockURL: URL?
     override var url: URL? {
         return mockURL
+    }
+
+    var mockTitle: String?
+    override var title: String? {
+        return mockTitle
     }
 
     var mockIsLoading: Bool = false

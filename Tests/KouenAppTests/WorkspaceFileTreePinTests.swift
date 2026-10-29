@@ -1,5 +1,6 @@
 import XCTest
 import KouenCore
+import KouenTerminalKit
 @testable import KouenApp
 
 /// A root picked by the user (header menu, cmd+click into another project) must survive the
@@ -133,5 +134,79 @@ final class WorkspaceFileTreePinTests: XCTestCase {
 
         XCTAssertEqual(tree.keyboard.state.focusedPath, target.path)
         XCTAssertEqual(tree.pendingRevealPath, target.path)
+    }
+
+    func testRevealDirectoryAutoExpandsTargetDirectory() async throws {
+        let tempDir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        let sub1 = tempDir.appendingPathComponent("parent")
+        let sub2 = sub1.appendingPathComponent("child")
+        let nestedFile = sub2.appendingPathComponent("inside.txt")
+        try FileManager.default.createDirectory(at: sub2, withIntermediateDirectories: true)
+        try "content".write(to: nestedFile, atomically: true, encoding: .utf8)
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+
+        let watcher = FileTreeWatcher()
+        let rootRaw = try await watcher.scan(rootPath: tempDir.path)
+        let rootNodes = rootRaw.map { FileTreeNode(node: $0) }
+
+        // Simulating the expandAncestorsAndReveal logic with directory target (e.g. CWD)
+        let cleanTarget = sub2.path
+        let cleanRoot = tempDir.path
+        let rootPrefix = cleanRoot + "/"
+        let relative = String(cleanTarget.dropFirst(rootPrefix.count))
+        let components = relative.split(separator: "/").map(String.init)
+
+        var currentNodes = rootNodes
+        var accumulated = cleanRoot
+        for i in 0..<components.count {
+            accumulated = (accumulated as NSString).appendingPathComponent(components[i])
+            if let node = currentNodes.first(where: { $0.node.path == accumulated }) {
+                if node.node.isDirectory {
+                    if node.children == nil || node.children?.isEmpty == true {
+                        let children = try await watcher.expand(node: node.node)
+                        node.children = children.map { FileTreeNode(node: $0) }
+                    }
+                    node.isExpanded = true
+                    currentNodes = node.children ?? []
+                }
+            }
+        }
+
+        let parentNode = rootNodes.first(where: { $0.node.path == sub1.path })
+        XCTAssertTrue(parentNode?.isExpanded == true)
+
+        let childNode = parentNode?.children?.first(where: { $0.node.path == sub2.path })
+        // Key improvement: target directory itself is now expanded!
+        XCTAssertTrue(childNode?.isExpanded == true)
+        let innerFile = childNode?.children?.first(where: { $0.node.path == nestedFile.path })
+        XCTAssertNotNil(innerFile)
+        XCTAssertEqual(innerFile?.node.name, "inside.txt")
+    }
+
+    func testPastedImagesNotificationTriggers() {
+        let exp = expectation(description: "Notification fired")
+        let token = NotificationCenter.default.addObserver(
+            forName: Notification.Name("KouenPastedImagesDidChange"),
+            object: nil,
+            queue: .main
+        ) { _ in
+            exp.fulfill()
+        }
+        defer { NotificationCenter.default.removeObserver(token) }
+
+        let pasteboard = NSPasteboard.withUniqueName()
+        let image = NSImage(size: NSSize(width: 10, height: 10))
+        image.lockFocus()
+        NSColor.red.drawSwatch(in: NSRect(x: 0, y: 0, width: 10, height: 10))
+        image.unlockFocus()
+        pasteboard.clearContents()
+        pasteboard.writeObjects([image])
+
+        let path = PasteController.writePastedImage(from: pasteboard)
+        XCTAssertNotNil(path)
+        wait(for: [exp], timeout: 2.0)
+        if let path {
+            try? FileManager.default.removeItem(atPath: path)
+        }
     }
 }

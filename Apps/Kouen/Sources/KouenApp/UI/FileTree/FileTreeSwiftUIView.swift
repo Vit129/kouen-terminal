@@ -140,6 +140,8 @@ struct FileTreeSwiftUIView: View {
     @State private var rootNodes: [FileTreeNode] = []
     @State private var searchResultNodes: [FileTreeNode] = []
     @State private var gitBranch: String?
+    @State private var pastedImageNodes: [FileTreeNode] = []
+    @State private var isPastedImagesExpanded: Bool = false
     /// RL-040: Hold old nodes for one render cycle so SwiftUI closures that captured
     /// them don't dereference freed @Observable objects mid-body evaluation.
     @State private var retiredNodes: [FileTreeNode] = []
@@ -192,6 +194,9 @@ struct FileTreeSwiftUIView: View {
                     }
                 }
                 Divider()
+                Button("Pasted Images Folder…") {
+                    context.onPickRoot?(KouenPaths.pastedImagesDirectory.path)
+                }
                 Button("Choose Folder…") {
                     let panel = NSOpenPanel()
                     panel.canChooseFiles = false
@@ -262,6 +267,9 @@ struct FileTreeSwiftUIView: View {
                     if let gitBranch, !gitBranch.isEmpty {
                         branchChip(gitBranch)
                     }
+                    if !pastedImageNodes.isEmpty && trimmedSearchText.isEmpty {
+                        pastedImagesSection
+                    }
                     ForEach(filteredNodes) { node in
                         NodeRow(
                             node: node,
@@ -300,13 +308,20 @@ struct FileTreeSwiftUIView: View {
             .clipped()
         }
         .background(Color(KouenDesign.chrome.sidebarBackground))
-        .onAppear { refreshGitBranch(); updateVisiblePaths() }
+        .onAppear { refreshGitBranch(); updateVisiblePaths(); refreshPastedImages() }
         .onReceive(NotificationCenter.default.publisher(for: Notification.Name("KouenActiveTabGitBranchDidChange"))) { _ in
             refreshGitBranch()
             scheduleLoadRoot()
         }
         .onReceive(NotificationCenter.default.publisher(for: .fileTreeDidChange)) { _ in
             scheduleLoadRoot()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .pastedImagesDidChange)) { _ in
+            isPastedImagesExpanded = true
+            refreshPastedImages()
+        }
+        .onChange(of: isPastedImagesExpanded) { _, _ in
+            updateVisiblePaths()
         }
         // React to both path and session changes — different sessions may be on
         // different branches sharing the same rootPath.
@@ -439,6 +454,11 @@ struct FileTreeSwiftUIView: View {
     /// Build a flat ordered list of visible node paths for keyboard navigation.
     private func updateVisiblePaths() {
         var paths: [String] = []
+        if isPastedImagesExpanded && trimmedSearchText.isEmpty {
+            for n in pastedImageNodes {
+                paths.append(n.node.path)
+            }
+        }
         func collect(_ nodes: [FileTreeNode]) {
             for n in nodes {
                 paths.append(n.node.path)
@@ -541,6 +561,19 @@ struct FileTreeSwiftUIView: View {
             }
         }
         rootNodes = reconciled
+        // Auto-expand single top-level folder so the user isn't faced with a lone collapsed root folder
+        if reconciled.count == 1, let singleFolder = reconciled.first, singleFolder.node.isDirectory, !singleFolder.isExpanded {
+            if singleFolder.children == nil || singleFolder.children?.isEmpty == true {
+                singleFolder.isLoadingChildren = true
+                if let children = try? await watcher.expand(node: singleFolder.node, gitStatus: currentGitStatus, options: scanOptions),
+                   singleFolder.children == nil || singleFolder.children?.isEmpty == true {
+                    singleFolder.children = children.map { FileTreeNode(node: $0) }
+                }
+                singleFolder.isLoadingChildren = false
+            }
+            singleFolder.isExpanded = true
+        }
+        updateVisiblePaths()
         // RL-040: Keep removed nodes alive until the next render cycle completes,
         // preventing SwiftUI closures from dereferencing freed @Observable objects.
         retiredNodes = Array(existingByID.values.filter { existing in
@@ -584,32 +617,50 @@ struct FileTreeSwiftUIView: View {
         var currentNodes = rootNodes
         var accumulated = cleanRoot
 
-        // Expand each ancestor directory along the path
+        // If target is root itself and root has a single directory, auto-expand it
+        if components.isEmpty {
+            if rootNodes.count == 1, let singleFolder = rootNodes.first, singleFolder.node.isDirectory {
+                if singleFolder.children == nil || singleFolder.children?.isEmpty == true {
+                    singleFolder.isLoadingChildren = true
+                    do {
+                        let children = try await watcher.expand(node: singleFolder.node, gitStatus: currentGitStatus, options: scanOptions)
+                        guard !Task.isCancelled else {
+                            singleFolder.isLoadingChildren = false
+                            return
+                        }
+                        singleFolder.children = children.map { FileTreeNode(node: $0) }
+                    } catch {
+                        singleFolder.children = []
+                    }
+                    singleFolder.isLoadingChildren = false
+                }
+                singleFolder.isExpanded = true
+            }
+        }
+
+        // Expand each directory along the path (both ancestors and directory target itself)
         for i in 0..<components.count {
             guard !Task.isCancelled else { return }
             accumulated = (accumulated as NSString).appendingPathComponent(components[i])
-            let isLast = (i == components.count - 1)
 
             if let node = currentNodes.first(where: { $0.node.path == accumulated }) {
-                if !isLast {
-                    if node.node.isDirectory {
-                        if node.children == nil || node.children?.isEmpty == true {
-                            node.isLoadingChildren = true
-                            do {
-                                let children = try await watcher.expand(node: node.node, gitStatus: currentGitStatus, options: scanOptions)
-                                guard !Task.isCancelled else {
-                                    node.isLoadingChildren = false
-                                    return
-                                }
-                                node.children = children.map { FileTreeNode(node: $0) }
-                            } catch {
-                                node.children = []
+                if node.node.isDirectory {
+                    if node.children == nil || node.children?.isEmpty == true {
+                        node.isLoadingChildren = true
+                        do {
+                            let children = try await watcher.expand(node: node.node, gitStatus: currentGitStatus, options: scanOptions)
+                            guard !Task.isCancelled else {
+                                node.isLoadingChildren = false
+                                return
                             }
-                            node.isLoadingChildren = false
+                            node.children = children.map { FileTreeNode(node: $0) }
+                        } catch {
+                            node.children = []
                         }
-                        node.isExpanded = true
-                        currentNodes = node.children ?? []
+                        node.isLoadingChildren = false
                     }
+                    node.isExpanded = true
+                    currentNodes = node.children ?? []
                 }
             } else {
                 break
@@ -629,6 +680,154 @@ struct FileTreeSwiftUIView: View {
 
         if context.pendingRevealPath == targetPath {
             context.pendingRevealPath = nil
+        }
+    }
+
+    // MARK: - Pasted Images
+
+    private static let pastedImageTimeFormatter: DateFormatter = {
+        let df = DateFormatter()
+        df.dateFormat = "HH:mm"
+        return df
+    }()
+
+    private func refreshPastedImages() {
+        let dir = KouenPaths.pastedImagesDirectory
+        Task.detached(priority: .userInitiated) {
+            guard let urls = try? FileManager.default.contentsOfDirectory(
+                at: dir,
+                includingPropertiesForKeys: [.contentModificationDateKey],
+                options: [.skipsHiddenFiles]
+            ) else {
+                await MainActor.run {
+                    pastedImageNodes = []
+                    updateVisiblePaths()
+                }
+                return
+            }
+
+            let datedPNGs: [(url: URL, date: Date?)] = urls
+                .filter { $0.pathExtension.lowercased() == "png" }
+                .map { url in
+                    let date = (try? url.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate
+                    return (url, date)
+                }
+                .sorted { ($0.date ?? .distantPast) > ($1.date ?? .distantPast) }
+                .prefix(50)
+                .map { $0 }
+
+            await MainActor.run {
+                let existingByID = Dictionary(pastedImageNodes.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+                pastedImageNodes = datedPNGs.map { item in
+                    let path = item.url.path
+                    if let existing = existingByID[path] {
+                        return existing
+                    }
+                    let displayName: String
+                    if let date = item.date {
+                        displayName = "\(Self.pastedImageTimeFormatter.string(from: date)) · \(item.url.lastPathComponent)"
+                    } else {
+                        displayName = item.url.lastPathComponent
+                    }
+                    let fileNode = FileNode(
+                        id: path,
+                        name: displayName,
+                        path: path,
+                        isDirectory: false,
+                        children: nil,
+                        gitStatus: .unmodified
+                    )
+                    return FileTreeNode(node: fileNode)
+                }
+                updateVisiblePaths()
+            }
+        }
+    }
+
+    private var pastedImagesSection: some View {
+        DisclosureGroup(isExpanded: $isPastedImagesExpanded) {
+            ForEach(pastedImageNodes) { node in
+                pastedImageRow(node)
+            }
+        } label: {
+            HStack(spacing: KouenDesign.Spacing.xs) {
+                Image(systemName: "photo.stack")
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(Color(KouenDesign.chrome.textSecondary))
+                Text("Pasted Images (\(pastedImageNodes.count))")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(Color(KouenDesign.chrome.textSecondary))
+                Spacer()
+                Button {
+                    NSWorkspace.shared.selectFile(nil, inFileViewerRootedAtPath: KouenPaths.pastedImagesDirectory.path)
+                } label: {
+                    Image(systemName: "arrow.up.forward.app")
+                        .font(.system(size: 10))
+                        .foregroundStyle(Color(KouenDesign.chrome.textSecondary))
+                }
+                .buttonStyle(.plain)
+                .help("Open Pasted Images folder in Finder")
+            }
+            .contentShape(Rectangle())
+        }
+        .listRowInsets(EdgeInsets(
+            top: KouenDesign.Spacing.xs,
+            leading: KouenDesign.horizontalInset,
+            bottom: KouenDesign.Spacing.xs,
+            trailing: KouenDesign.horizontalInset
+        ))
+    }
+
+    private func pastedImageRow(_ node: FileTreeNode) -> some View {
+        HStack(spacing: 4) {
+            Label {
+                Text(node.node.name)
+                    .font(.system(size: 11))
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+            } icon: {
+                Image(systemName: "photo")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+            }
+            Spacer()
+        }
+        .contentShape(Rectangle())
+        .background(keyboard.focusedPath == node.node.path ? Color.accentColor.opacity(0.2) : Color.clear)
+        .cornerRadius(4)
+        .onTapGesture(count: 2) {
+            NSWorkspace.shared.open(URL(fileURLWithPath: node.node.path))
+        }
+        .onTapGesture {
+            keyboard.focusedPath = node.node.path
+            onPreview(node.node)
+        }
+        .contextMenu {
+            Button("Open with Default Application") {
+                NSWorkspace.shared.open(URL(fileURLWithPath: node.node.path))
+            }
+            Button("Show in Finder") {
+                NSWorkspace.shared.selectFile(node.node.path, inFileViewerRootedAtPath: "")
+            }
+            Divider()
+            Button("Copy Path") {
+                NSPasteboard.general.clearContents()
+                NSPasteboard.general.setString(node.node.path, forType: .string)
+            }
+            Button("Copy Shell Quoted Path") {
+                NSPasteboard.general.clearContents()
+                NSPasteboard.general.setString("'\(node.node.path)'", forType: .string)
+            }
+            Divider()
+            Button("Move to Trash", role: .destructive) {
+                let path = node.node.path
+                Task.detached(priority: .userInitiated) {
+                    try? FileManager.default.trashItem(at: URL(fileURLWithPath: path), resultingItemURL: nil)
+                    await MainActor.run {
+                        refreshPastedImages()
+                    }
+                }
+            }
         }
     }
 }
@@ -1041,4 +1240,5 @@ final class BranchSwitchHelper: NSObject {
 extension Notification.Name {
     static let fileTreeDidChange = Notification.Name("KouenFileTreeDidChange")
     static let fileTreeToggleExpand = Notification.Name("KouenFileTreeToggleExpand")
+    static let pastedImagesDidChange = Notification.Name("KouenPastedImagesDidChange")
 }

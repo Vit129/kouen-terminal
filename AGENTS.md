@@ -24,6 +24,7 @@ Per-project memory lives centrally in `~/Git/Personal/agent-memory-private/agent
 - `rules/concurrency.md` — Swift 6 strict concurrency, `@unchecked Sendable` ownership, terminal replay
 - `rules/ipc-protocol.md` — IPC framing, daemon socket security, generated-file regeneration
 - FileTree programmatic reveal: populate `node.children` before setting `node.isExpanded = true`, and guard `NodeRow.loadChildren` to prevent race conditions clobbering descendants.
+- BrowserPane WKWebView repaint: WKWebView with `drawsBackground = false` stays pitch black unless woken; override `viewDidMoveToWindow`, kick compositor on `didCommit`, and call `forceRepaint()` on structural rebuilds after layout.
 
 ## Graphify
 

@@ -30,6 +30,7 @@ Library          Process
 ${ROOT}            ${CURDIR}/../..
 ${MOBILE_BRIDGE}   ${ROOT}/Packages/KouenDaemon/Sources/KouenDaemon/MobileBridgeServer.swift
 ${MOBILE_BRIDGE_CONN}    ${ROOT}/Packages/KouenDaemon/Sources/KouenDaemon/MobileBridgeServer+Connection.swift
+${MOBILE_BRIDGE_WEB}     ${ROOT}/Packages/KouenDaemon/Sources/KouenDaemon/MobileBridgeWebAssets.swift
 
 *** Test Cases ***
 Bug 1 - Rotation Grace Slot Keeps The Previous Token Redeemable
@@ -101,7 +102,7 @@ Bug 2 - Client onerror Does Not Clobber The Server Error Banner
     [Documentation]    The MDN/WHATWG contract: a WS error event carries no reason. The mobile
     ...                page must NOT drive a user-facing banner from onerror; the specific server
     ...                error arrives via onmessage, and onclose reads the close code.
-    ${content}=    Get File    ${MOBILE_BRIDGE}
+    ${content}=    Get File    ${MOBILE_BRIDGE_WEB}
     Should Contain    ${content}    ws.onerror = () => console.error('[kouen mobile] websocket error');
     ...    msg=onerror must only log — driving showError() from it reintroduces the generic-banner mask (Bug 2)
     Should Not Contain    ${content}    ws.onerror = () => showError
