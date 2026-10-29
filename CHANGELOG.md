@@ -5,6 +5,20 @@ All notable changes to Kouen are documented here. The format is based on
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Each released version
 has a matching `vX.Y.Z` tag and a signed, notarized DMG on
 [GitHub Releases](https://github.com/Vit129/kouen-terminal/releases).
+## [4.22.3] - 2026-10-29
+
+### Added
+- Auto-expand revealed directories and add pasted images section ([`2473a54`](https://github.com/Vit129/kouen-terminal/commit/2473a54736b553bafecf66051ee07dfcd5f958d4))
+
+### Documentation
+- Record lesson on WKWebView transparent repaint and compositor waking ([`b0c0d6b`](https://github.com/Vit129/kouen-terminal/commit/b0c0d6b8589e32a63682d01cc7cf31933ec93a8d))
+
+### Fixed
+- Stop ScriptingTests crashing/flaking so the full suite is green ([`16860d7`](https://github.com/Vit129/kouen-terminal/commit/16860d70e55741e0d82659c152aeb9992cc5032e))
+- Wake compositor on window attach and commit to prevent black screen ([`67f2b45`](https://github.com/Vit129/kouen-terminal/commit/67f2b459493c1214cebfbae829ec374415f21aa1))
+- Resolve compositor kick drop, sidebar reveal race, and main-thread I/O ([`6febe9b`](https://github.com/Vit129/kouen-terminal/commit/6febe9b31765abdb3430e8f0a3a96a36c49cca05))
+
+
 ## [4.22.2] - 2026-10-26
 
 ### Fixed
