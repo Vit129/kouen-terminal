@@ -1,0 +1,18 @@
+Apps/Kouen/Sources/KouenApp/UI/Chrome/BrowserPaneView.swift
+  h_d82339d8725694 65,67,69,106-108,190-200,487-490,572-575,620,623,628-633,649-654,664-668,1421,1427,1434,1452,1460,1509,1631,1634,1656-1657,1659,1665,1671-1672
+Scripts/install-graceful.sh
+  h_d82339d8725694 128-130,158-159
+Tests/KouenAppTests/BrowserPaneViewTests.swift
+  h_d82339d8725694 380-436
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.3",
+  "base_commit_sha": "b03d6d3d0acce8bc607ecaf0ab6721a4afe44399",
+  "prompts": {},
+  "humans": {
+    "h_d82339d8725694": {
+      "author": "Vit129 <vitosk129@gmail.com>"
+    }
+  }
+}
