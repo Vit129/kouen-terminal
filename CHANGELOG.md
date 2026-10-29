@@ -5,6 +5,12 @@ All notable changes to Kouen are documented here. The format is based on
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Each released version
 has a matching `vX.Y.Z` tag and a signed, notarized DMG on
 [GitHub Releases](https://github.com/Vit129/kouen-terminal/releases).
+## [4.22.4] - 2026-10-29
+
+### Fixed
+- Ensure full-width webview layout, progress completion, and graceful install quit timeout ([`b03d6d3`](https://github.com/Vit129/kouen-terminal/commit/b03d6d3d0acce8bc607ecaf0ab6721a4afe44399))
+
+
 ## [4.22.3] - 2026-10-29
 
 ### Added
