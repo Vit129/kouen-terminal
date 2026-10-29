@@ -1,0 +1,20 @@
+Apps/Kouen/Sources/KouenApp/UI/Chrome/BrowserPaneView.swift
+  h_d82339d8725694 26-27,745-754,757-761,763-764
+Apps/Kouen/Sources/KouenApp/UI/FileTree/FileTreeSwiftUIView.swift
+  h_d82339d8725694 321-324,566-570,572,574,576,688-693,696-706,709-742,823-829
+Apps/Kouen/Sources/KouenApp/UI/Sidebar/KouenSidebarPanelViewController.swift
+  h_d82339d8725694 1256-1260,1265-1266,1312-1316,1322-1323,1327-1328
+Tests/KouenAppTests/BrowserPaneViewTests.swift
+  h_d82339d8725694 47-70
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.3",
+  "base_commit_sha": "6febe9b31765abdb3430e8f0a3a96a36c49cca05",
+  "prompts": {},
+  "humans": {
+    "h_d82339d8725694": {
+      "author": "Vit129 <vitosk129@gmail.com>"
+    }
+  }
+}
