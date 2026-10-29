@@ -18,7 +18,6 @@ has a matching `vX.Y.Z` tag and a signed, notarized DMG on
 - Wake compositor on window attach and commit to prevent black screen ([`67f2b45`](https://github.com/Vit129/kouen-terminal/commit/67f2b459493c1214cebfbae829ec374415f21aa1))
 - Resolve compositor kick drop, sidebar reveal race, and main-thread I/O ([`6febe9b`](https://github.com/Vit129/kouen-terminal/commit/6febe9b31765abdb3430e8f0a3a96a36c49cca05))
 
-
 ## [4.22.2] - 2026-10-26
 
 ### Fixed
