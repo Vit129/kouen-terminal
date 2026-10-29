@@ -10,7 +10,6 @@ has a matching `vX.Y.Z` tag and a signed, notarized DMG on
 ### Fixed
 - Ensure full-width webview layout, progress completion, and graceful install quit timeout ([`b03d6d3`](https://github.com/Vit129/kouen-terminal/commit/b03d6d3d0acce8bc607ecaf0ab6721a4afe44399))
 
-
 ## [4.22.3] - 2026-10-29
 
 ### Added
