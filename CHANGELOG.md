@@ -5,6 +5,13 @@ All notable changes to Kouen are documented here. The format is based on
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Each released version
 has a matching `vX.Y.Z` tag and a signed, notarized DMG on
 [GitHub Releases](https://github.com/Vit129/kouen-terminal/releases).
+## [4.22.6] - 2026-10-30
+
+### Fixed
+- Stop agent launches from opening the Companion in Chrome ([`84c809f`](https://github.com/Vit129/kouen-terminal/commit/84c809fd02a225ab244038232c2c74c705e865f7))
+- Release browser panes when closed ([`81d1cfc`](https://github.com/Vit129/kouen-terminal/commit/81d1cfc798d793d9fb757de73fac0b8af5a5dd3a))
+
+
 ## [4.22.5] - 2026-10-30
 
 ### Changed
