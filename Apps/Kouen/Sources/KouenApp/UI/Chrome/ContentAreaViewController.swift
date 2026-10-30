@@ -331,6 +331,7 @@ final class PaneContainerView: NSView {
         super.init(frame: .zero)
         KouenDesign.makeClear(self)
         build(node: node, cwd: cwd, into: self)
+        browserController.disposeUnclaimedPanes()
         // Unclaimed entries are closed panes or other tabs' surfaces — already held by
         // ZombieHoldRegistry for 1.5s. Drop the strong ref here so they can deallocate.
         self.existingHosts.removeAll()

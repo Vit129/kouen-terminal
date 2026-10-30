@@ -378,6 +378,45 @@ final class BrowserPaneViewTests: XCTestCase {
         XCTAssertTrue(mockWebView.stopLoadingCalled)
     }
 
+    func testDisposingUnclaimedBrowserPaneReleasesPaneAndKeepsReusedPaneAlive() {
+        let closedID = UUID()
+        let keptID = UUID()
+        var controller: BrowserIntegrationController?
+        var didStopClosedWebView = false
+        var closedDelegatesWereCleared = false
+        weak var releasedPane: BrowserPaneView?
+        weak var reusedPane: BrowserPaneView?
+        let host = NSView()
+
+        autoreleasepool {
+            let closedWebView = MockWebView(frame: .zero, configuration: WKWebViewConfiguration())
+            let keptWebView = MockWebView(frame: .zero, configuration: WKWebViewConfiguration())
+            let closedPane = BrowserPaneView(
+                url: URL(string: "https://example.com/closed")!, paneID: closedID, webView: closedWebView
+            )
+            let keptPane = BrowserPaneView(
+                url: URL(string: "https://example.com/kept")!, paneID: keptID, webView: keptWebView
+            )
+            releasedPane = closedPane
+            reusedPane = keptPane
+
+            controller = BrowserIntegrationController(existingPanes: [closedID: closedPane, keptID: keptPane])
+            controller?.buildNode(
+                BrowserLeaf(id: keptID, url: URL(string: "https://example.com/kept")!), into: host
+            )
+            controller?.disposeUnclaimedPanes()
+            didStopClosedWebView = closedWebView.stopLoadingCalled
+            closedDelegatesWereCleared = closedWebView.navigationDelegate == nil && closedWebView.uiDelegate == nil
+        }
+
+        XCTAssertTrue(didStopClosedWebView)
+        XCTAssertTrue(closedDelegatesWereCleared)
+        XCTAssertNil(releasedPane, "the closed pane must be released after its references are dropped")
+        XCTAssertNotNil(reusedPane, "the browser pane retained by the new tree must stay alive")
+        XCTAssertTrue(controller?.collectBrowserPanes(in: host)[keptID] === reusedPane)
+        XCTAssertTrue(reusedPane?.webView.navigationDelegate === reusedPane)
+    }
+
     func testDidFinishAndCommitFallBackToHostWhenWebViewTitleIsEmptyString() {
         let mockWebView = MockWebView(frame: .zero, configuration: WKWebViewConfiguration())
         let testURL = URL(string: "https://github.com/Vit129/space-")!
