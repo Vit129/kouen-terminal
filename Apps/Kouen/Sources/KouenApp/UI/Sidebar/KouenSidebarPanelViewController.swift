@@ -742,11 +742,6 @@ final class KouenSidebarPanelViewController: NSViewController {
 
     /// Resumes in a new session, the same as ⌘T, so it gets its own entry in the tab bar.
     private func resumeAgentSession(_ record: AgentSessionRecord) {
-        let settings = KouenSettings.load()
-        let mode = settings.sessionMode(for: record.agentKind)
-        if mode == .remoteControl {
-            RemoteControlURLProvider.openInGoogleChrome(for: record.agentKind)
-        }
         let cmd = Self.resumeCommand(for: record)
         let req = DefaultTerminalLaunchRequest(
             command: cmd,
@@ -809,9 +804,6 @@ final class KouenSidebarPanelViewController: NSViewController {
         guard let workspaceID = SessionCoordinator.shared.snapshot.activeWorkspace?.id ?? SessionCoordinator.shared.snapshot.workspaces.first?.id else { return }
         let settings = KouenSettings.load()
         let mode = settings.sessionMode(for: targetKind)
-        if mode == .remoteControl {
-            RemoteControlURLProvider.openInGoogleChrome(for: targetKind)
-        }
         let cwd = Self.handoffDirectory(for: record.projectPath)
         let launchCmd = AgentLaunchCommands.launch(kind: targetKind, mode: mode, cwd: cwd)
 
