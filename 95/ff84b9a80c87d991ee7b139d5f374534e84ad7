@@ -1,0 +1,20 @@
+Apps/Kouen/Sources/KouenApp/Resources/Info.plist
+  h_d82339d8725694 100,115
+CHANGELOG.md
+  h_d82339d8725694 8-14
+Packages/KouenCore/Sources/KouenCore/KouenVersion.swift
+  h_d82339d8725694 15,18
+Packages/KouenCore/Sources/KouenCore/ReleaseNotes/GeneratedReleaseNotes.swift
+  h_d82339d8725694 1,8-9,11-13
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.3",
+  "base_commit_sha": "95ff84b9a80c87d991ee7b139d5f374534e84ad7",
+  "prompts": {},
+  "humans": {
+    "h_d82339d8725694": {
+      "author": "Vit129 <vitosk129@gmail.com>"
+    }
+  }
+}
