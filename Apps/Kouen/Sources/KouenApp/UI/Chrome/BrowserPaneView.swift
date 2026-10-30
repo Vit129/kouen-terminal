@@ -60,6 +60,7 @@ public final class BrowserPaneView: NSView {
     private var retryTimer: Timer?
     private var retryCount = 0
     private static let maxRetries = 10  // 10 × 3s = 30s then auto-close
+    private var isDisposed = false
 
     private var loadStates: [LoadCompletionState] = []
     internal let progressLine = BrowserProgressLine()
@@ -166,6 +167,31 @@ public final class BrowserPaneView: NSView {
         let logPath = (NSTemporaryDirectory() as NSString)
             .appendingPathComponent("kouen-browser-\(uuid).log")
         try? FileManager.default.removeItem(atPath: logPath)
+    }
+
+    /// Stop browser work when a pane disappears from the pane tree. WebKit configuration,
+    /// cookies, and website data are intentionally left intact for other panes and future tabs.
+    func prepareForDisposal() {
+        guard !isDisposed else { return }
+        isDisposed = true
+
+        cancelRetry()
+        compositorKickWorkItem?.cancel()
+        compositorKickWorkItem = nil
+        compositorKickBaseMagnification = nil
+        progressObservation = nil
+        isLoadingObservation = nil
+        titleObservation = nil
+        designModePopover?.close()
+        designModePopover = nil
+        isDesignModeActive = false
+        completeLoading(error: CancellationError())
+
+        for tab in tabs {
+            tab.webView.stopLoading()
+            tab.webView.navigationDelegate = nil
+            tab.webView.uiDelegate = nil
+        }
     }
 
     override public func viewDidMoveToSuperview() {

@@ -41,6 +41,15 @@ final class BrowserIntegrationController {
         ])
     }
 
+    /// Dispose panes from the previous tree that were not claimed by a live browser leaf.
+    /// Called after the complete tree has been built so panes reused in the new tree survive.
+    func disposeUnclaimedPanes() {
+        for pane in panes.values {
+            pane.prepareForDisposal()
+        }
+        panes.removeAll()
+    }
+
     // MARK: - Collect
 
     func collectBrowserPanes(in view: NSView) -> [PaneID: BrowserPaneView] {
