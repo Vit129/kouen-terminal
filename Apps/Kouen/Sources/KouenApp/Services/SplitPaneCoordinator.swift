@@ -17,6 +17,20 @@ struct AgentBrowserPaneTracker {
     mutating func drain(origin: SurfaceID) -> Set<PaneID> {
         panes.removeValue(forKey: origin) ?? []
     }
+
+    /// Forgets a single pane wherever it is tracked. Called when the pane is closed by any
+    /// means so a later `drain` cannot try to close it again.
+    mutating func untrack(_ paneID: PaneID) {
+        for (origin, ids) in panes where ids.contains(paneID) {
+            var updated = ids
+            updated.remove(paneID)
+            if updated.isEmpty {
+                panes.removeValue(forKey: origin)
+            } else {
+                panes[origin] = updated
+            }
+        }
+    }
 }
 
 /// Handles split pane creation, focus, killing, and pane-tree navigation.
@@ -199,8 +213,39 @@ final class SplitPaneCoordinator {
     }
 
     func killPane(paneID: PaneID) {
+        // An agent's browser panes are owned by the terminal surface(s) it ran in — if the
+        // agent's pane is killed, those browser panes must not outlive it.
+        for surfaceID in surfaceIDs(forPaneID: paneID) {
+            closeAgentBrowserPanes(origin: surfaceID)
+        }
         coord.requestDaemon(.killPane(paneID: paneID))
         coord.syncFromDaemon()
+    }
+
+    /// Every surface hosted anywhere in `paneID`'s leaf, across all workspaces/sessions/tabs.
+    private func surfaceIDs(forPaneID paneID: PaneID) -> [SurfaceID] {
+        var found: [SurfaceID] = []
+        for workspace in coord.snapshot.workspaces {
+            for session in workspace.sessions {
+                for tab in session.tabs {
+                    if let leaf = leaf(forPaneID: paneID, in: tab.rootPane) {
+                        found.append(contentsOf: leaf.surfaceIDs)
+                    }
+                }
+            }
+        }
+        return found
+    }
+
+    private func leaf(forPaneID paneID: PaneID, in node: PaneNode) -> PaneLeaf? {
+        switch node {
+        case let .leaf(leaf):
+            return leaf.id == paneID ? leaf : nil
+        case let .branch(_, _, first, second):
+            return leaf(forPaneID: paneID, in: first) ?? leaf(forPaneID: paneID, in: second)
+        case .browser:
+            return nil
+        }
     }
 
     // MARK: - Pane tree helpers
@@ -342,6 +387,11 @@ final class SplitPaneCoordinator {
 
     /// Remove a browser pane from the app-side snapshot and deregister it.
     func closeBrowserPane(paneID: PaneID) {
+        // Deterministic teardown: stop navigation/timers and detach the web views before the
+        // registry drops its reference, so the WebKit content process can exit promptly and no
+        // work item survives the pane. Then forget the pane so a later drain cannot re-close it.
+        BrowserPaneRegistry.shared.get(paneID)?.prepareForDisposal()
+        agentBrowserPanes.untrack(paneID)
         BrowserPaneRegistry.shared.unregister(paneID)
         var updatedSnapshot = coord.snapshot
         for (wIdx, ws) in updatedSnapshot.workspaces.enumerated() {

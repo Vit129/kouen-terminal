@@ -191,6 +191,9 @@ public final class BrowserPaneView: NSView {
             tab.webView.stopLoading()
             tab.webView.navigationDelegate = nil
             tab.webView.uiDelegate = nil
+            // Detach from the view hierarchy so the remote layer/compositor is released and
+            // the pane's content process has nothing left to keep alive while it is closed.
+            tab.webView.removeFromSuperview()
         }
     }
 

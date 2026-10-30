@@ -86,14 +86,23 @@ final class PaneLifecycleManager {
         }
         affectedHosts.forEach { $0.setPresentsWithTransaction(true) }
 
-        // Structural rebuild (force=true): harvest and detach hosts so the new container
-        // can reuse surviving ones (same surface IDs). Tab switch (!force): leave the old
-        // container's hosts intact — they stay alive in the hidden view and the fast path
-        // above renders them correctly on the next switch back. Without this guard,
+        // Harvest and detach hosts so the new container can reuse the surviving ones (same
+        // surface IDs). This must happen for every IN-PLACE rebuild of the displayed tab —
+        // not just `force` ones. A local structural edit reaches here with `force == false`:
+        // `structureFingerprint` (DaemonSyncService) deliberately ignores `.browser` leaves,
+        // so ⌘B inserting a browser pane never sets `structureChanged`, and split/close/zoom
+        // edits on local snapshots go through `applyLocalSnapshot` the same way. Keying this
+        // off `force` alone meant the browser panes of those rebuilds were dropped
+        // (`existingBrowserPanes = [:]`) and a brand-new `BrowserPaneView` + WKWebView was
+        // constructed every time — losing the page and re-entering the WKWebView black-pane
+        // race for no reason. A genuine tab switch (`!force`, different tab) must still leave
+        // the old container's hosts intact: they stay alive in the hidden view and the fast
+        // path above renders them on the next switch back. Without that guard,
         // detachHostsOnly() empties the cached container so the fast path reveals black.
+        let isInPlaceRebuild = force || activeTabID == tabID
         let existingHosts: [SurfaceID: TerminalHostView]
         let existingBrowserPanes: [PaneID: BrowserPaneView]
-        if force {
+        if isInPlaceRebuild {
             existingHosts = paneContainer?.collectTerminalHosts() ?? [:]
             existingBrowserPanes = paneContainer?.collectBrowserPanes() ?? [:]
             paneContainer?.detachHostsOnly()
@@ -104,20 +113,20 @@ final class PaneLifecycleManager {
         }
 
         // Hide old container.
-        // force=false (tab switch): hosts are intact — cache for fast-path revisit.
-        // force=true (structural rebuild): detachHostsOnly() already stripped the hosts —
-        //   caching the empty shell causes a black screen on the next revisit. Evict instead.
+        // Tab switch: hosts are intact — cache for fast-path revisit.
+        // In-place rebuild: detachHostsOnly() already stripped the hosts — caching the
+        //   empty shell causes a black screen on the next revisit. Evict instead.
         if let old = paneContainer {
             old.isHidden = true
             if let prevTabID = activeTabID {
-                if force {
+                if isInPlaceRebuild {
                     containerCache.removeValue(forKey: prevTabID)
                     old.removeFromSuperview()
                 } else {
                     containerCache[prevTabID] = old
                 }
             } else {
-                if force { ZombieHoldRegistry.shared.hold(old) }
+                if isInPlaceRebuild { ZombieHoldRegistry.shared.hold(old) }
                 old.removeFromSuperview()
             }
         }
