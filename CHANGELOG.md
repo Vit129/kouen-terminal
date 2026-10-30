@@ -11,7 +11,6 @@ has a matching `vX.Y.Z` tag and a signed, notarized DMG on
 - Refuse a version build that rolls backwards ([`3679c49`](https://github.com/Vit129/kouen-terminal/commit/3679c49ae2eb7d8604c924cd7777a55fdb0a37eb))
 - Keep the live browser pane on cmd+B and fully dispose panes on close ([`a1a40e1`](https://github.com/Vit129/kouen-terminal/commit/a1a40e194325ba6c028281b287430ca8a63093fc))
 
-
 ## [4.22.6] - 2026-10-30
 
 ### Fixed
