@@ -320,7 +320,7 @@
     "semantic_hash": ""
   },
   "Apps/Kouen/Sources/KouenApp/UI/Chrome/BrowserPaneView.swift": {
-    "mtime": 1793269074.9099517,
+    "mtime": 1793333643.6080797,
     "ast_hash": "eccbbb0e64e4fb1d5fac337cadf198a4",
     "semantic_hash": ""
   },
@@ -640,8 +640,8 @@
     "semantic_hash": ""
   },
   "Apps/Kouen/Sources/KouenApp/UI/Sidebar/KouenSidebarPanelViewController.swift": {
-    "mtime": 1793262742.6263356,
-    "ast_hash": "3e0bc0f874fcce73c46c1eeea3103297",
+    "mtime": 1793343162.2335386,
+    "ast_hash": "fa17ece5acd1f7392997ba38b616e7eb",
     "semantic_hash": ""
   },
   "Apps/Kouen/Sources/KouenApp/UI/Sidebar/SidebarListModel.swift": {
@@ -960,8 +960,8 @@
     "semantic_hash": ""
   },
   "Packages/KouenCore/Sources/KouenCore/KouenVersion.swift": {
-    "mtime": 1793262742.6273687,
-    "ast_hash": "4a270354867cb4d4c4ef2b2f6b38838d",
+    "mtime": 1793343254.9660344,
+    "ast_hash": "5823af061012cbde64b97d38efce40d4",
     "semantic_hash": ""
   },
   "Packages/KouenCore/Sources/KouenCore/Layouts/LayoutTemplate.swift": {
@@ -1050,8 +1050,8 @@
     "semantic_hash": ""
   },
   "Packages/KouenCore/Sources/KouenCore/ReleaseNotes/GeneratedReleaseNotes.swift": {
-    "mtime": 1793262742.6276877,
-    "ast_hash": "533a50834ae2f537d373a3759312f982",
+    "mtime": 1793343255.7311196,
+    "ast_hash": "da4d74f6a09ee9ff12eb56696e39dbd7",
     "semantic_hash": ""
   },
   "Packages/KouenCore/Sources/KouenCore/ReleaseNotes/ReleaseNotes.swift": {
@@ -1085,8 +1085,8 @@
     "semantic_hash": ""
   },
   "Packages/KouenCore/Sources/KouenCore/Shell/ShellIntegration.swift": {
-    "mtime": 1792029521.6533728,
-    "ast_hash": "2db91b722de7e6915dcf1c4d7829157e",
+    "mtime": 1793343151.0149724,
+    "ast_hash": "b9a0814f3e6892d476841f44b1af1b0c",
     "semantic_hash": ""
   },
   "Packages/KouenCore/Sources/KouenCore/Tasks/TaskStore.swift": {
@@ -1890,7 +1890,7 @@
     "semantic_hash": ""
   },
   "Scripts/install-graceful.sh": {
-    "mtime": 1793268954.6644943,
+    "mtime": 1793270061.2501614,
     "ast_hash": "8c4f93331e9db2c206adc432f74f8c11",
     "semantic_hash": ""
   },
@@ -1980,7 +1980,7 @@
     "semantic_hash": ""
   },
   "Tests/KouenAppTests/BrowserPaneViewTests.swift": {
-    "mtime": 1793269077.4869337,
+    "mtime": 1793270061.2503893,
     "ast_hash": "4fd06176185ece05298134290697bca7",
     "semantic_hash": ""
   },
@@ -3260,13 +3260,13 @@
     "semantic_hash": ""
   },
   "docs/shell-integration/kouen.bash": {
-    "mtime": 1792029521.6643164,
-    "ast_hash": "aa6ebe3fe19ef25db91510b46d161ab5",
+    "mtime": 1793343341.301738,
+    "ast_hash": "38eb1fb9b610455a0f3a3b6fb1e9124e",
     "semantic_hash": ""
   },
   "docs/shell-integration/kouen.fish": {
-    "mtime": 1792029521.666434,
-    "ast_hash": "be7ae4c6307d76cde1473895b95fd6db",
+    "mtime": 1793343341.3028667,
+    "ast_hash": "4634df9fae28fd9640e1aa161890037e",
     "semantic_hash": ""
   },
   "project.yml": {
@@ -4320,8 +4320,8 @@
     "semantic_hash": ""
   },
   "Packages/KouenDaemon/Sources/KouenDaemon/AgentRemoteControlDaemonService.swift": {
-    "mtime": 1791868883.7267942,
-    "ast_hash": "782a81276af4f7ec39837dc28b2e03f3",
+    "mtime": 1793279743.9173076,
+    "ast_hash": "74cd7a71ead5b6c3b846eb41ae798fdb",
     "semantic_hash": ""
   },
   "Tests/KouenDaemonTests/AgentRemoteControlDaemonServiceTests.swift": {
@@ -4424,19 +4424,9 @@
     "ast_hash": "01d83d8bdbbbe4db2e0d52fbae710a3a",
     "semantic_hash": ""
   },
-  "Packages/KouenCore/Sources/KouenCore/Agents/RemoteControlURLProvider.swift": {
-    "mtime": 1791537128.540834,
-    "ast_hash": "96dc8a246a1525453c55c30f56906b49",
-    "semantic_hash": ""
-  },
   "Tests/KouenAppTests/ProjectStoreSyncTests.swift": {
     "mtime": 1791537128.5434139,
     "ast_hash": "9b3f4fb6ee426bb1b203118d8c9d49d3",
-    "semantic_hash": ""
-  },
-  "Tests/KouenCoreTests/RemoteControlURLProviderTests.swift": {
-    "mtime": 1791537128.544993,
-    "ast_hash": "e6a2e95540a4992a22626322da537d48",
     "semantic_hash": ""
   },
   "Tests/KouenCoreTests/AgentHistoryMultiAgentCoverageTests.swift": {

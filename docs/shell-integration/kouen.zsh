@@ -54,18 +54,13 @@ if [[ -n "$KOUEN" && -n "$KOUEN_CLAUDE_SESSION_MODE" && -z "$__kouen_claude_wrap
     if [[ "$KOUEN_CLAUDE_SESSION_MODE" == cloud && $resume -eq 0 ]]; then
       __kouen_claude_next --cloud "$@"
     elif [[ "$KOUEN_CLAUDE_SESSION_MODE" == cloud || "$KOUEN_CLAUDE_SESSION_MODE" == remote-control ]]; then
-      if [[ "$KOUEN_CLAUDE_SESSION_MODE" == remote-control ]]; then
-        # replaced by Kouen Companion; run `kouen rc`
-        # /usr/bin/open -a "Google Chrome" "https://claude.ai/code" >/dev/null 2>&1 &
-        (__kouen_next rc >/dev/null 2>&1 &)
-      fi
         __kouen_claude_next --remote-control --remote-control-session-name-prefix kouen "$@"
     else
       __kouen_claude_next "$@"
     fi
   }
 fi
-# Codex session mode: a `codex` typed by hand gets the Companion opened when $KOUEN_CODEX_SESSION_MODE is `remote-control`.
+# Codex session mode: a `codex` typed by hand gets --rc handling when $KOUEN_CODEX_SESSION_MODE is `remote-control`; the Companion opens only for an explicit --rc.
 if [[ -n "$KOUEN" && "$KOUEN_CODEX_SESSION_MODE" == "remote-control" && -z "$__kouen_codex_wrapped" ]]; then
   __kouen_codex_wrapped=1
   if (( ${+functions[codex]} )); then
@@ -84,7 +79,7 @@ if [[ -n "$KOUEN" && "$KOUEN_CODEX_SESSION_MODE" == "remote-control" && -z "$__k
         --remote-control|--rc) rc=1 ;;
       esac
     done
-    if [[ "$KOUEN_CODEX_SESSION_MODE" == "remote-control" || $rc -eq 1 ]]; then
+    if [[ $rc -eq 1 ]]; then
       # replaced by Kouen Companion; run `kouen rc`
       # /usr/bin/open -a "Google Chrome" "https://chatgpt.com" >/dev/null 2>&1 &
       (__kouen_next rc >/dev/null 2>&1 &)
@@ -112,7 +107,7 @@ if [[ -n "$KOUEN" && "$KOUEN_AGY_SESSION_MODE" == "remote-control" && -z "$__kou
         *) n=$((n+1)) ;;
       esac
     done
-    if [[ "$KOUEN_AGY_SESSION_MODE" == "remote-control" || $rc -eq 1 ]]; then
+    if [[ $rc -eq 1 ]]; then
       # replaced by Kouen Companion; run `kouen rc`
       # /usr/bin/open -a "Google Chrome" "https://antigravity.google.com" >/dev/null 2>&1 &
       (__kouen_next rc >/dev/null 2>&1 &)
@@ -139,7 +134,7 @@ if [[ -n "$KOUEN" && "$KOUEN_COPILOT_SESSION_MODE" == "remote-control" && -z "$_
         --remote) rc=1 ;;
       esac
     done
-    if [[ "$KOUEN_COPILOT_SESSION_MODE" == "remote-control" || $rc -eq 1 ]]; then
+    if [[ $rc -eq 1 ]]; then
       (__kouen_next rc >/dev/null 2>&1 &)
     fi
     if (( rc )); then __kouen_copilot_next "$@"; else __kouen_copilot_next --remote "$@"; fi
