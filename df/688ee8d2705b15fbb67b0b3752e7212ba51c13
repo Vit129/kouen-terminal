@@ -1,5 +1,6 @@
 graphify-out/manifest.json
   h_d82339d8725694 318-319,323-324,328-329,1983-1984
+  s_74324f989aab74::t_9dbca494ad0f51 4727
 ---
 {
   "schema_version": "authorship/3.0.0",
@@ -9,6 +10,16 @@ graphify-out/manifest.json
   "humans": {
     "h_d82339d8725694": {
       "author": "Vit129 <vitosk129@gmail.com>"
+    }
+  },
+  "sessions": {
+    "s_74324f989aab74": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a18aef-92a7-7890-907a-ebe09d5f4c2d",
+        "model": "gpt-6.1-terra"
+      },
+      "human_author": "Vit129 <vitosk129@gmail.com>"
     }
   }
 }
