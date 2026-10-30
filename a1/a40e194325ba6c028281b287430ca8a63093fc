@@ -1,0 +1,25 @@
+Apps/Kouen/Sources/KouenApp/UI/Chrome/PaneLifecycleManager.swift
+  s_dfd1e72e3b0d11::t_bb4ae7c370d946 89-100,102,105,116-118,122,129
+Apps/Kouen/Sources/KouenApp/UI/Chrome/BrowserPaneView.swift
+  s_dfd1e72e3b0d11::t_4bcfbd1ec622bd 194-196
+Apps/Kouen/Sources/KouenApp/Services/SplitPaneCoordinator.swift
+  s_dfd1e72e3b0d11::t_af0921c9ce35e3 20-33,216-220,225-250,390-394
+Tests/KouenAppTests/AgentBrowserPaneTrackerTests.swift
+  s_dfd1e72e3b0d11::t_ec37f23043b18f 22-58
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.3",
+  "base_commit_sha": "a1a40e194325ba6c028281b287430ca8a63093fc",
+  "prompts": {},
+  "sessions": {
+    "s_dfd1e72e3b0d11": {
+      "agent_id": {
+        "tool": "github-copilot-cli",
+        "id": "81a25085-db04-4a36-b28d-625c27311c2e",
+        "model": "deepseek"
+      },
+      "human_author": "Vit129 <vitosk129@gmail.com>"
+    }
+  }
+}
