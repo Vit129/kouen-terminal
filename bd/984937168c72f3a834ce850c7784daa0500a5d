@@ -1,0 +1,14 @@
+graphify-out/manifest.json
+  h_d82339d8725694 963
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.3",
+  "base_commit_sha": "bd984937168c72f3a834ce850c7784daa0500a5d",
+  "prompts": {},
+  "humans": {
+    "h_d82339d8725694": {
+      "author": "Vit129 <vitosk129@gmail.com>"
+    }
+  }
+}
