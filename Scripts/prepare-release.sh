@@ -163,6 +163,16 @@ if [[ ! "$build" =~ ^[0-9]+$ ]]; then
   exit 2
 fi
 
+# CFBundleVersion must strictly increase: DaemonStats.isStale compares app build against
+# the running daemon's with `!=`, so a rolled-back build makes every already-installed
+# daemon look mismatched (reconnect churn) — and it silently ships a binary that no
+# future bump can outrank correctly. v4.22.6 went 295 -> 256 this way.
+if (( build <= plist_build )); then
+  echo "Build must increase: Info.plist is at $plist_build — refusing to set $build." >&2
+  echo "Use the default (build+1) or pass a higher --build N." >&2
+  exit 2
+fi
+
 echo ""
 echo "Release metadata plan:"
 echo "  version: $plist_version -> $version"
