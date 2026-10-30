@@ -1,0 +1,36 @@
+Apps/Kouen/Sources/KouenApp/UI/Chrome/ContentAreaViewController.swift
+  s_74324f989aab74::t_bbf9e56fe9dbe1 334
+Apps/Kouen/Sources/KouenApp/UI/Chrome/BrowserPaneView.swift
+  s_74324f989aab74::t_289ed21346b463 63,172-194
+  s_8a9a65489537cb::t_3eab1b48c876cc 195-196
+Tests/KouenAppTests/BrowserPaneViewTests.swift
+  s_74324f989aab74::t_e925e0d58709e8 384-389,391-401,403-410,412-414,416-417
+  s_74324f989aab74::t_9795f4d5ef89c3 381
+  s_74324f989aab74::t_96049c075a4814 382-383,390,402,411,415,418-419
+Apps/Kouen/Sources/KouenApp/UI/Chrome/BrowserIntegrationController.swift
+  s_74324f989aab74::t_c367506c6beecf 44-52
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.3",
+  "base_commit_sha": "81d1cfc798d793d9fb757de73fac0b8af5a5dd3a",
+  "prompts": {},
+  "sessions": {
+    "s_74324f989aab74": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a18aef-92a7-7890-907a-ebe09d5f4c2d",
+        "model": "gpt-6-luna"
+      },
+      "human_author": "Vit129 <vitosk129@gmail.com>"
+    },
+    "s_8a9a65489537cb": {
+      "agent_id": {
+        "tool": "github-copilot-cli",
+        "id": "f0078983-6a1a-4af0-875f-4f230a6d4df7",
+        "model": "deepseek"
+      },
+      "human_author": "Vit129 <vitosk129@gmail.com>"
+    }
+  }
+}
