@@ -1855,8 +1855,8 @@
     "semantic_hash": ""
   },
   "Scripts/full-cycle.sh": {
-    "mtime": 1792246211.4879742,
-    "ast_hash": "46dd8d7d4fa116187076a05de32ef078",
+    "mtime": 1793411340.18055,
+    "ast_hash": "d0775bd7f74a761744ed0ca7fa1e3d3c",
     "semantic_hash": ""
   },
   "Scripts/generate-app-icon.sh": {
@@ -1915,8 +1915,8 @@
     "semantic_hash": ""
   },
   "Scripts/prepare-release.sh": {
-    "mtime": 1793372054.887817,
-    "ast_hash": "200db31ab1825db503b22844c2240ac7",
+    "mtime": 1793412547.785844,
+    "ast_hash": "9f5a000b4c322e44fe97f5ad656b1c65",
     "semantic_hash": ""
   },
   "Scripts/preview.sh": {
