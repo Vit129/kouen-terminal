@@ -1,0 +1,29 @@
+Scripts/full-cycle.sh
+  s_dfd1e72e3b0d11::t_cd7d03a216a330 246
+graphify-out/manifest.json
+  s_53ad839a68fb1c::t_850e482f58c29b 963-964,1053-1054
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.3",
+  "base_commit_sha": "7ea98c34a581cd7bc3222b101a592ac43104c90b",
+  "prompts": {},
+  "sessions": {
+    "s_53ad839a68fb1c": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a18fb7-5316-7db2-acef-76f7f2031027",
+        "model": "gpt-6-luna"
+      },
+      "human_author": "Vit129 <vitosk129@gmail.com>"
+    },
+    "s_dfd1e72e3b0d11": {
+      "agent_id": {
+        "tool": "github-copilot-cli",
+        "id": "81a25085-db04-4a36-b28d-625c27311c2e",
+        "model": "deepseek"
+      },
+      "human_author": "Vit129 <vitosk129@gmail.com>"
+    }
+  }
+}
