@@ -30,7 +30,7 @@ Usage:
 
 Options:
   --version X.Y.Z  Set an explicit marketing version.
-  --build N        Set an explicit build number. Defaults to current build + 1.
+  --build N        Set a build number greater than all recorded builds.
   --dry-run        Print the planned metadata changes without editing files.
   -h, --help       Show this help.
 USAGE
@@ -144,8 +144,27 @@ if [[ ! "$version" =~ ^[0-9]+[.][0-9]+[.][0-9]+$ ]]; then
   exit 2
 fi
 
+# CFBundleVersion must strictly increase across the project's whole history, not just
+# against the current plist: DaemonStats.isStale compares app build against the running
+# daemon's with `!=`, so a rolled-back build makes every already-installed daemon look
+# mismatched (reconnect churn) — and it silently ships a binary that no future bump can
+# outrank correctly. v4.22.6 went 295 -> 256 this way, and comparing only against the
+# plist would have let v4.22.7 go 256 -> 257, still below the 295 already shipped.
+historical_build="$(git log -p --format= -- "$INFO_PLIST" | awk '
+  /<key>CFBundleVersion<\/key>/ { capture=1; next }
+  capture && /^[ +-][[:space:]]*<string>[0-9]+<\/string>/ {
+    value=$0; sub(/^.*<string>/, "", value); sub(/<\/string>.*$/, "", value)
+    if (value+0 > max) max=value+0
+    next
+  }
+  capture { capture=0 }
+  END { print max+0 }
+')"
+max_build="$plist_build"
+if (( historical_build > max_build )); then max_build="$historical_build"; fi
+
 if [[ -z "$build" ]]; then
-  next_build=$((plist_build + 1))
+  next_build=$((max_build + 1))
   if [[ -n "${AUTO_YES:-}" || "${CI:-}" == "1" || "${NON_INTERACTIVE:-}" == "1" ]]; then
     build="$next_build"
     echo "Auto-yes / CI mode: defaulting build number to $build."
@@ -163,12 +182,8 @@ if [[ ! "$build" =~ ^[0-9]+$ ]]; then
   exit 2
 fi
 
-# CFBundleVersion must strictly increase: DaemonStats.isStale compares app build against
-# the running daemon's with `!=`, so a rolled-back build makes every already-installed
-# daemon look mismatched (reconnect churn) — and it silently ships a binary that no
-# future bump can outrank correctly. v4.22.6 went 295 -> 256 this way.
-if (( build <= plist_build )); then
-  echo "Build must increase: Info.plist is at $plist_build — refusing to set $build." >&2
+if (( 10#$build <= max_build )); then
+  echo "Build must be greater than the highest recorded build ($max_build): $build" >&2
   echo "Use the default (build+1) or pass a higher --build N." >&2
   exit 2
 fi
