@@ -1855,8 +1855,8 @@
     "semantic_hash": ""
   },
   "Scripts/full-cycle.sh": {
-    "mtime": 1793411340.18055,
-    "ast_hash": "d0775bd7f74a761744ed0ca7fa1e3d3c",
+    "mtime": 1793413623.6031015,
+    "ast_hash": "ed00728795770d1368e75e363a8aa513",
     "semantic_hash": ""
   },
   "Scripts/generate-app-icon.sh": {
