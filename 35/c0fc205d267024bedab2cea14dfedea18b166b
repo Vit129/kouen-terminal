@@ -1,0 +1,20 @@
+Scripts/prepare-release.sh
+  s_dfd1e72e3b0d11::t_87148b8f676ca3 147-165,167,185-186
+  s_dfd1e72e3b0d11::t_20de503aa0d688 33
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.3",
+  "base_commit_sha": "35c0fc205d267024bedab2cea14dfedea18b166b",
+  "prompts": {},
+  "sessions": {
+    "s_dfd1e72e3b0d11": {
+      "agent_id": {
+        "tool": "github-copilot-cli",
+        "id": "81a25085-db04-4a36-b28d-625c27311c2e",
+        "model": "deepseek"
+      },
+      "human_author": "Vit129 <vitosk129@gmail.com>"
+    }
+  }
+}
