@@ -243,7 +243,7 @@ git-cliff --tag "$TAG" --output CHANGELOG.md
 # of its real notes.
 PREV_TAG="$(git tag --sort=-v:refname | grep -v "^${TAG}$" | head -1)"
 if [[ -n "$PREV_TAG" ]]; then
-  NOTES="$(git-cliff "${PREV_TAG}..HEAD" --strip header 2>/dev/null)" || NOTES=""
+  NOTES="$(git-cliff --tag "$TAG" "${PREV_TAG}..HEAD" --strip header 2>/dev/null)" || NOTES=""
 else
   NOTES="$(git-cliff --tag "$TAG" --strip header 2>/dev/null)" || NOTES=""
 fi
