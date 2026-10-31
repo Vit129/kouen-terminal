@@ -5,6 +5,13 @@ All notable changes to Kouen are documented here. The format is based on
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Each released version
 has a matching `vX.Y.Z` tag and a signed, notarized DMG on
 [GitHub Releases](https://github.com/Vit129/kouen-terminal/releases).
+## [4.22.8] - 2026-10-31
+
+### Fixed
+- Generate GitHub release notes from HEAD, not the not-yet-created tag ([`4f48ebd`](https://github.com/Vit129/kouen-terminal/commit/4f48ebdc727f5d434c6cc9c83a0bfe8f1f9198ab))
+- Keep CFBundleVersion above every build ever shipped ([`35c0fc2`](https://github.com/Vit129/kouen-terminal/commit/35c0fc205d267024bedab2cea14dfedea18b166b))
+
+
 ## [4.22.7] - 2026-10-30
 
 ### Fixed
