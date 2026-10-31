@@ -236,13 +236,20 @@ PYEOF
 # Generate full CHANGELOG.md from all tags
 git-cliff --tag "$TAG" --output CHANGELOG.md
 
-# Generate release notes for this tag only (since previous tag)
+# Generate release notes for this tag only (since previous tag).
+# Range the previous tag against HEAD, not "$TAG": the tag is only created further
+# down (git tag -f), so "${PREV_TAG}..${TAG}" resolves to a missing ref, git-cliff
+# exits non-zero, and every release shipped the "Release vX.Y.Z" stub body instead
+# of its real notes.
 PREV_TAG="$(git tag --sort=-v:refname | grep -v "^${TAG}$" | head -1)"
 if [[ -n "$PREV_TAG" ]]; then
-  NOTES="$(git-cliff "${PREV_TAG}..${TAG}" --strip header 2>/dev/null)" || NOTES="Release ${TAG}"
+  NOTES="$(git-cliff "${PREV_TAG}..HEAD" --strip header 2>/dev/null)" || NOTES=""
 else
-  NOTES="$(git-cliff --tag "$TAG" --strip header 2>/dev/null)" || NOTES="Release ${TAG}"
+  NOTES="$(git-cliff --tag "$TAG" --strip header 2>/dev/null)" || NOTES=""
 fi
+# git-cliff can also exit 0 with an empty body (e.g. only chore commits in range);
+# an empty --notes would publish a blank release, so fall back to the stub.
+[[ -n "$NOTES" ]] || NOTES="Release ${TAG}"
 # GitHub release-notes body caps at 125000 chars — an empty/wrong PREV_TAG (e.g. a
 # broken tag lookup) would silently dump full project history past that limit and
 # 422 on every create/edit attempt below.
