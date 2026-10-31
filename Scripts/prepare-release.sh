@@ -145,11 +145,13 @@ if [[ ! "$version" =~ ^[0-9]+[.][0-9]+[.][0-9]+$ ]]; then
 fi
 
 # CFBundleVersion must strictly increase across the project's whole history, not just
-# against the current plist: DaemonStats.isStale compares app build against the running
-# daemon's with `!=`, so a rolled-back build makes every already-installed daemon look
-# mismatched (reconnect churn) — and it silently ships a binary that no future bump can
-# outrank correctly. v4.22.6 went 295 -> 256 this way, and comparing only against the
-# plist would have let v4.22.7 go 256 -> 257, still below the 295 already shipped.
+# against the current plist. Build is a monotonic identity, not a cosmetic counter:
+# DaemonStats.isStale compares it with `!=` (so a rollback counts as stale, not just a
+# downgrade), SurfaceRegistry keys the version banner on `lastSeen != build`, and
+# DoctorRunner reports a daemon/CLI build mismatch as a problem. Once 295 has shipped,
+# a later 257 is still below it — the number stops ordering releases, and the next
+# release has to jump above 295 anyway. v4.22.6 went 295 -> 256 this way, and comparing
+# only against the plist would have let v4.22.7 go 256 -> 257, still below 295.
 historical_build="$(git log -p --format= -- "$INFO_PLIST" | awk '
   /<key>CFBundleVersion<\/key>/ { capture=1; next }
   capture && /^[ +-][[:space:]]*<string>[0-9]+<\/string>/ {
