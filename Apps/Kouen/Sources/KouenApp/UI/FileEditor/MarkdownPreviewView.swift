@@ -63,6 +63,7 @@ final class MarkdownPreviewView: NSView, WKNavigationDelegate {
     private func ensureWebView() -> WKWebView {
         if let existing = webView { return existing }
         let config = WKWebViewConfiguration()
+        config.disableExtensibleSSO()
         let userController = WKUserContentController()
         for script in Self.cachedUserScripts {
             userController.addUserScript(script)

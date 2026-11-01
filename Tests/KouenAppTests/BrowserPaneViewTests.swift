@@ -131,6 +131,31 @@ final class BrowserPaneViewTests: XCTestCase {
             "createTab()'s webview must allow magnification, or the compositor kick in didFinish is a permanent no-op for this tab")
     }
 
+    // Regression: WebKit asks the system AppSSO service before every navigation and has no
+    // timeout, so when that call never returns the page stays provisional (progress ~10%)
+    // and the transparent web view shows the pane's black background. Kouen has no SSO
+    // use, so every web view it creates must opt out: the warm pool, the fallback built at
+    // open time, and the extra tabs from createTab().
+    func testBrowserWebViewsOptOutOfExtensibleSSO() {
+        let blank = URL(string: "about:blank")!
+        func ssoEnabled(_ web: WKWebView) -> Bool? {
+            // WKPreferences declares this as `getter=_isExtensibleSSOEnabled`; KVC finds it
+            // under that exact name (the bare key `extensibleSSOEnabled` is undefined).
+            web.configuration.preferences.value(forKey: "_isExtensibleSSOEnabled") as? Bool
+        }
+
+        BrowserPaneRegistry.shared.prewarm()
+        let pooledPane = BrowserPaneView(url: blank, paneID: UUID())
+        let fallbackPane = BrowserPaneView(url: blank, paneID: UUID())
+        let pooledWeb = pooledPane.webView
+        let fallbackWeb = fallbackPane.webView
+        let extraTabWeb = pooledPane.createTab(url: blank, skipLoad: true)
+
+        XCTAssertEqual(ssoEnabled(pooledWeb), false, "web view from the warm pool must opt out of Extensible SSO")
+        XCTAssertEqual(ssoEnabled(fallbackWeb), false, "web view created at open time must opt out of Extensible SSO")
+        XCTAssertEqual(ssoEnabled(extraTabWeb), false, "createTab() web view must opt out of Extensible SSO")
+    }
+
     // Regression for the black screen on tab switch: PaneLifecycleManager's fast path
     // reveals a cached (previously hidden) pane container by toggling `isHidden` alone,
     // never re-adding it to the view hierarchy — so WKWebView's remote layer can stay
