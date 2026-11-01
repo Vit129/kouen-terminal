@@ -1,0 +1,28 @@
+Tests/KouenAppTests/BrowserPaneViewTests.swift
+  s_3ebc92290f21f9::t_9720218b9aaeb3 134-141,145-158
+  s_3ebc92290f21f9::t_a4846d272268b9 142-144
+Apps/Kouen/Sources/KouenApp/UI/Chrome/WKWebViewConfiguration+ExtensibleSSO.swift
+  s_3ebc92290f21f9::t_59e7b5c29d13c5 1-21
+Apps/Kouen/Sources/KouenApp/UI/Chrome/BrowserPaneView.swift
+  s_3ebc92290f21f9::t_e73feeed66556a 107
+  s_3ebc92290f21f9::t_4053aef235e339 1542
+  s_3ebc92290f21f9::t_ba22c03434b84e 516-519
+Apps/Kouen/Sources/KouenApp/UI/FileEditor/MarkdownPreviewView.swift
+  s_3ebc92290f21f9::t_a92676c6988c59 66
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.3",
+  "base_commit_sha": "780b5b8eade7ee732b258cc7183cd966d7932248",
+  "prompts": {},
+  "sessions": {
+    "s_3ebc92290f21f9": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "dff141c4-84ee-4399-b08c-bf6f1745b1ec",
+        "model": "claude-sonnet-5-5"
+      },
+      "human_author": "Vit129 <vitosk129@gmail.com>"
+    }
+  }
+}
