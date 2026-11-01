@@ -1,0 +1,19 @@
+graphify-out/memory/query_20261101_115108_browserpaneview_createtab_openbrowserpane_navigati.md
+  s_157fb46e528981::t_520c5429a5bc9d 1-23
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.3",
+  "base_commit_sha": "845ab6972f32f28a2a81a115839027f9841b2bff",
+  "prompts": {},
+  "sessions": {
+    "s_157fb46e528981": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a196f2-1661-7a71-9652-46eb286101aa",
+        "model": "gpt-6.1-terra"
+      },
+      "human_author": "Vit129 <vitosk129@gmail.com>"
+    }
+  }
+}
