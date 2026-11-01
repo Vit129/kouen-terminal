@@ -14,7 +14,6 @@ has a matching `vX.Y.Z` tag and a signed, notarized DMG on
 - Label generated release notes with the release tag ([`7ea98c3`](https://github.com/Vit129/kouen-terminal/commit/7ea98c34a581cd7bc3222b101a592ac43104c90b))
 - Opt web views out of Extensible SSO so navigation cannot hang on AppSSO ([`780b5b8`](https://github.com/Vit129/kouen-terminal/commit/780b5b8eade7ee732b258cc7183cd966d7932248))
 
-
 ## [4.22.8] - 2026-10-31
 
 ### Fixed
