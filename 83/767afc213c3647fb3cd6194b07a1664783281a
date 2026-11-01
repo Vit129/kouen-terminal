@@ -1,0 +1,25 @@
+Apps/Kouen/Sources/KouenApp/Resources/Info.plist
+  s_157fb46e528981::t_13627ad574d6af 100,115
+CHANGELOG.md
+  s_157fb46e528981::t_bea54916182461 8-17
+Packages/KouenCore/Sources/KouenCore/KouenVersion.swift
+  s_157fb46e528981::t_bae2d6f9f5340d 15,18
+Packages/KouenCore/Sources/KouenCore/ReleaseNotes/GeneratedReleaseNotes.swift
+  s_157fb46e528981::t_034c6bece61eff 1,8-9,11-13,15-16
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.3",
+  "base_commit_sha": "83767afc213c3647fb3cd6194b07a1664783281a",
+  "prompts": {},
+  "sessions": {
+    "s_157fb46e528981": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a196f2-1661-7a71-9652-46eb286101aa",
+        "model": "unknown"
+      },
+      "human_author": "Vit129 <vitosk129@gmail.com>"
+    }
+  }
+}
