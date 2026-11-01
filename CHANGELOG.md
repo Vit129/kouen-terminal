@@ -5,6 +5,16 @@ All notable changes to Kouen are documented here. The format is based on
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Each released version
 has a matching `vX.Y.Z` tag and a signed, notarized DMG on
 [GitHub Releases](https://github.com/Vit129/kouen-terminal/releases).
+## [4.22.9] - 2026-11-01
+
+### Documentation
+- State the real reason the build number must not roll back ([`e3caa30`](https://github.com/Vit129/kouen-terminal/commit/e3caa30ce55ef1a391783a227c069ce24ceeb2d9))
+
+### Fixed
+- Label generated release notes with the release tag ([`7ea98c3`](https://github.com/Vit129/kouen-terminal/commit/7ea98c34a581cd7bc3222b101a592ac43104c90b))
+- Opt web views out of Extensible SSO so navigation cannot hang on AppSSO ([`780b5b8`](https://github.com/Vit129/kouen-terminal/commit/780b5b8eade7ee732b258cc7183cd966d7932248))
+
+
 ## [4.22.8] - 2026-10-31
 
 ### Fixed

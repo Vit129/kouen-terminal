@@ -1,16 +1,19 @@
-// Generated from the CHANGELOG.md [4.22.8] block by Scripts/generate-release-notes.swift.
+// Generated from the CHANGELOG.md [4.22.9] block by Scripts/generate-release-notes.swift.
 // DO NOT EDIT BY HAND — regenerate in release prep after updating CHANGELOG.md:
 //   swift Scripts/generate-release-notes.swift
 // Drift guards: ReleaseNotesGuardTests (version + changelog digest), package-app.sh.
 
 extension ReleaseNotes {
     public static let current = ReleaseNotes(
-        version: "4.22.8",
-        changelogDigest: "f37180299d8695ed",
+        version: "4.22.9",
+        changelogDigest: "2c838d9bec73533d",
         sections: [
+            Section(title: "Documentation", items: [
+                "State the real reason the build number must not roll back (e3caa30)",
+            ]),
             Section(title: "Fixed", items: [
-                "Generate GitHub release notes from HEAD, not the not-yet-created tag (4f48ebd)",
-                "Keep CFBundleVersion above every build ever shipped (35c0fc2)",
+                "Label generated release notes with the release tag (7ea98c3)",
+                "Opt web views out of Extensible SSO so navigation cannot hang on AppSSO (780b5b8)",
             ]),
         ]
     )

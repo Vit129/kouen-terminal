@@ -104,6 +104,7 @@ public final class BrowserPaneView: NSView {
         } else {
             let config = WKWebViewConfiguration()
             config.limitsNavigationsToAppBoundDomains = false
+            config.disableExtensibleSSO()
             // Initialize with a non-zero viewport frame so WebKit's WebPageProxy allocates
             // a valid tile backing store even when navigate() is called before first layout.
             web = WKWebView(frame: NSRect(x: 0, y: 0, width: 800, height: 600), configuration: config)
@@ -512,7 +513,10 @@ public final class BrowserPaneView: NSView {
     func createTab(url: URL, configuration: WKWebViewConfiguration? = nil, skipLoad: Bool = false) -> WKWebView {
         let isFreshConfiguration = configuration == nil
         let config = configuration ?? WKWebViewConfiguration()
-        if isFreshConfiguration { config.limitsNavigationsToAppBoundDomains = false }
+        if isFreshConfiguration {
+            config.limitsNavigationsToAppBoundDomains = false
+            config.disableExtensibleSSO()
+        }
         let initialFrame = webView.bounds.width > 0 ? webView.bounds : NSRect(x: 0, y: 0, width: 800, height: 600)
         let newWeb = WKWebView(frame: initialFrame, configuration: config)
         newWeb.setValue(false, forKey: "drawsBackground")
@@ -1535,6 +1539,7 @@ public final class BrowserPaneRegistry {
         guard warmPool.isEmpty else { return }
         let config = WKWebViewConfiguration()
         config.limitsNavigationsToAppBoundDomains = false
+        config.disableExtensibleSSO()
         let web = WKWebView(frame: NSRect(x: 0, y: 0, width: 800, height: 600), configuration: config)
         web.allowsMagnification = true
         web.allowsBackForwardNavigationGestures = true
