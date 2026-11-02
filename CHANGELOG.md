@@ -8,8 +8,7 @@ has a matching `vX.Y.Z` tag and a signed, notarized DMG on
 ## [4.22.10] - 2026-11-02
 
 ### Fixed
-- Stop black panes and make tab switching reliable
-
+- Stop black panes and make tab switching reliable (release v4.22.10) ([`6d014ba`](https://github.com/Vit129/kouen-terminal/commit/6d014ba7e5a7be15676ed159c54031061980b502))
 
 ## [4.22.9] - 2026-11-01
 
