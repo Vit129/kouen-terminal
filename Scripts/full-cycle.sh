@@ -94,6 +94,21 @@ if [[ "$(git rev-parse --git-dir)" == *"worktrees"* ]]; then
   fi
 fi
 
+rollback_version_bump() {
+  git checkout -- \
+    Apps/Kouen/Sources/KouenApp/Resources/Info.plist \
+    Packages/KouenCore/Sources/KouenCore/KouenVersion.swift \
+    Packages/KouenCore/Sources/KouenCore/ReleaseNotes/GeneratedReleaseNotes.swift \
+    CHANGELOG.md
+}
+
+# Ask now rather than at commit time: the release notes are built from this message before
+# the commit exists, and without one the work would be committed as a skipped chore(release).
+if [[ -z "$COMMIT_MSG" && "$NO_BUMP" -eq 0 && "$AUTO_YES" -eq 0 && -t 0 ]] \
+  && [[ -n "$(git status --porcelain -- ':!graphify-out')" ]]; then
+  read -erp "Commit message for uncommitted work (e.g. fix: ...): " COMMIT_MSG
+fi
+
 # Step 1: Pre-build verification — catch compile errors BEFORE bumping version.
 echo ""
 echo "▶ Step 1: Verifying build..."
@@ -111,7 +126,12 @@ if [[ "$NO_BUMP" -eq 1 ]]; then
 else
   echo ""
   echo "▶ Step 2: Bumping version..."
-  ./Scripts/prepare-release.sh "${BUMP_ARGS[@]}"
+  if ! COMMIT_MESSAGE="$COMMIT_MSG" ./Scripts/prepare-release.sh "${BUMP_ARGS[@]}"; then
+    echo ""
+    echo "❌ Version bump failed — rolling back version files..."
+    rollback_version_bump
+    exit 1
+  fi
 fi
 
 # Step 3: Commit, push, and merge into main — always via commit-push-merge.sh, whether
@@ -160,11 +180,7 @@ echo "▶ Step 4: Building production app and installing (graceful)..."
 if ! Scripts/install-graceful.sh; then
   echo ""
   echo "❌ Production build failed — rolling back version bump..."
-  git checkout -- \
-    Apps/Kouen/Sources/KouenApp/Resources/Info.plist \
-    Packages/KouenCore/Sources/KouenCore/KouenVersion.swift \
-    Packages/KouenCore/Sources/KouenCore/ReleaseNotes/GeneratedReleaseNotes.swift \
-    CHANGELOG.md
+  rollback_version_bump
   echo "↩️  Version files restored. Fix the build and try again."
   exit 1
 fi

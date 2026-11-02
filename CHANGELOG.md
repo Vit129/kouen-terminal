@@ -5,6 +5,12 @@ All notable changes to Kouen are documented here. The format is based on
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Each released version
 has a matching `vX.Y.Z` tag and a signed, notarized DMG on
 [GitHub Releases](https://github.com/Vit129/kouen-terminal/releases).
+## [4.22.10] - 2026-11-02
+
+### Fixed
+- Stop black panes and make tab switching reliable
+
+
 ## [4.22.9] - 2026-11-01
 
 ### Documentation

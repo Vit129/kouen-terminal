@@ -115,6 +115,21 @@ final class BrowserPaneViewTests: XCTestCase {
             "didFinish should kick the compositor so a completed load can't stay stuck black")
     }
 
+    // Regression: closing the active tab removed its web view from the stack before
+    // selectTab() looked up that web view's slot, so the next tab was never inserted
+    // and the content area stayed black.
+    func testClosingActiveTabAttachesRemainingTabWebView() {
+        let mockWebView = MockWebView(frame: .zero, configuration: WKWebViewConfiguration())
+        let paneView = BrowserPaneView(url: URL(string: "https://example.com/first")!, paneID: UUID(), webView: mockWebView)
+        let closing = paneView.createTab(url: URL(string: "https://example.com/second")!, skipLoad: true)
+
+        paneView.closeTab(at: 1)
+
+        XCTAssertTrue(paneView.webView === mockWebView)
+        XCTAssertNotNil(mockWebView.superview, "the remaining tab's web view must be back in the pane")
+        XCTAssertNil(closing.superview, "the closed tab's web view must be detached")
+    }
+
     // Regression: a tab opened via createTab() (Cmd+T, or a link/window.open that pops
     // a new tab) must also get allowsMagnification=true, same as the pane's first tab —
     // otherwise kickCompositorRelayout()'s guard silently no-ops for it forever, and no

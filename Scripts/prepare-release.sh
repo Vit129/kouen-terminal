@@ -203,6 +203,39 @@ run() {
   fi
 }
 
+# Build the changelog block before touching any file, so a release with nothing to list stops
+# here instead of leaving a half-applied bump. It comes from the real unreleased commits so
+# `make release-notes` (the in-app What's New) lists them. A placeholder here shipped "Release
+# version bump" as the whole changelog in v4.20.16 -- full-cycle's git-cliff only rewrites
+# CHANGELOG.md later, after the notes are already baked into the build. COMMIT_MESSAGE is the
+# commit full-cycle will make after this script, so its work is listed too.
+tmp_block=""
+if [[ "$cl_version" != "$version" ]]; then
+  tmp_block="$(mktemp)"
+  if command -v git-cliff >/dev/null 2>&1; then
+    cliff_args=("$(git describe --tags --abbrev=0)..HEAD" --tag "v$version" --strip header)
+    if [[ -n "${COMMIT_MESSAGE:-}" ]]; then
+      cliff_args+=(--with-commit "$COMMIT_MESSAGE")
+    fi
+    # A commit that does not exist yet has no hash, so drop its empty link.
+    git-cliff "${cliff_args[@]}" 2>/dev/null \
+      | sed -E -e '/./,$!d' -e 's/ \(\[``\]\([^)]*\)\)$//' > "$tmp_block" || true
+    if ! grep -q '^- ' "$tmp_block"; then
+      rm -f "$tmp_block"
+      echo "error: no feat/fix/refactor/perf/docs commits since the last tag, so v$version has no release notes." >&2
+      echo "Commit the work first, or pass a commit message of one of those types. Nothing was changed." >&2
+      exit 1
+    fi
+  else
+    cat <<EOF > "$tmp_block"
+## [$version] - $(date +%Y-%m-%d)
+
+### Added
+- Release version bump to v$version.
+EOF
+  fi
+fi
+
 run /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $version" "$INFO_PLIST"
 run /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $build" "$INFO_PLIST"
 
@@ -222,22 +255,6 @@ if [[ "$cl_version" != "$version" ]]; then
   echo "CHANGELOG.md top entry is [$cl_version], not [$version]."
   if [[ "$dry_run" == "0" ]]; then
     echo "Prepending new release block to CHANGELOG.md..."
-    date_str="$(date +%Y-%m-%d)"
-    tmp_block="$(mktemp)"
-    # Build the block from the real unreleased commits so `make release-notes` below (the
-    # in-app What's New) lists them. A placeholder here shipped "Release version bump" as the
-    # whole changelog in v4.20.16 -- full-cycle's git-cliff only rewrites CHANGELOG.md later,
-    # after the notes are already baked into the build.
-    if ! { command -v git-cliff >/dev/null 2>&1 \
-        && git-cliff "$(git describe --tags --abbrev=0)..HEAD" --tag "v$version" --strip header 2>/dev/null | sed -e '/./,$!d' > "$tmp_block" \
-        && grep -q '^## \[' "$tmp_block"; }; then
-      cat <<EOF > "$tmp_block"
-## [$version] - $date_str
-
-### Added
-- Release version bump to v$version.
-EOF
-    fi
     tmp_cl="$(mktemp)"
     awk -v block_file="$tmp_block" '
       BEGIN { inserted = 0 }
@@ -255,6 +272,7 @@ EOF
     rm "$tmp_block"
     cl_version="$version"
   else
+    rm -f "$tmp_block"
     echo "+ would prepend new release block to CHANGELOG.md for $version"
   fi
 fi

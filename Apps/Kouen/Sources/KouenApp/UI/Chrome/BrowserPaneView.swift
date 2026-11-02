@@ -23,12 +23,14 @@ public final class BrowserPaneView: NSView {
     private var consoleLogs: [String] = []
     private var pendingLogLines: [String] = []
     private var logWriteScheduled = false
-    private var compositorKickBaseMagnification: CGFloat?
-    private var compositorKickWorkItem: DispatchWorkItem?
+    /// Per web view: tabs load concurrently, and a kick from one must not cancel another's restore.
+    private var compositorKicks: [ObjectIdentifier: (base: CGFloat, restore: DispatchWorkItem)] = [:]
 
     private let tabBar = NSView()
+    private let tabScrollView = NSScrollView()
     private let tabBarStack = NSStackView()
     private let newTabButton = NSButton()
+    private let tabNavigationButtons = TabNavigationButtons(accessibilityPrefix: "browser")
 
     private let toolbar = NSView()
     private let backButton = SoftIconButton(frame: NSRect(x: 0, y: 0, width: 20, height: 20))
@@ -123,6 +125,7 @@ public final class BrowserPaneView: NSView {
         self.webView = webView
 
         super.init(frame: .zero)
+        webView.ignoreWindowOcclusion()
         wantsLayer = true
 
         // Create first tab
@@ -177,9 +180,8 @@ public final class BrowserPaneView: NSView {
         isDisposed = true
 
         cancelRetry()
-        compositorKickWorkItem?.cancel()
-        compositorKickWorkItem = nil
-        compositorKickBaseMagnification = nil
+        compositorKicks.values.forEach { $0.restore.cancel() }
+        compositorKicks.removeAll()
         progressObservation = nil
         isLoadingObservation = nil
         titleObservation = nil
@@ -429,10 +431,30 @@ public final class BrowserPaneView: NSView {
         tabBar.wantsLayer = true
         KouenDesign.applyTabBarChrome(to: tabBar)
 
+        tabScrollView.translatesAutoresizingMaskIntoConstraints = false
+        tabScrollView.hasHorizontalScroller = false
+        tabScrollView.hasVerticalScroller = false
+        tabScrollView.horizontalScrollElasticity = .none
+        tabScrollView.drawsBackground = false
+        tabScrollView.documentView = tabBarStack
+
         tabBarStack.orientation = .horizontal
         tabBarStack.spacing = 1
         tabBarStack.translatesAutoresizingMaskIntoConstraints = false
-        tabBar.addSubview(tabBarStack)
+        tabBarStack.setContentHuggingPriority(.required, for: .horizontal)
+        tabBarStack.setContentCompressionResistancePriority(.required, for: .horizontal)
+        let clipView = tabScrollView.contentView
+        NSLayoutConstraint.activate([
+            tabBarStack.leadingAnchor.constraint(equalTo: clipView.leadingAnchor),
+            tabBarStack.topAnchor.constraint(equalTo: clipView.topAnchor),
+            tabBarStack.bottomAnchor.constraint(equalTo: clipView.bottomAnchor),
+            tabBarStack.widthAnchor.constraint(greaterThanOrEqualTo: clipView.widthAnchor),
+        ])
+
+        tabNavigationButtons.onSelect = { [weak self] index in self?.selectTab(at: index) }
+
+        tabBar.addSubview(tabScrollView)
+        tabBar.addSubview(tabNavigationButtons)
 
         newTabButton.translatesAutoresizingMaskIntoConstraints = false
         newTabButton.image = NSImage(systemSymbolName: "plus", accessibilityDescription: "New Tab")?
@@ -443,13 +465,17 @@ public final class BrowserPaneView: NSView {
         tabBarStack.addArrangedSubview(newTabButton)
 
         NSLayoutConstraint.activate([
-            tabBarStack.leadingAnchor.constraint(equalTo: tabBar.leadingAnchor, constant: 2),
-            tabBarStack.trailingAnchor.constraint(lessThanOrEqualTo: tabBar.trailingAnchor, constant: -8),
-            tabBarStack.centerYAnchor.constraint(equalTo: tabBar.centerYAnchor),
+            tabScrollView.leadingAnchor.constraint(equalTo: tabBar.leadingAnchor, constant: 2),
+            tabScrollView.trailingAnchor.constraint(equalTo: tabNavigationButtons.leadingAnchor, constant: -2),
+            tabScrollView.topAnchor.constraint(equalTo: tabBar.topAnchor),
+            tabScrollView.bottomAnchor.constraint(equalTo: tabBar.bottomAnchor),
+            tabNavigationButtons.trailingAnchor.constraint(equalTo: tabBar.trailingAnchor, constant: -4),
+            tabNavigationButtons.centerYAnchor.constraint(equalTo: tabBar.centerYAnchor),
         ])
 
         refreshTabBar()
     }
+
     private func refreshTabBar() {
         // Remove existing tab views (keep newTabButton)
         for view in tabBarStack.arrangedSubviews where view !== newTabButton {
@@ -468,6 +494,13 @@ public final class BrowserPaneView: NSView {
         }
         // Always show tab bar (like Chrome/Safari)
         tabBar.isHidden = false
+        tabBar.layoutSubtreeIfNeeded()
+        tabBarStack.layoutSubtreeIfNeeded()
+        if let activeButton = tabBarStack.arrangedSubviews.indices.contains(activeTabIndex)
+            ? tabBarStack.arrangedSubviews[activeTabIndex] : nil {
+            activeButton.scrollToVisible(activeButton.bounds)
+        }
+        tabNavigationButtons.update(activeIndex: activeTabIndex, count: tabs.count)
     }
 
     @objc private func addNewTab() {
@@ -519,6 +552,7 @@ public final class BrowserPaneView: NSView {
         }
         let initialFrame = webView.bounds.width > 0 ? webView.bounds : NSRect(x: 0, y: 0, width: 800, height: 600)
         let newWeb = WKWebView(frame: initialFrame, configuration: config)
+        newWeb.ignoreWindowOcclusion()
         newWeb.setValue(false, forKey: "drawsBackground")
         newWeb.setValue(NSColor.clear, forKey: "underPageBackgroundColor")
         newWeb.appearance = isWebDarkModeForced ? NSAppearance(named: .darkAqua) : nil
@@ -613,23 +647,31 @@ public final class BrowserPaneView: NSView {
             // remote compositor layer stale/black, same as the reveal-from-cache case
             // forceRepaint() already fixes elsewhere (see PaneLifecycleManager, dbc950c3).
             forceRepaint()
+            // The swap's layout pass has not run yet and an unchanged size will not trigger
+            // layout()'s repaint, so repeat once it settles (as viewDidMoveToWindow does).
+            DispatchQueue.main.async { [weak self] in
+                guard let self, self.webView === newWeb else { return }
+                self.forceRepaint()
+            }
         }
         urlTextField.stringValue = newWeb.url?.absoluteString ?? ""
         updateViewSourceButtonVisibility(for: newWeb.url)
         refreshTabBar()
     }
 
-    private func closeTab(at index: Int) {
+    func closeTab(at index: Int) {
         NSLog("BROWSER_DEBUG: closeTab(at: %d), tabs.count=%d", index, tabs.count)
         guard tabs.count > 1 else {
             // Last tab — close the entire browser pane
             SessionCoordinator.shared.splitPaneCoordinator.closeBrowserPane(paneID: paneID)
             return
         }
-        tabs[index].webView.removeFromSuperview()
-        tabs.remove(at: index)
+        let closedWebView = tabs.remove(at: index).webView
         let newIndex = min(activeTabIndex, tabs.count - 1)
+        // selectTab finds the insertion slot from the active web view, so it must stay
+        // in the stack until the swap; detaching it first leaves the pane with no web view.
         selectTab(at: newIndex)
+        closedWebView.removeFromSuperview()
     }
 
     private func setupConstraints() {
@@ -812,24 +854,23 @@ public final class BrowserPaneView: NSView {
     // timer. P35 investigation, 2026-07-06, see agent-memory/knowledge/ui/browser-pane.md.
     private func kickCompositorRelayout(for webView: WKWebView) {
         guard webView.allowsMagnification else { return }
-        let base = compositorKickBaseMagnification ?? webView.magnification
-        if compositorKickBaseMagnification != nil {
-            compositorKickWorkItem?.cancel()
+        let key = ObjectIdentifier(webView)
+        let inFlight = compositorKicks[key]
+        let base = inFlight?.base ?? webView.magnification
+        if let inFlight {
+            inFlight.restore.cancel()
             // Reset to base first so the subsequent +0.01 is a real delta for WebKit
             // rather than being coalesced as a no-op if a prior kick was in flight.
             webView.setMagnification(base, centeredAt: .zero)
-        } else {
-            compositorKickBaseMagnification = base
         }
         // Delta must clear WebKit's internal rounding so the scale change is actually
         // applied (a sub-pixel nudge can be coalesced into a no-op that never commits).
         webView.setMagnification(base + 0.01, centeredAt: .zero)
         let workItem = DispatchWorkItem { [weak self, weak webView] in
             webView?.setMagnification(base, centeredAt: .zero)
-            self?.compositorKickBaseMagnification = nil
-            self?.compositorKickWorkItem = nil
+            self?.compositorKicks[key] = nil
         }
-        compositorKickWorkItem = workItem
+        compositorKicks[key] = (base, workItem)
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.05, execute: workItem)
     }
 
@@ -1607,13 +1648,11 @@ private final class BrowserTabButton: NSView {
         wantsLayer = true
         layer?.cornerRadius = 6
         layer?.cornerCurve = .continuous
-        layer?.backgroundColor = isActive
-            ? KouenDesign.chrome.surfaceElevated.cgColor
-            : NSColor.clear.cgColor
+        KouenDesign.applyTabSelection(to: self, isActive: isActive)
         translatesAutoresizingMaskIntoConstraints = false
 
         label.stringValue = title.isEmpty ? "New Tab" : title
-        label.font = .systemFont(ofSize: 11.5, weight: .regular)
+        label.font = .systemFont(ofSize: 11.5, weight: isActive ? .semibold : .regular)
         label.textColor = isActive ? KouenDesign.chrome.textPrimary : KouenDesign.chrome.textSecondary
         label.lineBreakMode = .byTruncatingTail
         label.translatesAutoresizingMaskIntoConstraints = false

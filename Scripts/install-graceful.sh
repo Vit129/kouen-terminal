@@ -42,8 +42,8 @@ if [[ $NO_BUILD -eq 0 ]]; then
   swift build -c release
   echo "==> Packaging..."
   Scripts/package-app.sh release
-  echo "==> Ad-hoc signing..."
-  codesign --force --sign - --deep "$ROOT/Kouen.app" >/dev/null
+  echo "==> Signing..."
+  Scripts/sign-local.sh "$ROOT/Kouen.app"
 fi
 
 if [[ ! -d "$ROOT/Kouen.app" ]]; then

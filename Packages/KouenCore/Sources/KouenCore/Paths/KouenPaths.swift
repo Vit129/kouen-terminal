@@ -23,13 +23,15 @@ public enum KouenPaths {
     private static var overrideRoot: URL? {
         guard let raw = overrideRootRaw, !raw.isEmpty else {
             let fm = FileManager.default
-            if Bundle.main.bundleIdentifier == "com.vit129.kouen.preview" {
-                return Bundle.main.bundleURL.deletingLastPathComponent()
-            }
+            // Launch Services does not inherit the shell's KOUEN_HOME. Prefer the
+            // generated preview path in Info.plist before falling back to the bundle folder.
             if let bundled = Bundle.main.object(forInfoDictionaryKey: "KouenPreviewHome") as? String,
                !bundled.isEmpty
             {
                 return URL(fileURLWithPath: (bundled as NSString).expandingTildeInPath, isDirectory: true)
+            }
+            if Bundle.main.bundleIdentifier == "com.vit129.kouen.preview" {
+                return Bundle.main.bundleURL.deletingLastPathComponent()
             }
             
             // Auto-detect if running inside a directory (e.g. repo) that contains a `.kouen-preview` folder.
