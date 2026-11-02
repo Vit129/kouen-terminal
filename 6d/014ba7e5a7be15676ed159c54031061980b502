@@ -1,0 +1,55 @@
+Scripts/prepare-release.sh
+  s_5dbf272a7b21ce::t_2ca4f4af791787 206-219,223-238,275
+  s_5dbf272a7b21ce::t_771a00e3795dbc 220-222
+Tests/KouenAppTests/BrowserPaneViewTests.swift
+  s_5dbf272a7b21ce::t_e672c46e9bce90 118-132
+Apps/Kouen/Sources/KouenApp/UI/Shared/TabNavigationButtons.swift
+  s_5dbf272a7b21ce::t_4e4f857c591679 1-83
+Tests/KouenAppTests/TabNavigationButtonsTests.swift
+  s_5dbf272a7b21ce::t_4e4f857c591679 1-51
+Apps/Kouen/Sources/KouenApp/UI/Chrome/BrowserPaneView.swift
+  s_4da9e11619dd26::t_90a0ed74b6ce8a 501
+  s_5dbf272a7b21ce::t_4e4f857c591679 33,454,457,469,472-473,503,1651,1655
+  s_5dbf272a7b21ce::t_e672c46e9bce90 662
+  s_5dbf272a7b21ce::t_5db37a1b09544f 669,671-672,674
+  s_4da9e11619dd26::t_b81dcf9c7cd637 30,434-440,444-452,455-456,468,470-471,478,497-500,502
+  s_5dbf272a7b21ce::t_87556de26e6daf 128,555
+  s_5dbf272a7b21ce::t_7a001ea43cc027 26-27,183-184,650-655,857-861,871,873
+  s_5dbf272a7b21ce::t_bd77bf136c7533 453
+Packages/KouenCore/Sources/KouenCore/Paths/KouenPaths.swift
+  s_4da9e11619dd26::t_577df1917b29a9 26-27,33-34
+  s_4da9e11619dd26::t_fdb2b414b841e0 35
+Tests/KouenAppTests/BrowserTabRepaintTests.swift
+  s_5dbf272a7b21ce::t_2610d0dd1694fd 1-30,32-36,38-39,43-44,46-55
+  s_5dbf272a7b21ce::t_d5b2cd46aba457 56-74
+  s_5dbf272a7b21ce::t_7a001ea43cc027 31,37,40-42,45
+Apps/Kouen/Sources/KouenApp/UI/Chrome/WKWebView+WindowOcclusion.swift
+  s_5dbf272a7b21ce::t_87556de26e6daf 1-16
+Scripts/full-cycle.sh
+  s_5dbf272a7b21ce::t_b1aac812349610 105-111
+  s_5dbf272a7b21ce::t_2ca4f4af791787 97-104,129-134,183
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.3",
+  "base_commit_sha": "6d014ba7e5a7be15676ed159c54031061980b502",
+  "prompts": {},
+  "sessions": {
+    "s_4da9e11619dd26": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a19713-e1bd-77e2-a9f1-8882eeb933be",
+        "model": "gpt-6-luna"
+      },
+      "human_author": "Vit129 <vitosk129@gmail.com>"
+    },
+    "s_5dbf272a7b21ce": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "0b100a2b-9c4c-42e3-87fc-6065f3936322",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Vit129 <vitosk129@gmail.com>"
+    }
+  }
+}
