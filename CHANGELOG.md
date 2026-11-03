@@ -8,8 +8,7 @@ has a matching `vX.Y.Z` tag and a signed, notarized DMG on
 ## [4.22.11] - 2026-11-03
 
 ### Fixed
-- Session history about searching
-
+- Session history about searching (release v4.22.11) ([`f015b6f`](https://github.com/Vit129/kouen-terminal/commit/f015b6f85a13678c5e61a1d5d6529ba8c47ea47a))
 
 ## [4.22.10] - 2026-11-02
 
