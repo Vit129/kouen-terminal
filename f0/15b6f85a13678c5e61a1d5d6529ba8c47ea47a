@@ -1,0 +1,88 @@
+Packages/KouenCore/Sources/KouenCore/Agents/AgentHistoryFTSIndex.swift
+  s_08e31f77123e5f::t_e1c38dac58852b 638-639,667-674,676,678,680,688-690,719-720,726,729-737,739,746,752-754,803-804
+  s_08e31f77123e5f::t_59aec50310979f 655
+  s_08e31f77123e5f::t_94bdff1729a354 696-701,717-718,721-725,727-728,738,740-745,747-751,755-767
+Scripts/full-cycle.sh
+  s_08e31f77123e5f::t_e703700d44a376 111
+  s_08e31f77123e5f::t_fa31effc2a3a34 105-107,109-110,112-119
+Apps/Kouen/Sources/KouenApp/UI/History/HistorySearchEvidence.swift
+  s_08e31f77123e5f::t_3dcf65d865636a 11,38-40
+  s_08e31f77123e5f::t_8d9e76cfe54d21 1-9,14,16-34,41,44,46-84
+  s_08e31f77123e5f::t_a2fe7d590dff7c 10,35-37
+  s_08e31f77123e5f::t_e33e58a4b55b1a 15,45
+  s_08e31f77123e5f::t_cf5f4b25023f7a 12-13,42-43
+Packages/KouenCore/Sources/KouenCore/Agents/AgentHistorySearch.swift
+  s_08e31f77123e5f::t_512c3ede2373bd 122-130
+  s_08e31f77123e5f::t_94bdff1729a354 113-115,120
+  s_08e31f77123e5f::t_bdb2766e7831d1 131-138
+  s_08e31f77123e5f::t_59aec50310979f 189-191
+  s_08e31f77123e5f::t_18bb86299b4d9e 116-117,121,196-203,215-239
+  s_08e31f77123e5f::t_9cb453b72fafba 186-188,240,249-254,395-397
+  s_08e31f77123e5f::t_c74e1fc925466f 119
+  s_08e31f77123e5f::t_bd1ac3a36234b1 15-17,24-26,33-34,155-159,242-248,388-390
+  s_08e31f77123e5f::t_bad4b2f9c4bd13 241
+Scripts/start.mjs
+  s_08e31f77123e5f::t_e703700d44a376 146-147,249,251-252
+Scripts/prepare-release.sh
+  s_08e31f77123e5f::t_ad9b18301403a7 174-180,182
+  s_08e31f77123e5f::t_e703700d44a376 181,233
+Tests/KouenAppTests/AgentSessionHistoryModelTests.swift
+  s_08e31f77123e5f::t_78410ce5a26c8e 90-101
+  s_08e31f77123e5f::t_74fe60df3a625b 53,63,65
+  s_08e31f77123e5f::t_bd4408c895341d 75-89
+  s_08e31f77123e5f::t_fe1c0f11dd7f3d 268-273
+Apps/Kouen/Sources/KouenApp/UI/History/AgentSessionHistoryModel.swift
+  s_08e31f77123e5f::t_cf5f4b25023f7a 138,386,433,455,495,498-501,536-539
+  s_08e31f77123e5f::t_9cb453b72fafba 479-486,489,491
+  s_08e31f77123e5f::t_664120b763839d 139,374,387,399,415,434,456-457,516,519-520,522-535
+  s_08e31f77123e5f::t_5cfaef80aeeeca 230
+  s_08e31f77123e5f::t_99a799aeb75e14 313-314
+  s_08e31f77123e5f::t_e8f1a6a3799da6 510-513,561
+  s_08e31f77123e5f::t_eb5c8d465fac50 122,372,431
+Apps/Kouen/Sources/KouenApp/UI/History/AgentSessionHistoryView.swift
+  s_08e31f77123e5f::t_d8fa1a934c0b9b 308
+  s_08e31f77123e5f::t_3dcf65d865636a 561
+  s_08e31f77123e5f::t_664120b763839d 567-568
+  s_08e31f77123e5f::t_e33e58a4b55b1a 564-565
+  s_08e31f77123e5f::t_cf5f4b25023f7a 562-563
+  s_08e31f77123e5f::t_99a799aeb75e14 556-559,566
+  s_08e31f77123e5f::t_a2fe7d590dff7c 560
+  s_08e31f77123e5f::t_ee16e9f08edbc1 244
+rules/build-release.md
+  s_08e31f77123e5f::t_e703700d44a376 24-25
+Tests/KouenCoreTests/AgentHistorySearchTests.swift
+  s_08e31f77123e5f::t_e310695d6ba1ce 37-57,100-145
+  s_08e31f77123e5f::t_bd4408c895341d 19-36
+  s_08e31f77123e5f::t_c74e1fc925466f 58-79
+  s_08e31f77123e5f::t_c2843e13c4afd0 80-99
+Packages/KouenCore/Sources/KouenCore/Agents/AgentHistoryScanner.swift
+  s_08e31f77123e5f::t_77f2dc2d7af3e5 1090,1098,1101-1102,1118,1125-1127,1162,1256-1257,1279,1287-1290,1292-1296
+Tests/KouenCoreTests/AgentHistoryMultiAgentCoverageTests.swift
+  s_08e31f77123e5f::t_b3bc418e3471bc 159,215-216
+  s_08e31f77123e5f::t_ce385304d110bc 160-179,198-214,217
+  s_08e31f77123e5f::t_d5e42e5f5ec9bd 180-197
+Apps/Kouen/Sources/KouenApp/Resources/Info.plist
+  s_08e31f77123e5f::t_b78d59491e2344 100,115
+CHANGELOG.md
+  s_08e31f77123e5f::t_eaa62d53d264c5 8-13
+Packages/KouenCore/Sources/KouenCore/KouenVersion.swift
+  s_08e31f77123e5f::t_22128611d0c512 15,18
+Packages/KouenCore/Sources/KouenCore/ReleaseNotes/GeneratedReleaseNotes.swift
+  s_08e31f77123e5f::t_9d1e1383ca2400 1,8-9,12
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.3",
+  "base_commit_sha": "f015b6f85a13678c5e61a1d5d6529ba8c47ea47a",
+  "prompts": {},
+  "sessions": {
+    "s_08e31f77123e5f": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a19c9f-5d6a-7523-9bdc-49416b196549",
+        "model": "gpt-6-luna"
+      },
+      "human_author": "Vit129 <vitosk129@gmail.com>"
+    }
+  }
+}
