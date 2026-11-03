@@ -21,8 +21,8 @@
 | Dev iteration | `make start` → `Preview build` (or `make start 2`) |
 | Release (with bump) | `make start` → `Full cycle` → patch / minor / major |
 | Release (no bump) | `make start` → `Full cycle` → skip |
-| AI / Non-interactive Commit | `make start 1 -m "<message>"` (or `COMMIT_MESSAGE="..." make start 1`) |
-| AI / Non-interactive Release | `make start patch -m "<message>" -y` (or `make start 3 minor -m "..." -y`) |
+| AI / Non-interactive Commit | `make start 1 msg="<message>"` (or `COMMIT_MESSAGE="..." make start 1`) |
+| AI / Non-interactive Release | `make start patch msg="<message>" -y` (or `COMMIT_MESSAGE="..." make start 3 minor -y`) |
 
 Full cycle: verify → bump → commit+push → prod → CHANGELOG → tag → GitHub release → install.
 

@@ -156,6 +156,65 @@ final class AgentHistoryMultiAgentCoverageTests: XCTestCase {
     }
     #endif
 
+    #if canImport(SQLite3)
+    func testAntigravityFailedDatabaseReadKeepsCachedSessions() async throws {
+        let tempDir = makeTempDir()
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+        let dbPath = tempDir.appendingPathComponent("conversation_summaries.db").path
+        let brainDir = tempDir.appendingPathComponent("brain")
+        createMockAntigravityDB(at: dbPath)
+        let index = AgentHistoryFTSIndex(dbPath: tempDir.appendingPathComponent("history.sqlite").path)
+        let scanner = AgentHistoryScanner(ftsIndex: index)
+
+        let original = await scanner.scanAntigravity(dbPath: dbPath, brainDir: brainDir)
+        XCTAssertFalse(original.isEmpty)
+        var db: OpaquePointer?
+        XCTAssertEqual(sqlite3_open(dbPath, &db), SQLITE_OK)
+        XCTAssertEqual(sqlite3_exec(db, "DROP TABLE conversation_summaries", nil, nil, nil), SQLITE_OK)
+        sqlite3_close(db)
+
+        let recovered = await scanner.scanAntigravity(dbPath: dbPath, brainDir: brainDir)
+        XCTAssertEqual(Set(recovered.map(\.id)), Set(original.map(\.id)))
+    }
+
+    func testAntigravitySummaryOnlySessionsWithSameTimestampKeepTheirIdentity() async throws {
+        let tempDir = makeTempDir()
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+        let dbPath = tempDir.appendingPathComponent("conversation_summaries.db").path
+        let brainDir = tempDir.appendingPathComponent("brain")
+        createMockAntigravityDB(at: dbPath)
+        var db: OpaquePointer?
+        XCTAssertEqual(sqlite3_open(dbPath, &db), SQLITE_OK)
+        XCTAssertEqual(sqlite3_exec(db, "UPDATE conversation_summaries SET last_modified_time = '2026-10-09T10:00:00Z'", nil, nil, nil), SQLITE_OK)
+        sqlite3_close(db)
+        let index = AgentHistoryFTSIndex(dbPath: tempDir.appendingPathComponent("history.sqlite").path)
+        let scanner = AgentHistoryScanner(ftsIndex: index)
+        let initial = await scanner.scanAntigravity(dbPath: dbPath, brainDir: brainDir)
+        let repeated = await scanner.scanAntigravity(dbPath: dbPath, brainDir: brainDir)
+        XCTAssertEqual(Set(initial.map(\.id)).count, initial.count)
+        XCTAssertEqual(Set(repeated.map(\.id)), Set(initial.map(\.id)))
+    }
+
+    func testAntigravityEmptyDatabaseDoesNotRestoreStaleSessions() async throws {
+        let tempDir = makeTempDir()
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+        let dbPath = tempDir.appendingPathComponent("conversation_summaries.db").path
+        let brainDir = tempDir.appendingPathComponent("brain")
+        createMockAntigravityDB(at: dbPath)
+        let index = AgentHistoryFTSIndex(dbPath: tempDir.appendingPathComponent("history.sqlite").path)
+        let scanner = AgentHistoryScanner(ftsIndex: index)
+        let original = await scanner.scanAntigravity(dbPath: dbPath, brainDir: brainDir)
+        XCTAssertFalse(original.isEmpty)
+        var db: OpaquePointer?
+        XCTAssertEqual(sqlite3_open(dbPath, &db), SQLITE_OK)
+        XCTAssertEqual(sqlite3_exec(db, "DELETE FROM conversation_summaries", nil, nil, nil), SQLITE_OK)
+        sqlite3_close(db)
+        let empty = await scanner.scanAntigravity(dbPath: dbPath, brainDir: brainDir)
+        XCTAssertTrue(empty.isEmpty)
+    }
+
+    #endif
+
     // MARK: - [TS-P55-001] Read Antigravity & Filter Subagents
 
     func testAntigravityReadsSummaryDBAndFiltersSubagents() async throws {

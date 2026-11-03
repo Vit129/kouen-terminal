@@ -1087,7 +1087,7 @@ public actor AgentHistoryScanner {
         ftsIndex: AgentHistoryFTSIndex? = nil
     ) -> [AgentSessionRecord] {
         var dummy: [String: FileCacheEntry] = [:]
-        return readAntigravitySummaries(dbPath: dbPath, brainDir: brainDir, ftsIndex: ftsIndex, fileCache: &dummy)
+        return readAntigravitySummaries(dbPath: dbPath, brainDir: brainDir, ftsIndex: ftsIndex, fileCache: &dummy) ?? []
     }
 
     static func readAntigravitySummaries(
@@ -1095,10 +1095,11 @@ public actor AgentHistoryScanner {
         brainDir: URL,
         ftsIndex: AgentHistoryFTSIndex? = nil,
         fileCache: inout [String: FileCacheEntry]
-    ) -> [AgentSessionRecord] {
+    ) -> [AgentSessionRecord]? {
         var db: OpaquePointer?
         guard sqlite3_open_v2(dbPath, &db, SQLITE_OPEN_READONLY, nil) == SQLITE_OK, let db else {
-            return []
+            if let db { sqlite3_close(db) }
+            return nil
         }
         defer { sqlite3_close(db) }
         // agy writes this db while it runs; without a busy timeout a read that lands mid-write fails
@@ -1114,14 +1115,16 @@ public actor AgentHistoryScanner {
         WHERE parent_conversation_id = '' OR parent_conversation_id IS NULL
         ORDER BY last_modified_time DESC;
         """
-        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else { return [] }
+        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else { return nil }
         defer { sqlite3_finalize(stmt) }
 
         var records: [AgentSessionRecord] = []
         var toSave: [CachedSessionEntry] = []
         var toIndex: [AgentHistoryFTSIndex.SessionIndexItem] = []
 
-        while sqlite3_step(stmt) == SQLITE_ROW {
+        var stepResult = sqlite3_step(stmt)
+        while stepResult == SQLITE_ROW {
+            defer { stepResult = sqlite3_step(stmt) }
             guard let convIDCStr = sqlite3_column_text(stmt, 0) else { continue }
             let conversationID = String(cString: convIDCStr)
             let title = sqlite3_column_text(stmt, 1).map { String(cString: $0) } ?? ""
@@ -1156,6 +1159,7 @@ public actor AgentHistoryScanner {
             }
 
             if let cached = fileCache[transcriptPath],
+               cached.record.id == conversationID,
                cached.mtime == modDate && cached.size == fileSize {
                 if let ftsIndex = ftsIndex {
                     if !ftsIndex.needsReindex(sessionID: conversationID, mtime: modDate, fileSize: fileSize) {
@@ -1249,6 +1253,8 @@ public actor AgentHistoryScanner {
             toSave.append(CachedSessionEntry(record: record, mtime: modDate, fileSize: fileSize))
         }
 
+        // A partial or failed read must not be treated as an authoritative empty scan.
+        guard stepResult == SQLITE_DONE else { return nil }
         if !toIndex.isEmpty {
             ftsIndex?.indexSessionsBatch(toIndex)
         }
@@ -1270,7 +1276,7 @@ public actor AgentHistoryScanner {
         brainDir: URL,
         ftsIndex: AgentHistoryFTSIndex? = nil,
         fileCache: inout [String: FileCacheEntry]
-    ) -> [AgentSessionRecord] { [] }
+    ) -> [AgentSessionRecord]? { nil }
     #endif
 
     public func scanAntigravity() async -> [AgentSessionRecord] {
@@ -1278,8 +1284,16 @@ public actor AgentHistoryScanner {
         let brainDir = home.appendingPathComponent(".gemini/antigravity-cli/brain")
         let dbPath = home.appendingPathComponent(".gemini/antigravity-cli/conversation_summaries.db").path
 
+        return scanAntigravity(dbPath: dbPath, brainDir: brainDir)
+    }
+
+    func scanAntigravity(dbPath: String, brainDir: URL) -> [AgentSessionRecord] {
         if FileManager.default.fileExists(atPath: dbPath) {
-            return Self.readAntigravitySummaries(dbPath: dbPath, brainDir: brainDir, ftsIndex: ftsIndex, fileCache: &fileCache)
+            if let records = Self.readAntigravitySummaries(dbPath: dbPath, brainDir: brainDir, ftsIndex: ftsIndex, fileCache: &fileCache) {
+                return records
+            }
+            // A locked or temporarily unreadable vendor DB must not erase history on refresh.
+            return ftsIndex.loadCachedEntries().map(\.record).filter { $0.agentKind == .antigravity }
         }
 
         guard FileManager.default.fileExists(atPath: brainDir.path) else { return [] }

@@ -12,19 +12,26 @@ public enum AgentHistorySearch {
         public let snippet: String?
         public let matchLocation: AgentSessionRecord.MatchLocationInfo?
         public let isSemanticMatch: Bool
+        /// Indexed file and tool metadata that actually matched a query term.
+        public let fileEvidence: String?
+        public let toolEvidence: String?
 
         public init(
             record: AgentSessionRecord,
             score: Double,
             snippet: String?,
             matchLocation: AgentSessionRecord.MatchLocationInfo? = nil,
-            isSemanticMatch: Bool = false
+            isSemanticMatch: Bool = false,
+            fileEvidence: String? = nil,
+            toolEvidence: String? = nil
         ) {
             self.record = record
             self.score = score
             self.snippet = snippet
             self.matchLocation = matchLocation ?? record.matchLocation(for: snippet ?? "")
             self.isSemanticMatch = isSemanticMatch
+            self.fileEvidence = fileEvidence
+            self.toolEvidence = toolEvidence
         }
     }
 
@@ -103,8 +110,32 @@ public enum AgentHistorySearch {
         // For standard alphanumeric queries, try fast SQLite FTS5 search first.
         // For non-segmented scripts (Thai), standard FTS tokenizer does not segment words,
         // so we route directly to Swift ranker with full substring coverage.
-        let ftsMatches = isNonSegmented ? [] : index.searchRanked(query: query, limit: ftsLimit, includeSnippet: false)
+        // The index spans all repositories. Limit after scoping, never before: a global
+        // candidate cap can otherwise exclude every match from the selected repository.
+        let ftsMatches = isNonSegmented
+            ? index.searchSubstring(query: query, includeEvidence: false)
+            : index.searchRanked(query: query, limit: -1, includeMetadata: false)
         if !ftsMatches.isEmpty {
+            var allTokenIDs = (isNonSegmented || matcher.tokens.count == 1)
+                ? Set(ftsMatches.map(\.sessionID))
+                : Set(index.searchRanked(query: query, limit: -1, requireAllTokens: true, includeMetadata: false).map(\.sessionID))
+            // Only non-indexed title/branch candidates need the in-memory coverage pass;
+            // indexed candidates already have the authoritative FTS AND result.
+            let indexedIDs = Set(ftsMatches.map(\.sessionID))
+            for record in records where !indexedIDs.contains(record.id) && !matcher.tokens.isEmpty {
+                let hasCandidate = matcher.tokens.contains { token in
+                    record.title.range(of: token, options: .caseInsensitive) != nil ||
+                        (record.gitBranch?.range(of: token, options: .caseInsensitive) != nil)
+                }
+                guard hasCandidate else { continue }
+                let fields = SearchMatcher.normalized(
+                    "\(record.title) \(record.gitBranch ?? "") \(record.projectName) \(record.firstPrompt) "
+                    + record.latestTurns.map(\.content).joined(separator: " ")
+                )
+                if matcher.tokens.allSatisfy({ SearchMatcher.tokenHits($0, inNormalized: fields) }) {
+                    allTokenIDs.insert(record.id)
+                }
+            }
             var recordMap: [String: AgentSessionRecord] = [:]
             recordMap.reserveCapacity(records.count)
             for r in records {
@@ -121,7 +152,11 @@ public enum AgentHistorySearch {
                 // FTS5 bm25 rank is negative (more negative = better match).
                 let score = -match.rank
                 let snippet = match.snippet.isEmpty ? nil : match.snippet
-                hits.append(Hit(record: record, score: score, snippet: snippet, matchLocation: record.matchLocation(for: query), isSemanticMatch: false))
+                hits.append(Hit(
+                    record: record, score: score, snippet: snippet, matchLocation: record.matchLocation(for: query),
+                    fileEvidence: metadataEvidence(match.filesEdited, matcher: matcher),
+                    toolEvidence: metadataEvidence(match.toolsCalled, matcher: matcher)
+                ))
             }
 
             // Check for unindexed records in `records` (regardless of records.count limit)
@@ -148,11 +183,24 @@ public enum AgentHistorySearch {
             }
 
             hits.sort { lhs, rhs in
+                let lhsExact = exactMetadataMatch(lhs.record, query: matcher.wholeQuery)
+                let rhsExact = exactMetadataMatch(rhs.record, query: matcher.wholeQuery)
+                if lhsExact != rhsExact { return lhsExact }
+                let lhsAll = allTokenIDs.contains(lhs.record.id)
+                let rhsAll = allTokenIDs.contains(rhs.record.id)
+                if lhsAll != rhsAll { return lhsAll }
                 if abs(lhs.score - rhs.score) > 1e-9 { return lhs.score > rhs.score }
                 return lhs.record.updatedAt > rhs.record.updatedAt
             }
             if !hits.isEmpty {
-                return hits
+                // SQLite transcript snippets and indexed metadata are costly to decode.
+                // Rank and scope first, then fetch only the initially visible batch.
+                let initialIDs = Array(hits.prefix(50).map { $0.record.id })
+                let evidence = indexedEvidence(query: query, ids: initialIDs, index: index)
+                return hits.map { hit in
+                    guard let match = evidence[hit.record.id] else { return hit }
+                    return hitWithEvidence(hit, match: match, matcher: matcher)
+                }
             }
         }
 
@@ -162,6 +210,46 @@ public enum AgentHistorySearch {
             return semanticSearchFallback(query: query, records: records)
         }
         return fallbackHits
+    }
+
+    /// Fetch evidence for a row that entered the viewport after the initial batch.
+    /// Call off the main thread; nil means no indexed content/file/tool evidence exists.
+    public static func evidence(query: String, record: AgentSessionRecord, index: AgentHistoryFTSIndex = .shared) -> Hit? {
+        let matcher = SearchMatcher(query: query)
+        guard matcher.hasQuery, let match = indexedEvidence(query: query, ids: [record.id], index: index)[record.id] else { return nil }
+        let base = Hit(record: record, score: 0, snippet: nil)
+        let hit = hitWithEvidence(base, match: match, matcher: matcher)
+        guard hit.snippet != nil || hit.fileEvidence != nil || hit.toolEvidence != nil else { return nil }
+        return hit
+    }
+
+    private static func indexedEvidence(query: String, ids: [String], index: AgentHistoryFTSIndex) -> [String: AgentHistoryFTSMatch] {
+        guard !ids.isEmpty else { return [:] }
+        let matches = containsNonSegmentedScript(query)
+            ? index.searchSubstring(query: query, matchingIDs: ids)
+            : index.searchRanked(query: query, limit: -1, includeSnippet: true, matchingIDs: ids)
+        return Dictionary(matches.map { ($0.sessionID, $0) }, uniquingKeysWith: { first, _ in first })
+    }
+
+    private static func hitWithEvidence(_ hit: Hit, match: AgentHistoryFTSMatch, matcher: SearchMatcher) -> Hit {
+        Hit(record: hit.record, score: hit.score,
+            snippet: match.snippet.isEmpty ? nil : match.snippet,
+            matchLocation: hit.matchLocation, isSemanticMatch: hit.isSemanticMatch,
+            fileEvidence: metadataEvidence(match.filesEdited, matcher: matcher),
+            toolEvidence: metadataEvidence(match.toolsCalled, matcher: matcher))
+    }
+
+    private static func metadataEvidence(_ value: String, matcher: SearchMatcher) -> String? {
+        guard !value.isEmpty,
+              let term = matcher.tokens.first(where: { value.range(of: $0, options: [.caseInsensitive, .diacriticInsensitive]) != nil })
+        else { return nil }
+        return matcher.extractSnippet(from: value, targetQuery: term, maxChars: 160)
+    }
+
+    private static func exactMetadataMatch(_ record: AgentSessionRecord, query: String) -> Bool {
+        guard !query.isEmpty else { return false }
+        return SearchMatcher.normalized(record.title).contains(query)
+            || SearchMatcher.normalized(record.gitBranch ?? "").contains(query)
     }
 
     /// Swift-side scoring fallback using IDFCache and typo tolerance.
@@ -297,11 +385,16 @@ public enum AgentHistorySearch {
                 score: score,
                 snippet: match.snippet ?? ftsMatch?.snippet,
                 matchLocation: record.matchLocation(for: query),
-                isSemanticMatch: false
+                isSemanticMatch: false,
+                fileEvidence: ftsMatch.flatMap { metadataEvidence($0.filesEdited, matcher: matcher) },
+                toolEvidence: ftsMatch.flatMap { metadataEvidence($0.toolsCalled, matcher: matcher) }
             ))
         }
 
         hits.sort { lhs, rhs in
+            let lhsExact = exactMetadataMatch(lhs.record, query: matcher.wholeQuery)
+            let rhsExact = exactMetadataMatch(rhs.record, query: matcher.wholeQuery)
+            if lhsExact != rhsExact { return lhsExact }
             if abs(lhs.score - rhs.score) > 0.001 { return lhs.score > rhs.score }
             return lhs.record.updatedAt > rhs.record.updatedAt
         }

@@ -241,7 +241,7 @@ public struct AgentSessionHistoryView: View {
     private var subHeaderView: some View {
         let c = KouenDesign.chrome
         HStack(alignment: .center) {
-            Text("\(model.windowedRecords.count) shown · \(model.records.count) recent")
+            Text(model.isLoading ? "Scanning history… results may be incomplete" : model.isSearching ? "Searching…" : "\(model.windowedRecords.count) shown · \(model.records.count) recent")
                 .font(.system(size: 10))
                 .foregroundStyle(Color(nsColor: c.textTertiary))
             Spacer()
@@ -305,7 +305,7 @@ public struct AgentSessionHistoryView: View {
     private var footerView: some View {
         let c = KouenDesign.chrome
         let totalCount = model.displayRecords.count
-        let repoSuffix = (model.selectedScope == .all || !model.searchQuery.isEmpty) ? " · all repos" : ""
+        let repoSuffix = model.selectedScope == .all ? " · all repos" : ""
         let countText = "\(totalCount) session\(totalCount == 1 ? "" : "s")\(repoSuffix)"
 
         HStack {
@@ -553,23 +553,19 @@ public struct AgentSessionHistoryView: View {
                             Spacer(minLength: 0)
                         }
 
-                        // Content snippet if matching query
-                        if let snippet = model.matchSnippet(for: record) {
-                            HStack(alignment: .top, spacing: 4) {
-                                Image(systemName: "text.magnifyingglass")
-                                    .font(.system(size: 8))
-                                    .foregroundStyle(Color.accentColor)
-                                highlightedText(
-                                    snippet,
-                                    query: model.searchQuery,
-                                    baseColor: c.textSecondary,
-                                    highlightColor: NSColor.controlAccentColor,
-                                    fontSize: 9,
-                                    weight: .regular
-                                )
-                                .lineLimit(1)
-                            }
-                            .padding(.top, 1)
+                        HistorySearchEvidence(
+                            query: model.searchQuery,
+                            title: record.title,
+                            branch: record.gitBranch,
+                            repo: record.projectName,
+                            agent: record.agentKind.displayName,
+                            file: model.matchMetadata(for: record, field: "File"),
+                            tool: model.matchMetadata(for: record, field: "Tool"),
+                            snippet: model.matchSnippet(for: record),
+                            isSemantic: model.isSemanticMatch(for: record)
+                        )
+                        .task(id: "\(record.id):\(model.searchQuery)") {
+                            await model.loadEvidence(for: record)
                         }
                     }
                 }
