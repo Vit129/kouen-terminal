@@ -119,6 +119,7 @@ public final class AgentSessionHistoryModel: ObservableObject {
     @Published public var expandedSessionIDs: Set<String> = []
     @Published public var collapsedSections: Set<String> = []
     @Published public var isLoading: Bool = false
+    @Published public private(set) var isSearching: Bool = false
     @Published public private(set) var selectedRecordID: String?
 
     /// How many records beyond the default 14-day window are currently revealed via "Load More".
@@ -134,6 +135,8 @@ public final class AgentSessionHistoryModel: ObservableObject {
 
     /// Snippets extracted during search scoring, keyed by session id.
     private var searchSnippets: [String: String] = [:]
+    private var searchMetadata: [String: [String: String]] = [:]
+    private var hydratedEvidenceIDs: Set<String> = []
     /// Match locations extracted during search scoring, keyed by session id.
     private var searchMatchLocations: [String: AgentSessionRecord.MatchLocationInfo] = [:]
     /// Set of session IDs that were matched via semantic search fallback.
@@ -224,7 +227,7 @@ public final class AgentSessionHistoryModel: ObservableObject {
     public var availableAgentKinds: [AgentKind] {
         let distinct = Set(records.map(\.agentKind))
         let canonical: [AgentKind] = [.claudeCode, .codex, .copilot, .antigravity]
-        var result = canonical.filter { distinct.contains($0) }
+        var result = canonical.filter { distinct.contains($0) || $0 == .antigravity }
         for kind in distinct where !canonical.contains(kind) {
             result.append(kind)
         }
@@ -307,7 +310,8 @@ public final class AgentSessionHistoryModel: ObservableObject {
             rawWindowed = Array(list.prefix(visibleCount))
         }
 
-        let windowed = Self.groupCrossRepoTasks(rawWindowed)
+        // Search results must remain individual: grouping can hide the actual matching session.
+        let windowed = searchQuery.isEmpty ? Self.groupCrossRepoTasks(rawWindowed) : rawWindowed
         cachedWindowedRecords = windowed
 
         let grouped: [(title: String, records: [AgentSessionRecord])]
@@ -365,8 +369,9 @@ public final class AgentSessionHistoryModel: ObservableObject {
     public func applyFilterNow() {
         filterTask?.cancel()
         filterTask = nil
+        isSearching = false
         let state = historySignposter.beginInterval("applyFilterNow")
-        let (filtered, newCache, snippets, matchLocations, semanticIDs) = Self.computeFiltered(
+        let (filtered, newCache, snippets, matchLocations, semanticIDs, metadata, hydratedIDs) = Self.computeFiltered(
             query: searchQuery,
             scope: selectedScope,
             selectedAgents: selectedAgents,
@@ -378,6 +383,8 @@ public final class AgentSessionHistoryModel: ObservableObject {
         historySignposter.endInterval("applyFilterNow", state)
         self.repoRootCache = newCache
         self.searchSnippets = snippets
+        self.searchMetadata = metadata
+        self.hydratedEvidenceIDs = hydratedIDs
         self.searchMatchLocations = matchLocations
         self.semanticMatchIDs = semanticIDs
         self.filteredRecords = filtered
@@ -389,6 +396,7 @@ public final class AgentSessionHistoryModel: ObservableObject {
         filterTask?.cancel()
 
         let currentQuery = searchQuery
+        isSearching = !currentQuery.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         let currentScope = selectedScope
         let currentAgents = selectedAgents
         let currentRecords = records
@@ -404,7 +412,7 @@ public final class AgentSessionHistoryModel: ObservableObject {
             if Task.isCancelled { return }
 
             let state = historySignposter.beginInterval("computeFiltered")
-            let (filtered, newCache, snippets, matchLocations, semanticIDs) = Self.computeFiltered(
+            let (filtered, newCache, snippets, matchLocations, semanticIDs, metadata, hydratedIDs) = Self.computeFiltered(
                 query: currentQuery,
                 scope: currentScope,
                 selectedAgents: currentAgents,
@@ -420,7 +428,10 @@ public final class AgentSessionHistoryModel: ObservableObject {
             await MainActor.run { [weak self] in
                 guard let self, !Task.isCancelled else { return }
                 self.repoRootCache = newCache
+                self.isSearching = false
                 self.searchSnippets = snippets
+                self.searchMetadata = metadata
+                self.hydratedEvidenceIDs = hydratedIDs
                 self.searchMatchLocations = matchLocations
                 self.semanticMatchIDs = semanticIDs
                 self.filteredRecords = filtered
@@ -441,7 +452,9 @@ public final class AgentSessionHistoryModel: ObservableObject {
         cache: [String: String],
         snippets: [String: String],
         matchLocations: [String: AgentSessionRecord.MatchLocationInfo],
-        semanticMatchIDs: Set<String>
+        semanticMatchIDs: Set<String>,
+        metadata: [String: [String: String]],
+        hydratedIDs: Set<String>
     ) {
         let baseRecords: [AgentSessionRecord]
         if selectedAgents.isEmpty {
@@ -463,16 +476,29 @@ public final class AgentSessionHistoryModel: ObservableObject {
             return root
         }
 
+        let activeRepoRoot = resolveRoot(for: activeCWD)
+        let scopedRecords = baseRecords.filter { record in
+            guard scope == .repo, !activeRepoRoot.isEmpty else { return true }
+            if record.projectPath == activeRepoRoot || record.projectPath.hasPrefix(activeRepoRoot + "/") {
+                return true
+            }
+            return resolveRoot(for: record.projectPath) == activeRepoRoot
+        }
         let matcher = SearchMatcher(query: query)
 
-        // 1. When search query is active, ignore scope entirely and search all records using ranked search
+        // Search respects the same repo and agent filters as the unfiltered list.
         if matcher.hasQuery {
-            let hits = AgentHistorySearch.rank(query: query, records: baseRecords)
+            let hits = AgentHistorySearch.rank(query: query, records: scopedRecords)
             var snippets: [String: String] = [:]
             var matchLocations: [String: AgentSessionRecord.MatchLocationInfo] = [:]
             var semanticMatchIDs = Set<String>()
+            var metadata: [String: [String: String]] = [:]
 
             for hit in hits {
+                var fields: [String: String] = [:]
+                fields["File"] = hit.fileEvidence
+                fields["Tool"] = hit.toolEvidence
+                if !fields.isEmpty { metadata[hit.record.id] = fields }
                 if let loc = hit.matchLocation {
                     matchLocations[hit.record.id] = loc
                 }
@@ -481,52 +507,36 @@ public final class AgentSessionHistoryModel: ObservableObject {
                 }
             }
 
-            // Pre-extract snippets on the background thread for top visible results so UI render doesn't block MainActor
-            for hit in hits.prefix(50) {
-                if let snip = hit.snippet, !snip.isEmpty {
-                    snippets[hit.record.id] = snip
-                } else {
-                    let turnsContent = hit.record.latestTurns.map(\.content).joined(separator: "\n")
-                    let chatContent = "\(hit.record.firstPrompt)\n\(turnsContent)"
-                    let branchFiles = hit.record.gitBranch ?? ""
-                    let repoAgent = "\(hit.record.projectName) \(hit.record.agentKind.displayName)"
-                    if let match = matcher.matchHistory(
-                        title: hit.record.title,
-                        branchFilesTools: branchFiles,
-                        repoAgent: repoAgent,
-                        chatContent: chatContent
-                    ), let snippet = match.snippet {
-                        snippets[hit.record.id] = snippet
-                    }
+            // Keep indexed evidence for every result, including those below the first screen.
+            for hit in hits {
+                if let snippet = hit.snippet, !snippet.isEmpty {
+                    snippets[hit.record.id] = snippet
                 }
             }
-            return (hits.map(\.record), cache, snippets, matchLocations, semanticMatchIDs)
+            return (hits.map(\.record), cache, snippets, matchLocations, semanticMatchIDs, metadata, Set(hits.prefix(50).map { $0.record.id }))
         }
 
-        // 2. When search query is empty, apply the selected scope with cached repo roots
-        let activeRepoRoot = resolveRoot(for: activeCWD)
+        return (scopedRecords, cache, [:], [:], [], [:], [])
+    }
 
-        let filtered = baseRecords.filter { record in
-            switch scope {
-            case .repo:
-                guard !activeRepoRoot.isEmpty else { return true }
-                if record.projectPath == activeRepoRoot ||
-                   record.projectPath.hasPrefix(activeRepoRoot + "/") {
-                    return true
-                }
-                let recordRepoRoot = resolveRoot(for: record.projectPath)
-                if recordRepoRoot == activeRepoRoot {
-                    return true
-                }
-                if record.projectPath.hasPrefix(activeRepoRoot) || activeRepoRoot.hasPrefix(record.projectPath) {
-                    return true
-                }
-                return false
-            case .all:
-                return true
-            }
-        }
-        return (filtered, cache, [:], [:], [])
+    /// Fetch evidence only when a result outside the initial screen becomes visible.
+    public func loadEvidence(for record: AgentSessionRecord) async {
+        let query = searchQuery
+        guard !query.isEmpty, hydratedEvidenceIDs.insert(record.id).inserted else { return }
+        let hit = await Task.detached(priority: .userInitiated) {
+            AgentHistorySearch.evidence(query: query, record: record)
+        }.value
+        guard searchQuery == query, let hit else { return }
+        objectWillChange.send()
+        if let snippet = hit.snippet { searchSnippets[record.id] = snippet }
+        var fields: [String: String] = [:]
+        fields["File"] = hit.fileEvidence
+        fields["Tool"] = hit.toolEvidence
+        if !fields.isEmpty { searchMetadata[record.id] = fields }
+    }
+
+    public func matchMetadata(for record: AgentSessionRecord, field: String) -> String? {
+        searchMetadata[record.id]?[field]
     }
 
     /// Match location info (e.g. "late in session · turn 42/50") for active query (O(1) dictionary read).
@@ -548,15 +558,7 @@ public final class AgentSessionHistoryModel: ObservableObject {
         guard matcher.hasQuery else { return nil }
         let turnsContent = record.latestTurns.map(\.content).joined(separator: "\n")
         let chatContent = "\(record.firstPrompt)\n\(turnsContent)"
-        let branchFiles = record.gitBranch ?? ""
-        let repoAgent = "\(record.projectName) \(record.agentKind.displayName)"
-
-        let match = matcher.matchHistory(
-            title: record.title,
-            branchFilesTools: branchFiles,
-            repoAgent: repoAgent,
-            chatContent: chatContent
-        )
+        let match = matcher.matchHistory(title: "", chatContent: chatContent)
         let snippet = match?.snippet ?? ""
         searchSnippets[record.id] = snippet
         return snippet.isEmpty ? nil : snippet

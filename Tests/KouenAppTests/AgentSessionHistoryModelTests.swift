@@ -50,7 +50,7 @@ final class AgentSessionHistoryModelTests: XCTestCase {
         XCTAssertEqual(AgentHistoryDateGroup.group(for: twoWeeksAgo, relativeTo: now), .older)
     }
 
-    func testSearchQueryIgnoresScopeAndWindow() {
+    func testSearchQueryFindsOlderSessionsInAllRepos() {
         let calendar = Calendar.current
         let now = Date()
         let oldDate = calendar.date(byAdding: .day, value: -30, to: now)!
@@ -60,10 +60,9 @@ final class AgentSessionHistoryModelTests: XCTestCase {
 
         let model = AgentSessionHistoryModel()
         model.records = [r1, r2]
-        model.selectedScope = .repo
+        model.selectedScope = .all
 
-        // Empty query with .repo scope filters out /repo/two if active repo doesn't match
-        // But when searching for "older", it matches r2 regardless of scope AND 14-day cutoff
+        // Searching includes sessions older than the normal recent window.
         model.searchQuery = "older"
         model.applyFilterNow()
         XCTAssertEqual(model.filteredRecords.count, 1)
@@ -71,6 +70,33 @@ final class AgentSessionHistoryModelTests: XCTestCase {
         XCTAssertEqual(model.windowedRecords.count, 1)
         XCTAssertEqual(model.groupedRecords.first?.title, "Best matches")
         XCTAssertEqual(model.groupedRecords.first?.records.count, 1)
+    }
+
+    func testSearchHonorsSelectedRepositoryAndFindsOldSessions() {
+        let old = Date(timeIntervalSince1970: 1)
+        let own = makeRecord(id: "own", title: "sprint report", projectPath: "/repo/one", projectName: "one", updatedAt: old)
+        let other = makeRecord(id: "other", title: "sprint report", projectPath: "/repo/two", projectName: "two")
+        let resolver: @Sendable (String) -> String? = { $0 }
+        let scoped = AgentSessionHistoryModel.computeFiltered(
+            query: "sprint", scope: .repo, records: [own, other], activeCWD: "/repo/one",
+            resolver: resolver, initialCache: [:])
+        XCTAssertEqual(scoped.filtered.map(\.id), ["own"])
+        let all = AgentSessionHistoryModel.computeFiltered(
+            query: "sprint", scope: .all, records: [own, other], activeCWD: "/repo/one",
+            resolver: resolver, initialCache: [:])
+        XCTAssertEqual(Set(all.filtered.map(\.id)), Set(["own", "other"]))
+    }
+
+    func testSearchingDoesNotCollapseMatchingSessionsAcrossRepos() {
+        let first = makeRecord(id: "search-a", title: "first", projectPath: "/one", projectName: "one", gitBranch: "refactor/logic-structure")
+        let second = makeRecord(id: "search-b", title: "second", projectPath: "/two", projectName: "two", gitBranch: "refactor/logic-structure")
+        let model = AgentSessionHistoryModel()
+        model.records = [first, second]
+        model.selectedScope = .all
+        model.searchQuery = "refactor/logic-structure"
+        model.applyFilterNow()
+        XCTAssertEqual(Set(model.windowedRecords.map(\.id)), Set(["search-a", "search-b"]))
+        XCTAssertTrue(model.windowedRecords.allSatisfy { $0.crossRepoSiblings == nil })
     }
 
     func testEmptyQueryGroupsByDate() {
@@ -237,6 +263,12 @@ final class AgentSessionHistoryModelTests: XCTestCase {
         let exactResolved = KouenSidebarPanelViewController.resolveTargetTab(for: exactRecord, in: snapshotWithExact)
         XCTAssertNotNil(exactResolved)
         XCTAssertEqual(exactResolved.map(\.tabID), tabWithID.id)
+    }
+
+    func testAntigravityFilterRemainsAvailableWhenNoSessionsLoaded() {
+        let model = AgentSessionHistoryModel()
+        model.records = [makeRecord(id: "claude", title: "Task", agentKind: .claudeCode)]
+        XCTAssertTrue(model.availableAgentKinds.contains(.antigravity))
     }
 
     func testAgentKindFilter() {

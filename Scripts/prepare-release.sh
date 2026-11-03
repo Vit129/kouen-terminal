@@ -171,8 +171,15 @@ if [[ -z "$build" ]]; then
     build="$next_build"
     echo "Auto-yes / CI mode: defaulting build number to $build."
   elif [[ -t 0 ]]; then
-    read -erp "Build number for $version [$next_build]: " build_input
-    build="${build_input:-$next_build}"
+    while true; do
+      read -erp "Build number for $version [$next_build] (Enter keeps default): " build_input
+      build="${build_input:-$next_build}"
+      if [[ "$build" =~ ^[0-9]+$ ]]; then
+        break
+      fi
+      echo "Build number must be numeric. Enter a number or press Enter for $next_build."
+      echo "Pass the commit message earlier with: make start patch msg=\"fix: ...\""
+    done
   else
     build="$next_build"
     echo "No TTY available; defaulting build number to $build."
@@ -223,7 +230,7 @@ if [[ "$cl_version" != "$version" ]]; then
     if ! grep -q '^- ' "$tmp_block"; then
       rm -f "$tmp_block"
       echo "error: no feat/fix/refactor/perf/docs commits since the last tag, so v$version has no release notes." >&2
-      echo "Commit the work first, or pass a commit message of one of those types. Nothing was changed." >&2
+      echo "Pass a release-note commit message with -m or make start patch msg=\"fix: ...\". Nothing was changed." >&2
       exit 1
     fi
   else

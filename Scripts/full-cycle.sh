@@ -102,11 +102,21 @@ rollback_version_bump() {
     CHANGELOG.md
 }
 
-# Ask now rather than at commit time: the release notes are built from this message before
-# the commit exists, and without one the work would be committed as a skipped chore(release).
-if [[ -z "$COMMIT_MSG" && "$NO_BUMP" -eq 0 && "$AUTO_YES" -eq 0 && -t 0 ]] \
+# Ask before build/version preparation: the release notes and release commit both use this
+# message. Do not let an empty answer fall through to a later, confusing changelog failure.
+if [[ -z "$COMMIT_MSG" && "$NO_BUMP" -eq 0 ]] \
   && [[ -n "$(git status --porcelain -- ':!graphify-out')" ]]; then
-  read -erp "Commit message for uncommitted work (e.g. fix: ...): " COMMIT_MSG
+  if [[ "$AUTO_YES" -eq 1 || ! -t 0 ]]; then
+    echo "❌ A commit message is required for uncommitted release work." >&2
+    echo "Use: make start patch msg=\"fix: ...\"" >&2
+    exit 2
+  fi
+  while [[ -z "$COMMIT_MSG" ]]; do
+    read -erp "Commit message for uncommitted work (e.g. fix: ...): " COMMIT_MSG
+    if [[ -z "$COMMIT_MSG" ]]; then
+      echo "Commit message cannot be empty; it is needed for the release notes."
+    fi
+  done
 fi
 
 # Step 1: Pre-build verification — catch compile errors BEFORE bumping version.

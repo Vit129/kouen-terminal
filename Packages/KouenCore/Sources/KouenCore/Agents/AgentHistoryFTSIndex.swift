@@ -635,7 +635,8 @@ public final class AgentHistoryFTSIndex: @unchecked Sendable {
 
     /// Searches the FTS5 index for sessions matching query tokens, ranked using bm25() with column weights.
     /// Returns array of matches ordered by bm25 rank (best first).
-    public func searchRanked(query: String, limit: Int = 200, includeSnippet: Bool = false) -> [AgentHistoryFTSMatch] {
+    public func searchRanked(query: String, limit: Int = 200, includeSnippet: Bool = false, requireAllTokens: Bool = false, includeMetadata: Bool = true, matchingIDs: [String]? = nil) -> [AgentHistoryFTSMatch] {
+        if let matchingIDs, matchingIDs.isEmpty { return [] }
         lock.lock()
         defer { lock.unlock() }
         guard let db else { return [] }
@@ -651,7 +652,7 @@ public final class AgentHistoryFTSIndex: @unchecked Sendable {
         let ftsQuery = rawTokens.map { token in
             let escaped = token.replacingOccurrences(of: "\"", with: "\"\"")
             return "\"\(escaped)\"*"
-        }.joined(separator: " OR ")
+        }.joined(separator: requireAllTokens ? " AND " : " OR ")
 
         // Column weights matching Swift field weights:
         // 0: session_id UNINDEXED = 0.0
@@ -663,26 +664,20 @@ public final class AgentHistoryFTSIndex: @unchecked Sendable {
         // 6: agent = 1.5
         // 7: files_edited = 2.5
         // 8: tools_called = 2.5
-        let sql = includeSnippet ? """
-        SELECT session_id,
-               snippet(session_fts, 3, '', '', '...', 15),
+        let snippetColumn = includeSnippet ? "snippet(session_fts, 3, char(1), char(2), '...', 24)" : "''"
+        let fileColumn = includeMetadata ? "files_edited" : "''"
+        let toolColumn = includeMetadata ? "tools_called" : "''"
+        let scope = matchingIDs.map { ids in
+            " AND session_id IN (" + ids.indices.map { "?\($0 + 3)" }.joined(separator: ",") + ")"
+        } ?? ""
+        let sql = """
+        SELECT session_id, \(snippetColumn),
                bm25(session_fts, 0.0, 3.0, 1.0, 1.0, 2.5, 1.5, 1.5, 2.5, 2.5) AS weighted_rank,
-               files_edited,
-               tools_called
+               \(fileColumn), \(toolColumn)
         FROM session_fts
-        WHERE session_fts MATCH ?
+        WHERE session_fts MATCH ?1\(scope)
         ORDER BY weighted_rank ASC
-        LIMIT ?;
-        """ : """
-        SELECT session_id,
-               '' AS snippet,
-               bm25(session_fts, 0.0, 3.0, 1.0, 1.0, 2.5, 1.5, 1.5, 2.5, 2.5) AS weighted_rank,
-               files_edited,
-               tools_called
-        FROM session_fts
-        WHERE session_fts MATCH ?
-        ORDER BY weighted_rank ASC
-        LIMIT ?;
+        LIMIT ?2;
         """
         var stmt: OpaquePointer?
         guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else { return [] }
@@ -690,12 +685,20 @@ public final class AgentHistoryFTSIndex: @unchecked Sendable {
 
         sqlite3_bind_text(stmt, 1, ftsQuery, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
         sqlite3_bind_int(stmt, 2, Int32(limit))
+        for (offset, id) in (matchingIDs ?? []).enumerated() {
+            sqlite3_bind_text(stmt, Int32(offset + 3), id, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
+        }
 
         var results: [AgentHistoryFTSMatch] = []
         while sqlite3_step(stmt) == SQLITE_ROW {
             guard let idCStr = sqlite3_column_text(stmt, 0) else { continue }
             let id = String(cString: idCStr)
-            let snippet = sqlite3_column_text(stmt, 1).map { String(cString: $0) } ?? ""
+            let rawSnippet = sqlite3_column_text(stmt, 1).map { String(cString: $0) } ?? ""
+            // FTS can return the beginning of a column even when the query matched only
+            // metadata. Never present that unrelated text as evidence for a match.
+            let snippet = rawSnippet.contains("\u{1}")
+                ? rawSnippet.replacingOccurrences(of: "\u{1}", with: "").replacingOccurrences(of: "\u{2}", with: "")
+                : ""
             let rank = sqlite3_column_double(stmt, 2)
             let filesEdited = sqlite3_column_text(stmt, 3).map { String(cString: $0) } ?? ""
             let toolsCalled = sqlite3_column_text(stmt, 4).map { String(cString: $0) } ?? ""
@@ -709,6 +712,57 @@ public final class AgentHistoryFTSIndex: @unchecked Sendable {
             ))
         }
         return results
+    }
+
+    /// FTS's unicode61 tokenizer does not segment Thai words. Search the indexed text
+    /// as a substring so a term inside a Thai sentence can still find old transcripts.
+    public func searchSubstring(query: String, includeEvidence: Bool = true, matchingIDs: [String]? = nil) -> [AgentHistoryFTSMatch] {
+        if let matchingIDs, matchingIDs.isEmpty { return [] }
+        let clean = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !clean.isEmpty else { return [] }
+        lock.lock()
+        defer { lock.unlock() }
+        guard let db else { return [] }
+        let snippetColumn = includeEvidence ? """
+          CASE WHEN instr(lower(full_transcript), lower(?1)) > 0
+            THEN substr(full_transcript, max(1, instr(lower(full_transcript), lower(?1)) - 80), 200)
+            ELSE '' END
+        """ : "''"
+        let fileColumn = includeEvidence ? "files_edited" : "''"
+        let toolColumn = includeEvidence ? "tools_called" : "''"
+        let scope = matchingIDs.map { ids in
+            " AND session_id IN (" + ids.indices.map { "?\($0 + 2)" }.joined(separator: ",") + ")"
+        } ?? ""
+        let sql = """
+        SELECT session_id, \(snippetColumn), \(fileColumn), \(toolColumn)
+        FROM session_fts
+        WHERE (instr(lower(title), lower(?1)) > 0
+           OR instr(lower(first_prompt), lower(?1)) > 0
+           OR instr(lower(full_transcript), lower(?1)) > 0
+           OR instr(lower(git_branch), lower(?1)) > 0
+           OR instr(lower(repo_name), lower(?1)) > 0
+           OR instr(lower(agent), lower(?1)) > 0
+           OR instr(lower(files_edited), lower(?1)) > 0
+           OR instr(lower(tools_called), lower(?1)) > 0)\(scope);
+        """
+        var stmt: OpaquePointer?
+        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else { return [] }
+        defer { sqlite3_finalize(stmt) }
+        sqlite3_bind_text(stmt, 1, clean, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
+        for (offset, id) in (matchingIDs ?? []).enumerated() {
+            sqlite3_bind_text(stmt, Int32(offset + 2), id, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
+        }
+        var matches: [AgentHistoryFTSMatch] = []
+        while sqlite3_step(stmt) == SQLITE_ROW {
+            guard let id = sqlite3_column_text(stmt, 0).map({ String(cString: $0) }) else { continue }
+            matches.append(AgentHistoryFTSMatch(
+                sessionID: id,
+                snippet: sqlite3_column_text(stmt, 1).map { String(cString: $0) } ?? "",
+                filesEdited: sqlite3_column_text(stmt, 2).map { String(cString: $0) } ?? "",
+                toolsCalled: sqlite3_column_text(stmt, 3).map { String(cString: $0) } ?? ""
+            ))
+        }
+        return matches
     }
 
     /// Searches the FTS5 index for sessions matching query tokens.
@@ -746,7 +800,8 @@ public final class AgentHistoryFTSIndex: @unchecked Sendable {
     public func loadCachedEntries() -> [CachedSessionEntry] { [] }
     public func pruneMissingSessions(validTranscriptPaths: Set<String>) {}
     public func deleteSession(sessionID: String) {}
-    public func searchRanked(query: String, limit: Int = 200, includeSnippet: Bool = false) -> [AgentHistoryFTSMatch] { [] }
+    public func searchRanked(query: String, limit: Int = 200, includeSnippet: Bool = false, requireAllTokens: Bool = false, includeMetadata: Bool = true, matchingIDs: [String]? = nil) -> [AgentHistoryFTSMatch] { [] }
+    public func searchSubstring(query: String, includeEvidence: Bool = true, matchingIDs: [String]? = nil) -> [AgentHistoryFTSMatch] { [] }
     public func search(query: String, limit: Int = 200) -> [String: AgentHistoryFTSMatch] { [:] }
     #endif
 }

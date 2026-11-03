@@ -16,6 +16,133 @@ final class AgentHistorySearchTests: XCTestCase {
         return (AgentHistoryFTSIndex(dbPath: url.path), url)
     }
 
+    func testExactBranchBeatsPartialMatchesEvenWhenFTSLimitIsSmall() {
+        let (index, url) = tempIndex()
+        defer { try? FileManager.default.removeItem(at: url) }
+        let branch = "refactor/sprint-report-logic-buckets"
+        let target = AgentSessionRecord(
+            id: "branch-target", agentKind: .claudeCode, title: "Old task",
+            projectPath: "/p/repo", projectName: "repo", gitBranch: branch,
+            messageCount: 1, updatedAt: Date.distantPast, firstPrompt: "",
+            transcriptPath: "/tmp/branch-target.jsonl", worktreeAvailable: false
+        )
+        let noise = record("noise", title: "refactor", project: "repo")
+        index.indexSession(sessionID: noise.id, title: noise.title, firstPrompt: "", fullTranscript: "refactor",
+                           gitBranch: "main", repoName: "repo", agentName: "Claude", filesEdited: "", toolsCalled: "",
+                           transcriptPath: noise.transcriptPath, mtime: Date(), fileSize: 1)
+        let hits = AgentHistorySearch.rank(query: branch, records: [noise, target], index: index, ftsLimit: 1)
+        XCTAssertEqual(hits.first?.record.id, target.id)
+    }
+
+    func testScopedSearchFindsDeepTranscriptDespiteMoreGlobalMatchesThanLimit() {
+        let (index, url) = tempIndex()
+        defer { try? FileManager.default.removeItem(at: url) }
+        for n in 0..<5 {
+            index.indexSession(
+                sessionID: "outside-\(n)", title: "deepseek", firstPrompt: "", fullTranscript: "deepseek",
+                gitBranch: "main", repoName: "elsewhere", agentName: "Claude", filesEdited: "", toolsCalled: "",
+                transcriptPath: "/tmp/outside-\(n)", mtime: Date(), fileSize: 1
+            )
+        }
+        index.indexSession(
+            sessionID: "inside", title: "Unrelated title", firstPrompt: "",
+            fullTranscript: String(repeating: "filler ", count: 200) + "worked with deepseek on the feature",
+            gitBranch: "main", repoName: "selected", agentName: "Claude", filesEdited: "", toolsCalled: "",
+            transcriptPath: "/tmp/inside", mtime: Date(), fileSize: 1
+        )
+        let hits = AgentHistorySearch.rank(query: "deepseek", records: [record("inside", title: "Unrelated title", project: "selected")], index: index, ftsLimit: 1)
+        XCTAssertEqual(hits.map(\.record.id), ["inside"])
+        XCTAssertTrue(hits.first?.snippet?.localizedCaseInsensitiveContains("deepseek") == true)
+    }
+
+    func testEvidenceAfterInitialBatchCanBeLoadedOnDemand() {
+        let (index, url) = tempIndex()
+        defer { try? FileManager.default.removeItem(at: url) }
+        var records: [AgentSessionRecord] = []
+        for n in 0..<55 {
+            let rec = record("later-\(n)", title: "Task \(n)", project: "repo", age: Double(n))
+            records.append(rec)
+            index.indexSession(
+                sessionID: rec.id, title: rec.title, firstPrompt: "", fullTranscript: "Working with deepseek on task \(n)",
+                gitBranch: "main", repoName: "repo", agentName: "Claude", filesEdited: "", toolsCalled: "",
+                transcriptPath: "/tmp/later-\(n)", mtime: Date(), fileSize: 1
+            )
+        }
+        let hits = AgentHistorySearch.rank(query: "deepseek", records: records, index: index)
+        XCTAssertEqual(hits.count, 55)
+        guard let later = hits.last else { return XCTFail("Expected later hit") }
+        XCTAssertNil(later.snippet)
+        let evidence = AgentHistorySearch.evidence(query: "deepseek", record: later.record, index: index)
+        XCTAssertTrue(evidence?.snippet?.contains("deepseek") == true)
+        XCTAssertNil(AgentHistorySearch.evidence(query: "nonexistent", record: later.record, index: index))
+    }
+
+    func testIndexedFileAndToolMatchesProvideTheirOwnEvidence() {
+        let (index, url) = tempIndex()
+        defer { try? FileManager.default.removeItem(at: url) }
+        let rec = record("metadata", title: "Work", project: "repo")
+        index.indexSession(
+            sessionID: rec.id, title: rec.title, firstPrompt: "", fullTranscript: "Unrelated conversation",
+            gitBranch: "main", repoName: "repo", agentName: "Claude",
+            filesEdited: "Sources/DeepSeekAdapter.swift", toolsCalled: "CustomSearchTool",
+            transcriptPath: "/tmp/metadata", mtime: Date(), fileSize: 1
+        )
+        let file = AgentHistorySearch.rank(query: "DeepSeekAdapter", records: [rec], index: index).first
+        XCTAssertTrue(file?.fileEvidence?.contains("DeepSeekAdapter.swift") == true)
+        XCTAssertNil(file?.toolEvidence)
+        XCTAssertNil(file?.snippet)
+        let tool = AgentHistorySearch.rank(query: "CustomSearchTool", records: [rec], index: index).first
+        XCTAssertEqual(tool?.toolEvidence, "CustomSearchTool")
+        XCTAssertNil(tool?.fileEvidence)
+        XCTAssertNil(tool?.snippet)
+    }
+
+    func testMetadataOnlyMatchDoesNotReturnUnrelatedTranscriptSnippet() {
+        let (index, url) = tempIndex()
+        defer { try? FileManager.default.removeItem(at: url) }
+        let branch = "refactor/logic-structure"
+        index.indexSession(
+            sessionID: "branch", title: "Work item", firstPrompt: "", fullTranscript: "Unrelated conversation",
+            gitBranch: branch, repoName: "repo", agentName: "Claude", filesEdited: "", toolsCalled: "",
+            transcriptPath: "/tmp/branch", mtime: Date(), fileSize: 1
+        )
+        let result = index.searchRanked(query: branch, includeSnippet: true)
+        XCTAssertEqual(result.first?.sessionID, "branch")
+        XCTAssertEqual(result.first?.snippet, "")
+    }
+
+    func testThaiSubstringFindsDeepTranscriptOutsideRecentTurns() {
+        let (index, url) = tempIndex()
+        defer { try? FileManager.default.removeItem(at: url) }
+        index.indexSession(
+            sessionID: "thai-deep", title: "Old conversation", firstPrompt: "",
+            fullTranscript: String(repeating: "filler ", count: 200) + "การทดสอบระบบและบันทึกข้อมูล",
+            gitBranch: "main", repoName: "repo", agentName: "Claude", filesEdited: "", toolsCalled: "",
+            transcriptPath: "/tmp/thai-deep", mtime: Date(), fileSize: 1
+        )
+        let hits = AgentHistorySearch.rank(query: "ทดสอบ", records: [record("thai-deep", title: "Old conversation", project: "repo")], index: index)
+        XCTAssertEqual(hits.map(\.record.id), ["thai-deep"])
+        XCTAssertTrue(hits.first?.snippet?.contains("ทดสอบ") == true)
+    }
+
+    func testLongQueryRanksAllWordsAboveSingleCommonWord() {
+        let (index, url) = tempIndex()
+        defer { try? FileManager.default.removeItem(at: url) }
+        let complete = record("long-complete", title: "Misc", project: "repo")
+        let partial = record("long-partial", title: "refactor", project: "repo")
+        for (item, body) in [(complete, "we need to refactor the payment export validation workflow"),
+                             (partial, "refactor unrelated menus")] {
+            index.indexSession(sessionID: item.id, title: item.title, firstPrompt: "", fullTranscript: body,
+                               gitBranch: "main", repoName: item.projectName, agentName: "Claude",
+                               filesEdited: "", toolsCalled: "", transcriptPath: item.transcriptPath,
+                               mtime: Date(), fileSize: 10)
+        }
+        let hits = AgentHistorySearch.rank(query: "refactor payment export validation workflow",
+                                           records: [partial, complete], index: index)
+        XCTAssertEqual(hits.first?.record.id, complete.id)
+        XCTAssertTrue(hits.first?.snippet?.contains("payment") == true)
+    }
+
     func testFindsSessionWhoseOnlyMatchIsDeepInTranscript() {
         let (index, url) = tempIndex()
         defer { try? FileManager.default.removeItem(at: url) }

@@ -143,8 +143,8 @@ Options & AI / Non-interactive Flags:
   -h, --help                     Show this help
 
 Examples:
-  make start 1 -m "feat(history): add usage view"
-  make start patch -m "fix: resolve memory leak"
+  make start 1 msg="feat(history): add usage view"
+  make start patch msg="fix: resolve memory leak"
   make start 3 minor -y
   make start preview
 `);
@@ -246,10 +246,10 @@ async function main() {
         console.error('\n🚀 Kouen Build & Release (Non-interactive / AI mode)');
         console.error(`Current Version: v${currentVersion} (build ${currentBuild})\n`);
         console.error('No interactive TTY detected. Specify options via arguments or environment:');
-        console.error('  make start 1 [-m "commit message"]               # Commit + Push + Merge');
+        console.error('  make start 1 msg="commit message"               # Commit + Push + Merge');
         console.error('  make start 2                                    # Preview build');
-        console.error('  make start 3 [patch|minor|major|skip] [-m "msg"] # Full cycle');
-        console.error('  make start patch [-m "commit message"]           # Shortcut for patch full-cycle');
+        console.error('  make start 3 [patch|minor|major|skip] msg="..."  # Full cycle');
+        console.error('  make start patch msg="commit message"            # Shortcut for patch full-cycle');
         console.error('\nOr pass variables:');
         console.error('  COMMIT_MESSAGE="feat: ..." make start 1');
         console.error('  make start 1 msg="feat: ..."\n');
