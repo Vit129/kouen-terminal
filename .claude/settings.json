@@ -28,6 +28,160 @@
             "statusMessage": "Skill trigger"
           }
         ]
+      },
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "f=\"$CLAUDE_PROJECT_DIR/.claude/hooks/memory-recall.py\"; [ -f \"$f\" ] || exit 0; CLAUDE_HOME=\"$CLAUDE_PROJECT_DIR/.claude\" exec python3 \"$f\""
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash|Edit|Write|MultiEdit|NotebookEdit|apply_patch",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "f=\"$CLAUDE_PROJECT_DIR/.claude/hooks/auditor-readonly.py\"; [ -f \"$f\" ] || exit 0; CLAUDE_HOME=\"$CLAUDE_PROJECT_DIR/.claude\" exec python3 \"$f\""
+          }
+        ]
+      },
+      {
+        "matcher": "Read|Bash|Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "f=\"$CLAUDE_PROJECT_DIR/.claude/hooks/secret-read-guard.py\"; [ -f \"$f\" ] || exit 0; CLAUDE_HOME=\"$CLAUDE_PROJECT_DIR/.claude\" exec python3 \"$f\""
+          }
+        ]
+      },
+      {
+        "matcher": "Edit|Write|MultiEdit|NotebookEdit|Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "f=\"$CLAUDE_PROJECT_DIR/.claude/hooks/coding-rules-gate.py\"; [ -f \"$f\" ] || exit 0; CLAUDE_HOME=\"$CLAUDE_PROJECT_DIR/.claude\" exec python3 \"$f\" pre"
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "f=\"$CLAUDE_PROJECT_DIR/.claude/hooks/dirty-branch-switch-guard.py\"; [ -f \"$f\" ] || exit 0; CLAUDE_HOME=\"$CLAUDE_PROJECT_DIR/.claude\" exec python3 \"$f\""
+          }
+        ]
+      },
+      {
+        "matcher": "Bash|Grep|Read|Glob",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "f=\"$CLAUDE_PROJECT_DIR/.claude/hooks/graphify-guard.py\"; [ -f \"$f\" ] || exit 0; CLAUDE_HOME=\"$CLAUDE_PROJECT_DIR/.claude\" exec python3 \"$f\" pre"
+          }
+        ]
+      },
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "f=\"$CLAUDE_PROJECT_DIR/.claude/hooks/memory-write-scan.py\"; [ -f \"$f\" ] || exit 0; CLAUDE_HOME=\"$CLAUDE_PROJECT_DIR/.claude\" exec python3 \"$f\""
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Read|Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "f=\"$CLAUDE_PROJECT_DIR/.claude/hooks/coding-rules-gate.py\"; [ -f \"$f\" ] || exit 0; CLAUDE_HOME=\"$CLAUDE_PROJECT_DIR/.claude\" exec python3 \"$f\" post"
+          }
+        ]
+      },
+      {
+        "matcher": "Bash|mcp__graphify__.*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "f=\"$CLAUDE_PROJECT_DIR/.claude/hooks/graphify-guard.py\"; [ -f \"$f\" ] || exit 0; CLAUDE_HOME=\"$CLAUDE_PROJECT_DIR/.claude\" exec python3 \"$f\" post"
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "f=\"$CLAUDE_PROJECT_DIR/.claude/hooks/skill-capture-nudge.py\"; [ -f \"$f\" ] || exit 0; CLAUDE_HOME=\"$CLAUDE_PROJECT_DIR/.claude\" exec python3 \"$f\" post"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "f=\"$CLAUDE_PROJECT_DIR/.claude/hooks/graphify-guard.py\"; [ -f \"$f\" ] || exit 0; CLAUDE_HOME=\"$CLAUDE_PROJECT_DIR/.claude\" exec python3 \"$f\" stop"
+          }
+        ]
+      },
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "f=\"$CLAUDE_PROJECT_DIR/.claude/hooks/skill-capture-nudge.py\"; [ -f \"$f\" ] || exit 0; CLAUDE_HOME=\"$CLAUDE_PROJECT_DIR/.claude\" exec python3 \"$f\""
+          }
+        ]
+      },
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "f=\"$CLAUDE_PROJECT_DIR/.claude/hooks/done-gate.py\"; [ -f \"$f\" ] || exit 0; CLAUDE_HOME=\"$CLAUDE_PROJECT_DIR/.claude\" exec python3 \"$f\""
+          }
+        ]
+      },
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "f=\"$CLAUDE_PROJECT_DIR/.claude/hooks/work-log.py\"; [ -f \"$f\" ] || exit 0; CLAUDE_HOME=\"$CLAUDE_PROJECT_DIR/.claude\" exec python3 \"$f\""
+          }
+        ]
+      }
+    ],
+    "SubagentStart": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "f=\"$CLAUDE_PROJECT_DIR/.claude/hooks/subagent-rules.py\"; [ -f \"$f\" ] || exit 0; CLAUDE_HOME=\"$CLAUDE_PROJECT_DIR/.claude\" exec python3 \"$f\""
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "matcher": "startup|resume|clear",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "f=\"$CLAUDE_PROJECT_DIR/.claude/hooks/session-start-recent.py\"; [ -f \"$f\" ] || exit 0; CLAUDE_HOME=\"$CLAUDE_PROJECT_DIR/.claude\" exec python3 \"$f\""
+          }
+        ]
       }
     ]
   },
