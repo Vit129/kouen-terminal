@@ -1,4 +1,5 @@
 import SwiftUI
+import KouenCore
 import KouenIPC
 
 /// One screen listing every live session across every workspace — P46 Pillar 6 gap 6. Layout
