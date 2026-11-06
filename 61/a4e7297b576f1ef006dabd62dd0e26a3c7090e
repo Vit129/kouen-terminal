@@ -1,0 +1,14 @@
+CHANGELOG.md
+  h_d82339d8725694 11,14-16
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.3",
+  "base_commit_sha": "61a4e7297b576f1ef006dabd62dd0e26a3c7090e",
+  "prompts": {},
+  "humans": {
+    "h_d82339d8725694": {
+      "author": "Vit129 <vitosk129@gmail.com>"
+    }
+  }
+}
