@@ -5,20 +5,15 @@ All notable changes to Kouen are documented here. The format is based on
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Each released version
 has a matching `vX.Y.Z` tag and a signed, notarized DMG on
 [GitHub Releases](https://github.com/Vit129/kouen-terminal/releases).
-## [Unreleased]
-
-### Fixed
-- Release memory during history scans
-
 ## [4.22.12] - 2026-11-06
 
 ### Documentation
-- Record that the fleet/tab-bar memory guards have landed ([`29e70e0`](https://github.com/Vit129/kouen-terminal/commit/29e70e0d012d61a5fcc601f1fe2e0c52cfd102bc))
+- Record that the fleet/tab-bar memory guards have landed ([`39549c8`](https://github.com/Vit129/kouen-terminal/commit/39549c85e878b5ea644b184e885606fa811566fb))
 
 ### Fixed
-- Stop fleet/tab-bar republishing on unchanged snapshots ([`8901aa8`](https://github.com/Vit129/kouen-terminal/commit/8901aa880b0a53ebca0f2f85b4838bed4493f5a3))
-- Drain autoreleased JSON per transcript during history scans ([`9ea7cf1`](https://github.com/Vit129/kouen-terminal/commit/9ea7cf1dce993a00b830c163d07d69ccf15fe4b4))
-
+- Stop fleet/tab-bar republishing on unchanged snapshots ([`debca87`](https://github.com/Vit129/kouen-terminal/commit/debca874c4acfc3ea930a1c4399307f46be77fd9))
+- Drain autoreleased JSON per transcript during history scans ([`acfab00`](https://github.com/Vit129/kouen-terminal/commit/acfab003895e646bb5c15d0b22c938c12df9cf6e))
+- Release memory during history scans ([`b004679`](https://github.com/Vit129/kouen-terminal/commit/b004679a9db62ca88b43351323ca085f1b639cf5))
 
 ## [4.22.11] - 2026-11-03
 
