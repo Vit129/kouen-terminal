@@ -1,0 +1,53 @@
+Apps/Kouen/Sources/KouenApp/UI/Terminal/TerminalTabBarView.swift
+  s_94574198a9f5aa::t_28b8dfc5b0c180 95-96,112-113,380-384,400,588,592-594,599-600,606-610,730-732
+  s_94574198a9f5aa::t_f233bdea71defe 157-160
+  s_94574198a9f5aa::t_ebbafac3b99806 379
+Apps/Kouen/Sources/KouenApp/UI/Terminal/FleetViewModel.swift
+  s_94574198a9f5aa::t_28b8dfc5b0c180 38
+  s_94574198a9f5aa::t_163a2fad0066a0 39
+  s_1d86b04db964e7::t_709bbb8f595f80 4-7,18,24,32-36
+kouen-memory-investigation.md
+  s_2478457ac09473::t_bb945695d6d25a 1-80
+  s_2478457ac09473::t_f1377a342aa061 81-83
+  s_1d86b04db964e7::t_8be961cc385f7c 84-183
+Apps/Kouen/Sources/KouenApp/UI/Terminal/FleetView.swift
+  s_1d86b04db964e7::t_7ea203d64b947f 2
+Packages/KouenCore/Sources/KouenCore/Fleet/FleetSessionList.swift
+  s_1d86b04db964e7::t_e7bac9f56e639c 1-116
+Tests/KouenAppTests/FleetViewModelTests.swift
+  s_1d86b04db964e7::t_7d3fdc271ed882 3,9-14,118-162
+Tests/KouenCoreTests/FleetSessionListTests.swift
+  s_1d86b04db964e7::t_1213185677ab42 1-79
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.3",
+  "base_commit_sha": "8901aa880b0a53ebca0f2f85b4838bed4493f5a3",
+  "prompts": {},
+  "sessions": {
+    "s_1d86b04db964e7": {
+      "agent_id": {
+        "tool": "github-copilot-cli",
+        "id": "af5a9cd7-6029-4363-a4a8-3bdc68721e59",
+        "model": "unknown"
+      },
+      "human_author": "Vit129 <vitosk129@gmail.com>"
+    },
+    "s_2478457ac09473": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1abf6-e1e2-73e3-b560-868c6935aaaf",
+        "model": "gpt-6.1-terra"
+      },
+      "human_author": "Vit129 <vitosk129@gmail.com>"
+    },
+    "s_94574198a9f5aa": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1ae8b-0f75-7c92-890e-2bd2b1e2ea8b",
+        "model": "gpt-6.1-terra"
+      },
+      "human_author": "Vit129 <vitosk129@gmail.com>"
+    }
+  }
+}
