@@ -92,8 +92,8 @@ final class TerminalTabBarView: NSView {
     }
 
     func reload(tabs: [Tab], activeTabID: TabID?) {
-        model.tabs = tabs
-        model.activeTabID = activeTabID
+        if model.tabs != tabs { model.tabs = tabs }
+        if model.activeTabID != activeTabID { model.activeTabID = activeTabID }
         resetDrag()
     }
 
@@ -109,8 +109,8 @@ final class TerminalTabBarView: NSView {
             return
         }
 
-        model.tabs = tabs
-        model.activeTabID = activeTabID
+        if model.tabs != tabs { model.tabs = tabs }
+        if model.activeTabID != activeTabID { model.activeTabID = activeTabID }
     }
 
     private var heightConstraint: NSLayoutConstraint?
@@ -154,10 +154,10 @@ final class TerminalTabBarView: NSView {
     }
 
     private func resetDrag() {
-        model.draggingTabID = nil
-        model.dragOffsetX = 0
-        model.dragOriginalIndex = nil
-        model.dragTargetIndex = nil
+        if model.draggingTabID != nil { model.draggingTabID = nil }
+        if model.dragOffsetX != 0 { model.dragOffsetX = 0 }
+        if model.dragOriginalIndex != nil { model.dragOriginalIndex = nil }
+        if model.dragTargetIndex != nil { model.dragTargetIndex = nil }
     }
 }
 
@@ -377,6 +377,12 @@ private struct TerminalTabBarBody: View {
 }
 
 @MainActor
+private final class TabTaskRefreshState {
+    var workspaces: [Workspace]?
+    var task: Task<Void, Never>?
+}
+
+@MainActor
 private struct TabPillView: View {
     var model: TerminalTabBarModel
     let tab: Tab
@@ -391,7 +397,7 @@ private struct TabPillView: View {
     @State private var isHovered = false
     @State private var showsMCPBadge = false
     @State private var tasks: [TaskSummary] = []
-    @State private var taskRefreshTask: Task<Void, Never>?
+    @State private var taskRefresh = TabTaskRefreshState()
 
     var body: some View {
         let _ = model.chromeEpoch
@@ -579,19 +585,28 @@ private struct TabPillView: View {
             await updateMCPBadge(lastAt: tab.lastMCPControlAt)
         }
         .task(id: tab.id) {
+            taskRefresh.workspaces = SessionCoordinator.shared.snapshot.workspaces
             await updateTasks()
         }
         .onReceive(NotificationCenter.default.publisher(for: NotificationBus.shared.snapshotChanged)) { _ in
+            let workspaces = SessionCoordinator.shared.snapshot.workspaces
+            guard taskRefresh.workspaces != workspaces else { return }
+            taskRefresh.workspaces = workspaces
             // snapshotChanged can fire many times per second (see ScriptRuntime.swift's own
             // doc comment on the same notification) — debounce the same way GitPanelView's
             // FSEvent-driven refresh does (cancel-and-reschedule, 0.5s quiet period) so this
             // doesn't fire a fresh TaskDaemonBridge IPC round-trip per tab on every tick.
-            taskRefreshTask?.cancel()
-            taskRefreshTask = Task {
+            taskRefresh.task?.cancel()
+            taskRefresh.task = Task {
                 try? await Task.sleep(nanoseconds: 500_000_000)
                 guard !Task.isCancelled else { return }
                 await updateTasks()
             }
+        }
+        .onDisappear {
+            taskRefresh.task?.cancel()
+            taskRefresh.task = nil
+            taskRefresh.workspaces = nil
         }
     }
 
@@ -712,7 +727,9 @@ private struct TabPillView: View {
             tasks = []
             return
         }
-        tasks = await TaskDaemonBridge.list(sessionID: sessionID)
+        let updatedTasks = await TaskDaemonBridge.list(sessionID: sessionID)
+        guard !Task.isCancelled else { return }
+        if tasks != updatedTasks { tasks = updatedTasks }
     }
 }
 
