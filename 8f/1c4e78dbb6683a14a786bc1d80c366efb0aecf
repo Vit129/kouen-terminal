@@ -1,0 +1,19 @@
+graphify-out/manifest.json
+  s_08e31f77123e5f::t_ecf4608680d1c6 963-964,1053-1054
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.3",
+  "base_commit_sha": "8f1c4e78dbb6683a14a786bc1d80c366efb0aecf",
+  "prompts": {},
+  "sessions": {
+    "s_08e31f77123e5f": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a19c9f-5d6a-7523-9bdc-49416b196549",
+        "model": "gpt-6-luna"
+      },
+      "human_author": "Vit129 <vitosk129@gmail.com>"
+    }
+  }
+}
