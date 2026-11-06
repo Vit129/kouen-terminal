@@ -635,7 +635,7 @@ public actor AgentHistoryScanner {
                 }
 
                 if toIndex.count >= Self.indexBatchSize { ftsIndex.indexSessionsBatch(toIndex); toIndex.removeAll(keepingCapacity: true) }
-                if let record = parseClaudeTranscript(fileURL: fileURL, toIndex: &toIndex) {
+                if let record = autoreleasepool(invoking: { parseClaudeTranscript(fileURL: fileURL, toIndex: &toIndex) }) {
                     if let rv = try? fileURL.resourceValues(forKeys: [.contentModificationDateKey, .fileSizeKey]),
                        let mtime = rv.contentModificationDate,
                        let size = rv.fileSize {
@@ -1181,8 +1181,13 @@ public actor AgentHistoryScanner {
                         var promptFound = false
                         var parts: [String] = []
                         for line in lines {
-                            guard let json = try? JSONSerialization.jsonObject(with: Data(line)) as? [String: Any] else { continue }
-                            if let (role, trimmed) = antigravityTurn(json) {
+                            // One scan is a single long async job, so autoreleased JSON objects
+                            // would otherwise pile up until the whole scan returns.
+                            let turn = autoreleasepool { () -> (String, String)? in
+                                guard let json = try? JSONSerialization.jsonObject(with: Data(line)) as? [String: Any] else { return nil }
+                                return antigravityTurn(json)
+                            }
+                            if let (role, trimmed) = turn {
                                 parts.append(trimmed)
                                 if role == "YOU" && !promptFound {
                                     firstPrompt = trimmed
@@ -1324,7 +1329,7 @@ public actor AgentHistoryScanner {
             }
 
             if toIndex.count >= Self.indexBatchSize { ftsIndex.indexSessionsBatch(toIndex); toIndex.removeAll(keepingCapacity: true) }
-            if let record = parseAntigravityTranscript(sessionID: folder, fileURL: transcriptURL, toIndex: &toIndex) {
+            if let record = autoreleasepool(invoking: { parseAntigravityTranscript(sessionID: folder, fileURL: transcriptURL, toIndex: &toIndex) }) {
                 if let rv = try? transcriptURL.resourceValues(forKeys: [.contentModificationDateKey, .fileSizeKey]),
                    let mtime = rv.contentModificationDate,
                    let size = rv.fileSize {
@@ -1582,7 +1587,7 @@ public actor AgentHistoryScanner {
 
             let tag = codexSurfaceTag(filePath: path, placement: .local)
             if toIndex.count >= Self.indexBatchSize { ftsIndex?.indexSessionsBatch(toIndex); toIndex.removeAll(keepingCapacity: true) }
-            if let record = parseCodexTranscript(fileURL: fileURL, surfaceTag: tag, ftsIndex: ftsIndex, toIndex: &toIndex) {
+            if let record = autoreleasepool(invoking: { parseCodexTranscript(fileURL: fileURL, surfaceTag: tag, ftsIndex: ftsIndex, toIndex: &toIndex) }) {
                 fileCache[path] = FileCacheEntry(mtime: mtime, size: size, record: record)
                 records.append(record)
                 toSave.append(CachedSessionEntry(record: record, mtime: mtime, fileSize: size))
@@ -1851,9 +1856,12 @@ public actor AgentHistoryScanner {
                         }
                     }
 
-                    guard let data = try? Data(contentsOf: url, options: .mappedIfSafe),
-                          let session = VSCodeChatSession.parse(data, isJSONL: file.hasSuffix(".jsonl")),
-                          let record = vscodeRecord(session, projectPath: projectPath, transcriptPath: url.path, fallbackDate: mtime, fileSize: size, ftsIndex: ftsIndex, surfaceTag: surfaceTag)
+                    guard let record = autoreleasepool(invoking: { () -> AgentSessionRecord? in
+                        guard let data = try? Data(contentsOf: url, options: .mappedIfSafe),
+                              let session = VSCodeChatSession.parse(data, isJSONL: file.hasSuffix(".jsonl"))
+                        else { return nil }
+                        return vscodeRecord(session, projectPath: projectPath, transcriptPath: url.path, fallbackDate: mtime, fileSize: size, ftsIndex: ftsIndex, surfaceTag: surfaceTag)
+                    })
                     else { continue }
                     fileCache[path] = FileCacheEntry(mtime: mtime, size: size, record: record)
                     records.append(record)
