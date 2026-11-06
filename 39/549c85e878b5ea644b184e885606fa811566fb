@@ -1,0 +1,19 @@
+kouen-memory-investigation.md
+  s_1d86b04db964e7::t_ca637a8d4729e4 183
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.3",
+  "base_commit_sha": "39549c85e878b5ea644b184e885606fa811566fb",
+  "prompts": {},
+  "sessions": {
+    "s_1d86b04db964e7": {
+      "agent_id": {
+        "tool": "github-copilot-cli",
+        "id": "af5a9cd7-6029-4363-a4a8-3bdc68721e59",
+        "model": "unknown"
+      },
+      "human_author": "Vit129 <vitosk129@gmail.com>"
+    }
+  }
+}
