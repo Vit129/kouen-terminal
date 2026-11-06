@@ -534,6 +534,8 @@ public enum IPCResponse: Codable, Sendable {
     case replayResult(text: String, endSequence: UInt64)
     /// Pushed on a `subscribeSnapshot` channel when the layout commits at `revision`.
     case snapshotChanged(revision: Int)
+    /// Sent only to snapshot subscribers that opt into task notifications.
+    case tasksChanged
     case agentInfo(AgentSnapshot?)
     case clients([ClientSummary])
     case daemonStats(DaemonStats)

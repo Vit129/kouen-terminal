@@ -107,6 +107,7 @@ public final class DaemonClient: @unchecked Sendable {
     public func subscribeSnapshot(
         label: String? = nil,
         onRevision: @escaping @Sendable (Int) -> Void,
+        onTasksChanged: (@Sendable () -> Void)? = nil,
         onBrowserRequest: (@Sendable (UUID, UUID?, BrowserRequestPayload) -> Void)? = nil,
         onOpenGitPanel: (@Sendable (String?) -> Void)? = nil,
         onActivateWindow: (@Sendable () -> Void)? = nil,
@@ -121,6 +122,8 @@ public final class DaemonClient: @unchecked Sendable {
                 switch response {
                 case let .snapshotChanged(revision):
                     onRevision(revision)
+                case .tasksChanged:
+                    onTasksChanged?()
                 case let .browserRequest(id, paneID, req):
                     onBrowserRequest?(id, paneID, req)
                 case let .openGitPanel(repoPath):

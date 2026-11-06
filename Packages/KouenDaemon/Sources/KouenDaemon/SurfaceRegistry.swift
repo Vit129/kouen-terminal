@@ -47,6 +47,7 @@ public final class SurfaceRegistry: @unchecked Sendable {
     /// Invoked after every layout commit with the new revision. `DaemonServer` uses
     /// this to push `snapshotChanged` to snapshot subscribers (the compositor).
     public var onSnapshotCommitted: ((Int) -> Void)?
+    public var onTasksChanged: (() -> Void)?
 
     // MARK: Monitoring (Phase 5)
     /// Cheap per-surface output state, updated on the PTY read thread and drained by
@@ -1067,7 +1068,9 @@ public final class SurfaceRegistry: @unchecked Sendable {
                 .flatMap { $0.sessions }
                 .first(where: { $0.id == sessionID })?
                 .activeTab?.cwd
-            return .taskInfo(Self.taskSummary(taskStore.create(sessionID: sessionID, title: title, cwd: cwd)))
+            let task = taskStore.create(sessionID: sessionID, title: title, cwd: cwd)
+            onTasksChanged?()
+            return .taskInfo(Self.taskSummary(task))
         case let .taskUpdate(id, title, done, status):
             let coreStatus = status.flatMap { KouenTaskStatus(rawValue: $0.rawValue) }
             do {
@@ -1075,6 +1078,7 @@ public final class SurfaceRegistry: @unchecked Sendable {
                 else {
                     return .error("Task not found")
                 }
+                onTasksChanged?()
                 return .taskInfo(Self.taskSummary(updated))
             } catch TaskStoreError.conflictingState(let done, let status) {
                 return .error("Conflicting task state: done=\(done) conflicts with status='\(status.rawValue)'")
@@ -1082,7 +1086,9 @@ public final class SurfaceRegistry: @unchecked Sendable {
                 return .error("Task update failed: \(error.localizedDescription)")
             }
         case let .taskDelete(id):
-            return taskStore.delete(id: id) ? .ok : .error("Task not found")
+            guard taskStore.delete(id: id) else { return .error("Task not found") }
+            onTasksChanged?()
+            return .ok
         case let .worktreeList(repoPath):
             let infos = WorktreeManager().list(repoPath: repoPath).map(Self.worktreeInfoSummary)
             return .worktrees(infos)

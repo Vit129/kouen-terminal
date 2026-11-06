@@ -143,6 +143,15 @@ public final class DaemonServer: @unchecked Sendable {
             guard let self else { return }
             self.queue.async { [weak self] in self?.pushSnapshotRevision(revision) }
         }
+        registry.onTasksChanged = { [weak self] in
+            guard let self else { return }
+            self.queue.async { [weak self] in
+                guard let self else { return }
+                for fd in self.snapshotSubscribers where self.clients[fd]?.label == "KouenGUI.tasks" {
+                    self.send(.tasksChanged, to: fd)
+                }
+            }
+        }
         registry.attachedClientCountProvider = { [registeredClientCount] in
             registeredClientCount.read()
         }
