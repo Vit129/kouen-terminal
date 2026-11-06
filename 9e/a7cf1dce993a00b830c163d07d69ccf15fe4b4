@@ -1,0 +1,23 @@
+Packages/KouenCore/Sources/KouenCore/Agents/AgentHistoryScanner.swift
+  s_479fbf23c05f80::t_45d6fdd840c0cc 1859-1864
+  s_479fbf23c05f80::t_65ddd80259bf93 638
+  s_479fbf23c05f80::t_8d44f9edda9247 1590
+  s_479fbf23c05f80::t_89a93ee2cb4925 1184-1190
+  s_479fbf23c05f80::t_30a54f23302ef9 1332
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.3",
+  "base_commit_sha": "9ea7cf1dce993a00b830c163d07d69ccf15fe4b4",
+  "prompts": {},
+  "sessions": {
+    "s_479fbf23c05f80": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "49c7f2a7-52a0-442c-bfbc-a6ab334ac2f8",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Vit129 <vitosk129@gmail.com>"
+    }
+  }
+}
