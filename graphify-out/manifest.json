@@ -4140,8 +4140,8 @@
     "semantic_hash": ""
   },
   "Packages/KouenCore/Sources/KouenCore/Agents/AgentHistoryScanner.swift": {
-    "mtime": 1793679502.6264412,
-    "ast_hash": "1f8142e0786b83a2626bd52c03eae4dc",
+    "mtime": 1793947138.0558395,
+    "ast_hash": "941e95323dd8e91c510d81e8d764caf3",
     "semantic_hash": ""
   },
   "Packages/KouenCore/Sources/KouenCore/Context/ContextResolutionEngine.swift": {
@@ -4775,8 +4775,8 @@
     "semantic_hash": ""
   },
   "kouen-memory-investigation.md": {
-    "mtime": 1793935428.108332,
-    "ast_hash": "d7a3871c45b275abb32c8c40ab82f7cc",
+    "mtime": 1793945796.0207677,
+    "ast_hash": "5042bd6cfaff441df5c2a1dcd538c51b",
     "semantic_hash": ""
   },
   "Packages/KouenCore/Sources/KouenCore/Fleet/FleetSessionList.swift": {
