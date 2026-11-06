@@ -180,4 +180,4 @@ commit เดียว: `12a2f224` (9 ต.ค. 2026, Merge PR #81, `Co-Authored-
 5. **Re-measure** ด้วยวิธีเดิม และ retest ของ P59: `PaneLifecycleManager` MRU cache (8) + laziness ของ `MarkdownPreviewView`
 6. **ถ้ายังโต**: เก็บ allocation stack ก่อน–หลังทีละกิจกรรม (เปิดแอปค้าง → ใช้ terminal → เปิด/ปิด Projects)
 
-**สถานะ**: ยังไม่แก้ anything committed — ทั้งหมดยังเป็นข้อเสนอ + diff ที่ค้างใน working tree
+**สถานะ**: ภาคผนวกนี้เป็นข้อเสนอที่ **ลงมือทำแล้ว** — guard ทั้งสองตัว (FleetViewModel/TerminalTabBarView) commit แล้วใน `8901aa88` พร้อมย้าย flatten/sort/filter ไป `KouenCore.FleetSessionList` + เทสต์ (`FleetSessionListTests` 4/4, `FleetViewModelTests` 6/6, ArchitectureGuardTests 7/7, robot 26/26) ส่วนข้อ 1, 2, 5 (repro/A-B/re-measure heap) ยังต้องรันแอปเองจึงยังไม่ได้ทำ
