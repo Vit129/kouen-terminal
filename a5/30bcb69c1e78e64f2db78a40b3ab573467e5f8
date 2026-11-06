@@ -1,0 +1,23 @@
+Packages/KouenCore/Sources/KouenCore/Platform/ProcessRunner.swift
+  s_3c341bc68c16b4::t_a90598acf1ef29 280-290
+  s_3c341bc68c16b4::t_8cbac2b14b2068 313-316
+Tests/KouenCoreTests/ProcessRunnerTests.swift
+  s_3c341bc68c16b4::t_153abcd3cb409f 94-95
+  s_3c341bc68c16b4::t_b6cd210a7ae219 83-93
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.3",
+  "base_commit_sha": "a530bcb69c1e78e64f2db78a40b3ab573467e5f8",
+  "prompts": {},
+  "sessions": {
+    "s_3c341bc68c16b4": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "83a98cdd-e9f0-4049-b1df-d41cb5e2af7d",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Vit129 <vitosk129@gmail.com>"
+    }
+  }
+}
