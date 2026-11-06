@@ -1,10 +1,17 @@
 import XCTest
 import KouenCore
+import Observation
 @testable import KouenApp
 
 /// P46 Pillar 6 gap 6: `FleetView` is the one screen that lists every live session across
 /// every workspace instead of clicking through tabs one at a time — these test the pure
 /// flatten/sort/filter logic behind it (`FleetViewModel.refresh`/`.filteredItems`), no UI.
+/// `withObservationTracking`'s `onChange` closure is `@Sendable`, so a plain captured `var`
+/// trips Swift 6 strict concurrency — a tiny box keeps mutable observation state without it.
+private final class RepublishFlag: @unchecked Sendable {
+    var value = false
+}
+
 final class FleetViewModelTests: XCTestCase {
     @MainActor
     func testRefreshFlattensAllTabsAndSortsWaitingFirst() {
@@ -107,6 +114,51 @@ final class FleetViewModelTests: XCTestCase {
         let waitingItems = model.itemsFor(filter: .waiting)
         XCTAssertEqual(waitingItems.count, 1)
         XCTAssertEqual(waitingItems.first?.title, "agent-waiting")
+    }
+
+    /// Memory investigation (Nov 2026): `refresh` runs on every `snapshotChanged`, and this
+    /// model is `@Observable` — an unconditional `items = ...` republishes even when nothing
+    /// changed, rebuilding `FleetView`'s `List` and feeding the RenderBox churn seen in the
+    /// heap snapshot. Re-refreshing with an identical snapshot must not republish.
+    @MainActor
+    func testRefreshWithUnchangedSnapshotDoesNotRepublishItems() {
+        let tab = Tab(title: "shell", cwd: "/tmp")
+        let session = SessionGroup(id: UUID(), name: "s", tabs: [tab], activeTabID: tab.id, sortOrder: 0)
+        let ws = Workspace(id: UUID(), name: "W", sessions: [session], activeSessionID: session.id)
+        let snap = SessionSnapshot(workspaces: [ws], activeWorkspaceID: ws.id)
+
+        let model = FleetViewModel()
+        model.refresh(from: snap)
+        XCTAssertEqual(model.items.count, 1)
+
+        let republishFlag = RepublishFlag()
+        withObservationTracking {
+            _ = model.items
+        } onChange: {
+            republishFlag.value = true
+        }
+        model.refresh(from: snap)
+
+        XCTAssertFalse(republishFlag.value, "an unchanged snapshot must not reassign `items`")    }
+
+    /// The guard must not be so greedy that a real change is swallowed — a tab that starts
+    /// waiting after the first refresh still has to reach the list.
+    @MainActor
+    func testRefreshWithChangedSnapshotStillUpdatesItems() {
+        let tab = Tab(title: "shell", cwd: "/tmp")
+        let session = SessionGroup(id: UUID(), name: "s", tabs: [tab], activeTabID: tab.id, sortOrder: 0)
+        let ws = Workspace(id: UUID(), name: "W", sessions: [session], activeSessionID: session.id)
+        let model = FleetViewModel()
+        model.refresh(from: SessionSnapshot(workspaces: [ws], activeWorkspaceID: ws.id))
+        XCTAssertEqual(model.waitingCount, 0)
+
+        var waitingTab = Tab(title: "shell", cwd: "/tmp")
+        waitingTab.status = .waiting
+        let waitingSession = SessionGroup(id: session.id, name: "s", tabs: [waitingTab], activeTabID: waitingTab.id, sortOrder: 0)
+        let waitingWS = Workspace(id: ws.id, name: "W", sessions: [waitingSession], activeSessionID: waitingSession.id)
+
+        model.refresh(from: SessionSnapshot(workspaces: [waitingWS], activeWorkspaceID: ws.id))
+        XCTAssertEqual(model.waitingCount, 1)
     }
 }
 
