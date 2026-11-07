@@ -5,6 +5,12 @@ All notable changes to Kouen are documented here. The format is based on
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Each released version
 has a matching `vX.Y.Z` tag and a signed, notarized DMG on
 [GitHub Releases](https://github.com/Vit129/kouen-terminal/releases).
+## [4.22.13] - 2026-11-07
+
+### Fixed
+- Stop ProcessRunner.run from blocking forever on an open pipe ([`a530bcb`](https://github.com/Vit129/kouen-terminal/commit/a530bcb69c1e78e64f2db78a40b3ab573467e5f8))
+
+
 ## [4.22.12] - 2026-11-06
 
 ### Documentation
