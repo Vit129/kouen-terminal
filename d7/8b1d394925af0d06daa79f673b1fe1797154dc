@@ -1,0 +1,21 @@
+Tests/KouenAppTests/AutomationsFleetModelTests.swift
+  s_9cf1b062c00e38::t_c7e8aaf9cb71f6 62-72
+Apps/Kouen/Sources/KouenApp/UI/Automations/AutomationsFleetModel.swift
+  s_9cf1b062c00e38::t_dee72a3383ae01 541-552
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.3",
+  "base_commit_sha": "d78b1d394925af0d06daa79f673b1fe1797154dc",
+  "prompts": {},
+  "sessions": {
+    "s_9cf1b062c00e38": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ff38f17e-ac77-4664-8320-8f7fc8bda9cf",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Vit129 <vitosk129@gmail.com>"
+    }
+  }
+}
