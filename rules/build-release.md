@@ -22,7 +22,7 @@
 | Release (with bump) | `make start` → `Full cycle` → patch / minor / major |
 | Release (no bump) | `make start` → `Full cycle` → skip |
 | AI / Non-interactive Commit | `make start 1 msg="<message>"` (or `COMMIT_MESSAGE="..." make start 1`) |
-| AI / Non-interactive Release | `make start patch msg="<message>" -y` (or `COMMIT_MESSAGE="..." make start 3 minor -y`) |
+| AI / Non-interactive Release | `make start patch msg="<message>" y=1` (or `COMMIT_MESSAGE="..." make start 3 minor y=1`) |
 
 Full cycle: verify → bump → commit+push → prod → CHANGELOG → tag → GitHub release → install.
 
