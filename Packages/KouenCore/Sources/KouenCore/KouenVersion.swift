@@ -12,8 +12,8 @@ import Foundation
 /// build when the two disagree (v1.3.0/v1.3.1 shipped daemons that reported 1.2.0).
 public enum KouenVersion {
     /// Marketing version, matches `CFBundleShortVersionString`.
-    public static let short = "4.22.13"
+    public static let short = "4.22.14"
     /// Build number, matches `CFBundleVersion`. Used as the secondary-DA firmware field
     /// and as the daemon↔app/CLI staleness handshake in `daemonStats`.
-    public static let build = 301
+    public static let build = 302
 }
