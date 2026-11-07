@@ -5,6 +5,13 @@ All notable changes to Kouen are documented here. The format is based on
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Each released version
 has a matching `vX.Y.Z` tag and a signed, notarized DMG on
 [GitHub Releases](https://github.com/Vit129/kouen-terminal/releases).
+## [4.22.14] - 2026-11-07
+
+### Fixed
+- Read only the log tail so a huge job log no longer spikes app memory ([`d78b1d3`](https://github.com/Vit129/kouen-terminal/commit/d78b1d394925af0d06daa79f673b1fe1797154dc))
+- Let make start release from a worktree when only graphify-out is dirty in main ([`69b2665`](https://github.com/Vit129/kouen-terminal/commit/69b266584d82fbd5de81c1c6d58dc27cd5d3620e))
+
+
 ## [4.22.13] - 2026-11-07
 
 ### Fixed

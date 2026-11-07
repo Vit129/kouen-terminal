@@ -59,4 +59,15 @@ final class AutomationsFleetModelTests: XCTestCase {
         XCTAssertEqual(AutomationsFleetModel.locateJob(programArgs: ["/usr/bin/true"], workingDirectory: nil).repo,
                        FileManager.default.homeDirectoryForCurrentUser.path)
     }
+
+    func testTailLogReadsOnlyTheEndOfALargeFile() throws {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("taillog-\(UUID().uuidString).log")
+        defer { try? FileManager.default.removeItem(at: url) }
+        let body = (1...50_000).map { "line \($0)" }.joined(separator: "\n") + "\n"
+        try body.write(to: url, atomically: true, encoding: .utf8)
+        XCTAssertEqual(AutomationsFleetModel.tailLog(path: url.path, lines: 2, maxBytes: 100),
+                       "line 49999\nline 50000")
+        XCTAssertEqual(AutomationsFleetModel.tailLog(path: url.path, lines: 2), "line 49999\nline 50000")
+        XCTAssertNil(AutomationsFleetModel.tailLog(path: url.path + ".missing", lines: 2))
+    }
 }
