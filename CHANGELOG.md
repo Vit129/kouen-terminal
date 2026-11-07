@@ -10,7 +10,6 @@ has a matching `vX.Y.Z` tag and a signed, notarized DMG on
 ### Fixed
 - Stop ProcessRunner.run from blocking forever on an open pipe ([`a530bcb`](https://github.com/Vit129/kouen-terminal/commit/a530bcb69c1e78e64f2db78a40b3ab573467e5f8))
 
-
 ## [4.22.12] - 2026-11-06
 
 ### Documentation
