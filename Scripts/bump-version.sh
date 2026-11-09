@@ -7,6 +7,7 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
+source "$ROOT/Scripts/graphify-commit.sh"
 
 INFO_PLIST="Apps/Kouen/Sources/KouenApp/Resources/Info.plist"
 
@@ -44,6 +45,6 @@ esac
 /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $next_build" "$INFO_PLIST"
 
 git add "$INFO_PLIST"
-git commit -m "chore: bump version to v$new_version (build $next_build)"
+commit_with_graph -m "chore: bump version to v$new_version (build $next_build)"
 
 echo "Bumped to v$new_version (build $next_build)."

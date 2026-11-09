@@ -15,6 +15,7 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
+source "$ROOT/Scripts/graphify-commit.sh"
 
 msg="${COMMIT_MESSAGE:-}"
 auto_yes=0
@@ -46,6 +47,8 @@ while (($#)); do
   esac
 done
 
+prepare_graph_for_commit
+
 if [[ -n "$(git status --porcelain)" ]]; then
   echo ""
   git status -s
@@ -73,8 +76,12 @@ if [[ -n "$(git status --porcelain)" ]]; then
     echo "Empty commit message — aborting." >&2
     exit 1
   fi
-  # graphify-out/ refreshes go on their own `chore(graphify)` commit, never a feature/release one.
-  git add -A ':!graphify-out'
+  # Preserve the existing commit-all product behavior without adding local graph queries/caches.
+  product=()
+  while IFS= read -r -d '' file; do
+    [[ "$file" == graphify-out/* ]] || product+=("$file")
+  done < <(git ls-files -z --modified --deleted --others --exclude-standard)
+  if ((${#product[@]})); then git add -- "${product[@]}"; fi
 
   # A release commit (full-cycle.sh's Step 2 stages Info.plist on every bump) needs a
   # version/bump/release/build keyword or .githooks/commit-msg rejects it — auto-tag so
@@ -87,15 +94,9 @@ if [[ -n "$(git status --porcelain)" ]]; then
     fi
   fi
 
-  git commit -m "$msg"
+  GRAPHIFY_SKIP_HOOK=1 git commit -m "$msg"
 else
   echo "Nothing to commit — using existing commit(s)."
-fi
-
-# If graphify-out/ was refreshed earlier, commit it on its own commit per repo rules
-if [[ -n "$(git status --porcelain graphify-out)" ]]; then
-  git add graphify-out
-  git commit -m "chore(graphify): refresh" || true
 fi
 
 echo ""
