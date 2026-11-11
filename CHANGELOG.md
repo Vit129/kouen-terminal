@@ -5,6 +5,12 @@ All notable changes to Kouen are documented here. The format is based on
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Each released version
 has a matching `vX.Y.Z` tag and a signed, notarized DMG on
 [GitHub Releases](https://github.com/Vit129/kouen-terminal/releases).
+## [4.22.15] - 2026-11-11
+
+### Fixed
+- Refresh Graphify before every commit and keep graph in the same commit ([`fb35c00`](https://github.com/Vit129/kouen-terminal/commit/fb35c00477e42624ab8bbd9748c61b5ce6d24ef5))
+
+
 ## [4.22.14] - 2026-11-07
 
 ### Fixed

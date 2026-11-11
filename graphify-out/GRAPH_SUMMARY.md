@@ -1,15 +1,15 @@
-# Graph Summary — graphify-commit-flows-20261109
+# Graph Summary — kouen-terminal
 _Auto-generated from GRAPH_REPORT.md · do not edit manually_
 _Regen: `graphify update .`_
 
 ## Summary
-- 20085 nodes · 58282 edges · 2654 communities (1514 shown, 1140 thin omitted)
-- Extraction: 85% EXTRACTED · 15% INFERRED · 0% AMBIGUOUS · INFERRED: 8903 edges (avg confidence: 0.74)
+- 19949 nodes · 57917 edges · 2787 communities (1507 shown, 1280 thin omitted)
+- Extraction: 85% EXTRACTED · 15% INFERRED · 0% AMBIGUOUS · INFERRED: 8852 edges (avg confidence: 0.74)
 - Token cost: 0 input · 0 output
 
 
 ## Graph Freshness
-- Built from commit: `bf6cfd1f`
+- Built from commit: `f540c09c`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -32,15 +32,15 @@ A high-degree node isn't always architecturally central - a widely-used
 utility/config file can rack up more edges than a real coupler while only
 ever touching one area. This ranks by how many DIFFERENT communities a
 node's neighbors span, not by raw edge count.
-1. `IPCRequest` - bridges 187 areas (208 edges)
+1. `IPCRequest` - bridges 189 areas (208 edges)
 2. `Command` - bridges 102 areas (108 edges)
-3. `AgentKind` - bridges 85 areas (176 edges)
-4. `t()` - bridges 84 areas (253 edges)
-5. `IPCResponse` - bridges 79 areas (103 edges)
-6. `KouenTerminalSurfaceView` - bridges 78 areas (345 edges)
-7. `KouenPaths` - bridges 70 areas (150 edges)
-8. `NSView` - bridges 67 areas (193 edges)
-9. `KouenGridTerminal` - bridges 65 areas (117 edges)
+3. `AgentKind` - bridges 86 areas (176 edges)
+4. `IPCResponse` - bridges 78 areas (103 edges)
+5. `t()` - bridges 77 areas (253 edges)
+6. `KouenTerminalSurfaceView` - bridges 76 areas (345 edges)
+7. `SessionCoordinator` - bridges 67 areas (235 edges)
+8. `NSView` - bridges 64 areas (193 edges)
+9. `KouenGridTerminal` - bridges 64 areas (117 edges)
 
 ## Surprising Connections (you probably didn't know these)
 - `.selectedHost` --references--> `RemoteHost`  [INFERRED]
