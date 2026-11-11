@@ -10,7 +10,6 @@ has a matching `vX.Y.Z` tag and a signed, notarized DMG on
 ### Fixed
 - Refresh Graphify before every commit and keep graph in the same commit ([`fb35c00`](https://github.com/Vit129/kouen-terminal/commit/fb35c00477e42624ab8bbd9748c61b5ce6d24ef5))
 
-
 ## [4.22.14] - 2026-11-07
 
 ### Fixed
