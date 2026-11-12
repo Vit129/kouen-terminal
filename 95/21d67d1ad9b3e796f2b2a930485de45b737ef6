@@ -1,0 +1,33 @@
+graphify-out/memory/query_20261112_020054_what_commands_build_and_test_kouen_and_prepare_gra.md
+  s_674546c028d4ca::t_54807208cc8288 1-17
+graphify-out/memory/query_20261111_063409_kouen_terminal_product_features_agent_workspace_br.md
+  s_d28a87b694cb5e::t_3b25658085f95e 1-22
+graphify-out/memory/query_20261111_065148_session_persistence_focus_routing_browser_disposal.md
+  s_d28a87b694cb5e::t_71fd5069e38aad 1-23
+graphify-out/memory/query_20261111_145916_how_should_checkpointmanager_restore_preserve_the.md
+  s_d28a87b694cb5e::t_cbfff5453b5438 1-23
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.3",
+  "base_commit_sha": "9521d67d1ad9b3e796f2b2a930485de45b737ef6",
+  "prompts": {},
+  "sessions": {
+    "s_674546c028d4ca": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1cd6f-5901-72a1-97c7-0472d85fc1ac",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "Vit129 <vitosk129@gmail.com>"
+    },
+    "s_d28a87b694cb5e": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1c94f-0af2-7bc0-9067-c1416f169781",
+        "model": "gpt-6-luna"
+      },
+      "human_author": "Vit129 <vitosk129@gmail.com>"
+    }
+  }
+}
