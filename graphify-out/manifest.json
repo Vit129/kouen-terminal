@@ -4250,13 +4250,13 @@
     "semantic_hash": ""
   },
   "Packages/KouenCore/Sources/KouenCore/Worktree/CheckpointManager.swift": {
-    "mtime": 1789981112.4669223,
-    "ast_hash": "76ccf02bfdbe7dd087a77f735392c50a",
+    "mtime": 1794408963.813705,
+    "ast_hash": "50788c351da1599ea38443dfdd20a82d",
     "semantic_hash": ""
   },
   "Tests/KouenCoreTests/CheckpointManagerTests.swift": {
-    "mtime": 1789981112.47409,
-    "ast_hash": "c6537ce5f2dc4662f9eeca62742ef600",
+    "mtime": 1794408886.9347403,
+    "ast_hash": "ca9618179aed278f2af687c76579d303",
     "semantic_hash": ""
   },
   "Tests/KouenCoreTests/VerificationRunnerTests.swift": {
@@ -4812,6 +4812,16 @@
   "graphify-out/memory/query_20261111_065148_session_persistence_focus_routing_browser_disposal.md": {
     "mtime": 1794379908.1817014,
     "ast_hash": "f587b5d800965bebb5e2154f6cc85256",
+    "semantic_hash": ""
+  },
+  "graphify-out/memory/query_20261111_145916_how_should_checkpointmanager_restore_preserve_the.md": {
+    "mtime": 1794409156.2390342,
+    "ast_hash": "67470d881a789bc2bc358cf818ccea6e",
+    "semantic_hash": ""
+  },
+  "graphify-out/memory/query_20261112_020054_what_commands_build_and_test_kouen_and_prepare_gra.md": {
+    "mtime": 1794448854.1903138,
+    "ast_hash": "878327e691f2df178f55a21992859d39",
     "semantic_hash": ""
   }
 }

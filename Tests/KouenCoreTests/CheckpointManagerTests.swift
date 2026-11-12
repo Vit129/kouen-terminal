@@ -84,6 +84,27 @@ final class CheckpointManagerTests: XCTestCase {
         XCTAssertEqual(content, "v2", "working tree must be back to the checkpointed content, not the later broken edit")
     }
 
+    func testRestorePreservesStagedIndexAndStagedFilesOutsideCheckpoint() throws {
+        FileManager.default.createFile(atPath: repoPath + "/deleted.txt", contents: "delete me".data(using: .utf8))
+        _ = shell("git add deleted.txt && git commit -m 'add deleted fixture'", in: repoPath)
+        try "checkpoint".write(toFile: repoPath + "/tracked.txt", atomically: true, encoding: .utf8)
+        _ = try XCTUnwrap(mgr.create(cwd: repoPath, session: "s5"))
+
+        try "staged version".write(toFile: repoPath + "/tracked.txt", atomically: true, encoding: .utf8)
+        _ = shell("git add tracked.txt", in: repoPath)
+        try "working version".write(toFile: repoPath + "/tracked.txt", atomically: true, encoding: .utf8)
+        FileManager.default.createFile(atPath: repoPath + "/staged-after-checkpoint.txt", contents: "keep me".data(using: .utf8))
+        _ = shell("git add staged-after-checkpoint.txt && git rm deleted.txt", in: repoPath)
+        let stagedTreeBefore = shell("git write-tree", in: repoPath)
+
+        XCTAssertTrue(mgr.restore(cwd: repoPath, session: "s5"))
+
+        XCTAssertEqual(shell("git write-tree", in: repoPath), stagedTreeBefore, "restore must not change the staged index")
+        XCTAssertEqual(try String(contentsOfFile: repoPath + "/tracked.txt", encoding: .utf8), "checkpoint")
+        XCTAssertEqual(try String(contentsOfFile: repoPath + "/staged-after-checkpoint.txt", encoding: .utf8), "keep me")
+        XCTAssertEqual(try String(contentsOfFile: repoPath + "/deleted.txt", encoding: .utf8), "delete me")
+    }
+
     func testRestoreWithNoCheckpointsReturnsFalse() {
         XCTAssertFalse(mgr.restore(cwd: repoPath, session: "never-checkpointed"))
     }
