@@ -5,6 +5,32 @@ All notable changes to Kouen are documented here. The format is based on
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Each released version
 has a matching `vX.Y.Z` tag and a signed, notarized DMG on
 [GitHub Releases](https://github.com/Vit129/kouen-terminal/releases).
+## [4.22.15] - 2026-11-11
+
+### Fixed
+- Refresh Graphify before every commit and keep graph in the same commit ([`fb35c00`](https://github.com/Vit129/kouen-terminal/commit/fb35c00477e42624ab8bbd9748c61b5ce6d24ef5))
+
+## [4.22.14] - 2026-11-07
+
+### Fixed
+- Read only the log tail so a huge job log no longer spikes app memory ([`d78b1d3`](https://github.com/Vit129/kouen-terminal/commit/d78b1d394925af0d06daa79f673b1fe1797154dc))
+- Let make start release from a worktree when only graphify-out is dirty in main ([`69b2665`](https://github.com/Vit129/kouen-terminal/commit/69b266584d82fbd5de81c1c6d58dc27cd5d3620e))
+
+## [4.22.13] - 2026-11-07
+
+### Fixed
+- Stop ProcessRunner.run from blocking forever on an open pipe ([`a530bcb`](https://github.com/Vit129/kouen-terminal/commit/a530bcb69c1e78e64f2db78a40b3ab573467e5f8))
+
+## [4.22.12] - 2026-11-06
+
+### Documentation
+- Record that the fleet/tab-bar memory guards have landed ([`39549c8`](https://github.com/Vit129/kouen-terminal/commit/39549c85e878b5ea644b184e885606fa811566fb))
+
+### Fixed
+- Stop fleet/tab-bar republishing on unchanged snapshots ([`debca87`](https://github.com/Vit129/kouen-terminal/commit/debca874c4acfc3ea930a1c4399307f46be77fd9))
+- Drain autoreleased JSON per transcript during history scans ([`acfab00`](https://github.com/Vit129/kouen-terminal/commit/acfab003895e646bb5c15d0b22c938c12df9cf6e))
+- Release memory during history scans ([`b004679`](https://github.com/Vit129/kouen-terminal/commit/b004679a9db62ca88b43351323ca085f1b639cf5))
+
 ## [4.22.11] - 2026-11-03
 
 ### Fixed

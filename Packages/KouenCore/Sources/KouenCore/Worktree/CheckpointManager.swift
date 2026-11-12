@@ -89,11 +89,9 @@ public struct CheckpointManager: Sendable {
     public func restore(cwd: String, session: String, checkpoint: CheckpointInfo? = nil) -> Bool {
         let target = checkpoint ?? list(cwd: cwd, session: session).last
         guard let target else { return false }
-        // `git checkout <commit> -- .` restores tracked-file contents from the checkpoint without
-        // touching HEAD/branch. Untracked files the checkpoint captured are NOT restored this way
-        // (checkout only ever touches tracked paths) — acceptable: undo is a safety net for
-        // "agent edited files badly," not a full filesystem snapshot restore.
-        return runGit(["checkout", target.commit, "--", "."], in: cwd)
+        // Restore only the worktree so staged changes remain in the user's index. Overlay mode
+        // retains paths added after the checkpoint, matching the prior checkout behavior.
+        return runGit(["restore", "--source=\(target.commit)", "--worktree", "--overlay", "--", "."], in: cwd)
     }
 
     // MARK: - Private

@@ -80,6 +80,19 @@ final class ProcessRunnerTests: XCTestCase {
         XCTAssertTrue(elapsed < 3.0, "20 concurrent 1s sleep calls took \(elapsed)s (expected < 3.0s)")
     }
 
+    /// Regression: a sync `run` with no timeout waited for pipe EOF, not for the process. When
+    /// something else kept the pipe's write end open after git exited, every caller blocked forever;
+    /// in the app all cooperative threads ended up stuck there and new Tasks piled up in memory.
+    func testProcessRunner_ReturnsWhenProcessExitsEvenIfPipeStaysOpen() {
+        let start = Date()
+        // The backgrounded sleep inherits stdout and keeps the pipe open after sh exits.
+        let res = ProcessRunner.run(executable: "/bin/sh", arguments: ["-c", "echo hi; sleep 20 &"])
+        let elapsed = Date().timeIntervalSince(start)
+        XCTAssertTrue(res.isSuccess)
+        XCTAssertEqual(res.stdout.trimmingCharacters(in: .whitespacesAndNewlines), "hi")
+        XCTAssertTrue(elapsed < 5.0, "Expected return soon after sh exits, took \(elapsed)s")
+    }
+
     // MARK: - Merged Output & Stderr Retention
 
     func testProcessRunner_StderrRetentionAndMerge() async {

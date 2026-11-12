@@ -277,18 +277,17 @@ public enum ProcessRunner {
         let errBuf = OutputBuffer()
         let group = DispatchGroup()
 
-        group.enter()
-        DispatchQueue.global(qos: .userInitiated).async {
-            let data = outPipe.fileHandleForReading.readDataToEndOfFile()
-            outBuf.append(data)
-            group.leave()
-        }
-
-        group.enter()
-        DispatchQueue.global(qos: .userInitiated).async {
-            let data = errPipe.fileHandleForReading.readDataToEndOfFile()
-            errBuf.append(data)
-            group.leave()
+        // Read chunk by chunk so output already written is kept even when we stop waiting for EOF.
+        for (pipe, buf) in [(outPipe, outBuf), (errPipe, errBuf)] {
+            group.enter()
+            DispatchQueue.global(qos: .userInitiated).async {
+                while true {
+                    let chunk = pipe.fileHandleForReading.availableData
+                    if chunk.isEmpty { break }
+                    buf.append(chunk)
+                }
+                group.leave()
+            }
         }
 
         if let timeout, timeout > 0 {
@@ -311,7 +310,10 @@ public enum ProcessRunner {
                 return ProcessResult(exitCode: status, stdout: stdoutStr, stderr: stderrStr, isTimedOut: true)
             }
         } else {
-            group.wait()
+            // Wait on the process, not on pipe EOF: a leftover holder of the write end (a
+            // backgrounded grandchild, a git helper) would otherwise block the caller forever.
+            process.waitUntilExit()
+            _ = group.wait(timeout: .now() + 2)
         }
 
         process.waitUntilExit()

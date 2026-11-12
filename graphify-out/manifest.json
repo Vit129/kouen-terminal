@@ -680,7 +680,7 @@
     "semantic_hash": ""
   },
   "Apps/Kouen/Sources/KouenApp/UI/Terminal/TerminalTabBarView.swift": {
-    "mtime": 1793946225.745628,
+    "mtime": 1794449540.8988416,
     "ast_hash": "58c1bee85fb99eef53d624083b17f496",
     "semantic_hash": ""
   },
@@ -960,8 +960,8 @@
     "semantic_hash": ""
   },
   "Packages/KouenCore/Sources/KouenCore/KouenVersion.swift": {
-    "mtime": 1793946124.7829392,
-    "ast_hash": "6c3f8315317579efe91a67fdc7af15c2",
+    "mtime": 1794449529.5992508,
+    "ast_hash": "6c0a858c46d6ea5b2a3a653b6c8fc261",
     "semantic_hash": ""
   },
   "Packages/KouenCore/Sources/KouenCore/Layouts/LayoutTemplate.swift": {
@@ -1050,8 +1050,8 @@
     "semantic_hash": ""
   },
   "Packages/KouenCore/Sources/KouenCore/ReleaseNotes/GeneratedReleaseNotes.swift": {
-    "mtime": 1793946124.7866466,
-    "ast_hash": "c25fc6c839074fca6f3655a3d03b2d31",
+    "mtime": 1794449529.6005876,
+    "ast_hash": "bdca14f472271c72cb28818e0d202afd",
     "semantic_hash": ""
   },
   "Packages/KouenCore/Sources/KouenCore/ReleaseNotes/ReleaseNotes.swift": {
@@ -1175,8 +1175,8 @@
     "semantic_hash": ""
   },
   "Packages/KouenDaemon/Sources/KouenDaemon/SurfaceRegistry.swift": {
-    "mtime": 1793946187.7981613,
-    "ast_hash": "b64fd9bee091cdd2edf0042504af358d",
+    "mtime": 1794449529.6025374,
+    "ast_hash": "70cc8eb3c50a3e7b30fe5e5796d6a857",
     "semantic_hash": ""
   },
   "Packages/KouenDaemon/Sources/KouenDaemon/VersionBannerState.swift": {
@@ -1815,8 +1815,8 @@
     "semantic_hash": ""
   },
   "Scripts/bump-version.sh": {
-    "mtime": 1793946124.8642979,
-    "ast_hash": "f0db8275d8c18851f56b687152d2036a",
+    "mtime": 1794449529.602999,
+    "ast_hash": "adb6e9984c86e519e8a6fdef9a6c58c0",
     "semantic_hash": ""
   },
   "Scripts/cheat.sh": {
@@ -1835,8 +1835,8 @@
     "semantic_hash": ""
   },
   "Scripts/commit-push-merge.sh": {
-    "mtime": 1793946124.8653429,
-    "ast_hash": "b77655f8018e807b75c91e4d143a5a55",
+    "mtime": 1794449529.603416,
+    "ast_hash": "838aa35098c85a815d03ae8722e22f21",
     "semantic_hash": ""
   },
   "Scripts/completions/kouen-cli.fish": {
@@ -1855,8 +1855,8 @@
     "semantic_hash": ""
   },
   "Scripts/full-cycle.sh": {
-    "mtime": 1793946124.866335,
-    "ast_hash": "0208490020b9b79e00514266bf31f765",
+    "mtime": 1794449529.604004,
+    "ast_hash": "8f3c5bcb77df26a5b943311bc42df96d",
     "semantic_hash": ""
   },
   "Scripts/generate-app-icon.sh": {
@@ -1940,8 +1940,8 @@
     "semantic_hash": ""
   },
   "Scripts/start.mjs": {
-    "mtime": 1793946124.8699932,
-    "ast_hash": "7c4d20b76f88f7473afb55feb3c2ce69",
+    "mtime": 1794449529.6047966,
+    "ast_hash": "bdca615a491ee8e3f2b2703fc1f12449",
     "semantic_hash": ""
   },
   "Scripts/start.sh": {
@@ -3280,8 +3280,8 @@
     "semantic_hash": ""
   },
   "AGENTS.md": {
-    "mtime": 1793946124.693597,
-    "ast_hash": "e4574f470e95b160f97b46b36aeb01db",
+    "mtime": 1794449529.592945,
+    "ast_hash": "5b57590a5e34cfafb616783bf1026ead",
     "semantic_hash": ""
   },
   "Apps/Kouen/Resources/Fonts/SymbolsNerdFont-LICENSE.txt": {
@@ -3990,8 +3990,8 @@
     "semantic_hash": ""
   },
   "ARCHITECTURE.md": {
-    "mtime": 1793946124.6939998,
-    "ast_hash": "cd5dd14544d99feba5655cf00f2eaeed",
+    "mtime": 1794449529.593643,
+    "ast_hash": "55ce049f34cc7c9a65f81a683330a3b6",
     "semantic_hash": ""
   },
   "CONTEXT.md": {
@@ -4005,8 +4005,8 @@
     "semantic_hash": ""
   },
   "rules/build-release.md": {
-    "mtime": 1793946124.9803379,
-    "ast_hash": "599f00b390abc1cbd272386ab26513c9",
+    "mtime": 1794449529.6138768,
+    "ast_hash": "0eb627c28bc1f5ef3e114cfdb5b88a35",
     "semantic_hash": ""
   },
   "rules/concurrency.md": {
@@ -4075,8 +4075,8 @@
     "semantic_hash": ""
   },
   "Apps/Kouen/Sources/KouenApp/UI/Automations/AutomationsFleetModel.swift": {
-    "mtime": 1793946124.730292,
-    "ast_hash": "cd03b93874106935af6e2aa89e07ab71",
+    "mtime": 1794449529.5956473,
+    "ast_hash": "2e84e3e3175a91ed87eefead9b3aa61f",
     "semantic_hash": ""
   },
   "Apps/Kouen/Sources/KouenApp/UI/Automations/AutomationsFleetView.swift": {
@@ -4090,8 +4090,8 @@
     "semantic_hash": ""
   },
   "Apps/Kouen/Sources/KouenApp/UI/Archive/GitPanelView.swift": {
-    "mtime": 1793946124.7287984,
-    "ast_hash": "e322819089cc38017567267c77c282a9",
+    "mtime": 1794449529.5951457,
+    "ast_hash": "211fd6e0556fff61513b0da2f6409328",
     "semantic_hash": ""
   },
   "Packages/KouenCore/Sources/KouenCore/Features/FeatureStore.swift": {
@@ -4140,8 +4140,8 @@
     "semantic_hash": ""
   },
   "Packages/KouenCore/Sources/KouenCore/Agents/AgentHistoryScanner.swift": {
-    "mtime": 1793946124.7718759,
-    "ast_hash": "1f8142e0786b83a2626bd52c03eae4dc",
+    "mtime": 1794449529.5979998,
+    "ast_hash": "941e95323dd8e91c510d81e8d764caf3",
     "semantic_hash": ""
   },
   "Packages/KouenCore/Sources/KouenCore/Context/ContextResolutionEngine.swift": {
@@ -4180,8 +4180,8 @@
     "semantic_hash": ""
   },
   "Tests/KouenAppTests/AutomationsFleetModelTests.swift": {
-    "mtime": 1793946124.8817446,
-    "ast_hash": "6d49d10e3239d750f4406aad9a2826c5",
+    "mtime": 1794449529.605427,
+    "ast_hash": "e467a3ac4616a4c3104a7bd5b0bd0336",
     "semantic_hash": ""
   },
   "graphify-out/memory/query_20260919_125938_animatesidebar_setcontentleadinginset_mainsplitvie.md": {
@@ -4250,13 +4250,13 @@
     "semantic_hash": ""
   },
   "Packages/KouenCore/Sources/KouenCore/Worktree/CheckpointManager.swift": {
-    "mtime": 1793946124.7990131,
-    "ast_hash": "76ccf02bfdbe7dd087a77f735392c50a",
+    "mtime": 1794449529.6014285,
+    "ast_hash": "50788c351da1599ea38443dfdd20a82d",
     "semantic_hash": ""
   },
   "Tests/KouenCoreTests/CheckpointManagerTests.swift": {
-    "mtime": 1793946124.9090488,
-    "ast_hash": "c6537ce5f2dc4662f9eeca62742ef600",
+    "mtime": 1794449529.6059191,
+    "ast_hash": "ca9618179aed278f2af687c76579d303",
     "semantic_hash": ""
   },
   "Tests/KouenCoreTests/VerificationRunnerTests.swift": {
@@ -4715,13 +4715,13 @@
     "semantic_hash": ""
   },
   "Packages/KouenCore/Sources/KouenCore/Platform/ProcessRunner.swift": {
-    "mtime": 1793946124.7857141,
-    "ast_hash": "afe050f5eb5a567d9a089f03ab40dfd6",
+    "mtime": 1794449529.6000128,
+    "ast_hash": "414f1930246ad20b076e795851851e97",
     "semantic_hash": ""
   },
   "Tests/KouenCoreTests/ProcessRunnerTests.swift": {
-    "mtime": 1793946124.9163003,
-    "ast_hash": "7f9cec856dfd4af13c053ff219de5eeb",
+    "mtime": 1794449529.6063054,
+    "ast_hash": "cefd925a140e80e5495f9f8b7244dbf2",
     "semantic_hash": ""
   },
   "Apps/Kouen/Sources/KouenApp/UI/Chrome/WKWebViewConfiguration+ExtensibleSSO.swift": {
@@ -4787,6 +4787,41 @@
   "Tests/KouenCoreTests/FleetSessionListTests.swift": {
     "mtime": 1793946124.9119701,
     "ast_hash": "1b0a5f7099673bae4eb9caef4653e4d7",
+    "semantic_hash": ""
+  },
+  "Packages/KouenCore/Sources/KouenCore/Platform/GitCommitCommand.swift": {
+    "mtime": 1794449529.599483,
+    "ast_hash": "411531eee80898c54cf10a9bb52d12c2",
+    "semantic_hash": ""
+  },
+  "Scripts/graphify-commit.sh": {
+    "mtime": 1794449529.6042225,
+    "ast_hash": "3990278c42e0c4aad8778ab9e1eedddc",
+    "semantic_hash": ""
+  },
+  "Scripts/test_graphify_commit.py": {
+    "mtime": 1794449529.6050715,
+    "ast_hash": "23b71e3af5572479f374b26055543fd6",
+    "semantic_hash": ""
+  },
+  "graphify-out/memory/query_20261111_063409_kouen_terminal_product_features_agent_workspace_br.md": {
+    "mtime": 1794449529.6120818,
+    "ast_hash": "af5641191bcbf655818127e5497cfb7b",
+    "semantic_hash": ""
+  },
+  "graphify-out/memory/query_20261111_065148_session_persistence_focus_routing_browser_disposal.md": {
+    "mtime": 1794449529.612524,
+    "ast_hash": "f587b5d800965bebb5e2154f6cc85256",
+    "semantic_hash": ""
+  },
+  "graphify-out/memory/query_20261111_145916_how_should_checkpointmanager_restore_preserve_the.md": {
+    "mtime": 1794449529.6131928,
+    "ast_hash": "67470d881a789bc2bc358cf818ccea6e",
+    "semantic_hash": ""
+  },
+  "graphify-out/memory/query_20261112_020054_what_commands_build_and_test_kouen_and_prepare_gra.md": {
+    "mtime": 1794449529.6133919,
+    "ast_hash": "878327e691f2df178f55a21992859d39",
     "semantic_hash": ""
   }
 }

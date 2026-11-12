@@ -8,6 +8,7 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
+source "$ROOT/Scripts/graphify-commit.sh"
 
 usage() {
   cat <<'USAGE'
@@ -86,6 +87,7 @@ done
 # before Step 3 merges to main, so a dirty checkout can't leave main merged but untagged.
 if [[ "$(git rev-parse --git-dir)" == *"worktrees"* ]]; then
   main_repo="$(cd "$(dirname "$(git rev-parse --git-common-dir)")" && pwd)"
+  # Preserve pre-existing graph edits too; never discard them to synchronize main.
   if [[ -n "$(git -C "$main_repo" status --porcelain)" ]]; then
     echo "❌ Cannot release: main repo at $main_repo has uncommitted changes:" >&2
     git -C "$main_repo" status -s >&2
@@ -171,7 +173,8 @@ if [[ "$git_dir" == *"worktrees"* ]]; then
   git pull --ff-only origin main
 elif [[ "$prior_branch" != "main" ]]; then
   echo "Code merged to main — syncing local checkout."
-  git checkout main
+  # main already carries the refreshed graph committed with the code; skip the background rebuild.
+  GRAPHIFY_SKIP_HOOK=1 git checkout main
   git pull --ff-only origin main
   git branch -d "$prior_branch" 2>/dev/null || true
 fi
@@ -287,7 +290,10 @@ fi
 
 # Commit the updated CHANGELOG
 git add CHANGELOG.md docs/CHANGELOG-archive.md 2>/dev/null || git add CHANGELOG.md
-git commit -m "chore(release): update CHANGELOG for ${TAG}" || true
+prepare_graph_for_commit
+if ! git diff --cached --quiet; then
+  GRAPHIFY_SKIP_HOOK=1 git commit -m "chore(release): update CHANGELOG for ${TAG}"
+fi
 
 git tag -f "$TAG" -m "$TAG"
 git push origin main

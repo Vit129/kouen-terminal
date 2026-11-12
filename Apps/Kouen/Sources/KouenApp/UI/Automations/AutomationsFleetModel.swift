@@ -538,8 +538,18 @@ final class AutomationsFleetModel {
         ProcessRunner.run(executable: "/bin/launchctl", arguments: ["print", "gui/\(getuid())/\(label)"]).isSuccess
     }
 
-    nonisolated private static func tailLog(path: String, lines: Int) -> String? {
-        guard let content = try? String(contentsOfFile: path, encoding: .utf8) else { return nil }
+    /// Reads only the last 64 KB: job logs can grow to hundreds of MB, and loading the whole
+    /// file on every fleet refresh caused ~1 GB memory spikes in the app.
+    nonisolated static func tailLog(path: String, lines: Int, maxBytes: UInt64 = 64 * 1024) -> String? {
+        guard let handle = FileHandle(forReadingAtPath: path) else { return nil }
+        defer { try? handle.close() }
+        guard let size = try? handle.seekToEnd() else { return nil }
+        let start = size > maxBytes ? size - maxBytes : 0
+        guard (try? handle.seek(toOffset: start)) != nil,
+              let data = try? handle.readToEnd() else { return nil }
+        var content = String(decoding: data, as: UTF8.self)
+        // Drop the partial first line when reading started mid-file.
+        if start > 0, let nl = content.firstIndex(of: "\n") { content = String(content[content.index(after: nl)...]) }
         let allLines = content.split(separator: "\n", omittingEmptySubsequences: true)
         let tail = allLines.suffix(lines)
         return tail.isEmpty ? nil : tail.joined(separator: "\n")
