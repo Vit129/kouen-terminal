@@ -485,6 +485,22 @@ final class DaemonRoundTripTests: XCTestCase {
         return nil
     }
 
+    func testTaskMutationsPushWithoutChangingSnapshot() throws {
+        let client = DaemonClient()
+        guard case let .snapshot(before) = try client.request(.getSnapshot) else { return XCTFail("snapshot") }
+        let pushed = expectation(description: "task changes")
+        pushed.expectedFulfillmentCount = 3
+        let subscription = try client.subscribeSnapshot(label: "KouenGUI.tasks", onRevision: { _ in }, onTasksChanged: { pushed.fulfill() })
+        defer { subscription.cancel() }
+        usleep(200_000)
+        guard case let .taskInfo(task?) = try client.request(.taskCreate(sessionID: UUID(), title: "badge")) else { return XCTFail("create") }
+        _ = try client.request(.taskUpdate(id: task.id, title: nil, done: true, status: nil))
+        _ = try client.request(.taskDelete(id: task.id))
+        wait(for: [pushed], timeout: 5)
+        guard case let .snapshot(after) = try client.request(.getSnapshot) else { return XCTFail("snapshot") }
+        XCTAssertEqual(before.workspaces, after.workspaces)
+    }
+
     /// The `subscribeSnapshot` push: a layout mutation must deliver a `snapshotChanged`
     /// revision to subscribers (replaces the compositor's old 0.5s poll).
     func testSnapshotSubscriptionPushesRevisionOnMutation() throws {

@@ -16,6 +16,7 @@ final class DaemonSyncService {
     private(set) var snapshotRefreshTask: Task<Void, Never>?
     var pendingSnapshotRevision: Int?
     private var snapshotSub: DaemonSubscription?
+    private var taskSub: DaemonSubscription?
 
     init(coordinator: SessionCoordinator) {
         self.coord = coordinator
@@ -26,10 +27,12 @@ final class DaemonSyncService {
     func switchEndpoint(_ endpoint: Endpoint) {
         daemon.switchEndpoint(endpoint)
         snapshotSub = nil
+        taskSub = nil
         ensureSnapshotSubscription()
     }
 
     func ensureSnapshotSubscription() {
+        ensureTaskSubscription()
         guard snapshotSub == nil else { return }
         do {
             let endpoint = daemon.endpoint
@@ -77,6 +80,30 @@ final class DaemonSyncService {
             )
         } catch {
             fputs("Kouen: failed to subscribe to snapshot channel: \(error)\n", kouenStderr)
+        }
+    }
+
+    private func ensureTaskSubscription() {
+        guard taskSub == nil else { return }
+        do {
+            taskSub = try DaemonClient(endpoint: daemon.endpoint).subscribeSnapshot(
+                label: "KouenGUI.tasks",
+                onRevision: { _ in },
+                onTasksChanged: {
+                    DispatchQueue.main.async {
+                        NotificationCenter.default.post(name: NotificationBus.shared.tasksChanged, object: nil)
+                    }
+                },
+                onEnd: { [weak self] in
+                    Task { @MainActor in
+                        self?.taskSub = nil
+                        self?.ensureTaskSubscription()
+                    }
+                }
+            )
+            NotificationCenter.default.post(name: NotificationBus.shared.tasksChanged, object: nil)
+        } catch {
+            fputs("Kouen: failed to subscribe to task changes: \(error)\n", kouenStderr)
         }
     }
 

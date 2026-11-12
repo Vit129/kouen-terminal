@@ -45,6 +45,7 @@ public final class NotificationBus: @unchecked Sendable {
     public let notificationPosted = Notification.Name("KouenNotificationPosted")
     public let tabStatusChanged = Notification.Name("KouenTabStatusChanged")
     public let snapshotChanged = Notification.Name("KouenSnapshotChanged")
+    public let tasksChanged = Notification.Name("KouenTasksChanged")
     public let configReloaded = Notification.Name("KouenConfigReloaded")
     public let sendKeysRequested = Notification.Name("KouenSendKeysRequested")
     public let copyModeRequested = Notification.Name("KouenCopyModeRequested")

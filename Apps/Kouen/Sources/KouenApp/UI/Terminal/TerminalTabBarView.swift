@@ -592,21 +592,25 @@ private struct TabPillView: View {
             let workspaces = SessionCoordinator.shared.snapshot.workspaces
             guard taskRefresh.workspaces != workspaces else { return }
             taskRefresh.workspaces = workspaces
-            // snapshotChanged can fire many times per second (see ScriptRuntime.swift's own
-            // doc comment on the same notification) — debounce the same way GitPanelView's
-            // FSEvent-driven refresh does (cancel-and-reschedule, 0.5s quiet period) so this
-            // doesn't fire a fresh TaskDaemonBridge IPC round-trip per tab on every tick.
-            taskRefresh.task?.cancel()
-            taskRefresh.task = Task {
-                try? await Task.sleep(nanoseconds: 500_000_000)
-                guard !Task.isCancelled else { return }
-                await updateTasks()
-            }
+            scheduleTaskRefresh()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NotificationBus.shared.tasksChanged)) { _ in
+            scheduleTaskRefresh()
         }
         .onDisappear {
             taskRefresh.task?.cancel()
             taskRefresh.task = nil
             taskRefresh.workspaces = nil
+        }
+    }
+
+    private func scheduleTaskRefresh() {
+        // Coalesce snapshot and task events before querying the daemon.
+        taskRefresh.task?.cancel()
+        taskRefresh.task = Task {
+            try? await Task.sleep(nanoseconds: 500_000_000)
+            guard !Task.isCancelled else { return }
+            await updateTasks()
         }
     }
 

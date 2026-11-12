@@ -1,15 +1,15 @@
-# Graph Summary — kouen-terminal
+# Graph Summary — fix-task-badge-refresh
 _Auto-generated from GRAPH_REPORT.md · do not edit manually_
 _Regen: `graphify update .`_
 
 ## Summary
-- 19959 nodes · 57928 edges · 2805 communities (1521 shown, 1284 thin omitted)
-- Extraction: 85% EXTRACTED · 15% INFERRED · 0% AMBIGUOUS · INFERRED: 8854 edges (avg confidence: 0.74)
+- 19967 nodes · 58092 edges · 2656 communities (1489 shown, 1167 thin omitted)
+- Extraction: 85% EXTRACTED · 15% INFERRED · 0% AMBIGUOUS · INFERRED: 8858 edges (avg confidence: 0.74)
 - Token cost: 0 input · 0 output
 
 
 ## Graph Freshness
-- Built from commit: `4635ff22`
+- Built from commit: `20afbf28`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -23,7 +23,7 @@ _Regen: `graphify update .`_
 6. `TerminalEmulator` - 229 edges
 7. `SurfaceRegistry` - 224 edges
 8. `u()` - 219 edges
-9. `DaemonClient` - 212 edges
+9. `DaemonClient` - 214 edges
 10. `KouenCLI` - 210 edges
 
 
@@ -33,14 +33,14 @@ utility/config file can rack up more edges than a real coupler while only
 ever touching one area. This ranks by how many DIFFERENT communities a
 node's neighbors span, not by raw edge count.
 1. `IPCRequest` - bridges 190 areas (208 edges)
-2. `Command` - bridges 102 areas (108 edges)
-3. `AgentKind` - bridges 86 areas (176 edges)
-4. `t()` - bridges 84 areas (253 edges)
-5. `KouenTerminalSurfaceView` - bridges 79 areas (345 edges)
-6. `IPCResponse` - bridges 79 areas (103 edges)
-7. `SessionCoordinator` - bridges 68 areas (235 edges)
-8. `SurfaceRegistry` - bridges 65 areas (224 edges)
-9. `KouenGridTerminal` - bridges 65 areas (117 edges)
+2. `Command` - bridges 101 areas (108 edges)
+3. `AgentKind` - bridges 89 areas (176 edges)
+4. `t()` - bridges 83 areas (253 edges)
+5. `IPCResponse` - bridges 79 areas (104 edges)
+6. `KouenTerminalSurfaceView` - bridges 76 areas (345 edges)
+7. `KouenGridTerminal` - bridges 67 areas (117 edges)
+8. `SessionCoordinator` - bridges 65 areas (235 edges)
+9. `NSView` - bridges 64 areas (193 edges)
 
 ## Surprising Connections (you probably didn't know these)
 - `.selectedHost` --references--> `RemoteHost`  [INFERRED]
