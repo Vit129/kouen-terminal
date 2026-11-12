@@ -1,0 +1,568 @@
+.claude/rules/robot/android.md
+  s_674546c028d4ca::t_c913ff7118baaa 1-201
+Packages/KouenCore/Sources/KouenCore/ReleaseNotes/GeneratedReleaseNotes.swift
+  s_674546c028d4ca::t_c913ff7118baaa 1,8-9,12
+.claude/skills/playwright-testing/references/runtime-inspection.md
+  s_674546c028d4ca::t_c913ff7118baaa 1-187
+.claude/skills/test-scenario/references/ts-data-gen.md
+  s_674546c028d4ca::t_c913ff7118baaa 1-65
+.claude/skills/playwright-cli/references/storage-state.md
+  s_674546c028d4ca::t_c913ff7118baaa 1-275
+.claude/skills/ai-sdlc/phases/phase2-existing-asset-scan.md
+  s_674546c028d4ca::t_c913ff7118baaa 1-22
+.claude/skills/macos-swiftui/references/filesystem.md
+  s_674546c028d4ca::t_c913ff7118baaa 1-34
+.claude/skills/uxui-designer/data/styles.csv
+  s_674546c028d4ca::t_c913ff7118baaa 1-85
+.claude/skills/uxui-designer/scripts/core.py
+  s_674546c028d4ca::t_c913ff7118baaa 1-464
+.claude/skills/uxui-designer/data/stacks/jetpack-compose.csv
+  s_674546c028d4ca::t_c913ff7118baaa 1-53
+Packages/KouenCore/Sources/KouenCore/Platform/ProcessRunner.swift
+  s_674546c028d4ca::t_c913ff7118baaa 280-290,313-316
+Tests/KouenCoreTests/CheckpointManagerTests.swift
+  s_674546c028d4ca::t_c913ff7118baaa 87-107
+.claude/skills/uxui-designer/references/design-search/quick-reference.md
+  s_674546c028d4ca::t_c913ff7118baaa 1-240
+.claude/skills/reverse-engineer-anything/references/android-applications.md
+  s_674546c028d4ca::t_c913ff7118baaa 1-34
+.claude/skills/reverse-engineer-anything/references/connection-and-recovery.md
+  s_674546c028d4ca::t_c913ff7118baaa 1-127
+.claude/skills/frontend-dev/SKILL.md
+  s_674546c028d4ca::t_c913ff7118baaa 1-173
+.claude/skills/test-scenario/references/ts-design.md
+  s_674546c028d4ca::t_c913ff7118baaa 1-117
+.claude/skills/agent-ops/SKILL.md
+  s_674546c028d4ca::t_c913ff7118baaa 1-51
+.claude/skills/uxui-designer/data/landing.csv
+  s_674546c028d4ca::t_c913ff7118baaa 1-35
+.claude/skills/backend-dev/references/authentication.md
+  s_674546c028d4ca::t_c913ff7118baaa 1-58
+.claude/skills/uxui-designer/data/colors.csv
+  s_674546c028d4ca::t_c913ff7118baaa 1-193
+.claude/skills/ai-sdlc/phases/phase2-reuse-retest.md
+  s_674546c028d4ca::t_c913ff7118baaa 1-32
+.claude/hooks/graphify-guard.py
+  s_674546c028d4ca::t_c913ff7118baaa 1-229
+.claude/skills/uxui-designer/data/stacks/angular.csv
+  s_674546c028d4ca::t_c913ff7118baaa 1-51
+.claude/skills/uxui-designer/references/industry-rules/finance.md
+  s_674546c028d4ca::t_c913ff7118baaa 1-150
+.claude/rules/playwright/web-ui.md
+  s_674546c028d4ca::t_c913ff7118baaa 1-55
+.claude/skills/uxui-designer/scripts/search.py
+  s_674546c028d4ca::t_c913ff7118baaa 1-162
+.claude/docs/antigravity.md
+  s_674546c028d4ca::t_c913ff7118baaa 1-55
+.claude/skills/uxui-designer/references/industry-rules/README.md
+  s_674546c028d4ca::t_c913ff7118baaa 1-59
+.claude/skills/robotframework-testing/references/rf-code-review.md
+  s_674546c028d4ca::t_c913ff7118baaa 1-74
+.claude/skills/ai-sdlc/phases/phase3-qa-design.md
+  s_674546c028d4ca::t_c913ff7118baaa 1-39
+Packages/KouenDaemon/Sources/KouenDaemon/SurfaceRegistry.swift
+  s_674546c028d4ca::t_c913ff7118baaa 1948-1949
+.claude/skills/ai-sdlc/phases/phase2-reuse-table.md
+  s_674546c028d4ca::t_c913ff7118baaa 1-62
+.claude/skills/project-blueprint/SKILL.md
+  s_674546c028d4ca::t_c913ff7118baaa 1-31
+.claude/skills/robotframework-testing/references/appium-capabilities.md
+  s_674546c028d4ca::t_c913ff7118baaa 1-44
+.claude/rules/product-design.md
+  s_674546c028d4ca::t_c913ff7118baaa 1-150
+.claude/skills/uxui-designer/references/ux-writing.md
+  s_674546c028d4ca::t_c913ff7118baaa 1-58
+.claude/hooks/session-start-recent.py
+  s_674546c028d4ca::t_c913ff7118baaa 1-154
+.claude/skills/frontend-dev/references/shared/frontend-code-review.md
+  s_674546c028d4ca::t_c913ff7118baaa 1-96
+.claude/skills/macos-swiftui/SKILL.md
+  s_674546c028d4ca::t_c913ff7118baaa 1-91
+.claude/rules/coding/release.md
+  s_674546c028d4ca::t_c913ff7118baaa 1-26
+.claude/skills/backend-dev/references/env-config-standards.md
+  s_674546c028d4ca::t_c913ff7118baaa 1-131
+.claude/skills/uxui-designer/references/industry-rules/INDUSTRY_README.md
+  s_674546c028d4ca::t_c913ff7118baaa 1-80
+.claude/rules/coding.md
+  s_674546c028d4ca::t_c913ff7118baaa 1-216
+.claude/skills/frontend-dev/references/web/nextjs.md
+  s_674546c028d4ca::t_c913ff7118baaa 1-177
+.claude/rules/data-testid-mapping.md
+  s_674546c028d4ca::t_c913ff7118baaa 1-110
+.claude/skills/uxui-designer/references/color-and-contrast.md
+  s_674546c028d4ca::t_c913ff7118baaa 1-60
+.claude/skills/macos-swiftui/references/ui-components.md
+  s_674546c028d4ca::t_c913ff7118baaa 1-75
+.claude/skills/uxui-designer/references/spatial-design.md
+  s_674546c028d4ca::t_c913ff7118baaa 1-53
+.claude/rules/gui-fixes.md
+  s_674546c028d4ca::t_c913ff7118baaa 1-14
+.claude/docs/skill-learning.md
+  s_674546c028d4ca::t_c913ff7118baaa 1-88
+.claude/skills/backend-dev/references/error-handling-standards.md
+  s_674546c028d4ca::t_c913ff7118baaa 1-224
+.claude/skills/macos-swiftui/references/state-management.md
+  s_674546c028d4ca::t_c913ff7118baaa 1-77
+.claude/skills/uxui-designer/references/diversification-memory.md
+  s_674546c028d4ca::t_c913ff7118baaa 1-85
+.claude/skills/uxui-designer/data/stacks/nuxtjs.csv
+  s_674546c028d4ca::t_c913ff7118baaa 1-59
+.claude/skills/uxui-designer/data/stacks/vue.csv
+  s_674546c028d4ca::t_c913ff7118baaa 1-50
+.claude/scripts/memory_index.py
+  s_674546c028d4ca::t_c913ff7118baaa 1-48
+.claude/skills/performance-testing/references/k6-scripting.md
+  s_674546c028d4ca::t_c913ff7118baaa 1-113
+.claude/skills/ai-sdlc/references/dev-qa-pattern.md
+  s_674546c028d4ca::t_c913ff7118baaa 1-212
+.claude/skills/performance-testing/references/triage.md
+  s_674546c028d4ca::t_c913ff7118baaa 1-81
+.claude/skills/playwright-testing/references/component-testing.md
+  s_674546c028d4ca::t_c913ff7118baaa 1-165
+.claude/skills/git-safety/SKILL.md
+  s_674546c028d4ca::t_c913ff7118baaa 1-44
+.claude/skills/uxui-designer/references/industry-rules/ecommerce.md
+  s_674546c028d4ca::t_c913ff7118baaa 1-130
+.claude/skills/uxui-designer/data/app-interface.csv
+  s_674546c028d4ca::t_c913ff7118baaa 1-31
+.claude/skills/robotframework-testing/references/workflow.md
+  s_674546c028d4ca::t_c913ff7118baaa 1-122
+.claude/skills/uxui-designer/data/stacks/winui.csv
+  s_674546c028d4ca::t_c913ff7118baaa 1-60
+.claude/skills/playwright-cli/references/video-recording.md
+  s_674546c028d4ca::t_c913ff7118baaa 1-155
+.claude/skills/macos-swiftui/references/appkit-swiftui.md
+  s_674546c028d4ca::t_c913ff7118baaa 1-76
+.claude/skills/playwright-cli/references/playwright-tests.md
+  s_674546c028d4ca::t_c913ff7118baaa 1-39
+.claude/skills/ai-sdlc/references/dev-qa-handoff.md
+  s_674546c028d4ca::t_c913ff7118baaa 1-143
+.claude/skills/ai-sdlc/references/qa-automation-loop.md
+  s_674546c028d4ca::t_c913ff7118baaa 1-73
+.claude/skills/playwright-testing/references/workflow.md
+  s_674546c028d4ca::t_c913ff7118baaa 1-284
+.claude/scripts/skill_learning_report.py
+  s_674546c028d4ca::t_c913ff7118baaa 1-283
+.claude/skills/uxui-designer/data/stacks/swiftui.csv
+  s_674546c028d4ca::t_c913ff7118baaa 1-51
+.claude/skills/uxui-designer/references/industry-rules/emerging-tech.md
+  s_674546c028d4ca::t_c913ff7118baaa 1-130
+.claude/hooks/skill-capture-nudge.py
+  s_674546c028d4ca::t_c913ff7118baaa 1-204
+CHANGELOG.md
+  s_674546c028d4ca::t_c913ff7118baaa 8-33
+.claude/rules/robot/ios.md
+  s_674546c028d4ca::t_c913ff7118baaa 1-203
+.claude/skills/playwright-cli/references/test-generation.md
+  s_674546c028d4ca::t_c913ff7118baaa 1-433
+.claude/hooks/dirty-branch-switch-guard.py
+  s_674546c028d4ca::t_c913ff7118baaa 1-129
+.claude/skills/uxui-designer/references/figma.md
+  s_674546c028d4ca::t_c913ff7118baaa 1-66
+.claude/skills/uxui-designer/data/stacks/astro.csv
+  s_674546c028d4ca::t_c913ff7118baaa 1-54
+graphify-out/GRAPH_REPORT.md
+  s_674546c028d4ca::t_c913ff7118baaa 1,4,8-9,13,35-37,39-41,688,692,700,731,735,739,744,748,752,831,835,848,856,859,888,892,904,923-924,927-928,931,935,944,955-956,959-960,963-964,967-968,971-972,975-976,983-984,987-988,1007-1012,1015,1027-1028,1035,1059,1063-1064,1067-1072,1091-1092,1095-1096,1099,1103,1107-1108,1111-1112,1119-1120,1123-1124,1132,1139,1147,1155,1160,1163,1167-1168,1184,1199-1200,1203-1204,1207,1220,1231-1232,1247,1251-1252,1256,1263,1275-1276,1279-1284,1291-1292,1299,1311-1312,1319-1320,1323-1324,1327-1328,1331-1332,1335-1336,1339-1340,1343-1344,1347-1348,1351,1355-1356,1367-1368,1375-1376,1383,1387-1388,1396,1399-1400,1403-1408,1419,1431-1432,1435-1436,1439-1440,1447-1448,1459-1460,1463,1467-1468,1471-1472,1475-1476,1491-1492,1495-1496,1512,1527,1543-1548,1563-1564,1567-1568,1572,1575,1579,1587,1591-1592,1595-1596,1600,1607-1608,1619,1628,1639-1640,1643,1655-1656,1667-1668,1671-1672,1690-1693,1695,1707,1731,1755,1763,1787,1799,1815,1819,1827,1831,1847,1855,1871,1875,1879,1883,1891,1895,1907,1911,1947,1983,1987,2003,2007,2015,2031,2047,2143,2171,2187,2195,2379,2391,2411
+  s_674546c028d4ca::t_2319949a1b729c 64,67-68,71-72,76,84,87-88,91-92,103-104,107-108,111-112,115-116,119-120,124,127-128,135-136,139-140,143-144,147-148,151-152,155-156,160,163-164,171-172,175-176,179-180,183-184,188,200,203-204,207-208,212,215,223-224,227-228,236,240,244,252,255-256,260,271-272,275-276,279-280,283-284,287-288,292,295-296,299-300,303-304,315-316,319-320,323-324,327-328,331-332,335-336,339-340,343-344,347-348,351-352,355-356,359-360,363-364,368,371-372,375-376,387-388,396,399-400,403-404,407-408,412,415-416,419-420,423-424,428,432,443-444,447-448,451-452,455-456,459-460,463-464,472,475-476,480,487-488,499,503,508,519,524,527-528,531-532,535-536,539-540,543-544,547-548,551-552,555-556,559,563-564,567-568,571-572,575-576,579-580,583-584,587-588,591-592,595-596,603-604,608,611-612,619-620,623-624,635-636,639-640,647-648,655-656,671,683,687,691,695-696,699,703,707-708,711-712,719-720,723,732,740,743,747,751,759-760,763-764,768,771-772,775-776,783-784,791-792,795-796,799-800,804,807-808,811-812,819-820,832,836,839-840,843-844,847,860,875-876,880,887,891,899-900,903,915-916,919-920,1899,2079,2095,2231,2291,2487,2507
+  s_674546c028d4ca::t_89ec8a609e4afa 42-43
+  s_674546c028d4ca::t_86fc6867190150 1696
+  s_674546c028d4ca::t_dcaddf15f7983e 1708
+  s_674546c028d4ca::t_dd94c180443b1f 1732
+  s_674546c028d4ca::t_626ef5dbecd368 1756
+  s_674546c028d4ca::t_4aba804410e8c2 1764
+  s_674546c028d4ca::t_8177872b4037db 1788
+  s_674546c028d4ca::t_3010baeaf0c035 1798
+  s_674546c028d4ca::t_ddb49bdd489430 1816
+  s_674546c028d4ca::t_953fb780765307 1820
+  s_674546c028d4ca::t_61d42e52964f24 1828
+  s_674546c028d4ca::t_53a81149d9e443 1856
+  s_674546c028d4ca::t_b8fec5824c2940 1870
+  s_674546c028d4ca::t_a638c16c264746 1874
+  s_674546c028d4ca::t_b9bddb601ee8a2 1876-1877
+  s_674546c028d4ca::t_eef2f34fd3a248 1880
+  s_674546c028d4ca::t_98d643e6f7e267 1884
+  s_674546c028d4ca::t_62f274b4447eda 1892
+  s_674546c028d4ca::t_e4fc4b532e4ff5 1898
+  s_674546c028d4ca::t_7f73307b272120 1900-1901
+  s_674546c028d4ca::t_1f8d20f2d30dae 1908
+  s_674546c028d4ca::t_74a0e5ff3cf46b 1912
+  s_674546c028d4ca::t_45cad5d42555e6 1946
+  s_674546c028d4ca::t_52a120306a60c9 1948
+  s_674546c028d4ca::t_abe3e9f8785d7d 2002
+  s_674546c028d4ca::t_2d923bb38d067d 2004
+  s_674546c028d4ca::t_b11e55349d83a8 2008
+  s_674546c028d4ca::t_ef36addfad0552 2016
+  s_674546c028d4ca::t_31ff0617a1fbe9 2048
+  s_674546c028d4ca::t_882e4d887e5c41 2080
+  s_674546c028d4ca::t_968337a49b21b6 2096
+  s_674546c028d4ca::t_e3332185e78575 2144
+  s_674546c028d4ca::t_07d72f3558347a 2172
+  s_674546c028d4ca::t_ed4640800b373a 2188
+  s_674546c028d4ca::t_8c9313c5fe029a 2230
+  s_674546c028d4ca::t_0e0a8709db6ab5 2232
+  s_674546c028d4ca::t_33e8c0cc77f062 2380
+  s_674546c028d4ca::t_530764379686f8 2392
+  s_674546c028d4ca::t_fd79a753f9573e 2410
+  s_674546c028d4ca::t_4f7d0f1565291b 2412
+  s_674546c028d4ca::t_ecc673932ebcff 2486
+  s_674546c028d4ca::t_505543f966f5bb 2488
+  s_674546c028d4ca::t_2c35f4ebe9bf78 2505-2506
+  s_674546c028d4ca::t_55d499032eb1ce 2508-2510
+.claude/skills/uxui-designer/references/industry-rules/services.md
+  s_674546c028d4ca::t_c913ff7118baaa 1-141
+.claude/skills/backend-dev/references/validation-standards.md
+  s_674546c028d4ca::t_c913ff7118baaa 1-165
+.claude/rules/playwright/api.md
+  s_674546c028d4ca::t_c913ff7118baaa 1-45
+.claude/skills/uxui-designer/data/stacks/uno.csv
+  s_674546c028d4ca::t_c913ff7118baaa 1-60
+.claude/skills/ai-sdlc/phases/phase5-qa-verify.md
+  s_674546c028d4ca::t_c913ff7118baaa 1-24
+.claude/skills/backend-dev/references/api-design.md
+  s_674546c028d4ca::t_c913ff7118baaa 1-137
+.claude/skills/frontend-dev/references/web/tailwind-standards.md
+  s_674546c028d4ca::t_c913ff7118baaa 1-21
+.claude/skills/ai-sdlc/phases/phase1-interview.md
+  s_674546c028d4ca::t_c913ff7118baaa 1-33
+.claude/skills/robotframework-testing/SKILL.md
+  s_674546c028d4ca::t_c913ff7118baaa 1-169
+Scripts/start.mjs
+  s_674546c028d4ca::t_c913ff7118baaa 263-264
+.claude/skills/chief-of-staff/SKILL.md
+  s_674546c028d4ca::t_c913ff7118baaa 1-86
+.claude/skills/security/references/rules.md
+  s_674546c028d4ca::t_c913ff7118baaa 1-249
+.claude/skills/security/SKILL.md
+  s_674546c028d4ca::t_c913ff7118baaa 1-59
+graphify-out/GRAPH_SUMMARY.md
+  s_674546c028d4ca::t_c913ff7118baaa 6-7,12,36-38,40
+  s_674546c028d4ca::t_2319949a1b729c 43
+  s_674546c028d4ca::t_6c91c22cc42765 41-42
+graphify-out/manifest.json
+  s_674546c028d4ca::t_c913ff7118baaa 3283-3284
+.claude/skills/robotframework-testing/references/flutter-appium.md
+  s_674546c028d4ca::t_c913ff7118baaa 1-240
+.claude/skills/playwright-cli/references/element-attributes.md
+  s_674546c028d4ca::t_c913ff7118baaa 1-23
+.claude/skills/uxui-designer/scripts/validate_data.py
+  s_674546c028d4ca::t_c913ff7118baaa 1-114
+.claude/hooks/_aodd_secrets.py
+  s_674546c028d4ca::t_c913ff7118baaa 1-18
+.claude/skills/frontend-dev/references/shared/ui-states-standards.md
+  s_674546c028d4ca::t_c913ff7118baaa 1-71
+.claude/hooks/coding-rules-gate.py
+  s_674546c028d4ca::t_c913ff7118baaa 1-193
+.claude/skills/uxui-designer/references/study-verb.md
+  s_674546c028d4ca::t_c913ff7118baaa 1-209
+rules/build-release.md
+  s_674546c028d4ca::t_c913ff7118baaa 25,44-49
+.claude/hooks/memory-write-scan.py
+  s_674546c028d4ca::t_c913ff7118baaa 1-111
+.claude/skills/backend-dev/SKILL.md
+  s_674546c028d4ca::t_c913ff7118baaa 1-111
+.claude/skills/uxui-designer/data/charts.csv
+  s_674546c028d4ca::t_c913ff7118baaa 1-26
+.claude/skills/uxui-designer/data/stacks/nextjs.csv
+  s_674546c028d4ca::t_c913ff7118baaa 1-53
+.claude/skills/ai-sdlc/references/skill-routing.md
+  s_674546c028d4ca::t_c913ff7118baaa 1-35
+.claude/scripts/release.py
+  s_674546c028d4ca::t_c913ff7118baaa 1-175
+.claude/skills/scheduled-jobs/SKILL.md
+  s_674546c028d4ca::t_c913ff7118baaa 1-27
+.claude/skills/uxui-designer/references/design-system-README.md
+  s_674546c028d4ca::t_c913ff7118baaa 1-96
+.claude/skills/destructive-ops-verify/SKILL.md
+  s_674546c028d4ca::t_c913ff7118baaa 1-23
+.claude/skills/uxui-designer/references/design-search/pro-rules.md
+  s_674546c028d4ca::t_c913ff7118baaa 1-109
+Scripts/full-cycle.sh
+  s_674546c028d4ca::t_c913ff7118baaa 11,90,176-177,293-296
+.claude/agents/advisor.md
+  s_674546c028d4ca::t_c913ff7118baaa 1-24
+.claude/rules/playwright/pw-coding-standards.md
+  s_674546c028d4ca::t_c913ff7118baaa 1-102
+.claude/skills/housekeeping/SKILL.md
+  s_674546c028d4ca::t_c913ff7118baaa 1-33
+.claude/skills/playwright-testing/SKILL.md
+  s_674546c028d4ca::t_c913ff7118baaa 1-126
+.claude/skills/uxui-designer/data/icons.csv
+  s_674546c028d4ca::t_c913ff7118baaa 1-106
+.claude/skills/ai-sdlc/references/ai-sdlc-workflow-guide.md
+  s_674546c028d4ca::t_c913ff7118baaa 1-77
+.claude/skills/uxui-designer/data/stacks/javafx.csv
+  s_674546c028d4ca::t_c913ff7118baaa 1-76
+Apps/Kouen/Sources/KouenApp/Resources/Info.plist
+  s_674546c028d4ca::t_c913ff7118baaa 100,115
+Packages/KouenCore/Sources/KouenCore/Worktree/CheckpointManager.swift
+  s_674546c028d4ca::t_c913ff7118baaa 92-94
+Scripts/commit-push-merge.sh
+  s_674546c028d4ca::t_c913ff7118baaa 18,50-51,79-84,97
+.claude/skills/uxui-designer/data/ui-reasoning.csv
+  s_674546c028d4ca::t_c913ff7118baaa 1-162
+AGENTS.md
+  s_674546c028d4ca::t_c913ff7118baaa 51-302
+.claude/skills/uxui-designer/references/industry-rules/healthcare.md
+  s_674546c028d4ca::t_c913ff7118baaa 1-140
+graphify-out/memory/query_20261112_020054_what_commands_build_and_test_kouen_and_prepare_gra.md
+  s_674546c028d4ca::t_c913ff7118baaa 1-17
+.claude/skills/uxui-designer/data/stacks/wpf.csv
+  s_674546c028d4ca::t_c913ff7118baaa 1-57
+.claude/skills/robotframework-testing/references/python-db.md
+  s_674546c028d4ca::t_c913ff7118baaa 1-38
+.claude/skills/uxui-designer/data/stacks/uwp.csv
+  s_674546c028d4ca::t_c913ff7118baaa 1-56
+.claude/docs/codex.md
+  s_674546c028d4ca::t_c913ff7118baaa 1-20
+.claude/skills/test-scenario/SKILL.md
+  s_674546c028d4ca::t_c913ff7118baaa 1-130
+.claude/skills/ai-sdlc/phases/phase2-architect.md
+  s_674546c028d4ca::t_c913ff7118baaa 1-52
+.claude/skills/playwright-cli/references/running-code.md
+  s_674546c028d4ca::t_c913ff7118baaa 1-241
+.claude/skills/playwright-testing/references/explore-to-test.md
+  s_674546c028d4ca::t_c913ff7118baaa 1-155
+.claude/skills/uxui-designer/data/stacks/laravel.csv
+  s_674546c028d4ca::t_c913ff7118baaa 1-51
+.claude/skills/backend-dev/references/backend-code-review.md
+  s_674546c028d4ca::t_c913ff7118baaa 1-114
+.claude/skills/playwright-testing/references/recorder.md
+  s_674546c028d4ca::t_c913ff7118baaa 1-89
+.claude/skills/reverse-engineer-anything/references/runtime-observation.md
+  s_674546c028d4ca::t_c913ff7118baaa 1-28
+.claude/skills/robotframework-testing/references/rf7-features.md
+  s_674546c028d4ca::t_c913ff7118baaa 1-183
+.claude/skills/playwright-cli/references/request-mocking.md
+  s_674546c028d4ca::t_c913ff7118baaa 1-87
+.claude/skills/playwright-testing/references/postman-migration.md
+  s_674546c028d4ca::t_c913ff7118baaa 1-296
+.claude/hooks/subagent-rules.py
+  s_674546c028d4ca::t_c913ff7118baaa 1-52
+.claude/skills/reverse-engineer-anything/references/javascript-applications.md
+  s_674546c028d4ca::t_c913ff7118baaa 1-149
+.claude/skills/uxui-designer/data/stacks/react.csv
+  s_674546c028d4ca::t_c913ff7118baaa 1-54
+.claude/rules/playwright/test-patterns.md
+  s_674546c028d4ca::t_c913ff7118baaa 1-33
+.claude/skills/reverse-engineer-anything/SKILL.md
+  s_674546c028d4ca::t_c913ff7118baaa 1-222
+.claude/rules/coding/programming-language.md
+  s_674546c028d4ca::t_c913ff7118baaa 1-15
+.claude/skills/playwright-testing/references/playwright-code-review.md
+  s_674546c028d4ca::t_c913ff7118baaa 1-77
+.claude/skills/uxui-designer/data/stacks/shadcn.csv
+  s_674546c028d4ca::t_c913ff7118baaa 1-61
+Apps/Kouen/Sources/KouenApp/UI/Automations/AutomationsFleetModel.swift
+  s_674546c028d4ca::t_c913ff7118baaa 541-552
+.claude/skills/uxui-designer/references/audit-verb.md
+  s_674546c028d4ca::t_c913ff7118baaa 1-59
+.claude/rules/coding/project-blueprint.md
+  s_674546c028d4ca::t_c913ff7118baaa 1-129
+Packages/KouenCore/Sources/KouenCore/Platform/GitCommitCommand.swift
+  s_674546c028d4ca::t_c913ff7118baaa 1-35
+Scripts/test_graphify_commit.py
+  s_674546c028d4ca::t_c913ff7118baaa 1-150
+.claude/scripts/rea_check.py
+  s_674546c028d4ca::t_c913ff7118baaa 1-101
+.claude/skills/ai-sdlc/references/ai-sdlc-progress-spec.md
+  s_674546c028d4ca::t_c913ff7118baaa 1-237
+.claude/skills/playwright-cli/references/pr-attachments.md
+  s_674546c028d4ca::t_c913ff7118baaa 1-60
+.claude/skills/reverse-engineer-anything/references/native-and-artifacts.md
+  s_674546c028d4ca::t_c913ff7118baaa 1-167
+.claude/skills/uxui-designer/references/tech-stacks.md
+  s_674546c028d4ca::t_c913ff7118baaa 1-203
+.claude/skills/playwright-cli/references/session-management.md
+  s_674546c028d4ca::t_c913ff7118baaa 1-227
+.claude/rules/ai-sdlc-workflow.md
+  s_674546c028d4ca::t_c913ff7118baaa 1-144
+.claude/skills/playwright-testing/references/visual-regression.md
+  s_674546c028d4ca::t_c913ff7118baaa 1-139
+graphify-out/memory/query_20261111_145916_how_should_checkpointmanager_restore_preserve_the.md
+  s_674546c028d4ca::t_c913ff7118baaa 1-23
+.claude/skills/uxui-designer/data/stacks/flutter.csv
+  s_674546c028d4ca::t_c913ff7118baaa 1-53
+.claude/rules/robot/rf-coding-standards.md
+  s_674546c028d4ca::t_c913ff7118baaa 1-222
+.githooks/post-commit
+  s_674546c028d4ca::t_c913ff7118baaa 8-9
+.claude/skills/uxui-designer/references/responsive-design.md
+  s_674546c028d4ca::t_c913ff7118baaa 1-54
+.claude/skills/hook-authoring/SKILL.md
+  s_674546c028d4ca::t_c913ff7118baaa 1-44
+.claude/skills/uxui-designer/data/stacks/threejs.csv
+  s_674546c028d4ca::t_c913ff7118baaa 1-54
+.claude/skills/frontend-dev/references/web/react.md
+  s_674546c028d4ca::t_c913ff7118baaa 1-120
+.claude/rules/aodd.md
+  s_674546c028d4ca::t_c913ff7118baaa 1-101
+.claude/settings.json
+  s_674546c028d4ca::t_c913ff7118baaa 31-184,208
+graphify-out/memory/query_20261111_065148_session_persistence_focus_routing_browser_disposal.md
+  s_674546c028d4ca::t_c913ff7118baaa 1-23
+.claude/skills/frontend-dev/references/shared/navigation-standards.md
+  s_674546c028d4ca::t_c913ff7118baaa 1-33
+.claude/skills/performance-testing/SKILL.md
+  s_674546c028d4ca::t_c913ff7118baaa 1-106
+Packages/KouenCore/Sources/KouenCore/Agents/AgentHistoryScanner.swift
+  s_674546c028d4ca::t_c913ff7118baaa 638,1184-1190,1332,1590,1859-1864
+.claude/skills/macos-swiftui/references/drag-drop.md
+  s_674546c028d4ca::t_c913ff7118baaa 1-80
+.claude/skills/uxui-designer/references/industry-rules/tech-saas.md
+  s_674546c028d4ca::t_c913ff7118baaa 1-139
+Scripts/graphify-commit.sh
+  s_674546c028d4ca::t_c913ff7118baaa 1-14
+.claude/skills/uxui-designer/data/ux-guidelines.csv
+  s_674546c028d4ca::t_c913ff7118baaa 1-100
+.claude/hooks/secret-read-guard.py
+  s_674546c028d4ca::t_c913ff7118baaa 1-190
+.claude/agents/auditor.md
+  s_674546c028d4ca::t_c913ff7118baaa 1-26
+.claude/skills/playwright-testing/references/accessibility.md
+  s_674546c028d4ca::t_c913ff7118baaa 1-168
+.claude/skills/frontend-dev/references/shared/testability-standards.md
+  s_674546c028d4ca::t_c913ff7118baaa 1-80
+.claude/skills/uxui-designer/data/typography.csv
+  s_674546c028d4ca::t_c913ff7118baaa 1-75
+.claude/skills/playwright-testing/references/fix-generated-files.md
+  s_674546c028d4ca::t_c913ff7118baaa 1-1020
+.claude/skills/macos-swiftui/references/testing.md
+  s_674546c028d4ca::t_c913ff7118baaa 1-124
+.claude/skills/uxui-designer/data/react-performance.csv
+  s_674546c028d4ca::t_c913ff7118baaa 1-45
+.claude/skills/uxui-designer/references/interaction-design.md
+  s_674546c028d4ca::t_c913ff7118baaa 1-77
+.claude/skills/test-scenario/references/ts-maintenance.md
+  s_674546c028d4ca::t_c913ff7118baaa 1-78
+.claude/scripts/check_agy_proposal.py
+  s_674546c028d4ca::t_c913ff7118baaa 1-62
+.claude/skills/uxui-designer/references/industry-rules/lifestyle.md
+  s_674546c028d4ca::t_c913ff7118baaa 1-131
+.claude/hooks/work-log.py
+  s_674546c028d4ca::t_c913ff7118baaa 1-148
+.claude/skills/ai-sdlc/SKILL.md
+  s_674546c028d4ca::t_c913ff7118baaa 1-36
+.claude/skills/uxui-designer/data/stacks/nuxt-ui.csv
+  s_674546c028d4ca::t_c913ff7118baaa 1-71
+.claude/skills/frontend-dev/references/shared/error-handling-standards.md
+  s_674546c028d4ca::t_c913ff7118baaa 1-27
+.claude/skills/security/references/pipeline-scanning.md
+  s_674546c028d4ca::t_c913ff7118baaa 1-213
+Tests/KouenCoreTests/ProcessRunnerTests.swift
+  s_674546c028d4ca::t_c913ff7118baaa 83-95
+.claude/skills/playwright-testing/references/har-mocking.md
+  s_674546c028d4ca::t_c913ff7118baaa 1-138
+.claude/skills/uxui-designer/data/motion.csv
+  s_674546c028d4ca::t_c913ff7118baaa 1-17
+.claude/scripts/agent_ops_gather.py
+  s_674546c028d4ca::t_c913ff7118baaa 1-143
+.claude/skills/uxui-designer/references/reasoning-engine/four-stage-process.md
+  s_674546c028d4ca::t_c913ff7118baaa 1-184
+.claude/skills/playwright-testing/references/quick-automation.md
+  s_674546c028d4ca::t_c913ff7118baaa 1-65
+.claude/skills/uxui-designer/data/stacks/html-tailwind.csv
+  s_674546c028d4ca::t_c913ff7118baaa 1-56
+.claude/skills/uxui-designer/references/motion-design.md
+  s_674546c028d4ca::t_c913ff7118baaa 1-59
+.claude/skills/playwright-cli/SKILL.md
+  s_674546c028d4ca::t_c913ff7118baaa 1-481
+Packages/KouenCore/Sources/KouenCore/KouenVersion.swift
+  s_674546c028d4ca::t_c913ff7118baaa 15,18
+.claude/skills/backend-dev/references/database-design.md
+  s_674546c028d4ca::t_c913ff7118baaa 1-47
+.claude/skills/uxui-designer/data/stacks/avalonia.csv
+  s_674546c028d4ca::t_c913ff7118baaa 1-57
+.claude/skills/uxui-designer/data/google-fonts.csv
+  s_674546c028d4ca::t_c913ff7118baaa 1-1924
+.claude/skills/uxui-designer/references/extract.md
+  s_674546c028d4ca::t_c913ff7118baaa 1-51
+.claude/docs/audit.md
+  s_674546c028d4ca::t_c913ff7118baaa 1-28
+.claude/rules/coding/output-and-workflow.md
+  s_674546c028d4ca::t_c913ff7118baaa 1-20
+.claude/skills/playwright-testing/references/db-writer.md
+  s_674546c028d4ca::t_c913ff7118baaa 1-84
+.claude/skills/reverse-engineer-anything/references/evidence-workflows.md
+  s_674546c028d4ca::t_c913ff7118baaa 1-48
+.claude/skills/frontend-dev/references/shared/logging-standards.md
+  s_674546c028d4ca::t_c913ff7118baaa 1-26
+.claude/skills/uxui-designer/references/craft.md
+  s_674546c028d4ca::t_c913ff7118baaa 1-58
+.claude/skills/uxui-designer/references/typography.md
+  s_674546c028d4ca::t_c913ff7118baaa 1-93
+graphify-out/.graphify_labels.json
+  s_674546c028d4ca::t_c913ff7118baaa 460,479,482-483,490,497,500,504-505,519,536,563,602,626,685,703,711,713,720,737,755,777,780,811-812,825-827,881,884,889,891,896,898-900,903-905,907-918,921
+.claude/skills/uxui-designer/data/stacks/react-native.csv
+  s_674546c028d4ca::t_c913ff7118baaa 1-52
+.claude/skills/uxui-designer/scripts/design_system.py
+  s_674546c028d4ca::t_c913ff7118baaa 1-1479
+.claude/skills/uxui-designer/data/products.csv
+  s_674546c028d4ca::t_c913ff7118baaa 1-193
+.claude/hooks/auditor-readonly.py
+  s_674546c028d4ca::t_c913ff7118baaa 1-48
+.claude/skills/uxui-designer/SKILL.md
+  s_674546c028d4ca::t_c913ff7118baaa 1-344
+.claude/rules/gemini-prompting.md
+  s_674546c028d4ca::t_c913ff7118baaa 1-93
+.claude/skills/backend-dev/references/logging-standards.md
+  s_674546c028d4ca::t_c913ff7118baaa 1-169
+.claude/skills/playwright-testing/references/property-testing.md
+  s_674546c028d4ca::t_c913ff7118baaa 1-31
+Tests/KouenAppTests/AutomationsFleetModelTests.swift
+  s_674546c028d4ca::t_c913ff7118baaa 62-72
+.claude/scripts/audit.py
+  s_674546c028d4ca::t_c913ff7118baaa 1-213
+.claude/skills/backend-dev/references/docker.md
+  s_674546c028d4ca::t_c913ff7118baaa 1-86
+.claude/skills/uxui-designer/references/redesign-verb.md
+  s_674546c028d4ca::t_c913ff7118baaa 1-72
+graphify-out/memory/query_20261111_063409_kouen_terminal_product_features_agent_workspace_br.md
+  s_674546c028d4ca::t_c913ff7118baaa 1-22
+.claude/skills/performance-testing/references/frontend-performance.md
+  s_674546c028d4ca::t_c913ff7118baaa 1-109
+.claude/skills/robotframework-testing/references/browser-library.md
+  s_674546c028d4ca::t_c913ff7118baaa 1-165
+.claude/rules/playwright/cli-session.md
+  s_674546c028d4ca::t_c913ff7118baaa 1-15
+.claude/skills/uxui-designer/data/stacks/svelte.csv
+  s_674546c028d4ca::t_c913ff7118baaa 1-54
+.claude/hooks/done-gate.py
+  s_674546c028d4ca::t_c913ff7118baaa 1-178
+Apps/Kouen/Sources/KouenApp/UI/Archive/GitPanelView.swift
+  s_674546c028d4ca::t_c913ff7118baaa 1365,1426-1427
+.claude/skills/playwright-cli/references/tracing.md
+  s_674546c028d4ca::t_c913ff7118baaa 1-139
+.claude/skills/uxui-designer/references/industry-rules/creative.md
+  s_674546c028d4ca::t_c913ff7118baaa 1-130
+.claude/rules/coding/review-report.md
+  s_674546c028d4ca::t_c913ff7118baaa 1-61
+.claude/skills/ai-sdlc/phases/phase4-dev.md
+  s_674546c028d4ca::t_c913ff7118baaa 1-45
+.claude/hooks/_aodd_paths.py
+  s_674546c028d4ca::t_c913ff7118baaa 1-97
+.claude/skills/frontend-dev/references/shared/env-config-standards.md
+  s_674546c028d4ca::t_c913ff7118baaa 1-125
+.claude/hooks/memory-recall.py
+  s_674546c028d4ca::t_c913ff7118baaa 1-240
+ARCHITECTURE.md
+  s_674546c028d4ca::t_c913ff7118baaa 339-342
+Scripts/bump-version.sh
+  s_674546c028d4ca::t_c913ff7118baaa 10,48
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.3",
+  "base_commit_sha": "65fd518b4123df79a9f8cde7bfd65cea4267e4a7",
+  "prompts": {},
+  "sessions": {
+    "s_674546c028d4ca": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1cd6f-5901-72a1-97c7-0472d85fc1ac",
+        "model": "gpt-6.1-terra"
+      },
+      "human_author": "Vit129 <vitosk129@gmail.com>"
+    }
+  }
+}
