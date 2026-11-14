@@ -1,0 +1,33 @@
+Tests/KouenAppTests/MarkdownPreviewTests.swift
+  s_ba3fae7fe129a9::t_8967f167164ea8 9,182-257
+ARCHITECTURE.md
+  s_ba3fae7fe129a9::t_b1969154e47aaf 113,343-346
+Apps/Kouen/Sources/KouenApp/UI/FileEditor/MarkdownImageSchemeHandler.swift
+  s_ba3fae7fe129a9::t_0fd23eaef7d020 1-56
+Apps/Kouen/Sources/KouenApp/UI/FileEditor/MarkdownPreviewView.swift
+  s_ba3fae7fe129a9::t_d9d68ae4e95820 10,46,68,192-197,273,295,302,608,622-623,665,691,712-716,724-725,754
+graphify-out/GRAPH_REPORT.md
+  s_ba3fae7fe129a9::t_4ca0add61c1004 4,13
+graphify-out/GRAPH_SUMMARY.md
+  s_ba3fae7fe129a9::t_cd8aebea8a0b29 12
+Packages/KouenSyntaxResources/Resources/Markdown/DOMPurify-LICENSE.txt
+  s_ba3fae7fe129a9::t_b2bd1fc58c9490 1-202
+Packages/KouenSyntaxResources/Resources/Markdown/purify.min.js
+  s_ba3fae7fe129a9::t_e7e01944e279e9 1-7
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.3",
+  "base_commit_sha": "498b90a077be425b9b63f90ae17ee54fb7118305",
+  "prompts": {},
+  "sessions": {
+    "s_ba3fae7fe129a9": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1d798-2970-7e80-9cfb-5fee5b184ea2",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "Vit129 <vitosk129@gmail.com>"
+    }
+  }
+}
