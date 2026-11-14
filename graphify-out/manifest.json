@@ -3905,8 +3905,8 @@
     "semantic_hash": ""
   },
   "Tests/KouenAppTests/MarkdownPreviewTests.swift": {
-    "mtime": 1794619200.2195866,
-    "ast_hash": "219c13c53bf8eee0467678772c9e85e0",
+    "mtime": 1794619581.1040173,
+    "ast_hash": "db22b291cab0f559e502ba4abbd491f0",
     "semantic_hash": ""
   },
   "Apps/Kouen/Sources/KouenApp/Services/SwarmDaemonBridge.swift": {
@@ -3980,8 +3980,8 @@
     "semantic_hash": ""
   },
   "Tests/KouenMCPTests/SSETransportTests.swift": {
-    "mtime": 1794619141.2657435,
-    "ast_hash": "175522c75d38753f9e21e925170fef83",
+    "mtime": 1794619492.0418901,
+    "ast_hash": "68ed72d00e1a0de6207ab905cf8d97da",
     "semantic_hash": ""
   },
   "Tools/kouen-mcp/Sources/KouenMCP/SSETransport.swift": {
@@ -4842,6 +4842,11 @@
   "Packages/KouenSyntaxResources/Resources/Markdown/DOMPurify-LICENSE.txt": {
     "mtime": 1794618763.1509402,
     "ast_hash": "3b83ef96387f14655fc854ddc3c6bd57",
+    "semantic_hash": ""
+  },
+  "graphify-out/memory/query_20261114_012223_where_are_the_wave_1_deadlock__http_transport_and.md": {
+    "mtime": 1794619343.1697583,
+    "ast_hash": "c9be348e5159315010b862078c285ebf",
     "semantic_hash": ""
   }
 }
