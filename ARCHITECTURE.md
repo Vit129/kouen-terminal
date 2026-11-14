@@ -110,7 +110,7 @@ no breakpoints, no Run button.
 2. **Remote Daemon (SSH Tunneling):**
    - Managed via `SSHTunnelManager` (`ssh -N -L <local>:<remote>`) exposing a local loopback Unix endpoint with transparent IPC.
 3. **kouen-mcp remote transport (HTTP/SSE):**
-   - Added v4.16.0 alongside stdio, with secure-by-default settings and the same tool registry as stdio. Bearer-token comparison was hardened against timing side-channels in P49.
+   - Added v4.16.0 alongside stdio, with the same tool registry. HTTP always requires a Bearer header (a per-process token is generated and printed if omitted), validates Host/Origin before reading the body, and exposes no wildcard CORS. Explicit remote binds remain supported. Stdio is unchanged.
 4. **Mobile bridge (Kouen Companion PWA, opt-in):**
    - `MobileBridgeServer` (P51) ships in `KouenDaemonCore`, gated by `mobileBridgeEnabled` (default `false`) and the `setMobileBridgeEnabled`/`mobile*` IPC messages. Un-deprecated and redesigned in 2026-10-09 (P51) as a zero-install Mobile PWA (Tailscale/LAN + QR pairing). Terminal emulation (xterm.js) was completely replaced with a native mobile-first chat feed (ANSI stripped to readable text), inline interactive diff/preview/draft-PR cards, slide-up review panels, and one-tap approvals.
 
@@ -340,3 +340,7 @@ One-line records; reasoning lives in each plan under `agent-memory/plans/`.
 ## Commit preparation
 
 CLI delivery entrypoints share `Scripts/graphify-commit.sh`. Git panel commit actions reach `SurfaceRegistry.runGitCommandInDaemon`, which configures `GitCommitCommand` for commit requests. Both await Graphify with deterministic hashing, stage tracked graph outputs, then commit the prepared index with only the Graphify post-commit rebuild suppressed. Release metadata/changelog commits use the same contract; failure blocks the next commit/push.
+
+## Markdown preview trust boundary
+
+Offline Marked/Highlight/Mermaid/DOMPurify bundles are injected as WKUserScripts. Parsed markdown and rendered Mermaid SVG are sanitized; Mermaid uses strict security and SVG text labels. A per-document nonce authorizes only the renderer script; CSP blocks connections, frames, forms, and external scripts. Copy buttons use a delegated event listener. Relative images use `MarkdownImageSchemeHandler`, which reads only image files beneath the document directory (including symlink resolution), caps images at 16 MiB, and reads off the main actor. Broad WebKit file-origin access is disabled; remote images and parent-directory images are intentionally blocked.
