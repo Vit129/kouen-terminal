@@ -1,0 +1,21 @@
+Apps/Kouen/Sources/KouenApp/Services/DaemonSyncService.swift
+  s_824dc91b169df4::t_59ea57d6fcc983 385-387,389,460-498
+Tests/KouenAppTests/DaemonSyncServiceBrowserLeafIdentityTests.swift
+  s_824dc91b169df4::t_d84f68f2c1c843 1-51
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.3",
+  "base_commit_sha": "d6ef9c6cd4017091549b5cfddd859682ce234121",
+  "prompts": {},
+  "sessions": {
+    "s_824dc91b169df4": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c2ac45a6-bf90-447c-8785-1284182c2dad",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Vit129 <vitosk129@gmail.com>"
+    }
+  }
+}
