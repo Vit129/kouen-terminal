@@ -1,0 +1,21 @@
+Apps/Kouen/Sources/KouenApp/UI/Chrome/BrowserPaneView.swift
+  s_824dc91b169df4::t_22349c06775f43 768,888-894,1801
+Tests/KouenAppTests/NetworkCaptureDecisionTests.swift
+  s_824dc91b169df4::t_8ad42044a86671 31-39
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.3",
+  "base_commit_sha": "05f5ceeacaa189c2b353060578d2441945d775e2",
+  "prompts": {},
+  "sessions": {
+    "s_824dc91b169df4": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c2ac45a6-bf90-447c-8785-1284182c2dad",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Vit129 <vitosk129@gmail.com>"
+    }
+  }
+}
