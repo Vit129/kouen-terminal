@@ -1,0 +1,19 @@
+graphify-out/memory/query_20261114_012223_where_are_the_wave_1_deadlock__http_transport_and.md
+  s_ba3fae7fe129a9::t_4f6c88832c99ba 1-24
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.3",
+  "base_commit_sha": "34a8d4edc1f780723b74ffaa9ca9f4144f4af866",
+  "prompts": {},
+  "sessions": {
+    "s_ba3fae7fe129a9": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1d798-2970-7e80-9cfb-5fee5b184ea2",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "Vit129 <vitosk129@gmail.com>"
+    }
+  }
+}
