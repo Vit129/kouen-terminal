@@ -15,8 +15,8 @@ final class DaemonSyncService {
     private var metadataTask: Task<Void, Never>?
     private(set) var snapshotRefreshTask: Task<Void, Never>?
     var pendingSnapshotRevision: Int?
-    private var snapshotSub: DaemonSubscription?
-    private var taskSub: DaemonSubscription?
+    private let snapshotSub = ResubscribingSlot<DaemonSubscription>()
+    private let taskSub = ResubscribingSlot<DaemonSubscription>()
 
     init(coordinator: SessionCoordinator) {
         self.coord = coordinator
@@ -26,18 +26,18 @@ final class DaemonSyncService {
 
     func switchEndpoint(_ endpoint: Endpoint) {
         daemon.switchEndpoint(endpoint)
-        snapshotSub = nil
-        taskSub = nil
+        snapshotSub.reset()
+        taskSub.reset()
         ensureSnapshotSubscription()
     }
 
     func ensureSnapshotSubscription() {
         ensureTaskSubscription()
-        guard snapshotSub == nil else { return }
-        do {
-            let endpoint = daemon.endpoint
-            let client = DaemonClient(endpoint: endpoint)
-            snapshotSub = try client.subscribeSnapshot(
+        snapshotSub.ensure { [weak self] onEnd in
+            // `onEnd` (daemon restart / dropped socket) re-subscribes through the slot, which
+            // ignores the end of a subscription `switchEndpoint` already replaced.
+            let client = DaemonClient(endpoint: self?.daemon.endpoint ?? .localControlSocket)
+            return try client.subscribeSnapshot(
                 label: "KouenGUI",
                 onRevision: { [weak self] revision in
                     guard let self else { return }
@@ -69,24 +69,15 @@ final class DaemonSyncService {
                     // uses when a background agent event needs attention).
                     Task { @MainActor in AgentNotchWindowActivator.bringKouenToFront() }
                 },
-                onEnd: { [weak self] in
-                    // Daemon restarted or socket dropped — clear the dead sub so
-                    // ensureSnapshotSubscription() can re-subscribe on next call.
-                    Task { @MainActor in
-                        self?.snapshotSub = nil
-                        self?.ensureSnapshotSubscription()
-                    }
-                }
+                onEnd: onEnd
             )
-        } catch {
-            fputs("Kouen: failed to subscribe to snapshot channel: \(error)\n", kouenStderr)
         }
     }
 
     private func ensureTaskSubscription() {
-        guard taskSub == nil else { return }
-        do {
-            taskSub = try DaemonClient(endpoint: daemon.endpoint).subscribeSnapshot(
+        let hadSub = taskSub.current != nil
+        taskSub.ensure { [weak self] onEnd in
+            try DaemonClient(endpoint: self?.daemon.endpoint ?? .localControlSocket).subscribeSnapshot(
                 label: "KouenGUI.tasks",
                 onRevision: { _ in },
                 onTasksChanged: {
@@ -94,16 +85,11 @@ final class DaemonSyncService {
                         NotificationCenter.default.post(name: NotificationBus.shared.tasksChanged, object: nil)
                     }
                 },
-                onEnd: { [weak self] in
-                    Task { @MainActor in
-                        self?.taskSub = nil
-                        self?.ensureTaskSubscription()
-                    }
-                }
+                onEnd: onEnd
             )
+        }
+        if !hadSub, taskSub.current != nil {
             NotificationCenter.default.post(name: NotificationBus.shared.tasksChanged, object: nil)
-        } catch {
-            fputs("Kouen: failed to subscribe to task changes: \(error)\n", kouenStderr)
         }
     }
 
@@ -396,47 +382,11 @@ final class DaemonSyncService {
 
     private func applySnapshot(_ remote: SessionSnapshot, metadataOnly: Bool, preserveBrowserPanes: Bool = true) {
         let structureChanged = Self.structureFingerprint(remote) != Self.structureFingerprint(snapshot)
-        var merged = remote
-        if preserveBrowserPanes {
-            // Fast path: skip the O(W×S×T) merge entirely when no browser panes exist
-            // in the current snapshot — the common case for non-browser-pane users.
-            let hasBrowserPanes = snapshot.workspaces.contains { ws in
-                ws.sessions.contains { session in
-                    session.tabs.contains { !$0.rootPane.allBrowserLeaves().isEmpty }
-                }
+        let merged = preserveBrowserPanes
+            ? Self.snapshotPreservingBrowserPanes(local: snapshot, remote: remote) { [coord] paneID, node in
+                _ = coord.splitPaneCoordinator.removePaneNode(paneID: paneID, from: &node)
             }
-            if hasBrowserPanes {
-                for (wIdx, ws) in snapshot.workspaces.enumerated() {
-                    guard wIdx < merged.workspaces.count else { continue }
-                    for (sIdx, session) in ws.sessions.enumerated() {
-                        guard sIdx < merged.workspaces[wIdx].sessions.count else { continue }
-                        for (tIdx, tab) in session.tabs.enumerated() {
-                            guard tIdx < merged.workspaces[wIdx].sessions[sIdx].tabs.count else { continue }
-                            let browserLeaves = tab.rootPane.allBrowserLeaves()
-                            guard !browserLeaves.isEmpty else { continue }
-                            // Browser leaves are local-only (never pushed to the daemon), so the
-                            // incoming tree never contains them — that alone doesn't mean nothing
-                            // structural changed daemon-side. Compare the LOCAL tree with browser
-                            // leaves stripped out against the incoming terminal-only tree: only
-                            // keep the local tree wholesale when the terminal structure actually
-                            // matches (preserves ratios); otherwise a real daemon-side change (new
-                            // split, killed pane, ...) was happening to be silently discarded here.
-                            var localTerminalOnly = tab.rootPane
-                            for leaf in browserLeaves {
-                                coord.splitPaneCoordinator.removePaneNode(paneID: leaf.id, from: &localTerminalOnly)
-                            }
-                            let incomingTree = merged.workspaces[wIdx].sessions[sIdx].tabs[tIdx].rootPane
-                            merged.workspaces[wIdx].sessions[sIdx].tabs[tIdx].rootPane = Self.mergedRootPane(
-                                localTree: tab.rootPane,
-                                localTerminalOnly: localTerminalOnly,
-                                incomingTree: incomingTree,
-                                browserLeaves: browserLeaves
-                            )
-                        }
-                    }
-                }
-            }
-        }
+            : remote
         snapshot = merged
         lastRevision = remote.revision
         if structureChanged {
@@ -505,6 +455,45 @@ final class DaemonSyncService {
             }
         }
         return index
+    }
+
+    /// Re-attaches the local-only browser leaves of `local` onto the daemon's `remote` snapshot.
+    /// Fast path: skips the O(W×S×T) merge entirely when no browser panes exist.
+    nonisolated static func snapshotPreservingBrowserPanes(
+        local: SessionSnapshot,
+        remote: SessionSnapshot,
+        removePane: (PaneID, inout PaneNode) -> Void
+    ) -> SessionSnapshot {
+        var merged = remote
+        let hasBrowserPanes = local.workspaces.contains { ws in
+            ws.sessions.contains { session in
+                session.tabs.contains { !$0.rootPane.allBrowserLeaves().isEmpty }
+            }
+        }
+        guard hasBrowserPanes else { return merged }
+        // Match by id, never by position: closing or reordering a tab shifts every later index and
+        // would re-attach a browser leaf to a neighbouring tab.
+        for ws in local.workspaces {
+            guard let wIdx = merged.workspaces.firstIndex(where: { $0.id == ws.id }) else { continue }
+            for session in ws.sessions {
+                guard let sIdx = merged.workspaces[wIdx].sessions.firstIndex(where: { $0.id == session.id }) else { continue }
+                for tab in session.tabs {
+                    guard let tIdx = merged.workspaces[wIdx].sessions[sIdx].tabs.firstIndex(where: { $0.id == tab.id }) else { continue }
+                    let browserLeaves = tab.rootPane.allBrowserLeaves()
+                    guard !browserLeaves.isEmpty else { continue }
+                    var localTerminalOnly = tab.rootPane
+                    for leaf in browserLeaves { removePane(leaf.id, &localTerminalOnly) }
+                    let incomingTree = merged.workspaces[wIdx].sessions[sIdx].tabs[tIdx].rootPane
+                    merged.workspaces[wIdx].sessions[sIdx].tabs[tIdx].rootPane = mergedRootPane(
+                        localTree: tab.rootPane,
+                        localTerminalOnly: localTerminalOnly,
+                        incomingTree: incomingTree,
+                        browserLeaves: browserLeaves
+                    )
+                }
+            }
+        }
+        return merged
     }
 
     /// Decides whether a tab's incoming (daemon) pane tree reflects a real structural change or

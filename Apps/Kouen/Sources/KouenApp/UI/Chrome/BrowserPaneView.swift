@@ -1411,6 +1411,13 @@ public final class BrowserPaneView: NSView {
         }
     }
 
+    /// `timeout` comes from an MCP/CLI caller: clamp to 0...120 s (NaN -> 0) so the `UInt64`
+    /// conversion can never trap.
+    nonisolated static func sleepNanoseconds(forTimeout timeout: TimeInterval) -> UInt64 {
+        guard !timeout.isNaN else { return 0 }
+        return UInt64(min(max(timeout, 0), 120) * 1_000_000_000)
+    }
+
     public func waitForLoad(timeout: TimeInterval) async throws {
         if !webView.isLoading {
             return
@@ -1420,7 +1427,7 @@ public final class BrowserPaneView: NSView {
             self.loadStates.append(state)
 
             Task {
-                try? await Task.sleep(nanoseconds: UInt64(timeout * 1_000_000_000))
+                try? await Task.sleep(nanoseconds: Self.sleepNanoseconds(forTimeout: timeout))
                 state.complete(error: NSError(domain: "BrowserPaneView", code: 1, userInfo: [NSLocalizedDescriptionKey: "Loading timed out"]))
             }
         }

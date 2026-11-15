@@ -169,11 +169,11 @@ public struct WorktreeManager: Sendable {
     // MARK: - Archive hook (P32 F3)
 
     /// Runs a project's `archiveScript` (from `kouen.json`) in `cwd`, blocking the caller
-    /// until it exits or `timeout` elapses (whichever first — the caller is the daemon's
-    /// synchronous IPC handler, so an unbounded arbitrary script would hang all other clients).
+    /// until it exits or `timeout` elapses (whichever first); SIGTERM at the timeout, SIGKILL `killGrace`
+    /// seconds later. The daemon calls this off its registry lock (`handleOffLock`).
     /// Returns false on spawn failure, non-zero exit, or timeout.
     @discardableResult
-    public func runArchiveScript(_ script: String, cwd: String, env: [String: String]? = nil, timeout: TimeInterval = 30) -> Bool {
+    public func runArchiveScript(_ script: String, cwd: String, env: [String: String]? = nil, timeout: TimeInterval = 30, killGrace: TimeInterval = 2) -> Bool {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/bin/sh")
         process.arguments = ["-c", script]
@@ -193,7 +193,13 @@ public struct WorktreeManager: Sendable {
         let timer = DispatchSource.makeTimerSource(queue: .global())
         timer.schedule(deadline: .now() + timeout)
         timer.setEventHandler { [process] in
-            if process.isRunning { process.terminate() }
+            guard process.isRunning else { return }
+            process.terminate()
+            // A script that traps/ignores SIGTERM must not hold the caller forever: SIGKILL after a grace.
+            let pid = process.processIdentifier
+            DispatchQueue.global().asyncAfter(deadline: .now() + killGrace) { [process] in
+                if process.isRunning { kill(pid, SIGKILL) }
+            }
         }
         timer.resume()
         process.waitUntilExit()

@@ -121,5 +121,45 @@ final class SSETransportTests: XCTestCase {
         let result = try XCTUnwrap(json["result"] as? [String: Any])
         XCTAssertGreaterThan(try XCTUnwrap(result["tools"] as? [[String: Any]]).count, 20)
     }
+
+    // MARK: - [TC-0702] Content-Length is untrusted input
+
+    /// Sends a hand-written request (URLSession refuses a malformed Content-Length) and returns the
+    /// status line the transport answered with.
+    private func rawStatusLine(contentLength: String, token: String? = nil) throws -> String {
+        let fd = socket(AF_INET, SOCK_STREAM, 0)
+        defer { close(fd) }
+        var addr = sockaddr_in()
+        addr.sin_family = sa_family_t(AF_INET)
+        addr.sin_port = testPort.bigEndian
+        addr.sin_addr.s_addr = inet_addr("127.0.0.1")
+        let rc = withUnsafePointer(to: &addr) {
+            $0.withMemoryRebound(to: sockaddr.self, capacity: 1) { connect(fd, $0, socklen_t(MemoryLayout<sockaddr_in>.size)) }
+        }
+        XCTAssertEqual(rc, 0)
+        var tv = timeval(tv_sec: 3, tv_usec: 0)
+        setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &tv, socklen_t(MemoryLayout<timeval>.size))
+        var head = "POST /message HTTP/1.1\r\nHost: 127.0.0.1:\(testPort)\r\nContent-Length: \(contentLength)\r\n"
+        if let token { head += "Authorization: Bearer \(token)\r\n" }
+        head += "\r\n"
+        _ = head.withCString { write(fd, $0, strlen($0)) }
+        var buf = [UInt8](repeating: 0, count: 256)
+        let n = read(fd, &buf, buf.count)
+        guard n > 0 else { return "" }
+        return String(decoding: buf.prefix(n), as: UTF8.self).components(separatedBy: "\r\n").first ?? ""
+    }
+
+    func test_TC0702_BE_UT_NegativeContentLengthIsRejectedBeforeAuth() async throws {
+        try await start()
+        XCTAssertTrue(try rawStatusLine(contentLength: "-1").contains("400"))
+        XCTAssertTrue(try rawStatusLine(contentLength: "abc").contains("400"))
+    }
+
+    func test_TC0702_BE_UT_OversizedContentLengthIsRejectedBeforeAuth() async throws {
+        try await start()
+        XCTAssertTrue(try rawStatusLine(contentLength: "\(4 * 1024 * 1024 + 1)").contains("413"))
+        let overflow = try rawStatusLine(contentLength: "99999999999999999999")
+        XCTAssertTrue(overflow.contains("413") || overflow.contains("400"), overflow)
+    }
 }
 #endif
