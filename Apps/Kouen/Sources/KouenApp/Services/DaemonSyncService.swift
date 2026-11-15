@@ -15,8 +15,8 @@ final class DaemonSyncService {
     private var metadataTask: Task<Void, Never>?
     private(set) var snapshotRefreshTask: Task<Void, Never>?
     var pendingSnapshotRevision: Int?
-    private var snapshotSub: DaemonSubscription?
-    private var taskSub: DaemonSubscription?
+    private let snapshotSub = ResubscribingSlot<DaemonSubscription>()
+    private let taskSub = ResubscribingSlot<DaemonSubscription>()
 
     init(coordinator: SessionCoordinator) {
         self.coord = coordinator
@@ -26,18 +26,18 @@ final class DaemonSyncService {
 
     func switchEndpoint(_ endpoint: Endpoint) {
         daemon.switchEndpoint(endpoint)
-        snapshotSub = nil
-        taskSub = nil
+        snapshotSub.reset()
+        taskSub.reset()
         ensureSnapshotSubscription()
     }
 
     func ensureSnapshotSubscription() {
         ensureTaskSubscription()
-        guard snapshotSub == nil else { return }
-        do {
-            let endpoint = daemon.endpoint
-            let client = DaemonClient(endpoint: endpoint)
-            snapshotSub = try client.subscribeSnapshot(
+        snapshotSub.ensure { [weak self] onEnd in
+            // `onEnd` (daemon restart / dropped socket) re-subscribes through the slot, which
+            // ignores the end of a subscription `switchEndpoint` already replaced.
+            let client = DaemonClient(endpoint: self?.daemon.endpoint ?? .localControlSocket)
+            return try client.subscribeSnapshot(
                 label: "KouenGUI",
                 onRevision: { [weak self] revision in
                     guard let self else { return }
@@ -69,24 +69,15 @@ final class DaemonSyncService {
                     // uses when a background agent event needs attention).
                     Task { @MainActor in AgentNotchWindowActivator.bringKouenToFront() }
                 },
-                onEnd: { [weak self] in
-                    // Daemon restarted or socket dropped — clear the dead sub so
-                    // ensureSnapshotSubscription() can re-subscribe on next call.
-                    Task { @MainActor in
-                        self?.snapshotSub = nil
-                        self?.ensureSnapshotSubscription()
-                    }
-                }
+                onEnd: onEnd
             )
-        } catch {
-            fputs("Kouen: failed to subscribe to snapshot channel: \(error)\n", kouenStderr)
         }
     }
 
     private func ensureTaskSubscription() {
-        guard taskSub == nil else { return }
-        do {
-            taskSub = try DaemonClient(endpoint: daemon.endpoint).subscribeSnapshot(
+        let hadSub = taskSub.current != nil
+        taskSub.ensure { [weak self] onEnd in
+            try DaemonClient(endpoint: self?.daemon.endpoint ?? .localControlSocket).subscribeSnapshot(
                 label: "KouenGUI.tasks",
                 onRevision: { _ in },
                 onTasksChanged: {
@@ -94,16 +85,11 @@ final class DaemonSyncService {
                         NotificationCenter.default.post(name: NotificationBus.shared.tasksChanged, object: nil)
                     }
                 },
-                onEnd: { [weak self] in
-                    Task { @MainActor in
-                        self?.taskSub = nil
-                        self?.ensureTaskSubscription()
-                    }
-                }
+                onEnd: onEnd
             )
+        }
+        if !hadSub, taskSub.current != nil {
             NotificationCenter.default.post(name: NotificationBus.shared.tasksChanged, object: nil)
-        } catch {
-            fputs("Kouen: failed to subscribe to task changes: \(error)\n", kouenStderr)
         }
     }
 
