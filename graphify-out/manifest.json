@@ -165,8 +165,8 @@
     "semantic_hash": ""
   },
   "Apps/Kouen/Sources/KouenApp/Services/SecureInputMonitor.swift": {
-    "mtime": 1794720243.1280296,
-    "ast_hash": "273b3b9142d00434c4685b45d928b701",
+    "mtime": 1794756639.6638842,
+    "ast_hash": "820c4ba37f575455c34d2eb54f1a7c5a",
     "semantic_hash": ""
   },
   "Apps/Kouen/Sources/KouenApp/Services/SessionCoordinator+HostDelegate.swift": {
@@ -1660,8 +1660,8 @@
     "semantic_hash": ""
   },
   "Packages/KouenTerminalKit/Sources/KouenTerminalKit/KouenTerminalSurfaceView.swift": {
-    "mtime": 1794720563.8002589,
-    "ast_hash": "45e0dec2922ae1fceb71cd81d726d581",
+    "mtime": 1794756573.3076284,
+    "ast_hash": "5e233fb0742ebe14da2f7c7b52c41bf5",
     "semantic_hash": ""
   },
   "Packages/KouenTerminalKit/Sources/KouenTerminalKit/LiveResizeGeometry.swift": {
@@ -4845,13 +4845,13 @@
     "semantic_hash": ""
   },
   "Packages/KouenTerminalKit/Sources/KouenTerminalKit/OutputTriggerMatcher.swift": {
-    "mtime": 1794720563.77193,
-    "ast_hash": "0fd244f56e3dbdbd8a84c3ff6e0527e1",
+    "mtime": 1794756749.7851205,
+    "ast_hash": "4662e80952a0553d25426f106d16f866",
     "semantic_hash": ""
   },
   "Tests/KouenTerminalKitTests/OutputTriggerMatcherTests.swift": {
-    "mtime": 1794720563.7585273,
-    "ast_hash": "c93ce78506ee04ce95c54420f7796eb3",
+    "mtime": 1794756708.6490016,
+    "ast_hash": "99e8ebea2500fcba890cc30b84327513",
     "semantic_hash": ""
   },
   "Apps/Kouen/Sources/KouenApp/Services/DaemonSyncService+JSLiteral.swift": {
@@ -4867,6 +4867,16 @@
   "Tests/KouenDaemonTests/CwdProbeGateTests.swift": {
     "mtime": 1794720844.0848372,
     "ast_hash": "e44ede0d85b3d1488ba6c49b77156ce7",
+    "semantic_hash": ""
+  },
+  "Tests/KouenAppTests/SecureInputMonitorTests.swift": {
+    "mtime": 1794756708.6492472,
+    "ast_hash": "c0bb4e0741cdaa66b1e54d9d8ec6f993",
+    "semantic_hash": ""
+  },
+  "graphify-out/memory/query_20261115_153351_outputtriggermatcher_secureinputmonitor_utf8.md": {
+    "mtime": 1794756831.5496,
+    "ast_hash": "05c629f8c7f58d24d6de384500ae5172",
     "semantic_hash": ""
   }
 }

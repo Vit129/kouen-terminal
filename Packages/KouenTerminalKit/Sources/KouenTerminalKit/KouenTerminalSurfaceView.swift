@@ -769,8 +769,7 @@ public final class KouenTerminalSurfaceView: NSView {
     private func scanOutputTriggers(_ data: Data) {
         let triggers = OutputTriggerStore.load()
         guard !triggers.isEmpty else { return }
-        guard let text = String(data: data, encoding: .utf8) else { return }
-        for pattern in triggerMatcher.matches(in: text, patterns: triggers.map(\.pattern)) {
+        for pattern in triggerMatcher.matches(in: data, patterns: triggers.map(\.pattern)) {
             guard let trigger = triggers.first(where: { $0.pattern == pattern }) else { continue }
             onOutputTrigger?(trigger.pattern, trigger.title)
         }

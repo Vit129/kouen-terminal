@@ -3,13 +3,13 @@ _Auto-generated from GRAPH_REPORT.md · do not edit manually_
 _Regen: `graphify update .`_
 
 ## Summary
-- 20013 nodes · 58197 edges · 2669 communities (1503 shown, 1166 thin omitted)
-- Extraction: 85% EXTRACTED · 15% INFERRED · 0% AMBIGUOUS · INFERRED: 8874 edges (avg confidence: 0.74)
+- 20039 nodes · 58263 edges · 2665 communities (1503 shown, 1162 thin omitted)
+- Extraction: 85% EXTRACTED · 15% INFERRED · 0% AMBIGUOUS · INFERRED: 8899 edges (avg confidence: 0.74)
 - Token cost: 0 input · 0 output
 
 
 ## Graph Freshness
-- Built from commit: `c10339d8`
+- Built from commit: `8f920d14`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -34,25 +34,25 @@ ever touching one area. This ranks by how many DIFFERENT communities a
 node's neighbors span, not by raw edge count.
 1. `IPCRequest` - bridges 188 areas (208 edges)
 2. `Command` - bridges 102 areas (108 edges)
-3. `AgentKind` - bridges 85 areas (176 edges)
-4. `t()` - bridges 79 areas (253 edges)
-5. `IPCResponse` - bridges 79 areas (104 edges)
-6. `KouenTerminalSurfaceView` - bridges 77 areas (346 edges)
-7. `SessionCoordinator` - bridges 70 areas (235 edges)
-8. `NSView` - bridges 69 areas (193 edges)
-9. `KouenGridTerminal` - bridges 64 areas (117 edges)
+3. `t()` - bridges 82 areas (253 edges)
+4. `AgentKind` - bridges 82 areas (176 edges)
+5. `KouenTerminalSurfaceView` - bridges 80 areas (346 edges)
+6. `IPCResponse` - bridges 80 areas (104 edges)
+7. `SessionCoordinator` - bridges 72 areas (235 edges)
+8. `NSView` - bridges 68 areas (193 edges)
+9. `KouenGridTerminal` - bridges 62 areas (117 edges)
 
 ## Surprising Connections (you probably didn't know these)
 - `.selectedHost` --references--> `RemoteHost`  [INFERRED]
   Apps/Kouen/Sources/KouenApp/Settings/SwiftUI/SettingsRemoteView.swift → Packages/KouenCore/Sources/KouenCore/Remote/RemoteHostStore.swift
 - `.terms` --calls--> `SearchMatcher`  [INFERRED]
   Apps/Kouen/Sources/KouenApp/UI/History/HistorySearchEvidence.swift → Packages/KouenCore/Sources/KouenCore/Search/SearchMatcher.swift
-- `.waitingCount` --references--> `FleetSessionItem`  [INFERRED]
-  Apps/Kouen/Sources/KouenApp/UI/Terminal/FleetViewModel.swift → Packages/KouenCore/Sources/KouenCore/Fleet/FleetSessionList.swift
 - `DaemonSyncService` --calls--> `DaemonSessionService`  [INFERRED]
   Apps/Kouen/Sources/KouenApp/Services/DaemonSyncService.swift → Packages/KouenCore/Sources/KouenCore/IPC/DaemonSessionService.swift
 - `RemoteHostsService` --calls--> `RemoteHostStore`  [INFERRED]
   Apps/Kouen/Sources/KouenApp/Services/RemoteHostsService.swift → Packages/KouenCore/Sources/KouenCore/Remote/RemoteHostStore.swift
+- `.selectWorkspace(byIndex:)` --references--> `SessionSnapshot`  [INFERRED]
+  Apps/Kouen/Sources/KouenApp/Services/SessionCoordinator.swift → Packages/KouenIPC/Sources/KouenIPC/SessionSnapshot.swift
 
 
 _Full map → GRAPH_REPORT.md · query: `graphify query "..."`_
