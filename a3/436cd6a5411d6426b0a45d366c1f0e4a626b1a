@@ -1,0 +1,21 @@
+Packages/KouenTerminalKit/Sources/KouenTerminalKit/TerminalHostView.swift
+  s_824dc91b169df4::t_4af2e2ecc03d98 837,854-857,859-869,885,891-901
+Tests/KouenTerminalKitTests/OutputCoalescerTests.swift
+  s_824dc91b169df4::t_6452f4aca3f553 1-24
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.3",
+  "base_commit_sha": "a3436cd6a5411d6426b0a45d366c1f0e4a626b1a",
+  "prompts": {},
+  "sessions": {
+    "s_824dc91b169df4": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c2ac45a6-bf90-447c-8785-1284182c2dad",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Vit129 <vitosk129@gmail.com>"
+    }
+  }
+}
