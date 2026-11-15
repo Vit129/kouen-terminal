@@ -394,6 +394,14 @@ public final class DaemonServer: @unchecked Sendable {
                 continue
             }
 
+            // Slow git/script work (closeSession cleanup, worktrees, feature sweep) runs off the
+            // registry lock and off this serial queue; the reply comes back via `replyAsync`.
+            if registry.handleOffLock(request, completion: { [weak self] response in
+                self?.replyAsync(response, to: fd, connection: connectionID)
+            }) {
+                continue
+            }
+
             // Intercept browser requests from MCP / CLI clients
             switch request {
             case let .openGitPanel(repoPath):
