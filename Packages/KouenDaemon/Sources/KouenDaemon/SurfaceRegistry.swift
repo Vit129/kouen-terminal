@@ -1178,7 +1178,7 @@ public final class SurfaceRegistry: @unchecked Sendable {
         case let .featureDelete(slug):
             return featureStore.delete(slug: slug) ? .ok : .error("Feature not found")
         case let .featureSweepMerged(repoPath):
-            tickFeatureWorktreeSweep(repoPath: repoPath)
+            tickFeatureWorktreeSweepLocked(repoPath: repoPath)
             return .ok
         case .routingRuleList:
             return .routingRules(routingRuleStore.list().map(Self.routingRuleSummary))

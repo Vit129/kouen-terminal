@@ -56,18 +56,6 @@ struct KouenMCPServer {
                 i += 1
             }
 
-            // A non-loopback bind is reachable by other devices (that's the whole point of
-            // Tailscale/remote access) — never start one unauthenticated. Auto-generate and
-            // print a token rather than hard-failing, so a first-time `--host <tailscale-ip>`
-            // still just works instead of bouncing the user to read `--help` first.
-            if !Self.isLoopback(host), token == nil {
-                token = Self.generateToken()
-                fputs("kouen-mcp: no --token given for a non-loopback --host — generated one for this run:\n", kouenStderr)
-                fputs("  \(token!)\n", kouenStderr)
-                fputs("  Pass it back with --token, or as ?token=... / an Authorization: Bearer header.\n", kouenStderr)
-                fflush(kouenStderr)
-            }
-
             #if canImport(Network)
             let sseTransport = SSETransport(server: server, host: host, port: port, authToken: token)
             await sseTransport.start()
@@ -84,14 +72,7 @@ struct KouenMCPServer {
         }
     }
 
-    /// Recognizes every host string that only reaches this same machine — anything else
-    /// (a real IP, a Tailscale MagicDNS name, `0.0.0.0`/`::` meaning "every interface") is
-    /// reachable from elsewhere and therefore requires a token.
-    private static func isLoopback(_ host: String) -> Bool {
-        ["127.0.0.1", "localhost", "::1"].contains(host)
-    }
-
-    private static func generateToken() -> String {
+    static func generateToken() -> String {
         #if canImport(Security)
         var bytes = [UInt8](repeating: 0, count: 24)
         let status = SecRandomCopyBytes(kSecRandomDefault, bytes.count, &bytes)
@@ -122,8 +103,8 @@ struct KouenMCPServer {
                                 Binding any other host (e.g. a Tailscale IP) makes this
                                 reachable from other devices and requires --token; one is
                                 auto-generated and printed if you don't pass one.
-          -t, --token <secret> Bearer auth token. Required in practice for any non-loopback
-                                --host (auto-generated otherwise); optional for loopback.
+          -t, --token <secret> Bearer auth token. Required for all HTTP requests;
+                                auto-generated and printed to stderr when omitted.
           -h, --help           Show this help message
 
         Endpoints:

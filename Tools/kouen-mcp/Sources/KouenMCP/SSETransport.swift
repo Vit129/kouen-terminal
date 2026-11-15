@@ -11,7 +11,8 @@ final class SSETransport: @unchecked Sendable {
     private let server: MCPServer
     private let host: String
     private let port: UInt16
-    private let authToken: String?
+    private let authToken: String
+    private let generatedToken: Bool
     private let queue = DispatchQueue(label: "kouen.mcp.sse", qos: .userInitiated)
 
     private let stateLock = NSLock()
@@ -43,11 +44,12 @@ final class SSETransport: @unchecked Sendable {
         }
     }
 
-    init(server: MCPServer, host: String = "0.0.0.0", port: UInt16 = 8765, authToken: String? = nil) {
+    init(server: MCPServer, host: String = "127.0.0.1", port: UInt16 = 8765, authToken: String? = nil) {
         self.server = server
         self.host = host
         self.port = port
-        self.authToken = authToken
+        self.generatedToken = authToken?.isEmpty != false
+        self.authToken = authToken.flatMap { $0.isEmpty ? nil : $0 } ?? KouenMCPServer.generateToken()
     }
 
     func start() async {
@@ -64,7 +66,10 @@ final class SSETransport: @unchecked Sendable {
                 guard let self else { return }
                 switch state {
                 case .ready:
-                    let tokenHint = self.authToken != nil ? " (auth token enabled)" : ""
+                    let tokenHint = " (Bearer authentication required)"
+                    if self.generatedToken {
+                        fputs("kouen-mcp: generated HTTP token for this run:\n  \(self.authToken)\n  Send Authorization: Bearer <token> on every request, or set --token for a stable token.\n", stderr)
+                    }
                     fputs("kouen-mcp: Remote HTTP/SSE server listening on http://\(self.host):\(self.port)\(tokenHint)\n", stderr)
                     fputs("  SSE Endpoint:    http://\(self.host):\(self.port)/sse\n", stderr)
                     fputs("  Direct MCP:      http://\(self.host):\(self.port)/mcp\n", stderr)
@@ -162,7 +167,20 @@ final class SSETransport: @unchecked Sendable {
                     guard let colonIdx = line.firstIndex(of: ":") else { continue }
                     let key = line[..<colonIdx].trimmingCharacters(in: .whitespaces).lowercased()
                     let value = line[line.index(after: colonIdx)...].trimmingCharacters(in: .whitespaces)
+                    if ["host", "origin", "authorization"].contains(key), headers[key] != nil {
+                        self.sendHTTPResponse(conn: conn, status: "400 Bad Request", body: "Duplicate security header")
+                        return
+                    }
                     headers[key] = value
+                }
+
+                guard HTTPRequestPolicy.permits(headers: headers, bindHost: self.host, port: self.port) else {
+                    self.sendHTTPResponse(conn: conn, status: "403 Forbidden", body: "Untrusted Host or Origin")
+                    return
+                }
+                guard Self.constantTimeEquals(headers["authorization"] ?? "", "Bearer \(self.authToken)") else {
+                    self.sendHTTPResponse(conn: conn, status: "401 Unauthorized", body: "Unauthorized: Invalid or missing Bearer token")
+                    return
                 }
 
                 let contentLength = Int(headers["content-length"] ?? "0") ?? 0
@@ -222,21 +240,6 @@ final class SSETransport: @unchecked Sendable {
             return
         }
 
-        // Validate Token if configured
-        if let token = authToken {
-            let authHeader = headers["authorization"] ?? ""
-            let urlParams = parseQueryParams(url: fullPath)
-            let tokenParam = urlParams["token"]
-
-            let bearerValid = Self.constantTimeEquals(authHeader, "Bearer \(token)")
-            let paramValid = tokenParam.map { Self.constantTimeEquals($0, token) } ?? false
-            let valid = bearerValid || paramValid
-            if !valid {
-                sendHTTPResponse(conn: conn, status: "401 Unauthorized", body: "Unauthorized: Invalid or missing authentication token")
-                return
-            }
-        }
-
         let pathOnly = fullPath.split(separator: "?").first.map(String.init) ?? fullPath
         let queryParams = parseQueryParams(url: fullPath)
 
@@ -284,8 +287,6 @@ final class SSETransport: @unchecked Sendable {
             "Content-Type: text/event-stream",
             "Cache-Control: no-cache, no-transform",
             "Connection: keep-alive",
-            "Access-Control-Allow-Origin: *",
-            "Access-Control-Allow-Headers: *",
             "\r\n"
         ].joined(separator: "\r\n")
 
@@ -380,7 +381,6 @@ final class SSETransport: @unchecked Sendable {
             "Content-Type: text/plain; charset=utf-8",
             "Content-Length: \(bodyData.count)",
             "Connection: close",
-            "Access-Control-Allow-Origin: *",
             "\r\n"
         ].joined(separator: "\r\n") + body
 
@@ -396,7 +396,6 @@ final class SSETransport: @unchecked Sendable {
             "Content-Type: application/json; charset=utf-8",
             "Content-Length: \(bodyData.count)",
             "Connection: close",
-            "Access-Control-Allow-Origin: *",
             "\r\n"
         ].joined(separator: "\r\n") + json
 
@@ -408,9 +407,6 @@ final class SSETransport: @unchecked Sendable {
     private func sendCORSPreflightResponse(conn: NWConnection) {
         let resp = [
             "HTTP/1.1 204 No Content",
-            "Access-Control-Allow-Origin: *",
-            "Access-Control-Allow-Methods: GET, POST, OPTIONS",
-            "Access-Control-Allow-Headers: Content-Type, Authorization",
             "Access-Control-Max-Age: 86400",
             "Content-Length: 0",
             "Connection: close",

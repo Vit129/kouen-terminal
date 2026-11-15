@@ -46,3 +46,9 @@ AI agents (Claude Code, Codex, Kiro) can see and interact with the embedded brow
 | Worktrees, hosts, projects | `kouenWorktreeList`, `kouenWorktreeCreate`, `kouenWorktreeRemove`, `kouenHostList`, `kouenProjectsList` |
 | Automations | `kouenAutomationList`, `kouenAutomationGet`, `kouenAutomationCreate`, `kouenAutomationUpdate`, `kouenAutomationDelete`, `kouenAutomationPause`, `kouenAutomationResume`, `kouenAutomationRunNow` |
 | Agent routing rules | `kouenRoutingRuleList`, `kouenRoutingRuleCreate`, `kouenRoutingRuleUpdate`, `kouenRoutingRuleDelete`, `kouenRoutingRuleReorder` |
+
+## HTTP/SSE authentication
+
+Stdio is unchanged. `kouen-mcp --http` binds to `127.0.0.1:8765` by default. Every HTTP endpoint, including health and SSE, requires `Authorization: Bearer <token>`. Supply a stable secret with `--token <secret>`; otherwise a fresh token is generated for each process and printed once to stderr when the listener is ready. Configure the same header on the SSE connection and message POSTs. Query-string tokens are rejected.
+
+HTTP requests must send the matching Host and port. Loopback binds accept `127.0.0.1`, `localhost`, or `[::1]`; an explicit remote bind accepts its configured host, and a wildcard bind accepts literal IP addresses. Foreign or opaque browser Origins are rejected before routing, and wildcard CORS is disabled. Native MCP clients should omit Origin. Use an explicit `--host <address>` for remote access.
