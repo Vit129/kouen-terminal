@@ -174,6 +174,17 @@ final class SSETransport: @unchecked Sendable {
                     headers[key] = value
                 }
 
+                // Validated before auth and before any buffer slicing: the value is attacker-controlled
+                // and a negative length would trap `Data.prefix`, an unbounded one buffer forever.
+                let contentLength: Int
+                switch Self.parseContentLength(headers["content-length"]) {
+                case let .success(length):
+                    contentLength = length
+                case let .failure(rejection):
+                    self.sendHTTPResponse(conn: conn, status: rejection.status, body: rejection.body)
+                    return
+                }
+
                 guard HTTPRequestPolicy.permits(headers: headers, bindHost: self.host, port: self.port) else {
                     self.sendHTTPResponse(conn: conn, status: "403 Forbidden", body: "Untrusted Host or Origin")
                     return
@@ -182,8 +193,6 @@ final class SSETransport: @unchecked Sendable {
                     self.sendHTTPResponse(conn: conn, status: "401 Unauthorized", body: "Unauthorized: Invalid or missing Bearer token")
                     return
                 }
-
-                let contentLength = Int(headers["content-length"] ?? "0") ?? 0
 
                 // Check if we have received the full body
                 if bodyData.count < contentLength {
@@ -204,6 +213,22 @@ final class SSETransport: @unchecked Sendable {
                 self.readHTTPRequest(conn: conn, accumulated: buffer)
             }
         }
+    }
+
+    static let maxBodyLength = 4 * 1024 * 1024
+
+    struct ContentLengthRejection: Error { let status: String; let body: String }
+
+    static func parseContentLength(_ raw: String?) -> Result<Int, ContentLengthRejection> {
+        guard let raw else { return .success(0) }
+        guard !raw.isEmpty, raw.allSatisfy(\.isNumber) else {
+            return .failure(.init(status: "400 Bad Request", body: "Invalid Content-Length"))
+        }
+        // All digits but not an Int means astronomically large.
+        guard let length = Int(raw), length <= maxBodyLength else {
+            return .failure(.init(status: "413 Payload Too Large", body: "Request body too large"))
+        }
+        return .success(length)
     }
 
     private func readRemainingBody(conn: NWConnection, method: String, fullPath: String, headers: [String: String], accumulatedBody: Data, expectedLength: Int) {
