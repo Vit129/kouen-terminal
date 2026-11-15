@@ -1,0 +1,21 @@
+Packages/KouenSettings/Sources/KouenSettings/ProjectConfig.swift
+  s_616d85e6d9c76f::t_f72f23ce0d7bd7 80
+graphify-out/manifest.json
+  s_616d85e6d9c76f::t_8695bdce0318a8 1458-1459
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.3",
+  "base_commit_sha": "57aa16e5fd7d11bf5f6ce3fda951c90bd1e28b84",
+  "prompts": {},
+  "sessions": {
+    "s_616d85e6d9c76f": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1dfca-7b48-7e52-8e0e-e446fed44c42",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "Vit129 <vitosk129@gmail.com>"
+    }
+  }
+}
