@@ -1,7 +1,7 @@
 # Graph Report - review-wave3-perf  (2026-11-15)
 
 ## Corpus Check
-- 967 files · ~1,059,323 words
+- 967 files · ~1,059,515 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
@@ -10,7 +10,7 @@
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `8cc3b2ab`
+- Built from commit: `8f0c277e`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
