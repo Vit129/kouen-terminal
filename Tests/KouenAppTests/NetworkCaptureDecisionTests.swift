@@ -28,3 +28,12 @@ final class NetworkCaptureDecisionTests: XCTestCase {
         XCTAssertTrue(shouldCapture("application/json", "1200"))
     }
 }
+
+@MainActor
+final class ConsoleLineCapTests: XCTestCase {
+    func test_TC1203_FEUT_consoleLineIsCapped() {
+        let line = BrowserPaneView.consoleLogLine(level: "log", text: String(repeating: "x", count: 100_000))
+        XCTAssertLessThanOrEqual(line.count, BrowserPaneView.maxConsoleLineLength + 16)
+        XCTAssertTrue(line.hasPrefix("[LOG] x"))
+    }
+}

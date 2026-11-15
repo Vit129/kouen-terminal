@@ -765,7 +765,7 @@ public final class BrowserPaneView: NSView {
                             try { return JSON.stringify(arg); } catch(e) { return String(arg); }
                         }
                         return String(arg);
-                    }).join(' ');
+                    }).join(' ').slice(0, 4000);
                     try {
                         window.webkit.messageHandlers.kouenConsoleLog.postMessage({
                             level: level,
@@ -884,6 +884,13 @@ public final class BrowserPaneView: NSView {
         return isFinite(n) && n <= 1048576;
     }
     """
+
+    static let maxConsoleLineLength = 4000
+
+    /// One page log call can carry megabytes; cap it before it is stored, logged and snapshotted.
+    static func consoleLogLine(level: String, text: String) -> String {
+        "[\(level.uppercased())] \(text.prefix(maxConsoleLineLength))"
+    }
 
     private func setupNetworkCapture(for webView: WKWebView) {
         let js = """
@@ -1791,7 +1798,7 @@ extension BrowserPaneView: WKScriptMessageHandler {
             return
         }
         
-        let logLine = "[\(level.uppercased())] \(text)"
+        let logLine = Self.consoleLogLine(level: level, text: text)
         
         // Cap in-memory array
         if consoleLogs.count >= 200 {
