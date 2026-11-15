@@ -1,0 +1,23 @@
+Apps/Kouen/Sources/KouenApp/Services/SecureInputMonitor.swift
+  s_824dc91b169df4::t_ebb1044864c6dd 20-24,36-51,66
+Apps/Kouen/Sources/KouenApp/Services/SecureInputPromptScanner.swift
+  s_824dc91b169df4::t_c666f34bb3093c 1-25
+Tests/KouenAppTests/SecureInputPromptScannerTests.swift
+  s_824dc91b169df4::t_974e097b9fc78e 1-30
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.3",
+  "base_commit_sha": "e3630f0ff7e2e580131dd0fc503f367d60ba5596",
+  "prompts": {},
+  "sessions": {
+    "s_824dc91b169df4": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c2ac45a6-bf90-447c-8785-1284182c2dad",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Vit129 <vitosk129@gmail.com>"
+    }
+  }
+}
