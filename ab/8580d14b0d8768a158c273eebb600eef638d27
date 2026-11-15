@@ -1,0 +1,25 @@
+Packages/KouenCore/Sources/KouenCore/Worktree/WorktreeManager.swift
+  s_824dc91b169df4::t_9ca75ed7795b12 172-173,176,196-202
+Packages/KouenDaemon/Sources/KouenDaemon/DaemonServer.swift
+  s_824dc91b169df4::t_4085942b3f7452 397-404
+Packages/KouenDaemon/Sources/KouenDaemon/SurfaceRegistry.swift
+  s_824dc91b169df4::t_946423d9ac6d99 385-489,713-717,1162-1163,1237,2585-2586,2664,2667-2669
+Tests/KouenDaemonTests/DaemonOffLockWorktreeTests.swift
+  s_824dc91b169df4::t_c03c0bd46f961d 1-95
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.3",
+  "base_commit_sha": "ab8580d14b0d8768a158c273eebb600eef638d27",
+  "prompts": {},
+  "sessions": {
+    "s_824dc91b169df4": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c2ac45a6-bf90-447c-8785-1284182c2dad",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Vit129 <vitosk129@gmail.com>"
+    }
+  }
+}
