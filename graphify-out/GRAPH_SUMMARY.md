@@ -1,15 +1,15 @@
-# Graph Summary — review-wave3-perf
+# Graph Summary — kouen-terminal
 _Auto-generated from GRAPH_REPORT.md · do not edit manually_
 _Regen: `graphify update .`_
 
 ## Summary
-- 20155 nodes · 58137 edges · 2688 communities (1552 shown, 1136 thin omitted)
+- 20146 nodes · 57981 edges · 2788 communities (1545 shown, 1243 thin omitted)
 - Extraction: 85% EXTRACTED · 15% INFERRED · 0% AMBIGUOUS · INFERRED: 8519 edges (avg confidence: 0.74)
 - Token cost: 0 input · 0 output
 
 
 ## Graph Freshness
-- Built from commit: `8f0c277e`
+- Built from commit: `84262995`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -34,13 +34,13 @@ ever touching one area. This ranks by how many DIFFERENT communities a
 node's neighbors span, not by raw edge count.
 1. `IPCRequest` - bridges 189 areas (211 edges)
 2. `Command` - bridges 102 areas (108 edges)
-3. `AgentKind` - bridges 82 areas (176 edges)
-4. `IPCResponse` - bridges 81 areas (107 edges)
-5. `KouenTerminalSurfaceView` - bridges 76 areas (346 edges)
-6. `SessionCoordinator` - bridges 66 areas (235 edges)
-7. `NSView` - bridges 65 areas (193 edges)
-8. `KouenGridTerminal` - bridges 64 areas (117 edges)
-9. `AnyCodable` - bridges 63 areas (190 edges)
+3. `AgentKind` - bridges 83 areas (176 edges)
+4. `IPCResponse` - bridges 79 areas (107 edges)
+5. `KouenTerminalSurfaceView` - bridges 72 areas (346 edges)
+6. `SessionCoordinator` - bridges 67 areas (235 edges)
+7. `NSView` - bridges 67 areas (193 edges)
+8. `KouenGridTerminal` - bridges 65 areas (117 edges)
+9. `AnyCodable` - bridges 64 areas (190 edges)
 
 ## Surprising Connections (you probably didn't know these)
 - `.selectedHost` --references--> `RemoteHost`  [INFERRED]
