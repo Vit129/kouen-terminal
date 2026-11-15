@@ -874,10 +874,22 @@ public final class BrowserPaneView: NSView {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.05, execute: workItem)
     }
 
+    /// Body-capture gate for fetch responses: skip streams (text/event-stream never ends) and bodies
+    /// with no Content-Length or one over 1 MB, so a clone is never buffered whole. Kept as JS source
+    /// so the unit test can run the exact function the page runs.
+    static let networkCaptureDecisionJS = """
+    function __kouenShouldCaptureBody(contentType, contentLength) {
+        if (contentType && String(contentType).toLowerCase().indexOf('text/event-stream') !== -1) return false;
+        var n = contentLength === null || contentLength === undefined ? NaN : Number(contentLength);
+        return isFinite(n) && n <= 1048576;
+    }
+    """
+
     private func setupNetworkCapture(for webView: WKWebView) {
         let js = """
         (function() {
             \(Self.oauthGuardJS)
+            \(Self.networkCaptureDecisionJS)
             if (window.__kouenNetworkCaptured) return;
             window.__kouenNetworkCaptured = true;
             window.__kouenNetwork = [];
@@ -896,8 +908,17 @@ public final class BrowserPaneView: NSView {
                 return _fetch.apply(this, arguments).then(function(res) {
                     entry.status = res.status;
                     entry.duration = (Date.now() - t0) / 1000;
-                    var clone = res.clone();
-                    clone.text().then(function(body) { entry.responseBody = body.slice(0, 4000); }).catch(function(){});
+                    if (!__kouenShouldCaptureBody(res.headers.get('content-type'), res.headers.get('content-length')) || !res.body) return res;
+                    // Read at most 4 KB then cancel, so the clone never buffers the whole stream.
+                    var reader = res.clone().body.getReader(), dec = new TextDecoder(), got = '';
+                    (function pump() {
+                        return reader.read().then(function(r) {
+                            if (r.done) { entry.responseBody = got.slice(0, 4000); return; }
+                            got += dec.decode(r.value, { stream: true });
+                            if (got.length >= 4000) { entry.responseBody = got.slice(0, 4000); return reader.cancel(); }
+                            return pump();
+                        });
+                    })().catch(function(){});
                     return res;
                 }).catch(function(e) { entry.status = 0; throw e; });
             };
