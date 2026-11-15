@@ -1455,8 +1455,8 @@
     "semantic_hash": ""
   },
   "Packages/KouenSettings/Sources/KouenSettings/ProjectConfig.swift": {
-    "mtime": 1794719968.9010231,
-    "ast_hash": "2c491258477933f654ec80a4324aa0bf",
+    "mtime": 1794757376.6102371,
+    "ast_hash": "b98ca82b10eda45c7c69fbadca41dc69",
     "semantic_hash": ""
   },
   "Packages/KouenSettings/Sources/KouenSettings/ShellRCWiring.swift": {
@@ -4872,6 +4872,11 @@
   "Tests/KouenDaemonTests/DaemonOffLockWorktreeTests.swift": {
     "mtime": 1794720790.65019,
     "ast_hash": "a5ff63fe69efee4dd2f5d2e6341f0621",
+    "semantic_hash": ""
+  },
+  "graphify-out/memory/query_20261114_012223_where_are_the_wave_1_deadlock__http_transport_and.md": {
+    "mtime": 1794757376.6116202,
+    "ast_hash": "c9be348e5159315010b862078c285ebf",
     "semantic_hash": ""
   }
 }
