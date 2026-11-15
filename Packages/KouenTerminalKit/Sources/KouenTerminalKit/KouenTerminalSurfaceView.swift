@@ -763,15 +763,15 @@ public final class KouenTerminalSurfaceView: NSView {
         return tail.joined(separator: "\n")
     }
 
+    private var triggerMatcher = OutputTriggerMatcher()
+
     /// Scan raw output bytes for user-configured trigger patterns.
     private func scanOutputTriggers(_ data: Data) {
         let triggers = OutputTriggerStore.load()
         guard !triggers.isEmpty else { return }
-        guard let text = String(data: data, encoding: .utf8) else { return }
-        for trigger in triggers {
-            if text.localizedCaseInsensitiveContains(trigger.pattern) {
-                onOutputTrigger?(trigger.pattern, trigger.title)
-            }
+        for pattern in triggerMatcher.matches(in: data, patterns: triggers.map(\.pattern)) {
+            guard let trigger = triggers.first(where: { $0.pattern == pattern }) else { continue }
+            onOutputTrigger?(trigger.pattern, trigger.title)
         }
     }
 

@@ -165,6 +165,10 @@ public final class DaemonClient: @unchecked Sendable {
                     return reply.response
                 }
                 break
+            } else if errno != EINTR, errno != EAGAIN {
+                // A failed read (e.g. ECONNRESET) leaves POLLERR set, so polling again returns at
+                // once; without leaving here the loop busy-spins until the deadline.
+                break
             }
         }
         throw DaemonClientError.timeout

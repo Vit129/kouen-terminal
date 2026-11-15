@@ -834,7 +834,7 @@ public final class TerminalHostView: NSView {
         }
     }
 
-    private final class OutputCoalescer: @unchecked Sendable {
+    final class OutputCoalescer: @unchecked Sendable {
         private let lock = NSLock()
         private var pendingBatch = Data()
         private var isScheduled = false
@@ -851,13 +851,22 @@ public final class TerminalHostView: NSView {
             }
         }
 
-        func drain() -> Data {
+        /// Hands out at most `maxBytes` so one huge flood is fed to the emulator in slices
+        /// (main stays responsive between them) instead of one multi-MB `receive`. Order is kept;
+        /// while `hasMore`, `isScheduled` stays set and the caller reschedules the next slice.
+        func drain(maxBytes: Int = 256 * 1024) -> (data: Data, hasMore: Bool) {
             lock.lock()
-            let batch = pendingBatch
-            pendingBatch = Data()
-            isScheduled = false
-            lock.unlock()
-            return batch
+            defer { lock.unlock() }
+            let batch: Data
+            if pendingBatch.count > maxBytes {
+                batch = pendingBatch.prefix(maxBytes)
+                pendingBatch = Data(pendingBatch.dropFirst(maxBytes))
+            } else {
+                batch = pendingBatch
+                pendingBatch = Data()
+                isScheduled = false
+            }
+            return (batch, isScheduled)
         }
     }
 
@@ -873,12 +882,19 @@ public final class TerminalHostView: NSView {
         return { [weak self] data, _ in
             coalescer.append(data) {
                 DispatchQueue.main.async { [weak self] in
-                    guard let self else { return }
-                    let batch = coalescer.drain()
-                    if !batch.isEmpty {
-                        self.nativeView.receive(batch)
-                    }
+                    MainActor.assumeIsolated { self?.feedCoalescedSlice() }
                 }
+            }
+        }
+    }
+
+    /// Feeds one capped slice, then re-queues itself (FIFO behind other main work) if more is pending.
+    private func feedCoalescedSlice() {
+        let (batch, hasMore) = outputCoalescer.drain()
+        if !batch.isEmpty { nativeView.receive(batch) }
+        if hasMore {
+            DispatchQueue.main.async { [weak self] in
+                MainActor.assumeIsolated { self?.feedCoalescedSlice() }
             }
         }
     }

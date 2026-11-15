@@ -1838,6 +1838,13 @@ public final class SurfaceRegistry: @unchecked Sendable {
     /// Lightweight CWD-only refresh: reads each surface's direct shell PID cwd via a single
     /// `proc_pidinfo` syscall (no process-tree walk). O(N) where N = open surfaces, ~0.1ms
     /// total. Suitable for 500ms polling without significant CPU cost.
+    /// A shell's cwd only changes alongside output (the prompt redraw), so a surface that has been
+    /// silent for a while needs no 0.5s probe; the 1.5s metadata scan still covers stragglers.
+    static func shouldProbeCwd(idleSeconds: TimeInterval?) -> Bool {
+        guard let idleSeconds else { return true }
+        return idleSeconds < 3
+    }
+
     public func refreshCwdOnly() {
         lock.lock()
         let snap = Array(sessions)
@@ -1848,7 +1855,8 @@ public final class SurfaceRegistry: @unchecked Sendable {
             // scan (refreshSurfaceMetadata) covers those. Both paths report the shell's
             // own cwd — never a descendant's — so a session stays pinned to its worktree
             // even while a build/agent subprocess runs in another directory.
-            guard session.isShellInForeground(),
+            guard Self.shouldProbeCwd(idleSeconds: surfaceIdleTime(for: key)),
+                  session.isShellInForeground(),
                   let uuid = UUID(uuidString: key), let result = session.probeShellCwd() else { return nil }
             return (key, session, uuid, result.pid, result.cwd)
         }
