@@ -1,0 +1,23 @@
+Packages/KouenTerminalKit/Sources/KouenTerminalKit/KouenTerminalSurfaceView.swift
+  s_824dc91b169df4::t_2493a75216e3f9 766-767,773-775
+Packages/KouenTerminalKit/Sources/KouenTerminalKit/OutputTriggerMatcher.swift
+  s_824dc91b169df4::t_e8ff2daee34bc3 1-18
+Tests/KouenTerminalKitTests/OutputTriggerMatcherTests.swift
+  s_824dc91b169df4::t_c6e5cbc812947d 1-16
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.3",
+  "base_commit_sha": "fc2778713937bc3f3841c8016393d2150eb439fc",
+  "prompts": {},
+  "sessions": {
+    "s_824dc91b169df4": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c2ac45a6-bf90-447c-8785-1284182c2dad",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Vit129 <vitosk129@gmail.com>"
+    }
+  }
+}
