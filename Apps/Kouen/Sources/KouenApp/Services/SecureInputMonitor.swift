@@ -17,9 +17,11 @@ final class SecureInputMonitor {
     private var active: Set<SurfaceID> = []
     private var timers: [SurfaceID: DispatchWorkItem] = [:]
 
-    // Substrings covering sudo, ssh, gpg, git, and VT conceal-mode (ESC[8m).
-    private let patterns: [String] = ["assword", "assphrase", "Enter PIN", "sudo:", "\u{1b}[8m"]
-    private lazy var rawPatterns: [Data] = patterns.map { Data($0.utf8) }
+    /// Scans run here, off main: only a focused pane's chunks are scanned, and each
+    /// surface keeps its own carry-over so a prompt split across two chunks still matches.
+    private let scanQueue = DispatchQueue(label: "com.vit129.kouen.secure-input-scan", qos: .userInitiated)
+    // Touched only on `scanQueue`.
+    nonisolated(unsafe) private var scanners: [SurfaceID: SecureInputPromptScanner] = [:]
 
     private init() {}
 
@@ -31,11 +33,22 @@ final class SecureInputMonitor {
         // release(id) to fire twice per OSC 133 — corrupting the active set.
         guard surface.onRawOutput == nil else { return }
 
-        surface.onRawOutput = { [weak self] data in
-            guard let self,
-                  self.rawPatterns.contains(where: { data.range(of: $0) != nil }) else { return }
-            if self.active.insert(id).inserted { EnableSecureEventInput() }
-            self.armTimer(for: id)
+        surface.onRawOutput = { [weak self, weak surface] data in
+            // Secure Input is system-wide: only the pane the user is typing into may arm it.
+            let focused = surface.map { $0.window?.isKeyWindow == true && $0.window?.firstResponder === $0 } ?? false
+            guard let self else { return }
+            self.scanQueue.async {
+                var scanner = self.scanners[id] ?? SecureInputPromptScanner()
+                let hit = scanner.feed(data, focused: focused)
+                self.scanners[id] = scanner
+                guard hit else { return }
+                DispatchQueue.main.async {
+                    MainActor.assumeIsolated {
+                        if self.active.insert(id).inserted { EnableSecureEventInput() }
+                        self.armTimer(for: id)
+                    }
+                }
+            }
         }
 
         // Chain onto the existing onCommandFinished set by TerminalHostView.configureNative()
@@ -50,6 +63,7 @@ final class SecureInputMonitor {
     /// Call from onRetire to ensure secure input is released when a pane closes.
     func release(_ surfaceID: SurfaceID) {
         timers.removeValue(forKey: surfaceID)?.cancel()
+        scanQueue.async { self.scanners[surfaceID] = nil }
         guard active.remove(surfaceID) != nil else { return }
         if active.isEmpty { DisableSecureEventInput() }
     }
