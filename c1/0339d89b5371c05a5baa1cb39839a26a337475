@@ -1,0 +1,21 @@
+Packages/KouenDaemon/Sources/KouenDaemon/SurfaceRegistry.swift
+  s_824dc91b169df4::t_2c6bf2ab77548d 1785-1791,1802-1803
+Tests/KouenDaemonTests/CwdProbeGateTests.swift
+  s_824dc91b169df4::t_a761f140dbaf9c 1-13
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.3",
+  "base_commit_sha": "c10339d89b5371c05a5baa1cb39839a26a337475",
+  "prompts": {},
+  "sessions": {
+    "s_824dc91b169df4": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c2ac45a6-bf90-447c-8785-1284182c2dad",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Vit129 <vitosk129@gmail.com>"
+    }
+  }
+}
