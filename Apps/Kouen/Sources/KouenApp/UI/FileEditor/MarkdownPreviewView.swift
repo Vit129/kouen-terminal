@@ -7,6 +7,7 @@ import KouenSyntaxResources
 /// Uses bundled offline Marked.js, Highlight.js, and Mermaid.js.
 @MainActor
 final class MarkdownPreviewView: NSView, WKNavigationDelegate {
+    private let imageHandler = MarkdownImageSchemeHandler()
     private var webView: WKWebView?
     private var isWebViewReady = false
     private var pendingMarkdown: String?
@@ -42,7 +43,7 @@ final class MarkdownPreviewView: NSView, WKNavigationDelegate {
 
     private static let cachedUserScripts: [WKUserScript] = {
         var scripts: [WKUserScript] = [bootstrapErrorScript]
-        for name in ["marked.min.js", "highlight.min.js", "mermaid.min.js"] {
+        for name in ["purify.min.js", "marked.min.js", "highlight.min.js", "mermaid.min.js"] {
             if let code = MarkdownBundle.scriptString(filename: name) {
                 scripts.append(WKUserScript(source: code, injectionTime: .atDocumentStart, forMainFrameOnly: true))
             }
@@ -64,12 +65,12 @@ final class MarkdownPreviewView: NSView, WKNavigationDelegate {
         if let existing = webView { return existing }
         let config = WKWebViewConfiguration()
         config.disableExtensibleSSO()
+        config.setURLSchemeHandler(imageHandler, forURLScheme: MarkdownImageSchemeHandler.scheme)
         let userController = WKUserContentController()
         for script in Self.cachedUserScripts {
             userController.addUserScript(script)
         }
         config.userContentController = userController
-        config.preferences.setValue(true, forKey: "allowFileAccessFromFileURLs")
 
         let wv = WKWebView(frame: bounds, configuration: config)
         wv.translatesAutoresizingMaskIntoConstraints = false
@@ -188,8 +189,12 @@ final class MarkdownPreviewView: NSView, WKNavigationDelegate {
         let wv = ensureWebView()
         let isDark = isAppearanceDark
         let html = generateHTML(markdown: effectiveMarkdown, isDark: isDark)
-        let baseURL = fileURL?.deletingLastPathComponent() ?? URL(fileURLWithPath: NSHomeDirectory())
-        wv.loadHTMLString(html, baseURL: baseURL)
+        imageHandler.directory = fileURL?.deletingLastPathComponent()
+        var base = URLComponents()
+        base.scheme = MarkdownImageSchemeHandler.scheme
+        base.host = "local"
+        base.path = (imageHandler.directory?.path ?? "") + "/"
+        wv.loadHTMLString(html, baseURL: base.url)
     }
 
     func update(markdown: String) {
@@ -265,7 +270,7 @@ final class MarkdownPreviewView: NSView, WKNavigationDelegate {
         }
 
         // Local file link
-        if url.scheme == "file" {
+        if url.scheme == "file" || url.scheme == MarkdownImageSchemeHandler.scheme {
             if let onOpenFile {
                 onOpenFile(url.path)
                 decisionHandler(.cancel)
@@ -287,12 +292,14 @@ final class MarkdownPreviewView: NSView, WKNavigationDelegate {
             encodedMarkdown = "\"\""
         }
 
+        let nonce = UUID().uuidString
         return """
         <!DOCTYPE html>
         <html lang="en">
         <head>
           <meta charset="utf-8">
           <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'nonce-\(nonce)'; style-src 'unsafe-inline'; img-src kouen-markdown: data:; font-src data:; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
           <style>
             :root {
               --font-body: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Helvetica, Arial, sans-serif;
@@ -598,7 +605,7 @@ final class MarkdownPreviewView: NSView, WKNavigationDelegate {
         <body class="\(isDark ? "dark" : "light")">
           <div id="content" class="markdown-body"></div>
 
-          <script>
+          <script nonce="\(nonce)">
             window.isDarkMode = \(isDark ? "true" : "false");
 
             function escapeHtml(str) {
@@ -612,7 +619,8 @@ final class MarkdownPreviewView: NSView, WKNavigationDelegate {
                 mermaid.initialize({
                   startOnLoad: false,
                   theme: window.isDarkMode ? 'dark' : 'default',
-                  securityLevel: 'loose',
+                  securityLevel: 'strict',
+                  flowchart: { htmlLabels: false },
                   fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif'
                 });
               }
@@ -654,7 +662,7 @@ final class MarkdownPreviewView: NSView, WKNavigationDelegate {
                       } else {
                         codeBodyHtml = `<div class="code-with-lines"><pre class="code-pre"><code class="hljs ${lang ? 'language-' + escapeHtml(lang) : ''}">${highlighted}</code></pre></div>`;
                       }
-                      return `<div class="code-container"><div class="code-header"><span class="code-lang">${escapeHtml(langLabel)}</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div>${codeBodyHtml}</div>`;
+                      return `<div class="code-container"><div class="code-header"><span class="code-lang">${escapeHtml(langLabel)}</span><button class="copy-btn">Copy</button></div>${codeBodyHtml}</div>`;
                     }
                   }
                 });
@@ -680,7 +688,7 @@ final class MarkdownPreviewView: NSView, WKNavigationDelegate {
                 const id = 'mermaid-diag-' + (++diagramCounter);
                 try {
                   const { svg } = await mermaid.render(id, code);
-                  node.innerHTML = svg;
+                  node.innerHTML = DOMPurify.sanitize(svg);
                 } catch (err) {
                   node.innerHTML = `<div class="mermaid-error"><div class="mermaid-error-title">⚠️ Mermaid Syntax Error</div><pre>${escapeHtml(err.message || String(err))}</pre></div>`;
                   const tempEl = document.getElementById('d' + id);
@@ -701,6 +709,11 @@ final class MarkdownPreviewView: NSView, WKNavigationDelegate {
               }
             };
 
+            document.getElementById('content').addEventListener('click', function(event) {
+              const button = event.target.closest('.copy-btn');
+              if (button) window.copyCode(button);
+            });
+
             window.setDarkMode = function(isDark) {
               window.isDarkMode = isDark;
               document.body.className = isDark ? 'dark' : 'light';
@@ -708,7 +721,8 @@ final class MarkdownPreviewView: NSView, WKNavigationDelegate {
                 mermaid.initialize({
                   startOnLoad: false,
                   theme: isDark ? 'dark' : 'default',
-                  securityLevel: 'loose'
+                  securityLevel: 'strict',
+                  flowchart: { htmlLabels: false }
                 });
               }
             };
@@ -737,7 +751,7 @@ final class MarkdownPreviewView: NSView, WKNavigationDelegate {
                 }
                 let html = marked.parse(rawMarkdown);
                 html = processAlerts(html);
-                contentEl.innerHTML = html;
+                contentEl.innerHTML = DOMPurify.sanitize(html, { USE_PROFILES: { html: true } });
                 await renderMermaidDiagrams();
               } catch (e) {
                 console.error('renderMarkdown error:', e);

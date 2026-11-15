@@ -27,6 +27,20 @@ final class SurfaceRegistryTests: XCTestCase {
         if let root { try? FileManager.default.removeItem(at: root) }
     }
 
+    func test_TC0101_BE_UT_FeatureSweepReturnsWithoutRecursiveLock() {
+        let registry = SurfaceRegistry()
+        let returned = expectation(description: "[TC-0101][BE-UT] feature sweep returns")
+        DispatchQueue.global().async {
+            guard case .ok = registry.handle(.featureSweepMerged(repoPath: nil)) else {
+                XCTFail("expected ok")
+                returned.fulfill()
+                return
+            }
+            returned.fulfill()
+        }
+        wait(for: [returned], timeout: 2)
+    }
+
     func testPingReturnsPong() {
         guard case .pong = SurfaceRegistry().handle(.ping) else { return XCTFail("expected pong") }
     }

@@ -382,6 +382,111 @@ public final class SurfaceRegistry: @unchecked Sendable {
         metrics.recordLockWait(nanos: DispatchTime.now().uptimeNanoseconds &- start)
     }
 
+    /// A worktree whose session just closed: removed (after the project's archive script) only if clean.
+    struct WorktreeCleanup: Sendable {
+        let path: String
+        let parent: String?
+    }
+
+    /// Everything `.closeSession` does under the registry lock; no git, no scripts. The caller owns the
+    /// returned worktree cleanup and must run it with `cleanupWorktree` once the lock is released.
+    private func closeSessionLocked(_ sessionID: UUID) -> (IPCResponse, WorktreeCleanup?) {
+        let closingSession = editor.snapshot.workspaces
+            .flatMap(\.sessions)
+            .first(where: { $0.id == sessionID })
+        let closedSurfaces = closingSession?
+            .tabs
+            .flatMap { $0.rootPane.allSurfaceIDs().map(\.uuidString) } ?? []
+        // Capture worktree metadata before close for cleanup.
+        let cleanup: WorktreeCleanup? = closingSession?.tabs.first.flatMap {
+            guard let wt = $0.worktreePath else { return nil }
+            return WorktreeCleanup(path: wt, parent: $0.parentRepoPath)
+        }
+        // Hook context captured BEFORE the close: `#{session_name}` must describe
+        // the session that closed, not whatever survives it.
+        let closedContext = buildFormatContext(
+            surfaceKey: (closingSession?.activeTab ?? closingSession?.tabs.first)?
+                .rootPane.allSurfaceIDs().first?.uuidString
+        )
+        guard editor.closeSession(sessionID) else { return (.error("Session not found"), nil) }
+        closeSurfaces(closedSurfaces)
+        // Drop the session's per-session env so entries don't accumulate in environment.json.
+        environmentStore.clearSession(sessionID.uuidString)
+        ensureAllSnapshotSurfaces()
+        commit()
+        fireHookLocked(.sessionClosed, context: closedContext)
+        return (.ok, cleanup)
+    }
+
+    /// Clean up the worktree if it's not dirty. Slow (git, archive script up to 30 s): never call it
+    /// while holding `lock` from the daemon's serial queue.
+    private static func cleanupWorktree(_ wt: WorktreeCleanup) {
+        let mgr = WorktreeManager()
+        let repoPath = wt.parent ?? mgr.repoRoot(for: wt.path) ?? wt.path
+        guard !mgr.isDirty(worktreePath: wt.path) else { return }
+        // P32 F3: run the project's archiveScript (if any) before the worktree dir disappears —
+        // the only point where the worktree still exists but the task is definitely ending.
+        if let config = ProjectConfig.load(from: wt.path),
+           let archive = config.archiveScript, !archive.isEmpty {
+            mgr.runArchiveScript(archive, cwd: wt.path, env: config.env)
+        }
+        mgr.remove(repoPath: repoPath, worktreePath: wt.path)
+    }
+
+    /// Worktree requests touch only `WorktreeManager`/`ProjectConfig`, never registry state.
+    private static func worktreeResponse(for request: IPCRequest) -> IPCResponse? {
+        switch request {
+        case let .worktreeList(repoPath):
+            return .worktrees(WorktreeManager().list(repoPath: repoPath).map(Self.worktreeInfoSummary))
+        case let .worktreeCreate(repoPath, sessionID, branch, baseRef):
+            guard let path = WorktreeManager().create(
+                repoPath: repoPath, sessionID: sessionID, branch: branch, baseRef: baseRef
+            ) else {
+                return .error("git worktree add failed")
+            }
+            // Each worktree needs its own deps (never a symlinked node_modules — CASE-041), so
+            // the project's setupScript runs here, detached, same as the in-app task path.
+            ProjectConfig.launchSetupScript(parentRepoPath: repoPath, worktreePath: path)
+            return .worktreePath(path)
+        case let .worktreeRemove(repoPath, worktreePath, force):
+            let ok = WorktreeManager().remove(repoPath: repoPath, worktreePath: worktreePath, force: force)
+            return ok ? .ok : .error("git worktree remove failed")
+        default:
+            return nil
+        }
+    }
+
+    /// Requests whose work is git or a script (slow, up to ~30 s). They must not run under `lock` nor on
+    /// `DaemonServer`'s serial queue, or every other client waits behind one slow call. Returns `false`
+    /// when `request` is not one of them (use `handle`); otherwise takes ownership and calls `completion`
+    /// from a background queue.
+    public func handleOffLock(_ request: IPCRequest, completion: @escaping @Sendable (IPCResponse) -> Void) -> Bool {
+        let queue = DispatchQueue.global(qos: .userInitiated)
+        switch request {
+        case let .closeSession(sessionID):
+            acquireRegistryLock()
+            let (response, cleanup) = closeSessionLocked(sessionID)
+            lock.unlock()
+            guard let cleanup else { completion(response); return true }
+            queue.async {
+                Self.cleanupWorktree(cleanup)
+                completion(response)
+            }
+            return true
+        case .worktreeList, .worktreeCreate, .worktreeRemove:
+            queue.async { completion(Self.worktreeResponse(for: request) ?? .error("unsupported request")) }
+            return true
+        case let .featureSweepMerged(repoPath):
+            queue.async { [weak self] in
+                self?.sweepFeatureWorktrees(repoPath: repoPath)
+                completion(.ok)
+            }
+            return true
+        default:
+            return false
+        }
+    }
+
     public func handle(_ request: IPCRequest) -> IPCResponse {
         acquireRegistryLock()
         defer { lock.unlock() }
@@ -605,46 +710,11 @@ public final class SurfaceRegistry: @unchecked Sendable {
             fireHookLocked(.afterKillTab)
             return .ok
         case let .closeSession(sessionID):
-            let closingSession = editor.snapshot.workspaces
-                .flatMap(\.sessions)
-                .first(where: { $0.id == sessionID })
-            let closedSurfaces = closingSession?
-                .tabs
-                .flatMap { $0.rootPane.allSurfaceIDs().map(\.uuidString) } ?? []
-            // Capture worktree metadata before close for cleanup.
-            let worktreeInfo: (path: String, parent: String?)? = closingSession?.tabs.first.flatMap {
-                guard let wt = $0.worktreePath else { return nil }
-                return (wt, $0.parentRepoPath)
-            }
-            // Hook context captured BEFORE the close: `#{session_name}` must describe
-            // the session that closed, not whatever survives it.
-            let closedContext = buildFormatContext(
-                surfaceKey: (closingSession?.activeTab ?? closingSession?.tabs.first)?
-                    .rootPane.allSurfaceIDs().first?.uuidString
-            )
-            guard editor.closeSession(sessionID) else { return .error("Session not found") }
-            closeSurfaces(closedSurfaces)
-            // Clean up the worktree if it's not dirty.
-            if let wt = worktreeInfo {
-                let mgr = WorktreeManager()
-                let repoPath = wt.parent ?? mgr.repoRoot(for: wt.path) ?? wt.path
-                if !mgr.isDirty(worktreePath: wt.path) {
-                    // P32 F3: run the project's archiveScript (if any) before the worktree
-                    // dir disappears — this is the only point in the lifecycle where the
-                    // worktree still exists but the task is definitely ending.
-                    if let config = ProjectConfig.load(from: wt.path),
-                       let archive = config.archiveScript, !archive.isEmpty {
-                        mgr.runArchiveScript(archive, cwd: wt.path, env: config.env)
-                    }
-                    mgr.remove(repoPath: repoPath, worktreePath: wt.path)
-                }
-            }
-            // Drop the session's per-session env so entries don't accumulate in environment.json.
-            environmentStore.clearSession(sessionID.uuidString)
-            ensureAllSnapshotSurfaces()
-            commit()
-            fireHookLocked(.sessionClosed, context: closedContext)
-            return .ok
+            // In-process/sync path (tests, internal callers): cleanup stays inline. The daemon's IPC
+            // path goes through `handleOffLock`, which runs the same cleanup without this lock.
+            let (response, cleanup) = closeSessionLocked(sessionID)
+            if let cleanup { Self.cleanupWorktree(cleanup) }
+            return response
         case let .closeWorkspace(id):
             let workspaceSessionIDs = editor.snapshot.workspaces
                 .first(where: { $0.id == id })?
@@ -1089,22 +1159,8 @@ public final class SurfaceRegistry: @unchecked Sendable {
             guard taskStore.delete(id: id) else { return .error("Task not found") }
             onTasksChanged?()
             return .ok
-        case let .worktreeList(repoPath):
-            let infos = WorktreeManager().list(repoPath: repoPath).map(Self.worktreeInfoSummary)
-            return .worktrees(infos)
-        case let .worktreeCreate(repoPath, sessionID, branch, baseRef):
-            guard let path = WorktreeManager().create(
-                repoPath: repoPath, sessionID: sessionID, branch: branch, baseRef: baseRef
-            ) else {
-                return .error("git worktree add failed")
-            }
-            // Each worktree needs its own deps (never a symlinked node_modules — CASE-041), so
-            // the project's setupScript runs here, detached, same as the in-app task path.
-            ProjectConfig.launchSetupScript(parentRepoPath: repoPath, worktreePath: path)
-            return .worktreePath(path)
-        case let .worktreeRemove(repoPath, worktreePath, force):
-            let ok = WorktreeManager().remove(repoPath: repoPath, worktreePath: worktreePath, force: force)
-            return ok ? .ok : .error("git worktree remove failed")
+        case .worktreeList, .worktreeCreate, .worktreeRemove:
+            return Self.worktreeResponse(for: request) ?? .error("unsupported request")
         case .automationList:
             return .automations(automationStore.list().map(Self.automationSummary))
         case let .automationGet(id):
@@ -1178,7 +1234,7 @@ public final class SurfaceRegistry: @unchecked Sendable {
         case let .featureDelete(slug):
             return featureStore.delete(slug: slug) ? .ok : .error("Feature not found")
         case let .featureSweepMerged(repoPath):
-            tickFeatureWorktreeSweep(repoPath: repoPath)
+            sweepFeatureWorktrees(repoPath: repoPath)
             return .ok
         case .routingRuleList:
             return .routingRules(routingRuleStore.list().map(Self.routingRuleSummary))
@@ -2533,8 +2589,9 @@ public final class SurfaceRegistry: @unchecked Sendable {
         for automation in due {
             _ = fireAutomationLocked(automation)
         }
-        tickFeatureWorktreeSweepLocked()
         lock.unlock()
+        // Git work, off the registry lock: it only needs `featureStore` (own lock).
+        sweepFeatureWorktrees()
     }
 
     /// Spawns a session, launches `automation.agent`, then (after a short delay) types
@@ -2612,12 +2669,12 @@ public final class SurfaceRegistry: @unchecked Sendable {
     // MARK: - Features / Worktree Lifecycle Discipline (P46)
 
     public func tickFeatureWorktreeSweep(repoPath: String? = nil) {
-        acquireRegistryLock()
-        tickFeatureWorktreeSweepLocked(repoPath: repoPath)
-        lock.unlock()
+        sweepFeatureWorktrees(repoPath: repoPath)
     }
 
-    private func tickFeatureWorktreeSweepLocked(repoPath: String? = nil) {
+    /// Merged-feature worktree sweep (git merge-base/status/remove). Needs no registry state, only
+    /// `featureStore`, which has its own lock, so it runs without `lock`.
+    private func sweepFeatureWorktrees(repoPath: String? = nil) {
         let features = featureStore.list(repoPath: repoPath)
         let manager = WorktreeManager()
         for feature in features {

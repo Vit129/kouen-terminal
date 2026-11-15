@@ -90,8 +90,8 @@
     "semantic_hash": ""
   },
   "Apps/Kouen/Sources/KouenApp/Services/DaemonSyncService.swift": {
-    "mtime": 1794720726.4102516,
-    "ast_hash": "9f7c85c5c4b117efbc87b15184de216a",
+    "mtime": 1794757588.9519632,
+    "ast_hash": "a3918a0a86565ebd7346b5efa5772d2a",
     "semantic_hash": ""
   },
   "Apps/Kouen/Sources/KouenApp/Services/DefaultTerminalManager.swift": {
@@ -320,8 +320,8 @@
     "semantic_hash": ""
   },
   "Apps/Kouen/Sources/KouenApp/UI/Chrome/BrowserPaneView.swift": {
-    "mtime": 1794720657.6712296,
-    "ast_hash": "643d31d8a2eaf21da0159b476419b196",
+    "mtime": 1794757588.9529812,
+    "ast_hash": "85dc1ed89757914b9190166644f79e62",
     "semantic_hash": ""
   },
   "Apps/Kouen/Sources/KouenApp/UI/Chrome/ContentAreaViewController.swift": {
@@ -1110,8 +1110,8 @@
     "semantic_hash": ""
   },
   "Packages/KouenCore/Sources/KouenCore/Worktree/WorktreeManager.swift": {
-    "mtime": 1794719971.4517603,
-    "ast_hash": "f541cd8798873d0b1d0333092b16a4c2",
+    "mtime": 1794757588.954428,
+    "ast_hash": "9160fa42cb648d7c97fb4ef0b3169a28",
     "semantic_hash": ""
   },
   "Packages/KouenDaemon/Sources/KouenDaemon/AgentScanner.swift": {
@@ -1140,8 +1140,8 @@
     "semantic_hash": ""
   },
   "Packages/KouenDaemon/Sources/KouenDaemon/DaemonServer.swift": {
-    "mtime": 1794719971.4534013,
-    "ast_hash": "99b327e13271fddbe38609bd2e56c05e",
+    "mtime": 1794757588.9552608,
+    "ast_hash": "d7ab3d5028679d2bd9609fc886c963e7",
     "semantic_hash": ""
   },
   "Packages/KouenDaemon/Sources/KouenDaemon/FormatContextBuilder.swift": {
@@ -1175,8 +1175,8 @@
     "semantic_hash": ""
   },
   "Packages/KouenDaemon/Sources/KouenDaemon/SurfaceRegistry.swift": {
-    "mtime": 1794720844.12208,
-    "ast_hash": "5401945c713387cde64ed7901d8198c8",
+    "mtime": 1794757588.9558933,
+    "ast_hash": "35392b05c846f8d96dc555e00e32e094",
     "semantic_hash": ""
   },
   "Packages/KouenDaemon/Sources/KouenDaemon/VersionBannerState.swift": {
@@ -1455,8 +1455,8 @@
     "semantic_hash": ""
   },
   "Packages/KouenSettings/Sources/KouenSettings/ProjectConfig.swift": {
-    "mtime": 1794719971.4692948,
-    "ast_hash": "2c491258477933f654ec80a4324aa0bf",
+    "mtime": 1794757588.9562707,
+    "ast_hash": "b98ca82b10eda45c7c69fbadca41dc69",
     "semantic_hash": ""
   },
   "Packages/KouenSettings/Sources/KouenSettings/ShellRCWiring.swift": {
@@ -2650,8 +2650,8 @@
     "semantic_hash": ""
   },
   "Tests/KouenDaemonTests/SurfaceRegistryTests.swift": {
-    "mtime": 1794719971.552514,
-    "ast_hash": "6aef0671cd8eabe4d3dacc6013206008",
+    "mtime": 1794757588.9598718,
+    "ast_hash": "825bec52f9c3203e4fc1e4378258d3fc",
     "semantic_hash": ""
   },
   "Tests/KouenDaemonTests/TaskIPCDaemonTests.swift": {
@@ -3070,8 +3070,8 @@
     "semantic_hash": ""
   },
   "Tools/kouen-mcp/Sources/KouenMCP/Main.swift": {
-    "mtime": 1794719971.5944657,
-    "ast_hash": "e7c9ebc992ca75244de2e14cfc46b562",
+    "mtime": 1794757588.960391,
+    "ast_hash": "dda5ac0058a71f4a2bd6c1553cb73f6a",
     "semantic_hash": ""
   },
   "Tools/kouen-mcp/Sources/KouenMCP/StdioTransport.swift": {
@@ -3880,8 +3880,8 @@
     "semantic_hash": ""
   },
   "Apps/Kouen/Sources/KouenApp/UI/FileEditor/MarkdownPreviewView.swift": {
-    "mtime": 1794719971.4189358,
-    "ast_hash": "ac67236e382c6622a5ff12d4a4bcf2df",
+    "mtime": 1794757588.953887,
+    "ast_hash": "76b5529eb008c3b1023e09dd3b9a439a",
     "semantic_hash": ""
   },
   "Packages/KouenSyntaxResources/Resources/Markdown/highlight.min.js": {
@@ -3905,8 +3905,8 @@
     "semantic_hash": ""
   },
   "Tests/KouenAppTests/MarkdownPreviewTests.swift": {
-    "mtime": 1794719971.505263,
-    "ast_hash": "bfa9a29eaffae5bd1f06e365a1748e1f",
+    "mtime": 1794757588.9586284,
+    "ast_hash": "db22b291cab0f559e502ba4abbd491f0",
     "semantic_hash": ""
   },
   "Apps/Kouen/Sources/KouenApp/Services/SwarmDaemonBridge.swift": {
@@ -3980,18 +3980,18 @@
     "semantic_hash": ""
   },
   "Tests/KouenMCPTests/SSETransportTests.swift": {
-    "mtime": 1794719971.556206,
-    "ast_hash": "e916a14b7f78a706d795c036f89d3ec3",
+    "mtime": 1794757588.9600756,
+    "ast_hash": "2e6fe73e561153c85e3c3ef868797f98",
     "semantic_hash": ""
   },
   "Tools/kouen-mcp/Sources/KouenMCP/SSETransport.swift": {
-    "mtime": 1794719971.5945756,
-    "ast_hash": "aa262837d3c740403e3cbae1b4fa0d1b",
+    "mtime": 1794757588.961228,
+    "ast_hash": "7c0a75bee073df46a133bfde3d1dfb64",
     "semantic_hash": ""
   },
   "ARCHITECTURE.md": {
-    "mtime": 1794719971.3888717,
-    "ast_hash": "55ce049f34cc7c9a65f81a683330a3b6",
+    "mtime": 1794757588.951614,
+    "ast_hash": "6ba4c4b870489e58f2c382119d290429",
     "semantic_hash": ""
   },
   "CONTEXT.md": {
@@ -4615,8 +4615,8 @@
     "semantic_hash": ""
   },
   "docs/mcp-tools.md": {
-    "mtime": 1794719971.6353414,
-    "ast_hash": "70eba5c16e67721d3c97c135f7cad672",
+    "mtime": 1794757588.9615564,
+    "ast_hash": "821708ce37ae96cca87d5178bfa96676",
     "semantic_hash": ""
   },
   "Apps/Kouen/Sources/KouenApp/Services/AIProviderAwakeService.swift": {
@@ -4877,6 +4877,61 @@
   "graphify-out/memory/query_20261115_153351_outputtriggermatcher_secureinputmonitor_utf8.md": {
     "mtime": 1794756831.5496,
     "ast_hash": "05c629f8c7f58d24d6de384500ae5172",
+    "semantic_hash": ""
+  },
+  "Apps/Kouen/Sources/KouenApp/Services/ResubscribingSlot.swift": {
+    "mtime": 1794757588.9522629,
+    "ast_hash": "b05b49a90640a4fd930f8d77106171ef",
+    "semantic_hash": ""
+  },
+  "Apps/Kouen/Sources/KouenApp/UI/FileEditor/MarkdownImageSchemeHandler.swift": {
+    "mtime": 1794757588.9534662,
+    "ast_hash": "c615b73914a4cfb2a6e8cbf73437f7ce",
+    "semantic_hash": ""
+  },
+  "Packages/KouenSyntaxResources/Resources/Markdown/purify.min.js": {
+    "mtime": 1794757588.9574568,
+    "ast_hash": "52abf5cb41ad3e11631ef0a01910c1a2",
+    "semantic_hash": ""
+  },
+  "Tests/KouenAppTests/BrowserPaneWaitTimeoutTests.swift": {
+    "mtime": 1794757588.9577582,
+    "ast_hash": "609f7c8fa30a959db8e937164baf5b01",
+    "semantic_hash": ""
+  },
+  "Tests/KouenAppTests/DaemonSyncServiceBrowserLeafIdentityTests.swift": {
+    "mtime": 1794757588.9581633,
+    "ast_hash": "ddd912cb8882a5ac2692c7d5b9aa1a87",
+    "semantic_hash": ""
+  },
+  "Tests/KouenAppTests/ResubscribingSlotTests.swift": {
+    "mtime": 1794757588.9589467,
+    "ast_hash": "0798322cec1d624f5bfba4a7cb3bd170",
+    "semantic_hash": ""
+  },
+  "Tests/KouenDaemonTests/DaemonAsyncReplyRoutingTests.swift": {
+    "mtime": 1794757588.9591007,
+    "ast_hash": "35ca3f898103e9ce2393ff45daf9dab1",
+    "semantic_hash": ""
+  },
+  "Tests/KouenDaemonTests/DaemonOffLockWorktreeTests.swift": {
+    "mtime": 1794757588.9594622,
+    "ast_hash": "a5ff63fe69efee4dd2f5d2e6341f0621",
+    "semantic_hash": ""
+  },
+  "Tools/kouen-mcp/Sources/KouenMCP/HTTPRequestPolicy.swift": {
+    "mtime": 1794757588.960222,
+    "ast_hash": "4e83db01c38f42e41f0ea54aadbf0117",
+    "semantic_hash": ""
+  },
+  "Packages/KouenSyntaxResources/Resources/Markdown/DOMPurify-LICENSE.txt": {
+    "mtime": 1794757588.9572346,
+    "ast_hash": "3b83ef96387f14655fc854ddc3c6bd57",
+    "semantic_hash": ""
+  },
+  "graphify-out/memory/query_20261114_012223_where_are_the_wave_1_deadlock__http_transport_and.md": {
+    "mtime": 1794757588.968678,
+    "ast_hash": "c9be348e5159315010b862078c285ebf",
     "semantic_hash": ""
   }
 }

@@ -86,6 +86,11 @@ public final class DaemonServer: @unchecked Sendable {
     }
     private var clients: [Int32: ClientRecord] = [:]
     private var clientFDsByID: [UUID: Int32] = [:]
+    /// Per-accepted-connection token. The kernel recycles fd numbers, so an async reply that only
+    /// remembers `fd` can land on a *different* client accepted later on the same number. Replies
+    /// capture the token instead and `replyAsync` drops them when it no longer matches. Covers
+    /// anonymous RPC connections too (`clients`/`ClientRecord.id` only exists after `identifyClient`).
+    private var connectionIDs: [Int32: UUID] = [:]
     /// Lock-guarded mirror of `clients.count` for `#{session_attached}`. The registry's
     /// format builder runs under its own lock on arbitrary threads, so it can't hop onto
     /// `queue` (the daemon queue itself calls into the registry — `queue.sync` would
@@ -257,6 +262,7 @@ public final class DaemonServer: @unchecked Sendable {
         // Non-blocking so a slow/stuck client never blocks `write` on the serial queue.
         _ = kouen_set_nonblocking(clientFD)
         clientBuffers[clientFD] = Data()
+        connectionIDs[clientFD] = UUID()
         // Don't auto-register the connection as a client — `DaemonClient.request`
         // opens a fresh socket per call, and bookkeeping every one of those would
         // make `list-clients` useless. Clients announce themselves with
@@ -272,6 +278,7 @@ public final class DaemonServer: @unchecked Sendable {
                 self.registeredClientCount.update(self.clients.count)
                 self.registry.fireClientDetached(label: removed.label)
             }
+            self.connectionIDs.removeValue(forKey: clientFD)
             self.clientBuffers.removeValue(forKey: clientFD)
             self.clientSources.removeValue(forKey: clientFD)
             self.writeBuffers.removeValue(forKey: clientFD)
@@ -294,6 +301,7 @@ public final class DaemonServer: @unchecked Sendable {
             source.cancel()
             return
         }
+        let connectionID = connectionIDs[fd]
         var data = clientBuffers.removeValue(forKey: fd) ?? Data()
         data.append(contentsOf: buffer.prefix(count))
         var offset = 0
@@ -386,6 +394,14 @@ public final class DaemonServer: @unchecked Sendable {
                 continue
             }
 
+            // Slow git/script work (closeSession cleanup, worktrees, feature sweep) runs off the
+            // registry lock and off this serial queue; the reply comes back via `replyAsync`.
+            if registry.handleOffLock(request, completion: { [weak self] response in
+                self?.replyAsync(response, to: fd, connection: connectionID)
+            }) {
+                continue
+            }
+
             // Intercept browser requests from MCP / CLI clients
             switch request {
             case let .openGitPanel(repoPath):
@@ -408,122 +424,92 @@ public final class DaemonServer: @unchecked Sendable {
                     let resp = await self.forwardBrowserRequest(
                         paneID: nil, req: .open(url: url, direction: direction, originSurfaceID: originSurfaceID)
                     )
-                    self.queue.async {
-                        self.send(.browserSuccess(resp), to: fd)
-                    }
+                    self.replyAsync(.browserSuccess(resp), to: fd, connection: connectionID)
                 }
                 continue
             case let .browserNavigate(paneID, url):
                 Task {
                     let resp = await self.forwardBrowserRequest(paneID: paneID, req: .navigate(paneID: paneID, url: url))
-                    self.queue.async {
-                        self.send(.browserSuccess(resp), to: fd)
-                    }
+                    self.replyAsync(.browserSuccess(resp), to: fd, connection: connectionID)
                 }
                 continue
             case let .browserWait(paneID, timeoutSeconds):
                 Task {
                     let resp = await self.forwardBrowserRequest(paneID: paneID, req: .wait(paneID: paneID, timeoutSeconds: timeoutSeconds))
-                    self.queue.async {
-                        self.send(.browserSuccess(resp), to: fd)
-                    }
+                    self.replyAsync(.browserSuccess(resp), to: fd, connection: connectionID)
                 }
                 continue
             case let .browserSnapshot(paneID, interactive):
                 Task {
                     let resp = await self.forwardBrowserRequest(paneID: paneID, req: .snapshot(paneID: paneID, interactive: interactive))
-                    self.queue.async {
-                        self.send(.browserSuccess(resp), to: fd)
-                    }
+                    self.replyAsync(.browserSuccess(resp), to: fd, connection: connectionID)
                 }
                 continue
             case let .browserInteract(paneID, action, elementID, text):
                 Task {
                     let resp = await self.forwardBrowserRequest(paneID: paneID, req: .interact(paneID: paneID, action: action, elementID: elementID, text: text))
-                    self.queue.async {
-                        self.send(.browserSuccess(resp), to: fd)
-                    }
+                    self.replyAsync(.browserSuccess(resp), to: fd, connection: connectionID)
                 }
                 continue
             case let .browserClose(paneID):
                 Task {
                     let resp = await self.forwardBrowserRequest(paneID: paneID, req: .close(paneID: paneID))
-                    self.queue.async {
-                        self.send(.browserSuccess(resp), to: fd)
-                    }
+                    self.replyAsync(.browserSuccess(resp), to: fd, connection: connectionID)
                 }
                 continue
             case let .browserScreenshot(paneID):
                 Task {
                     let resp = await self.forwardBrowserRequest(paneID: paneID, req: .screenshot(paneID: paneID))
-                    self.queue.async {
-                        self.send(.browserSuccess(resp), to: fd)
-                    }
+                    self.replyAsync(.browserSuccess(resp), to: fd, connection: connectionID)
                 }
                 continue
             case let .browserNetwork(paneID):
                 Task {
                     let resp = await self.forwardBrowserRequest(paneID: paneID, req: .network(paneID: paneID))
-                    self.queue.async {
-                        self.send(.browserSuccess(resp), to: fd)
-                    }
+                    self.replyAsync(.browserSuccess(resp), to: fd, connection: connectionID)
                 }
                 continue
             case let .browserCookies(paneID):
                 Task {
                     let resp = await self.forwardBrowserRequest(paneID: paneID, req: .cookies(paneID: paneID))
-                    self.queue.async {
-                        self.send(.browserSuccess(resp), to: fd)
-                    }
+                    self.replyAsync(.browserSuccess(resp), to: fd, connection: connectionID)
                 }
                 continue
             case let .browserStorage(paneID, storageType):
                 Task {
                     let resp = await self.forwardBrowserRequest(paneID: paneID, req: .storage(paneID: paneID, storageType: storageType))
-                    self.queue.async {
-                        self.send(.browserSuccess(resp), to: fd)
-                    }
+                    self.replyAsync(.browserSuccess(resp), to: fd, connection: connectionID)
                 }
                 continue
             case let .browserEvaluate(paneID, script):
                 Task {
                     let resp = await self.forwardBrowserRequest(paneID: paneID, req: .evaluate(paneID: paneID, script: script))
-                    self.queue.async {
-                        self.send(.browserSuccess(resp), to: fd)
-                    }
+                    self.replyAsync(.browserSuccess(resp), to: fd, connection: connectionID)
                 }
                 continue
             case let .browserGoBack(paneID):
                 Task {
                     let resp = await self.forwardBrowserRequest(paneID: paneID, req: .goBack(paneID: paneID))
-                    self.queue.async {
-                        self.send(.browserSuccess(resp), to: fd)
-                    }
+                    self.replyAsync(.browserSuccess(resp), to: fd, connection: connectionID)
                 }
                 continue
             case let .browserGoForward(paneID):
                 Task {
                     let resp = await self.forwardBrowserRequest(paneID: paneID, req: .goForward(paneID: paneID))
-                    self.queue.async {
-                        self.send(.browserSuccess(resp), to: fd)
-                    }
+                    self.replyAsync(.browserSuccess(resp), to: fd, connection: connectionID)
                 }
                 continue
             case let .browserReload(paneID):
                 Task {
                     let resp = await self.forwardBrowserRequest(paneID: paneID, req: .reload(paneID: paneID))
-                    self.queue.async {
-                        self.send(.browserSuccess(resp), to: fd)
-                    }
+                    self.replyAsync(.browserSuccess(resp), to: fd, connection: connectionID)
                 }
                 continue
             case let .runGit(args, cwd):
                 Task { [weak self] in
                     guard let self else { return }
                     let res = await self.registry.runGitCommandInDaemon(args: args, cwd: cwd)
-                    self.queue.async {
-                        self.send(.gitResult(output: res.output, stderr: res.stderr, success: res.success), to: fd)
-                    }
+                    self.replyAsync(.gitResult(output: res.output, stderr: res.stderr, success: res.success), to: fd, connection: connectionID)
                 }
                 continue
             case let .browserResponse(id, response):
@@ -564,28 +550,28 @@ public final class DaemonServer: @unchecked Sendable {
                         id: id, agentKind: kind, prompt: prompt, cwd: cwd, profile: profileValue,
                         model: model, effort: effort, resumeSessionID: resumeSessionID
                     )
-                    self.queue.async { self.send(.ccRunInfo(Self.wireSummary(summary)), to: fd) }
+                    self.replyAsync(.ccRunInfo(Self.wireSummary(summary)), to: fd, connection: connectionID)
                 }
                 continue
             case let .ccRunGet(id):
                 Task { [weak self] in
                     guard let self else { return }
                     let summary = await self.claudeCodeHarness.get(id: id)
-                    self.queue.async { self.send(.ccRunInfo(summary.map(Self.wireSummary)), to: fd) }
+                    self.replyAsync(.ccRunInfo(summary.map(Self.wireSummary)), to: fd, connection: connectionID)
                 }
                 continue
             case .ccRunList:
                 Task { [weak self] in
                     guard let self else { return }
                     let list = await self.claudeCodeHarness.list()
-                    self.queue.async { self.send(.ccRuns(list.map(Self.wireSummary)), to: fd) }
+                    self.replyAsync(.ccRuns(list.map(Self.wireSummary)), to: fd, connection: connectionID)
                 }
                 continue
             case let .ccRunCancel(id):
                 Task { [weak self] in
                     guard let self else { return }
                     let cancelled = await self.claudeCodeHarness.cancel(id: id)
-                    self.queue.async { self.send(cancelled ? .ok : .error("run not found or already finished"), to: fd) }
+                    self.replyAsync(cancelled ? .ok : .error("run not found or already finished"), to: fd, connection: connectionID)
                 }
                 continue
             case let .swarmSpawn(lane, agentKindRaw, cwd, initialCommand, role):
@@ -596,35 +582,35 @@ public final class DaemonServer: @unchecked Sendable {
                     if resolvedLane == .structured && !ClaudeCodeHarness.hasAdapter(for: agentKind) {
                         let supported = ClaudeCodeHarness.registeredAgentKinds.map(\.rawValue).joined(separator: ", ")
                         let msg = "headless: true has no adapter for '\(agentKindRaw)' — supported: \(supported). Pass headless: false (or omit it) to use the interactive pty path."
-                        self.queue.async { self.send(.error(msg), to: fd) }
+                        self.replyAsync(.error(msg), to: fd, connection: connectionID)
                         return
                     }
                     let node = await self.swarmWorkerManager.spawn(SwarmSpawnSpec(
                         lane: resolvedLane, agentKind: agentKind, cwd: cwd,
                         initialCommand: initialCommand, role: role
                     ))
-                    self.queue.async { self.send(.swarmTaskNode(DaemonServer.wireSwarmNode(node)), to: fd) }
+                    self.replyAsync(.swarmTaskNode(DaemonServer.wireSwarmNode(node)), to: fd, connection: connectionID)
                 }
                 continue
             case let .swarmSend(taskID, text):
                 Task { [weak self] in
                     guard let self else { return }
                     let result = await self.swarmWorkerManager.send(taskID: taskID, text: text)
-                    self.queue.async { self.send(.swarmActionResult(result), to: fd) }
+                    self.replyAsync(.swarmActionResult(result), to: fd, connection: connectionID)
                 }
                 continue
             case let .swarmTerminate(taskID):
                 Task { [weak self] in
                     guard let self else { return }
                     let result = await self.swarmWorkerManager.terminate(taskID: taskID)
-                    self.queue.async { self.send(.swarmActionResult(result), to: fd) }
+                    self.replyAsync(.swarmActionResult(result), to: fd, connection: connectionID)
                 }
                 continue
             case .swarmList:
                 Task { [weak self] in
                     guard let self else { return }
                     let snapshot = await self.swarmWorkerManager.snapshot()
-                    self.queue.async { self.send(.swarmFleetSnapshot(DaemonServer.wireSwarmSnapshot(snapshot)), to: fd) }
+                    self.replyAsync(.swarmFleetSnapshot(DaemonServer.wireSwarmSnapshot(snapshot)), to: fd, connection: connectionID)
                 }
                 continue
             default:
@@ -749,6 +735,15 @@ public final class DaemonServer: @unchecked Sendable {
 
     private enum WriteOutcome { case complete, wouldBlock, failed }
 
+    /// Reply from a `Task`/completion to the connection identified by `connection`; dropped if that
+    /// connection is gone (the fd may now belong to another client).
+    private func replyAsync(_ response: IPCResponse, to fd: Int32, connection: UUID?) {
+        queue.async {
+            guard let connection, self.connectionIDs[fd] == connection else { return }
+            self.send(response, to: fd)
+        }
+    }
+
     private func send(_ response: IPCResponse, to fd: Int32) {
         guard let data = try? IPCCodec.encode(IPCReply(response: response)) else {
             // Encoding a reply should be infallible; if it isn't, the client would hang forever
@@ -860,10 +855,11 @@ public final class DaemonServer: @unchecked Sendable {
     }
 
     private func handleSubscribe(surfaceID: String, label: String?, fd: Int32) {
+        let connection = connectionIDs[fd]
         guard let token = registry.subscribe(surfaceID: surfaceID, handler: { [weak self] data, sequence in
             guard let server = self else { return }
             server.queue.async { [weak server] in
-                guard let server else { return }
+                guard let server, server.connectionIDs[fd] == connection else { return }
                 server.registry.metrics.recordOutputNotification()
                 server.sendDataFrame(data, sequence: sequence, to: fd)
             }

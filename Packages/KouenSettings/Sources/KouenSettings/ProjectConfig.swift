@@ -77,7 +77,7 @@ public struct ProjectConfig: Codable, Sendable, Equatable {
         environment["KOUEN_WORKTREE_PATH"] = worktreePath
         process.environment = environment
         let logPath = NSTemporaryDirectory() + "kouen-setup-\((worktreePath as NSString).lastPathComponent).log"
-        FileManager.default.createFile(atPath: logPath, contents: nil)
+        _ = FileManager.default.createFile(atPath: logPath, contents: nil)
         let log = FileHandle(forWritingAtPath: logPath)
         process.standardOutput = log ?? FileHandle.nullDevice
         process.standardError = log ?? FileHandle.nullDevice
