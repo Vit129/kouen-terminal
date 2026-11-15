@@ -1,0 +1,31 @@
+graphify-out/GRAPH_SUMMARY.md
+  s_616d85e6d9c76f::t_13c070bfc98797 12
+CHANGELOG.md
+  s_616d85e6d9c76f::t_a9c8e17c35b5f8 8-40
+Packages/KouenCore/Sources/KouenCore/KouenVersion.swift
+  s_616d85e6d9c76f::t_a9c8e17c35b5f8 15,18
+graphify-out/GRAPH_REPORT.md
+  s_616d85e6d9c76f::t_13c070bfc98797 4,13
+Packages/KouenCore/Sources/KouenCore/ReleaseNotes/GeneratedReleaseNotes.swift
+  s_616d85e6d9c76f::t_a9c8e17c35b5f8 1,8-9,11-21,23-39
+Apps/Kouen/Sources/KouenApp/Resources/Info.plist
+  s_616d85e6d9c76f::t_a9c8e17c35b5f8 100,115
+graphify-out/manifest.json
+  s_616d85e6d9c76f::t_13c070bfc98797 963-964,1053-1054
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.3",
+  "base_commit_sha": "32d634296c8a9205588ea05ac190c26035fc65dd",
+  "prompts": {},
+  "sessions": {
+    "s_616d85e6d9c76f": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1dfca-7b48-7e52-8e0e-e446fed44c42",
+        "model": "gpt-6-luna"
+      },
+      "human_author": "Vit129 <vitosk129@gmail.com>"
+    }
+  }
+}
