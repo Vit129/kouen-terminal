@@ -201,15 +201,13 @@ final class DaemonSyncService {
                                              .replacingOccurrences(of: "\"", with: "\\\"")
             let script: String
             if action.lowercased() == "type" {
-                let escapedText = (text ?? "").replacingOccurrences(of: "\\", with: "\\\\")
-                                               .replacingOccurrences(of: "\"", with: "\\\"")
-                                               .replacingOccurrences(of: "\n", with: "\\n")
+                let textLiteral = Self.jsStringLiteral(text ?? "")
                 script = """
                 (function(){
                   var el=document.querySelector('[data-kouen-ref="\(escapedElementID)"]');
                   if(!el) return JSON.stringify({ok:false,error:'element not found'});
                   el.focus();
-                  el.value = "\(escapedText)";
+                  el.value = \(textLiteral);
                   el.dispatchEvent(new Event('input', { bubbles: true }));
                   el.dispatchEvent(new Event('change', { bubbles: true }));
                   return JSON.stringify({ok:true});
