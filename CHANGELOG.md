@@ -14,12 +14,10 @@ has a matching `vX.Y.Z` tag and a signed, notarized DMG on
 - Skip the 0.5s cwd probe for silent surfaces ([`c10339d`](https://github.com/Vit129/kouen-terminal/commit/c10339d89b5371c05a5baa1cb39839a26a337475))
 
 ### Documentation
-- Record that the fleet/tab-bar memory guards have landed ([`29e70e0`](https://github.com/Vit129/kouen-terminal/commit/29e70e0d012d61a5fcc601f1fe2e0c52cfd102bc))
 - Retain verified Kouen query results ([`9521d67`](https://github.com/Vit129/kouen-terminal/commit/9521d67d1ad9b3e796f2b2a930485de45b737ef6))
 - Retain wave 1 query result ([`34a8d4e`](https://github.com/Vit129/kouen-terminal/commit/34a8d4edc1f780723b74ffaa9ca9f4144f4af866))
 
 ### Fixed
-- Stop fleet/tab-bar republishing on unchanged snapshots ([`8901aa8`](https://github.com/Vit129/kouen-terminal/commit/8901aa880b0a53ebca0f2f85b4838bed4493f5a3))
 - Preserve staged index when restoring checkpoint ([`8729b55`](https://github.com/Vit129/kouen-terminal/commit/8729b55f585d8522f25ed084098fa7c063a1d0eb))
 - Match output triggers split across chunks ([`fc27787`](https://github.com/Vit129/kouen-terminal/commit/fc2778713937bc3f3841c8016393d2150eb439fc))
 - Cap console log line length ([`05f5cee`](https://github.com/Vit129/kouen-terminal/commit/05f5ceeacaa189c2b353060578d2441945d775e2))
@@ -36,7 +34,6 @@ has a matching `vX.Y.Z` tag and a signed, notarized DMG on
 - Re-attach local browser panes by tab id, not index ([`d6ef9c6`](https://github.com/Vit129/kouen-terminal/commit/d6ef9c6cd4017091549b5cfddd859682ce234121))
 - Run worktree git and archive script off the registry lock ([`ab8580d`](https://github.com/Vit129/kouen-terminal/commit/ab8580d14b0d8768a158c273eebb600eef638d27))
 - Discard setup log creation result on Linux ([`57aa16e`](https://github.com/Vit129/kouen-terminal/commit/57aa16e5fd7d11bf5f6ce3fda951c90bd1e28b84))
-
 
 ## [4.22.15] - 2026-11-11
 
@@ -57,9 +54,11 @@ has a matching `vX.Y.Z` tag and a signed, notarized DMG on
 ## [4.22.12] - 2026-11-06
 
 ### Documentation
+- Record that the fleet/tab-bar memory guards have landed ([`29e70e0`](https://github.com/Vit129/kouen-terminal/commit/29e70e0d012d61a5fcc601f1fe2e0c52cfd102bc))
 - Record that the fleet/tab-bar memory guards have landed ([`39549c8`](https://github.com/Vit129/kouen-terminal/commit/39549c85e878b5ea644b184e885606fa811566fb))
 
 ### Fixed
+- Stop fleet/tab-bar republishing on unchanged snapshots ([`8901aa8`](https://github.com/Vit129/kouen-terminal/commit/8901aa880b0a53ebca0f2f85b4838bed4493f5a3))
 - Stop fleet/tab-bar republishing on unchanged snapshots ([`debca87`](https://github.com/Vit129/kouen-terminal/commit/debca874c4acfc3ea930a1c4399307f46be77fd9))
 - Drain autoreleased JSON per transcript during history scans ([`acfab00`](https://github.com/Vit129/kouen-terminal/commit/acfab003895e646bb5c15d0b22c938c12df9cf6e))
 - Release memory during history scans ([`b004679`](https://github.com/Vit129/kouen-terminal/commit/b004679a9db62ca88b43351323ca085f1b639cf5))
