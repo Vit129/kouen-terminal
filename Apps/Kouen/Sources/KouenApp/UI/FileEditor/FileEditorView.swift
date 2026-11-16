@@ -459,6 +459,12 @@ final class FileEditorView: NSView {
         lspSession.open(url: URL(fileURLWithPath: filePath), text: text, fileExtension: ext)
     }
 
+    /// Releases the LSP server and file watch when the editor panel is removed.
+    func teardown() {
+        lspSession.close()
+        fileWatcher.stop()
+    }
+
     private func showMessage(_ message: String) {
         lspSession.close()
         syntaxView.isHidden = true
