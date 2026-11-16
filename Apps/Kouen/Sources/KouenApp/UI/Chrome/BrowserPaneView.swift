@@ -165,7 +165,8 @@ public final class BrowserPaneView: NSView {
         fatalError("init(coder:) has not been implemented")
     }
 
-    deinit {
+    isolated deinit {
+        retryTimer?.invalidate()
         let uuid = paneID.uuidString
         NSLog("[BrowserPane] deinit \(uuid)")
         let logPath = (NSTemporaryDirectory() as NSString)
@@ -178,6 +179,7 @@ public final class BrowserPaneView: NSView {
     func prepareForDisposal() {
         guard !isDisposed else { return }
         isDisposed = true
+        UserDefaults.standard.removeObject(forKey: "browserPane.\(paneID.uuidString).url")
 
         cancelRetry()
         compositorKicks.values.forEach { $0.restore.cancel() }

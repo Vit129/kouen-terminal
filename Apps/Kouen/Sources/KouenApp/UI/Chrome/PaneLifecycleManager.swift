@@ -181,6 +181,7 @@ final class PaneLifecycleManager {
         let staleKeys = containerCache.keys.filter { !liveTabIDs.contains($0) }
         for key in staleKeys {
             let container = containerCache.removeValue(forKey: key)
+            container?.collectBrowserPanes().values.forEach { $0.prepareForDisposal() }
             container?.removeFromSuperview()
         }
     }

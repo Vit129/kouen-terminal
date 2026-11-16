@@ -42,6 +42,7 @@ final class SecureInputMonitor {
         // Guard against double-install: a second call would overwrite onRawOutput
         // (losing the first listener) and double-chain onCommandFinished, causing
         // release(id) to fire twice per OSC 133 — corrupting the active set.
+        registerSurface(id)
         guard surface.onRawOutput == nil else { return }
 
         surface.onRawOutput = { [weak self, weak surface] data in
@@ -61,10 +62,13 @@ final class SecureInputMonitor {
         }
     }
 
+    func registerSurface(_ id: SurfaceID) {
+        if scanGenerations[id] == nil { scanGenerations[id] = UUID() }
+    }
+
     func scanOutput(_ data: Data, for id: SurfaceID, isFocused: @escaping @MainActor @Sendable () -> Bool) {
+        guard let generation = scanGenerations[id] else { return }
         let focused = isFocused()
-        let generation = scanGenerations[id] ?? UUID()
-        scanGenerations[id] = generation
         scanQueue.async {
             var scanner = self.scanners[id] ?? SecureInputPromptScanner()
             let hit = scanner.feed(data, focused: focused)
@@ -82,8 +86,17 @@ final class SecureInputMonitor {
         }
     }
 
-    /// Call from onRetire to ensure secure input is released when a pane closes.
+    /// Release secure input when a command finishes without retiring the surface.
     func release(_ surfaceID: SurfaceID) {
+        if scanGenerations[surfaceID] != nil { scanGenerations[surfaceID] = UUID() }
+        timers.removeValue(forKey: surfaceID)?.cancel()
+        scanQueue.async { self.scanners[surfaceID] = nil }
+        guard active.remove(surfaceID) != nil else { return }
+        if active.isEmpty { disable() }
+    }
+
+    /// Invalidate the registration so late output cannot recreate its scanner.
+    func retire(_ surfaceID: SurfaceID) {
         scanGenerations.removeValue(forKey: surfaceID)
         timers.removeValue(forKey: surfaceID)?.cancel()
         scanQueue.async { self.scanners[surfaceID] = nil }

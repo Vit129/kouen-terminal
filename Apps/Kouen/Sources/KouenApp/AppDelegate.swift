@@ -25,6 +25,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NSLog("DEBUG: KouenPaths.applicationSupport: \(KouenPaths.applicationSupport.path)")
         NSLog("DEBUG: KouenPaths.socketURL: \(KouenPaths.socketURL.path)")
         StartupMetrics.shared.mark(.launchStart)
+        if let processStart = StaleTemporaryFileSweeper.processStartDate() {
+            StaleTemporaryFileSweeper.sweep(in: FileManager.default.temporaryDirectory, processStart: processStart)
+        } else {
+            NSLog("Kouen: could not determine process start time; skipping stale temporary-file cleanup")
+        }
         // Build the UI immediately so launch never blocks on the daemon. The
         // coordinator starts from a default snapshot and repopulates the moment
         // the daemon answers (below) — no frozen window, no modal timeout dialog.

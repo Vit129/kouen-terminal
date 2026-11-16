@@ -20,11 +20,24 @@ final class SecureInputMonitorTests: XCTestCase {
         var enables = 0
         let monitor = SecureInputMonitor(scanQueue: queue, enable: { enables += 1 }, disable: {})
         let id = UUID()
+        monitor.registerSurface(id)
         monitor.scanOutput(Data("Password: ".utf8), for: id, isFocused: { true })
         monitor.release(id)
         await drain(queue)
         XCTAssertEqual(enables, 0, "a released/retired surface must reject its pending scan")
         monitor.release(id)
+    }
+
+    func test_TS_2310_FE_IT_retiredSurfaceIgnoresLateOutput() async {
+        let queue = DispatchQueue(label: "test.secure-input.retired")
+        var enables = 0
+        let monitor = SecureInputMonitor(scanQueue: queue, enable: { enables += 1 }, disable: {})
+        let id = UUID()
+        monitor.registerSurface(id)
+        monitor.retire(id)
+        monitor.scanOutput(Data("Password: ".utf8), for: id, isFocused: { true })
+        await drain(queue)
+        XCTAssertEqual(enables, 0, "retired surfaces must not recreate scanners from late output")
     }
 
     func test_TC0902_FE_IT_focusIsRecheckedWhenScanResultArrives() async {
@@ -33,6 +46,7 @@ final class SecureInputMonitorTests: XCTestCase {
         let focus = Focus()
         let monitor = SecureInputMonitor(scanQueue: queue, enable: { enables += 1 }, disable: {})
         let id = UUID()
+        monitor.registerSurface(id)
         monitor.scanOutput(Data("Password: ".utf8), for: id, isFocused: { focus.isFocused })
         focus.isFocused = false
         await drain(queue)
@@ -46,6 +60,7 @@ final class SecureInputMonitorTests: XCTestCase {
         var disables = 0
         let monitor = SecureInputMonitor(scanQueue: queue, enable: { enables += 1 }, disable: { disables += 1 })
         let id = UUID()
+        monitor.registerSurface(id)
         monitor.scanOutput(Data("Password: ".utf8), for: id, isFocused: { true })
         await drain(queue)
         XCTAssertEqual(enables, 1)
@@ -65,6 +80,7 @@ final class SecureInputMonitorTests: XCTestCase {
         var enables = 0
         let monitor = SecureInputMonitor(scanQueue: queue, enable: { enables += 1 }, disable: {})
         let id = UUID()
+        monitor.registerSurface(id)
         monitor.scanOutput(Data("Password: ".utf8), for: id, isFocused: { true })
         monitor.release(id)
         monitor.scanOutput(Data("new command output".utf8), for: id, isFocused: { true })

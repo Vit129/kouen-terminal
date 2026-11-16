@@ -48,6 +48,19 @@ final class OutputCoalescerTests: XCTestCase {
         XCTAssertEqual(c.bufferedMemoryBytes, 0)
         XCTAssertEqual(c.bufferedSpoolBytes, 0)
     }
+
+    func test_TS_2310_BE_UT_stopReleasesQueuedOutput() throws {
+        let c = TerminalHostView.OutputCoalescer(maxMemoryBytes: 8)
+        try c.append(Data(repeating: 1, count: 16)) {}
+        XCTAssertEqual(c.bufferedSpoolBytes, 16)
+        c.stop()
+        XCTAssertEqual(c.bufferedMemoryBytes, 0)
+        XCTAssertEqual(c.bufferedSpoolBytes, 0)
+        try c.append(Data([2])) { XCTFail("retired output must not schedule more work") }
+        let drained = try c.drain()
+        XCTAssertTrue(drained.data.isEmpty)
+        XCTAssertFalse(drained.hasMore)
+    }
     func test_TS_2293_BE_UT_ContinuousDrainReleasesConsumedChunks() throws {
         let c = TerminalHostView.OutputCoalescer(maxMemoryBytes: 1024)
         try c.append(Data(repeating: 1, count: 32)) {}

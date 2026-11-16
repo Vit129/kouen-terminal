@@ -74,6 +74,8 @@ public final class MobileBridgeServer: @unchecked Sendable {
     /// token rotations, since its sleep can no longer just run forever.
     private let lifecycleLock = NSLock()
     private var _isRunning = false
+    private var pairingRequested = false
+    private let pairingWake = DispatchSemaphore(value: 0)
     var isRunning: Bool {
         get { lifecycleLock.lock(); defer { lifecycleLock.unlock() }; return _isRunning }
         set { lifecycleLock.lock(); _isRunning = newValue; lifecycleLock.unlock() }
@@ -83,6 +85,10 @@ public final class MobileBridgeServer: @unchecked Sendable {
         wsReadyLock.lock()
         if ready { wsReadyHosts.insert(host) } else { wsReadyHosts.remove(host) }
         wsReadyLock.unlock()
+        if ready {
+            lifecycleLock.lock(); let requested = pairingRequested; lifecycleLock.unlock()
+            if requested { pairingWake.signal() }
+        }
     }
 
     var anyWSListenerReady: Bool {
@@ -491,8 +497,6 @@ public final class MobileBridgeServer: @unchecked Sendable {
         } else if !serveActive {
             log("mobile bridge: Tailscale Serve HTTPS not detected — run 'tailscale serve --bg \(pageURLPort)' to enable HTTPS for PWA installation")
         }
-        var notReadyTicks = 0
-        var warnedNoListener = false
         // Wall-clock, not a tick counter: once a token is minted the loop sits in the 120s
         // sleep below, so a per-iteration counter only fired every ~16 minutes.
         var lastRecheck = Date()
@@ -535,21 +539,28 @@ public final class MobileBridgeServer: @unchecked Sendable {
         }
         // Each re-check spawns `tailscale` subprocesses; this loop never returns, so drain
         // their autoreleased objects per call instead of never.
+        var warnedNoListener = false
         while isRunning {
-            _ = autoreleasepool(invoking: recheckTailscale)
+            pairingWake.wait()
+            guard isRunning else { return }
+            lifecycleLock.lock(); let requested = pairingRequested; lifecycleLock.unlock()
+            guard requested else { continue }
+            let hostChanged = autoreleasepool(invoking: recheckTailscale)
 
             guard anyWSListenerReady else {
-                notReadyTicks += 1
-                if notReadyTicks >= 8 && !warnedNoListener {
-                    print("mobile bridge: no WS listener bound — cannot pair (is another Kouen daemon holding the port?)")
-                    fflush(stdout)
+                if !warnedNoListener, pairingWake.wait(timeout: .now() + 2) == .timedOut, isRunning, !anyWSListenerReady {
+                    log("mobile bridge: no WS listener bound — cannot pair (is another Kouen daemon holding the port?)")
                     warnedNoListener = true
+                } else if anyWSListenerReady {
+                    pairingWake.signal()
                 }
-                Thread.sleep(forTimeInterval: 0.25)
                 continue
             }
-            notReadyTicks = 0
             warnedNoListener = false
+            if !hostChanged, let current = pairingBox.current, current.expiresAt > Date() {
+                lifecycleLock.lock(); pairingRequested = false; lifecycleLock.unlock()
+                continue
+            }
             let token = String(format: "%06d", Int.random(in: 0..<1_000_000))
             let host = currentTailscaleHost ?? "127.0.0.1"
             let url = Self.buildPairingURL(
@@ -561,6 +572,7 @@ public final class MobileBridgeServer: @unchecked Sendable {
                 isServeActive: serveActive
             )
             pairingBox.current = PendingPairing(token: token, url: url, expiresAt: Date().addingTimeInterval(pairingLifetime))
+            lifecycleLock.lock(); pairingRequested = false; lifecycleLock.unlock()
             print("\nScan with your iPhone's Camera app — valid \(Int(pairingLifetime))s, grants access to every session on this Mac:\n")
             print(qrAsciiArt(for: url) ?? "(QR generation failed — open this URL manually)")
             print("\n\(url)\n")
@@ -571,12 +583,6 @@ public final class MobileBridgeServer: @unchecked Sendable {
                 print("On this Mac: \(local)\n")
             }
             fflush(stdout)
-            var slept: TimeInterval = 0
-            while slept < pairingLifetime && isRunning {
-                Thread.sleep(forTimeInterval: 0.25)
-                slept += 0.25
-                if autoreleasepool(invoking: recheckTailscale) { break }
-            }
         }
     }
 
@@ -1542,6 +1548,8 @@ public final class MobileBridgeServer: @unchecked Sendable {
 
         let outBuffer = PipeBuffer()
         let errBuffer = PipeBuffer()
+        let terminated = DispatchSemaphore(value: 0)
+        process.terminationHandler = { _ in terminated.signal() }
         outPipe.fileHandleForReading.readabilityHandler = { handle in
             let chunk = handle.availableData
             if !chunk.isEmpty { outBuffer.append(chunk) }
@@ -1571,14 +1579,12 @@ public final class MobileBridgeServer: @unchecked Sendable {
             return ProcessRunResult(status: -1, stdout: "", stderr: error.localizedDescription, timedOut: false)
         }
 
-        let deadline = Date().addingTimeInterval(timeoutSeconds)
-        while process.isRunning && Date() < deadline {
-            Thread.sleep(forTimeInterval: 0.05)
-        }
-        var timedOut = false
-        if process.isRunning {
-            timedOut = true
+        let timedOut = terminated.wait(timeout: .now() + timeoutSeconds) == .timedOut
+        if timedOut && process.isRunning {
             process.terminate()
+            if terminated.wait(timeout: .now() + 1) == .timedOut, process.isRunning {
+                kill(process.processIdentifier, SIGKILL)
+            }
         }
         process.waitUntilExit()
         // The handlers can still be holding the final chunk (gh prints the PR URL last), so
@@ -2061,6 +2067,8 @@ public final class MobileBridgeServer: @unchecked Sendable {
     public func stop() {
         guard isRunning else { return }
         isRunning = false
+        lifecycleLock.lock(); pairingRequested = false; lifecycleLock.unlock()
+        pairingWake.signal()
         listenersLock.lock()
         listeners.forEach { $0.listener.cancel() }
         listeners.removeAll()
@@ -2085,7 +2093,15 @@ public final class MobileBridgeServer: @unchecked Sendable {
     /// bridge was never started AND after `stop()`, matching the toggle's off state now that
     /// `start()`/`stop()` can happen live instead of only once at daemon launch.
     public func currentPairingInfo() -> (url: String?, secondsRemaining: Int, enabled: Bool) {
-        guard anyWSListenerReady, let pending = pairingBox.current else { return (nil, 0, isRunning) }
+        guard isRunning else { return (nil, 0, false) }
+        guard anyWSListenerReady, let pending = pairingBox.current, pending.expiresAt > Date() else {
+            lifecycleLock.lock()
+            let alreadyRequested = pairingRequested
+            pairingRequested = true
+            lifecycleLock.unlock()
+            if !alreadyRequested { pairingWake.signal() }
+            return (nil, 0, true)
+        }
         let remaining = max(0, Int(pending.expiresAt.timeIntervalSinceNow.rounded()))
         return (pending.url, remaining, isRunning)
     }

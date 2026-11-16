@@ -693,6 +693,15 @@ public final class TerminalHostView: NSView {
         showDetachedOverlay()
     }
 
+    /// Retire this pane's output resources immediately while the view is still alive.
+    public func stopOutputForRetire() {
+        intentionallyDetached = true
+        outputSubscription?.cancel()
+        outputSubscription = nil
+        io.attach(subscription: nil)
+        outputCoalescer.stop()
+    }
+
     /// Re-grab a surface released with `detachFromDaemonSurface()`: resubscribe and replay
     /// scrollback so the pane catches up. No-op if still attached.
     public func reattachToDaemonSurface() {
@@ -843,6 +852,7 @@ public final class TerminalHostView: NSView {
         private var pendingMemoryBytes = 0
         private var overflowSpool: OutputDiskSpool?
         private var isScheduled = false
+        private var isStopped = false
 
         init(maxMemoryBytes: Int = 4 * 1024 * 1024) {
             self.maxMemoryBytes = maxMemoryBytes
@@ -852,6 +862,7 @@ public final class TerminalHostView: NSView {
             guard !data.isEmpty else { return }
             lock.lock()
             defer { lock.unlock() }
+            guard !isStopped else { return }
             if let overflowSpool {
                 try overflowSpool.append(data)
             } else if pendingMemoryBytes + data.count <= maxMemoryBytes {
@@ -866,6 +877,18 @@ public final class TerminalHostView: NSView {
                 isScheduled = true
                 schedule()
             }
+        }
+
+        func stop() {
+            lock.lock()
+            defer { lock.unlock() }
+            isStopped = true
+            pendingChunks.removeAll(keepingCapacity: false)
+            headOffset = 0
+            chunkOffset = 0
+            pendingMemoryBytes = 0
+            overflowSpool = nil
+            isScheduled = false
         }
 
         /// Hands out at most `maxBytes` so one huge flood is fed to the emulator in slices

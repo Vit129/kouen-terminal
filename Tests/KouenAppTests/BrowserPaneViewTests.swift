@@ -6,6 +6,16 @@ import KouenCore
 
 @MainActor
 final class BrowserPaneViewTests: XCTestCase {
+    func test_TS_2310_FE_UT_disposalClearsSavedURL() {
+        let id = UUID()
+        let key = "browserPane.\(id.uuidString).url"
+        let pane = BrowserPaneView(url: URL(string: "about:blank")!, paneID: id,
+                                   webView: MockWebView(frame: .zero, configuration: WKWebViewConfiguration()))
+        UserDefaults.standard.set("https://example.com", forKey: key)
+        defer { UserDefaults.standard.removeObject(forKey: key) }
+        pane.prepareForDisposal()
+        XCTAssertNil(UserDefaults.standard.object(forKey: key))
+    }
     func testURLBarUpdatesOnCommitAndFinish() {
         let mockWebView = MockWebView(frame: .zero, configuration: WKWebViewConfiguration())
         let testURL = URL(string: "https://example.com/test")!

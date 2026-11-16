@@ -11,6 +11,23 @@ import XCTest
 /// No live listeners/sockets — the WS round-trip is covered by the scripted-client live
 /// check (see the P37 plan's verification gates), not by this file.
 final class MobileBridgePairingTests: XCTestCase {
+    func test_TS_2310_BE_IT_pairingRequestMintsWhenListenerReady() {
+        let bridge = MobileBridgeServer()
+        bridge.isRunning = true
+        bridge.setWSListener(host: "127.0.0.1", ready: true)
+        let finished = expectation(description: "pairing loop stopped")
+        DispatchQueue.global().async {
+            bridge.runPairingLoop(wsPort: 8080, pageURLPort: 8080, tailscaleHost: nil, magicDNSName: nil, log: { _ in })
+            finished.fulfill()
+        }
+        XCTAssertNil(bridge.pairingBox.current)
+        XCTAssertNil(bridge.currentPairingInfo().url)
+        let minted = expectation(for: NSPredicate { _, _ in bridge.pairingBox.current != nil }, evaluatedWith: nil)
+        wait(for: [minted], timeout: 5)
+        XCTAssertNotNil(bridge.currentPairingInfo().url)
+        bridge.stop()
+        wait(for: [finished], timeout: 5)
+    }
     private var root: URL?
     private var previousHome: String?
 
