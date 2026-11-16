@@ -1,0 +1,19 @@
+Packages/KouenCore/Sources/KouenCore/Agents/AgentHistoryJSONLSequence.swift
+  s_3546f3791531e1::t_ec7e21a4d61bb1 3-7
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.3",
+  "base_commit_sha": "28f2c1ef2bce62af7d9f9b9dffc241e695bd2cd8",
+  "prompts": {},
+  "sessions": {
+    "s_3546f3791531e1": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d9313ef0-6765-42f0-9d15-df1f99a3cab1",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Vit129 <vitosk129@gmail.com>"
+    }
+  }
+}
