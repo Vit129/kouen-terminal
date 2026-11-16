@@ -108,4 +108,21 @@ final class ProcessRunnerTests: XCTestCase {
         let combined = parts.joined(separator: "\n")
         XCTAssertEqual(combined, "stdout_line\nstderr_line")
     }
+
+    func test_TS_2292_BE_IT_OutputCaptureIsBoundedAndReportsTruncation() async {
+        let arguments = ["-c", "yes x | head -c 5000000; yes y | head -c 5000000 >&2"]
+        let sync = ProcessRunner.run(executable: "/bin/sh", arguments: arguments)
+        XCTAssertTrue(sync.isSuccess)
+        XCTAssertEqual(sync.stdout.utf8.count, 4 * 1024 * 1024)
+        XCTAssertEqual(sync.stderr.utf8.count, 4 * 1024 * 1024)
+        XCTAssertTrue(sync.stdoutWasTruncated)
+        XCTAssertTrue(sync.stderrWasTruncated)
+
+        let async = await ProcessRunner.runAsync(executable: "/bin/sh", arguments: arguments)
+        XCTAssertTrue(async.isSuccess)
+        XCTAssertEqual(async.stdout.utf8.count, 4 * 1024 * 1024)
+        XCTAssertEqual(async.stderr.utf8.count, 4 * 1024 * 1024)
+        XCTAssertTrue(async.stdoutWasTruncated)
+        XCTAssertTrue(async.stderrWasTruncated)
+    }
 }

@@ -29,14 +29,14 @@ final class OutputTriggerMatcherTests: XCTestCase {
         XCTAssertEqual(m.matches(in: "ba", patterns: patterns), ["aba"])
     }
 
-    func test_TC1207_BE_IT_coalescedSlicesKeepTriggersAroundSplitUTF8() {
+    func test_TC1207_BE_IT_coalescedSlicesKeepTriggersAroundSplitUTF8() throws {
         let c = TerminalHostView.OutputCoalescer()
         let text = "done " + String(repeating: "a", count: 256 * 1024 - 6) + "é done"
-        c.append(Data(text.utf8)) {}
+        try c.append(Data(text.utf8)) {}
         var m = OutputTriggerMatcher()
         var hits: [String] = []
         while true {
-            let slice = c.drain()
+            let slice = try c.drain()
             hits += m.matches(in: slice.data, patterns: ["done"])
             if !slice.hasMore { break }
         }

@@ -117,19 +117,23 @@ final class ScrollbackFile: @unchecked Sendable {
     /// to the pending buffer and (re)arm the debounce. The actual disk write happens on `queue`.
     func append(_ data: Data) {
         guard !data.isEmpty else { return }
-        queue.async { [weak self] in
+        // Admission is synchronous: an asynchronous closure retains every caller's Data before
+        // the pending cap is checked, so a slow disk can otherwise build an unbounded GCD queue.
+        // The PTY reader applies backpressure until this bounded batch has been accepted.
+        queue.sync { [weak self] in
             guard let self, !self.closed else { return }
-            self.pending.append(data)
-            // Bound RAM under a sustained flood: once buffered output crosses the cap, flush
-            // synchronously rather than re-arming the debounce (which a gapless stream would
-            // otherwise never let fire). Normal bursts stay batched off the hot path.
-            if self.pending.count >= self.maxPendingBytes {
-                self.pendingFlush?.cancel()
-                self.pendingFlush = nil
-                self.flushPending()
-            } else {
-                self.scheduleFlush()
+            var offset = 0
+            while offset < data.count {
+                let count = min(data.count - offset, self.maxPendingBytes - self.pending.count)
+                self.pending.append(data[offset..<(offset + count)])
+                offset += count
+                if self.pending.count >= self.maxPendingBytes {
+                    self.pendingFlush?.cancel()
+                    self.pendingFlush = nil
+                    self.flushPending()
+                }
             }
+            if !self.pending.isEmpty { self.scheduleFlush() }
         }
     }
 

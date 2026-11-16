@@ -6,6 +6,20 @@ import XCTest
 /// swallow the ref/log changes an external `git commit`/`push` produces —
 /// f6ffb0a's blanket `.git/` filter broke exactly that.
 final class GitPanelViewFSEventFilterTests: XCTestCase {
+    @MainActor
+    func test_TS_2284_BE_UT_RapidWatcherStartStopCyclesRetainCallbackContextUntilQueueDrains() {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("git-panel-watch-\(UUID().uuidString)", isDirectory: true)
+        try? FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let panel = GitPanelView(frame: .zero)
+        for _ in 0..<200 {
+            panel.updateRoot(path: root.path)
+            panel.clearRoot()
+        }
+    }
+
     func testAutoStageWritesAreFilteredAsNoise() {
         XCTAssertTrue(GitPanelView.isNoisyGitInternalPath("/repo/.git/index"))
         XCTAssertTrue(GitPanelView.isNoisyGitInternalPath("/repo/.git/index.lock"))

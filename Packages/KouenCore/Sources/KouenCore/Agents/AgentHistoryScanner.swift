@@ -412,6 +412,61 @@ public actor AgentHistoryScanner {
         return (lines, data.count)
     }
 
+    /// Foundation's JSON parser materializes a single record, so cap that one-record working set
+    /// while keeping the file itself streamed. Oversized records fail the scan; callers retain a
+    /// prior cached record and retry on the next metadata change instead of truncating history.
+    static let maxJSONLRecordBytes = 16 * 1024 * 1024
+
+    enum JSONLReadError: Error { case oversizedRecord(Int) }
+
+    @discardableResult
+    static func forEachJSONLLine(
+        from fileURL: URL,
+        _ body: (Data, Int) throws -> Void
+    ) throws -> (lineCount: Int, fileSize: Int) {
+        let handle = try FileHandle(forReadingFrom: fileURL)
+        defer { try? handle.close() }
+        var pending = Data()
+        var consumed = 0
+        var totalBytes = 0
+        var lineCount = 0
+        var eof = false
+
+        func emit(_ range: Range<Int>) throws {
+            let line = Data(pending[range])
+            guard let trimmed = trimmedLines(line).first else { return }
+            try body(trimmed, lineCount)
+            lineCount += 1
+        }
+
+        while !eof {
+            let chunk = try handle.read(upToCount: 64 * 1024) ?? Data()
+            eof = chunk.isEmpty
+            totalBytes += chunk.count
+            pending.append(chunk)
+            var cursor = consumed
+            while cursor < pending.count {
+                if pending[cursor] == UInt8(ascii: "\n") {
+                    try emit(consumed..<cursor)
+                    consumed = cursor + 1
+                }
+                cursor += 1
+            }
+            let unfinished = pending.count - consumed
+            guard unfinished <= Self.maxJSONLRecordBytes else { throw JSONLReadError.oversizedRecord(unfinished) }
+
+            if eof, consumed < pending.count {
+                try emit(consumed..<pending.count)
+                consumed = pending.count
+            }
+            if consumed > 0 {
+                pending.removeSubrange(0..<consumed)
+                consumed = 0
+            }
+        }
+        return (lineCount, totalBytes)
+    }
+
     /// Live-tail variant: the complete lines appended since `fromOffset`, plus the offset to pass
     /// next time. A trailing line with no newline yet is held back (the writer is mid-append), so
     /// `endOffset` stops after the last newline. nil = unreadable, or the file shrank below
@@ -453,16 +508,22 @@ public actor AgentHistoryScanner {
     private var fileCache: [String: FileCacheEntry] = [:]
     private var lastScanAt: Date = .distantPast
     private let ftsIndex: AgentHistoryFTSIndex
+    private let scanOperation: (@Sendable () async -> [AgentSessionRecord])?
     #if canImport(SQLite3)
     private var copilotCache: (mtime: Date, size: Int, records: [AgentSessionRecord])?
     #endif
     public static let didUpdateNotification = Notification.Name("KouenAgentHistoryDidUpdate")
 
     private var inFlightScanTask: Task<[AgentSessionRecord], Never>?
+    private var inFlightScanID: UUID?
 
-    public init(ftsIndex: AgentHistoryFTSIndex = .shared) {
+    public init(
+        ftsIndex: AgentHistoryFTSIndex = .shared,
+        scanOperation: (@Sendable () async -> [AgentSessionRecord])? = nil
+    ) {
         self.cloudSessionStore = ClaudeCloudSessionStore()
         self.ftsIndex = ftsIndex
+        self.scanOperation = scanOperation
     }
 
     /// Returns cached records immediately if available (from memory or persisted SQLite index).
@@ -494,16 +555,10 @@ public actor AgentHistoryScanner {
         return await scanAll()
     }
 
-    private func triggerBackgroundScan() {
-        guard inFlightScanTask == nil else { return }
-        let task = Task { [weak self] () -> [AgentSessionRecord] in
-            guard let self else { return [] }
-            return await self.performScanAll()
-        }
-        inFlightScanTask = task
-        Task {
-            _ = await task.value
-        }
+    @discardableResult
+    func triggerBackgroundScan() -> Task<[AgentSessionRecord], Never>? {
+        guard inFlightScanTask == nil else { return nil }
+        return startScan()
     }
 
     /// Scans all supported agent transcripts on disk.
@@ -513,17 +568,35 @@ public actor AgentHistoryScanner {
             return await existing.value
         }
 
+        return await startScan().value
+    }
+
+    private func startScan() -> Task<[AgentSessionRecord], Never> {
+        let id = UUID()
+        inFlightScanID = id
         let task = Task { [weak self] () -> [AgentSessionRecord] in
             guard let self else { return [] }
-            return await self.performScanAll()
+            let results = await self.performScanAll()
+            await self.finishScan(id: id)
+            return results
         }
         inFlightScanTask = task
-        let results = await task.value
+        return task
+    }
+
+    private func finishScan(id: UUID) {
+        guard inFlightScanID == id else { return }
         inFlightScanTask = nil
-        return results
+        inFlightScanID = nil
     }
 
     private func performScanAll() async -> [AgentSessionRecord] {
+        if let scanOperation {
+            let results = await scanOperation()
+            cachedRecords = results
+            lastScanAt = Date()
+            return results
+        }
         if fileCache.isEmpty {
             let entries = ftsIndex.loadCachedEntries()
             for entry in entries {
@@ -666,6 +739,7 @@ public actor AgentHistoryScanner {
 
     private func parseClaudeTranscript(fileURL: URL, toIndex: inout [AgentHistoryFTSIndex.SessionIndexItem]) -> AgentSessionRecord? {
         guard let (lines, dataSize) = Self.readJSONLLines(from: fileURL) else { return nil }
+        guard let transcriptSpool = try? AgentHistoryTranscriptSpool() else { return nil }
 
         let sessionID = fileURL.deletingPathExtension().lastPathComponent
         var cwd: String?
@@ -717,7 +791,12 @@ public actor AgentHistoryScanner {
             }
         }
 
-        var fullTranscriptParts: [String] = []
+        var hasTranscriptText = false
+        func appendTranscript(_ text: String) throws {
+            if hasTranscriptText { try transcriptSpool.append("\n") }
+            try transcriptSpool.append(text)
+            hasTranscriptText = true
+        }
         var filesEdited: Set<String> = []
         var toolsCalled: Set<String> = []
 
@@ -729,13 +808,13 @@ public actor AgentHistoryScanner {
             }
             if let contentStr = msg["content"] as? String {
                 let clean = contentStr.trimmingCharacters(in: .whitespacesAndNewlines)
-                if !clean.isEmpty { fullTranscriptParts.append(clean) }
+                if !clean.isEmpty { do { try appendTranscript(clean) } catch { return nil } }
             } else if let contentArr = msg["content"] as? [[String: Any]] {
                 for item in contentArr {
                     if let type = item["type"] as? String {
                         if type == "text", let text = item["text"] as? String {
                             let clean = text.trimmingCharacters(in: .whitespacesAndNewlines)
-                            if !clean.isEmpty { fullTranscriptParts.append(clean) }
+                            if !clean.isEmpty { do { try appendTranscript(clean) } catch { return nil } }
                         } else if type == "tool_use" {
                             if let name = item["name"] as? String, !name.isEmpty {
                                 toolsCalled.insert(name)
@@ -771,7 +850,8 @@ public actor AgentHistoryScanner {
                 fileSize: fileSize,
                 title: title,
                 firstPrompt: firstPrompt ?? "",
-                fullTranscript: fullTranscriptParts.joined(separator: "\n"),
+                fullTranscript: "",
+                transcriptSpool: transcriptSpool,
                 gitBranch: gitBranch,
                 repoName: projectName,
                 agentName: AgentKind.claudeCode.displayName,
@@ -1359,6 +1439,7 @@ public actor AgentHistoryScanner {
 
     func parseAntigravityTranscript(sessionID: String, fileURL: URL, toIndex: inout [AgentHistoryFTSIndex.SessionIndexItem]) -> AgentSessionRecord? {
         guard let (lines, dataSize) = Self.readJSONLLines(from: fileURL) else { return nil }
+        guard let transcriptSpool = try? AgentHistoryTranscriptSpool() else { return nil }
 
         var firstPrompt: String?
         var projectPath: String?
@@ -1426,7 +1507,12 @@ public actor AgentHistoryScanner {
             }
         }
 
-        var fullTranscriptParts: [String] = []
+        var hasTranscriptText = false
+        func appendTranscript(_ text: String) throws {
+            if hasTranscriptText { try transcriptSpool.append("\n") }
+            try transcriptSpool.append(text)
+            hasTranscriptText = true
+        }
         var filesEdited: Set<String> = []
         var toolsCalled: Set<String> = []
 
@@ -1443,7 +1529,7 @@ public actor AgentHistoryScanner {
                     clean = String(clean[rangeStart.upperBound..<rangeEnd.lowerBound])
                 }
                 let trimmed = clean.trimmingCharacters(in: .whitespacesAndNewlines)
-                if !trimmed.isEmpty { fullTranscriptParts.append(trimmed) }
+                if !trimmed.isEmpty { do { try appendTranscript(trimmed) } catch { return nil } }
             }
             if let toolCalls = json["tool_calls"] as? [[String: Any]] {
                 for tc in toolCalls {
@@ -1482,7 +1568,8 @@ public actor AgentHistoryScanner {
                 fileSize: fileSize,
                 title: title,
                 firstPrompt: firstPrompt ?? "",
-                fullTranscript: fullTranscriptParts.joined(separator: "\n"),
+                fullTranscript: "",
+                transcriptSpool: transcriptSpool,
                 gitBranch: nil,
                 repoName: projectName,
                 agentName: AgentKind.antigravity.displayName,
@@ -1641,6 +1728,7 @@ public actor AgentHistoryScanner {
         toIndex: inout [AgentHistoryFTSIndex.SessionIndexItem]
     ) -> AgentSessionRecord? {
         guard let (lines, dataSize) = readJSONLLines(from: fileURL) else { return nil }
+        guard let transcriptSpool = try? AgentHistoryTranscriptSpool() else { return nil }
 
         var sessionID: String?
         var cwd: String?
@@ -1659,7 +1747,12 @@ public actor AgentHistoryScanner {
             return out.trimmingCharacters(in: .whitespacesAndNewlines)
         }
 
-        var fullTranscriptParts: [String] = []
+        var hasTranscriptText = false
+        func appendTranscript(_ text: String) throws {
+            if hasTranscriptText { try transcriptSpool.append("\n") }
+            try transcriptSpool.append(text)
+            hasTranscriptText = true
+        }
         var filesEdited: Set<String> = []
         var toolsCalled: Set<String> = []
 
@@ -1715,7 +1808,7 @@ public actor AgentHistoryScanner {
                             continue
                         }
 
-                        fullTranscriptParts.append(text)
+                        do { try appendTranscript(text) } catch { return nil }
                         messageCount += 1
                         if firstPrompt == nil && role == "user" {
                             firstPrompt = text
@@ -1751,7 +1844,8 @@ public actor AgentHistoryScanner {
                 fileSize: fileSize,
                 title: title,
                 firstPrompt: firstPrompt ?? "",
-                fullTranscript: fullTranscriptParts.joined(separator: "\n"),
+                fullTranscript: "",
+                transcriptSpool: transcriptSpool,
                 gitBranch: gitBranch,
                 repoName: projectName,
                 agentName: AgentKind.codex.displayName,

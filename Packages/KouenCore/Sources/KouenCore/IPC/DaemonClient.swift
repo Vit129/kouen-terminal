@@ -93,7 +93,12 @@ public final class DaemonClient: @unchecked Sendable {
         //    tail, so flushing it would double-deliver. The caller's sink keeps both in one order.
         onReplay(replayText)
         if haveBoundary {
-            subscription.flushBuffered(droppingSequencesBelow: endSequence, onData: onData)
+            do {
+                try subscription.flushBuffered(droppingSequencesBelow: endSequence, onData: onData)
+            } catch {
+                subscription.cancel()
+                throw error
+            }
         } else {
             subscription.discardBufferedAndDeliverDirect()
         }
@@ -249,20 +254,65 @@ public final class DaemonSubscription: @unchecked Sendable {
     private let bufferLock = NSLock()
     private var buffering = false
     private var pendingFrames: [(Data, UInt64)] = []
-    /// Running byte total of `pendingFrames`, so the cap check stays O(1) on the read hot path.
+    private var pendingFrameSpool: PendingFrameSpool?
+    private var bufferFailure: Error?
+    /// Running memory byte total of `pendingFrames`, so the cap check stays O(1) on the read hot path.
     private var pendingBytes = 0
-    /// Cap on buffered live output while a replay is outstanding. A flooding surface against a slow
-    /// daemon could otherwise buffer the entire replay window (default 5 s) of output in memory.
-    /// On overflow we drop the OLDEST buffered frames (a byte ring) to stay under the cap, set
-    /// `bufferOverflowed`, and at flush time skip dedup — dropping-oldest broke buffer contiguity,
-    /// so the replay-boundary dedup can no longer prove which frames are duplicates; delivering all
-    /// remaining frames after the replay risks a momentary visible duplication but never drops live
-    /// output, and bounds memory. A few MiB is far above any real terminal's per-replay-window
-    /// output yet small enough that the worst-case flush is a single bounded `onData`.
+    /// Cap on buffered live output retained in memory while replay is outstanding. Overflow goes
+    /// synchronously to an owner-only spool, preserving sequence order without another async queue.
     private static let maxPendingBufferBytes = 4 * 1024 * 1024
-    /// Set once `pendingFrames` had to drop a frame to respect the cap (see above): tells
-    /// `flushBuffered` to skip dedup and deliver everything that survived.
-    private var bufferOverflowed = false
+
+    private final class PendingFrameSpool {
+        private let url: URL
+        private let writer: FileHandle
+        private let reader: FileHandle
+        private(set) var frameCount = 0
+        private var readCount = 0
+
+        init() throws {
+            url = FileManager.default.temporaryDirectory.appendingPathComponent("kouen-attach-\(UUID().uuidString).spool")
+            guard FileManager.default.createFile(atPath: url.path, contents: nil, attributes: [.posixPermissions: 0o600]) else {
+                throw CocoaError(.fileWriteUnknown)
+            }
+            do {
+                writer = try FileHandle(forWritingTo: url)
+                reader = try FileHandle(forReadingFrom: url)
+            } catch {
+                try? FileManager.default.removeItem(at: url)
+                throw error
+            }
+        }
+
+        func append(_ data: Data, sequence: UInt64) throws {
+            var seq = sequence.bigEndian
+            var length = UInt32(data.count).bigEndian
+            var record = Data()
+            record.reserveCapacity(12 + data.count)
+            withUnsafeBytes(of: &seq) { record.append(contentsOf: $0) }
+            withUnsafeBytes(of: &length) { record.append(contentsOf: $0) }
+            record.append(data)
+            try writer.write(contentsOf: record)
+            frameCount += 1
+        }
+
+        func readNext() throws -> (Data, UInt64)? {
+            guard readCount < frameCount else { return nil }
+            let header = try reader.read(upToCount: 12) ?? Data()
+            guard header.count == 12 else { throw CocoaError(.fileReadCorruptFile) }
+            let sequence = header.prefix(8).withUnsafeBytes { $0.loadUnaligned(as: UInt64.self).bigEndian }
+            let length = header.suffix(4).withUnsafeBytes { $0.loadUnaligned(as: UInt32.self).bigEndian }
+            let payload = try reader.read(upToCount: Int(length)) ?? Data()
+            guard payload.count == Int(length) else { throw CocoaError(.fileReadCorruptFile) }
+            readCount += 1
+            return (payload, sequence)
+        }
+
+        deinit {
+            try? writer.close()
+            try? reader.close()
+            try? FileManager.default.removeItem(at: url)
+        }
+    }
 
     init(fd: Int32) {
         self.fd = fd
@@ -380,17 +430,23 @@ public final class DaemonSubscription: @unchecked Sendable {
                 if let self {
                     self.bufferLock.lock()
                     if self.buffering {
-                        self.pendingFrames.append((data, sequence))
-                        self.pendingBytes += data.count
-                        // Bound the buffer: under a flood + slow replay, drop the OLDEST frames so
-                        // memory stays capped. Dropping-oldest (not refusing the newest) keeps the
-                        // freshest output; the `bufferOverflowed` flag makes the flush skip dedup so
-                        // a dropped frame can never be mistaken for a kept one.
-                        while self.pendingBytes > Self.maxPendingBufferBytes,
-                              self.pendingFrames.count > 1 {
-                            let evicted = self.pendingFrames.removeFirst()
-                            self.pendingBytes -= evicted.0.count
-                            self.bufferOverflowed = true
+                        do {
+                            if let spool = self.pendingFrameSpool {
+                                try spool.append(data, sequence: sequence)
+                            } else if self.pendingBytes + data.count <= Self.maxPendingBufferBytes {
+                                self.pendingFrames.append((data, sequence))
+                                self.pendingBytes += data.count
+                            } else {
+                                let spool = try PendingFrameSpool()
+                                for (frame, seq) in self.pendingFrames { try spool.append(frame, sequence: seq) }
+                                self.pendingFrames.removeAll(keepingCapacity: false)
+                                self.pendingBytes = 0
+                                try spool.append(data, sequence: sequence)
+                                self.pendingFrameSpool = spool
+                            }
+                        } catch {
+                            self.bufferFailure = error
+                            _ = shutdown(self.fd, Int32(SHUT_RDWR))
                         }
                         self.bufferLock.unlock()
                         return
@@ -399,7 +455,15 @@ public final class DaemonSubscription: @unchecked Sendable {
                 }
                 onData(data, sequence)
             },
-            onEnd: onEnd
+            onEnd: { [weak self] in
+                guard let self else { return }
+                self.bufferLock.lock()
+                let failedWhileBuffering = self.bufferFailure != nil
+                self.bufferLock.unlock()
+                // A local spool failure is surfaced by flushBuffered(); treating the resulting
+                // socket shutdown as a peer disconnect would schedule a pointless reconnect.
+                if !failedWhileBuffering { onEnd?() }
+            }
         )
     }
 
@@ -411,7 +475,12 @@ public final class DaemonSubscription: @unchecked Sendable {
     /// Test-only: how many live frames are currently held in the buffer (before a flush). Lets a
     /// deterministic test wait for the read loop to stash all frames without timing guesswork.
     func bufferedFrameCountForTesting() -> Int {
-        bufferLock.lock(); defer { bufferLock.unlock() }; return pendingFrames.count
+        bufferLock.lock(); defer { bufferLock.unlock() }
+        return pendingFrames.count + (pendingFrameSpool?.frameCount ?? 0)
+    }
+
+    func bufferedMemoryBytesForTesting() -> Int {
+        bufferLock.lock(); defer { bufferLock.unlock() }; return pendingBytes
     }
 
     /// Release buffered live frames in arrival order, dropping any whose sequence is already inside
@@ -436,22 +505,31 @@ public final class DaemonSubscription: @unchecked Sendable {
     func flushBuffered(
         droppingSequencesBelow endSequence: UInt64,
         onData: @Sendable (Data, UInt64) -> Void
-    ) -> Int {
+    ) throws -> Int {
         bufferLock.lock()
         defer { bufferLock.unlock() }
-        let skipDedup = bufferOverflowed || endSequence == 0
+        if let bufferFailure { throw bufferFailure }
         var dropped = 0
         var coalesced = Data()
         var lastSequence: UInt64 = 0
-        for (data, sequence) in pendingFrames {
-            if !skipDedup, sequence < endSequence { dropped += 1; continue }
+
+        func consume(_ data: Data, _ sequence: UInt64) {
+            if endSequence != 0, sequence < endSequence { dropped += 1; return }
+            if coalesced.count + data.count > 256 * 1024 {
+                if !coalesced.isEmpty { onData(coalesced, lastSequence) }
+                coalesced.removeAll(keepingCapacity: true)
+            }
             coalesced.append(data)
             lastSequence = sequence
         }
+        for (data, sequence) in pendingFrames { consume(data, sequence) }
+        if let spool = pendingFrameSpool {
+            while let (data, sequence) = try spool.readNext() { consume(data, sequence) }
+        }
         if !coalesced.isEmpty { onData(coalesced, lastSequence) }
         pendingFrames.removeAll(keepingCapacity: false)
+        pendingFrameSpool = nil
         pendingBytes = 0
-        bufferOverflowed = false
         buffering = false
         return dropped
     }
@@ -469,8 +547,9 @@ public final class DaemonSubscription: @unchecked Sendable {
         bufferLock.lock()
         defer { bufferLock.unlock() }
         pendingFrames.removeAll(keepingCapacity: false)
+        pendingFrameSpool = nil
         pendingBytes = 0
-        bufferOverflowed = false
+        bufferFailure = nil
         buffering = false
     }
 

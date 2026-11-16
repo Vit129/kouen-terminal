@@ -7,6 +7,45 @@ import SQLite3
 #endif
 
 final class AgentHistoryScannerTests: XCTestCase {
+    private actor ScanCallCounter {
+        private(set) var count = 0
+
+        func increment() { count += 1 }
+    }
+
+    func test_TS_2286_BE_UT_BackgroundScanClearsInflightAfterCompletion() async {
+        let counter = ScanCallCounter()
+        let fts = AgentHistoryFTSIndex(dbPath: ":memory:")
+        let scanner = AgentHistoryScanner(ftsIndex: fts, scanOperation: {
+            await counter.increment()
+            return []
+        })
+
+        let background = await scanner.triggerBackgroundScan()
+        await background?.value
+        _ = await scanner.scanAll()
+
+        let calls = await counter.count
+        XCTAssertEqual(calls, 2)
+    }
+
+    func test_TS_2287_BE_UT_ConcurrentScanCallersShareInflightWork() async {
+        let counter = ScanCallCounter()
+        let fts = AgentHistoryFTSIndex(dbPath: ":memory:")
+        let scanner = AgentHistoryScanner(ftsIndex: fts, scanOperation: {
+            await counter.increment()
+            await Task.yield()
+            return []
+        })
+
+        async let first = scanner.scanAll()
+        async let second = scanner.scanAll()
+        _ = await (first, second)
+
+        let calls = await counter.count
+        XCTAssertEqual(calls, 1)
+    }
+
     func testScanAllReturnsRecords() async {
         let tempDBPath = FileManager.default.temporaryDirectory
             .appendingPathComponent("test_agent_history_\(UUID().uuidString).sqlite").path
@@ -304,6 +343,62 @@ final class AgentHistoryScannerTests: XCTestCase {
         XCTAssertTrue(hits["long-session-42"]?.snippet.contains("quantumTeleportationProtocol") == true)
         XCTAssertEqual(hits["long-session-42"]?.filesEdited, "IndexTuner.swift")
         XCTAssertEqual(hits["long-session-42"]?.toolsCalled, "Edit Read")
+    }
+
+    func test_TS_2291_BE_IT_DiskBackedFTSChunkSearchDeduplicatesAndReplacesAtomically() throws {
+        let path = FileManager.default.temporaryDirectory.appendingPathComponent("history-spool-\(UUID().uuidString).sqlite")
+        defer {
+            try? FileManager.default.removeItem(at: path)
+            try? FileManager.default.removeItem(atPath: path.path + "-wal")
+            try? FileManager.default.removeItem(atPath: path.path + "-shm")
+        }
+        let index = AgentHistoryFTSIndex(dbPath: path.path)
+        let stamp = Date(timeIntervalSince1970: 1_700_000_000)
+        let boundarySpool = try AgentHistoryTranscriptSpool()
+        try boundarySpool.append(String(repeating: "x", count: 256 * 1024 - 8) + " boundary")
+        var largestChunk = 0
+        try boundarySpool.forEachChunk { largestChunk = max(largestChunk, $0.utf8.count) }
+        XCTAssertLessThanOrEqual(largestChunk, 272 * 1024)
+
+        index.indexSessionsBatch([.init(
+            sessionID: "spooled-session", transcriptPath: "/fixture/spooled.jsonl", mtime: stamp, fileSize: 1,
+            title: "Spool fixture", firstPrompt: "", fullTranscript: "", transcriptSpool: boundarySpool,
+            repoName: "fixture", agentName: "Claude"
+        )])
+        XCTAssertEqual(index.searchRanked(query: "boundary", limit: -1).map(\.sessionID), ["spooled-session"])
+        XCTAssertEqual(index.searchSubstring(query: "boundary").map(\.sessionID), ["spooled-session"])
+
+        let replacement = try AgentHistoryTranscriptSpool()
+        try replacement.append("replacement-token only")
+        index.indexSessionsBatch([.init(
+            sessionID: "spooled-session", transcriptPath: "/fixture/spooled.jsonl", mtime: stamp.addingTimeInterval(1), fileSize: 2,
+            title: "Spool fixture", firstPrompt: "", fullTranscript: "", transcriptSpool: replacement,
+            repoName: "fixture", agentName: "Claude"
+        )])
+        XCTAssertTrue(index.searchRanked(query: "boundary", limit: -1).isEmpty)
+        XCTAssertEqual(index.searchRanked(query: "replacement-token", limit: -1).map(\.sessionID), ["spooled-session"])
+    }
+
+    func test_TS_2292_BE_IT_AllSearchTermsCanSpanTranscriptChunks() throws {
+        let path = FileManager.default.temporaryDirectory.appendingPathComponent("history-fts-\(UUID().uuidString).sqlite")
+        defer { try? FileManager.default.removeItem(at: path) }
+        let index = AgentHistoryFTSIndex(dbPath: path.path)
+        let spool = try AgentHistoryTranscriptSpool()
+        try spool.append("firstunique " + String(repeating: "padding ", count: 70_000) + " secondunique")
+        index.indexSessionsBatch([.init(sessionID: "fixture", transcriptPath: "/fixture", mtime: Date(), fileSize: 1,
+            title: "", firstPrompt: "", fullTranscript: "", transcriptSpool: spool, repoName: "", agentName: "")])
+        XCTAssertEqual(index.searchRanked(query: "firstunique secondunique", requireAllTokens: true).map(\.sessionID), ["fixture"])
+        XCTAssertTrue(index.searchRanked(query: "firstunique absent", requireAllTokens: true).isEmpty)
+        XCTAssertTrue(index.searchRanked(query: "firstunique secondunique", requireAllTokens: true, matchingIDs: ["other"]).isEmpty)
+        XCTAssertEqual(index.searchRanked(query: "firstunique secondunique", requireAllTokens: true, matchingIDs: ["fixture"]).map(\.sessionID), ["fixture"])
+    }
+
+    func test_TS_2293_BE_UT_TranscriptSpoolPreservesSplitUTF8() throws {
+        let spool = try AgentHistoryTranscriptSpool()
+        try spool.append("1234567🙂tail")
+        var chunks: [String] = []
+        try spool.forEachChunk(chunkBytes: 8, overlapBytes: 0) { chunks.append($0) }
+        XCTAssertEqual(chunks.joined(), "1234567🙂tail")
     }
 
     func testFTSIndexRespectsLimit() {

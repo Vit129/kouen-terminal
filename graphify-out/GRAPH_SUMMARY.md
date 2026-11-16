@@ -1,15 +1,15 @@
-# Graph Summary — kouen-terminal
+# Graph Summary — performance-hardening-2026-11-16
 _Auto-generated from GRAPH_REPORT.md · do not edit manually_
 _Regen: `graphify update .`_
 
 ## Summary
-- 20146 nodes · 57981 edges · 2788 communities (1545 shown, 1243 thin omitted)
-- Extraction: 85% EXTRACTED · 15% INFERRED · 0% AMBIGUOUS · INFERRED: 8519 edges (avg confidence: 0.74)
+- 20213 nodes · 58315 edges · 2679 communities (1546 shown, 1133 thin omitted)
+- Extraction: 85% EXTRACTED · 15% INFERRED · 0% AMBIGUOUS · INFERRED: 8543 edges (avg confidence: 0.74)
 - Token cost: 0 input · 0 output
 
 
 ## Graph Freshness
-- Built from commit: `84262995`
+- Built from commit: `1e594b95`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -32,27 +32,27 @@ A high-degree node isn't always architecturally central - a widely-used
 utility/config file can rack up more edges than a real coupler while only
 ever touching one area. This ranks by how many DIFFERENT communities a
 node's neighbors span, not by raw edge count.
-1. `IPCRequest` - bridges 189 areas (211 edges)
+1. `IPCRequest` - bridges 187 areas (211 edges)
 2. `Command` - bridges 102 areas (108 edges)
 3. `AgentKind` - bridges 83 areas (176 edges)
 4. `IPCResponse` - bridges 79 areas (107 edges)
-5. `KouenTerminalSurfaceView` - bridges 72 areas (346 edges)
-6. `SessionCoordinator` - bridges 67 areas (235 edges)
-7. `NSView` - bridges 67 areas (193 edges)
-8. `KouenGridTerminal` - bridges 65 areas (117 edges)
-9. `AnyCodable` - bridges 64 areas (190 edges)
+5. `KouenTerminalSurfaceView` - bridges 75 areas (346 edges)
+6. `SessionCoordinator` - bridges 64 areas (235 edges)
+7. `NSView` - bridges 64 areas (193 edges)
+8. `KouenGridTerminal` - bridges 63 areas (117 edges)
+9. `SurfaceRegistry` - bridges 62 areas (230 edges)
 
 ## Surprising Connections (you probably didn't know these)
 - `.selectedHost` --references--> `RemoteHost`  [INFERRED]
   Apps/Kouen/Sources/KouenApp/Settings/SwiftUI/SettingsRemoteView.swift → Packages/KouenCore/Sources/KouenCore/Remote/RemoteHostStore.swift
 - `.terms` --calls--> `SearchMatcher`  [INFERRED]
   Apps/Kouen/Sources/KouenApp/UI/History/HistorySearchEvidence.swift → Packages/KouenCore/Sources/KouenCore/Search/SearchMatcher.swift
+- `.waitingCount` --references--> `FleetSessionItem`  [INFERRED]
+  Apps/Kouen/Sources/KouenApp/UI/Terminal/FleetViewModel.swift → Packages/KouenCore/Sources/KouenCore/Fleet/FleetSessionList.swift
 - `DaemonSyncService` --calls--> `DaemonSessionService`  [INFERRED]
   Apps/Kouen/Sources/KouenApp/Services/DaemonSyncService.swift → Packages/KouenCore/Sources/KouenCore/IPC/DaemonSessionService.swift
 - `RemoteHostsService` --calls--> `RemoteHostStore`  [INFERRED]
   Apps/Kouen/Sources/KouenApp/Services/RemoteHostsService.swift → Packages/KouenCore/Sources/KouenCore/Remote/RemoteHostStore.swift
-- `.selectWorkspace(byIndex:)` --references--> `SessionSnapshot`  [INFERRED]
-  Apps/Kouen/Sources/KouenApp/Services/SessionCoordinator.swift → Packages/KouenIPC/Sources/KouenIPC/SessionSnapshot.swift
 
 
 _Full map → GRAPH_REPORT.md · query: `graphify query "..."`_

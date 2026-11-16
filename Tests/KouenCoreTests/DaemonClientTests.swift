@@ -237,7 +237,7 @@ final class DaemonClientTests: XCTestCase {
         XCTAssertTrue(delivered.isEmpty, "buffered frames must NOT be delivered before the flush")
 
         // Flush deduping below sequence 13 — frame@10 is the replay overlap and must be dropped.
-        let dropped = subscription.flushBuffered(droppingSequencesBelow: 13, onData: onData)
+        let dropped = try subscription.flushBuffered(droppingSequencesBelow: 13, onData: onData)
         XCTAssertEqual(dropped, 1, "exactly the one overlapping frame (seq 10) is a duplicate")
         // The two kept frames (13: "bbb", 16: "ccc") are COALESCED into one ordered delivery — no
         // gap, no duplicate, byte order preserved.
@@ -274,7 +274,7 @@ final class DaemonClientTests: XCTestCase {
         }
         wait(for: [buffered], timeout: 3)
 
-        let dropped = subscription.flushBuffered(droppingSequencesBelow: 0, onData: onData)
+        let dropped = try subscription.flushBuffered(droppingSequencesBelow: 0, onData: onData)
         XCTAssertEqual(dropped, 0, "boundary 0 drops nothing")
         // Boundary 0 = old-daemon fallback: deliver every buffered frame, coalesced into one
         // ordered delivery (bytes "xx" then "yy").
@@ -357,9 +357,51 @@ final class DaemonClientTests: XCTestCase {
         }
         wait(for: [buffered], timeout: 4)
 
-        subscription.flushBuffered(droppingSequencesBelow: 1, onData: onData)
+        try subscription.flushBuffered(droppingSequencesBelow: 1, onData: onData)
         XCTAssertEqual(delivered.deliveryCount, 1, "the whole buffer flushes as ONE coalesced delivery")
         XCTAssertEqual(delivered.concatenatedBytes().count, count, "every buffered byte delivered, in order")
+    }
+
+    func test_TS_2290_BE_IT_AttachBufferSpoolsOverflowAndPreservesReplayDedupOrder() throws {
+        var fds: [Int32] = [0, 0]
+        XCTAssertEqual(makeUnixSocketPair(&fds), 0, "socketpair failed")
+        let localEnd = fds[0]
+        let peerEnd = fds[1]
+        defer { sysClose(localEnd); sysClose(peerEnd) }
+
+        let subscription = DaemonSubscription(fd: localEnd)
+        let delivered = FrameRecorder()
+        let frameCount = 70
+        let deliveredAll = expectation(description: "all post-replay frames delivered")
+        let onData: @Sendable (Data, UInt64) -> Void = { data, sequence in
+            delivered.record(data, sequence)
+            if sequence == UInt64(frameCount) { deliveredAll.fulfill() }
+        }
+        subscription.start(onData: onData, onEnd: nil, buffered: true)
+
+        var expected = Data()
+        for sequence in 1 ... frameCount {
+            let byte = UInt8(sequence % 251)
+            let payload = Data(repeating: byte, count: 64 * 1024)
+            let frame = try IPCCodec.encodeOutputFrame(payload, sequence: UInt64(sequence))
+            writeAllToFD(frame, fd: peerEnd)
+            if sequence >= 35 { expected.append(payload) }
+        }
+
+        let buffered = expectation(description: "all frames buffered")
+        DispatchQueue.global().async {
+            for _ in 0 ..< 200 {
+                if subscription.bufferedFrameCountForTesting() == frameCount { buffered.fulfill(); return }
+                usleep(20_000)
+            }
+        }
+        wait(for: [buffered], timeout: 5)
+        XCTAssertLessThanOrEqual(subscription.bufferedMemoryBytesForTesting(), 4 * 1024 * 1024)
+
+        let dropped = try subscription.flushBuffered(droppingSequencesBelow: 35, onData: onData)
+        XCTAssertEqual(dropped, 34)
+        wait(for: [deliveredAll], timeout: 5)
+        XCTAssertEqual(delivered.concatenatedBytes(), expected)
     }
 
     /// Stress: concurrent `sendInput` while `cancel()`/teardown runs must not crash or deadlock.

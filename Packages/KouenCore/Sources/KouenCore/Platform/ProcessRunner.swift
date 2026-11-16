@@ -2,13 +2,17 @@ import Foundation
 
 /// Thread-safe buffer accumulator for child process pipes.
 private final class OutputBuffer: @unchecked Sendable {
+    static let maxCapturedBytes = 4 * 1024 * 1024
     private let lock = NSLock()
     private var data = Data()
+    private var truncated = false
 
     func append(_ chunk: Data) {
         lock.lock()
         defer { lock.unlock() }
-        data.append(chunk)
+        let remaining = max(0, Self.maxCapturedBytes - data.count)
+        if remaining > 0 { data.append(chunk.prefix(remaining)) }
+        if chunk.count > remaining { truncated = true }
     }
 
     func toData() -> Data {
@@ -16,6 +20,26 @@ private final class OutputBuffer: @unchecked Sendable {
         defer { lock.unlock() }
         return data
     }
+
+    func isTruncated() -> Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return truncated
+    }
+}
+
+private struct OutputCapture {
+    let data: Data
+    let truncated: Bool
+}
+
+private func drainOutput(_ handle: FileHandle) -> OutputCapture {
+    let buffer = OutputBuffer()
+    while true {
+        guard let chunk = try? handle.read(upToCount: 64 * 1024), !chunk.isEmpty else { break }
+        buffer.append(chunk)
+    }
+    return OutputCapture(data: buffer.toData(), truncated: buffer.isTruncated())
 }
 
 /// Result of executing an external process.
@@ -24,14 +48,18 @@ public struct ProcessResult: Sendable, Equatable {
     public let stdout: String
     public let stderr: String
     public let isTimedOut: Bool
+    public let stdoutWasTruncated: Bool
+    public let stderrWasTruncated: Bool
 
     public var isSuccess: Bool { exitCode == 0 }
 
-    public init(exitCode: Int32, stdout: String, stderr: String = "", isTimedOut: Bool = false) {
+    public init(exitCode: Int32, stdout: String, stderr: String = "", isTimedOut: Bool = false, stdoutWasTruncated: Bool = false, stderrWasTruncated: Bool = false) {
         self.exitCode = exitCode
         self.stdout = stdout
         self.stderr = stderr
         self.isTimedOut = isTimedOut
+        self.stdoutWasTruncated = stdoutWasTruncated
+        self.stderrWasTruncated = stderrWasTruncated
     }
 }
 
@@ -47,6 +75,8 @@ private final class AsyncRunCoordinator: @unchecked Sendable {
 
     private var outData: Data?
     private var errData: Data?
+    private var outTruncated = false
+    private var errTruncated = false
     private var terminationStatus: Int32?
     private var didTimeout = false
     private var isResumed = false
@@ -87,19 +117,18 @@ private final class AsyncRunCoordinator: @unchecked Sendable {
         }
 
         DispatchQueue.global(qos: .userInitiated).async { [self] in
-            let data = self.outPipe.fileHandleForReading.readDataToEndOfFile()
-            self.handleOutDrained(data)
+            self.handleOutDrained(drainOutput(self.outPipe.fileHandleForReading))
         }
 
         DispatchQueue.global(qos: .userInitiated).async { [self] in
-            let data = self.errPipe.fileHandleForReading.readDataToEndOfFile()
-            self.handleErrDrained(data)
+            self.handleErrDrained(drainOutput(self.errPipe.fileHandleForReading))
         }
     }
 
-    private func handleOutDrained(_ data: Data) {
+    private func handleOutDrained(_ capture: OutputCapture) {
         lock.lock()
-        outData = data
+        outData = capture.data
+        outTruncated = capture.truncated
         let ready = checkReadyUnderLock()
         lock.unlock()
         if ready {
@@ -107,9 +136,10 @@ private final class AsyncRunCoordinator: @unchecked Sendable {
         }
     }
 
-    private func handleErrDrained(_ data: Data) {
+    private func handleErrDrained(_ capture: OutputCapture) {
         lock.lock()
-        errData = data
+        errData = capture.data
+        errTruncated = capture.truncated
         let ready = checkReadyUnderLock()
         lock.unlock()
         if ready {
@@ -174,6 +204,8 @@ private final class AsyncRunCoordinator: @unchecked Sendable {
         let err = errData ?? Data()
         let rawStatus = terminationStatus ?? (process.isRunning ? -1 : process.terminationStatus)
         let timedOut = didTimeout
+        let stdoutWasTruncated = outTruncated
+        let stderrWasTruncated = errTruncated
         let timeoutVal = timeout
         lock.unlock()
 
@@ -193,7 +225,9 @@ private final class AsyncRunCoordinator: @unchecked Sendable {
             exitCode: exitCode,
             stdout: stdoutStr,
             stderr: stderrStr,
-            isTimedOut: timedOut
+            isTimedOut: timedOut,
+            stdoutWasTruncated: stdoutWasTruncated,
+            stderrWasTruncated: stderrWasTruncated
         ))
     }
 
@@ -307,7 +341,8 @@ public enum ProcessRunner {
                 let timeoutNote = "Process timed out after \(timeout)s"
                 stderrStr = stderrStr.isEmpty ? timeoutNote : "\(stderrStr)\n\(timeoutNote)"
                 let status = process.terminationStatus != 0 ? process.terminationStatus : -1
-                return ProcessResult(exitCode: status, stdout: stdoutStr, stderr: stderrStr, isTimedOut: true)
+                return ProcessResult(exitCode: status, stdout: stdoutStr, stderr: stderrStr, isTimedOut: true,
+                                     stdoutWasTruncated: outBuf.isTruncated(), stderrWasTruncated: errBuf.isTruncated())
             }
         } else {
             // Wait on the process, not on pipe EOF: a leftover holder of the write end (a
@@ -320,7 +355,8 @@ public enum ProcessRunner {
 
         let stdoutStr = String(data: outBuf.toData(), encoding: .utf8) ?? ""
         let stderrStr = String(data: errBuf.toData(), encoding: .utf8) ?? ""
-        return ProcessResult(exitCode: process.terminationStatus, stdout: stdoutStr, stderr: stderrStr, isTimedOut: false)
+        return ProcessResult(exitCode: process.terminationStatus, stdout: stdoutStr, stderr: stderrStr, isTimedOut: false,
+                             stdoutWasTruncated: outBuf.isTruncated(), stderrWasTruncated: errBuf.isTruncated())
     }
 
     /// Asynchronously executes a binary non-blockingly with pipe draining and bounded timeout safety.

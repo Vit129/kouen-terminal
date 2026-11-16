@@ -2,15 +2,15 @@ import XCTest
 @testable import KouenTerminalKit
 
 final class OutputCoalescerTests: XCTestCase {
-    func test_TC1201_BEUT_drainIsCappedAndKeepsOrder() {
+    func test_TS_2288_BE_UT_DrainIsCappedAndKeepsOrder() throws {
         let c = TerminalHostView.OutputCoalescer()
         let all = Data((0 ..< 1000).map { UInt8($0 % 251) })
         var scheduled = 0
-        c.append(all) { scheduled += 1 }
+        try c.append(all) { scheduled += 1 }
         var out = Data()
         var drains = 0
         while true {
-            let step = c.drain(maxBytes: 300)
+            let step = try c.drain(maxBytes: 300)
             XCTAssertLessThanOrEqual(step.data.count, 300)
             out.append(step.data)
             drains += 1
@@ -18,7 +18,34 @@ final class OutputCoalescerTests: XCTestCase {
         }
         XCTAssertEqual(out, all)
         XCTAssertEqual(drains, 4)
-        c.append(Data([1])) { scheduled += 1 }
+        try c.append(Data([1])) { scheduled += 1 }
         XCTAssertEqual(scheduled, 2, "after the last drain a new append must schedule again")
+    }
+
+    func test_TS_2289_BE_UT_OverflowSpoolsInOrderWithinMemoryWindow() throws {
+        let memoryLimit = 64 * 1024
+        let c = TerminalHostView.OutputCoalescer(maxMemoryBytes: memoryLimit)
+        let first = Data((0 ..< 48_000).map { UInt8($0 % 251) })
+        let overflow = Data((48_000 ..< 248_000).map { UInt8($0 % 251) })
+        var expected = first
+        expected.append(overflow)
+        var scheduled = 0
+        try c.append(first) { scheduled += 1 }
+        try c.append(overflow) { scheduled += 1 }
+
+        XCTAssertLessThanOrEqual(c.bufferedMemoryBytes, memoryLimit)
+        XCTAssertEqual(c.bufferedSpoolBytes, overflow.count)
+        XCTAssertEqual(scheduled, 1)
+
+        var output = Data()
+        while true {
+            let (chunk, hasMore) = try c.drain(maxBytes: 17_000)
+            XCTAssertLessThanOrEqual(chunk.count, 17_000)
+            output.append(chunk)
+            if !hasMore { break }
+        }
+        XCTAssertEqual(output, expected)
+        XCTAssertEqual(c.bufferedMemoryBytes, 0)
+        XCTAssertEqual(c.bufferedSpoolBytes, 0)
     }
 }

@@ -113,10 +113,16 @@ public final class AgentHistoryFTSIndex: @unchecked Sendable {
         return rc == SQLITE_OK
     }
 
-    /// Wraps `body` in a transaction; rolls back if COMMIT fails. Caller holds `lock`.
-    private func inTransaction(_ context: String, _ body: () -> Void) {
+    /// Wraps `body` in a transaction; rolls back if the body or COMMIT fails. Caller holds `lock`.
+    private func inTransaction(_ context: String, _ body: () throws -> Void) {
         guard exec("BEGIN TRANSACTION;", context: "\(context) BEGIN") else { return }
-        body()
+        do {
+            try body()
+        } catch {
+            logStepFailure(SQLITE_ERROR, context: "\(context): \(error.localizedDescription)")
+            exec("ROLLBACK;", context: "\(context) ROLLBACK")
+            return
+        }
         if !exec("COMMIT;", context: "\(context) COMMIT") {
             exec("ROLLBACK;", context: "\(context) ROLLBACK")
         }
@@ -532,6 +538,7 @@ public final class AgentHistoryFTSIndex: @unchecked Sendable {
         public let title: String
         public let firstPrompt: String
         public let fullTranscript: String
+        public let transcriptSpool: AgentHistoryTranscriptSpool?
         public let gitBranch: String?
         public let repoName: String
         public let agentName: String
@@ -548,6 +555,7 @@ public final class AgentHistoryFTSIndex: @unchecked Sendable {
             title: String,
             firstPrompt: String,
             fullTranscript: String,
+            transcriptSpool: AgentHistoryTranscriptSpool? = nil,
             gitBranch: String? = nil,
             repoName: String = "",
             agentName: String = "",
@@ -563,6 +571,7 @@ public final class AgentHistoryFTSIndex: @unchecked Sendable {
             self.title = title
             self.firstPrompt = firstPrompt
             self.fullTranscript = fullTranscript
+            self.transcriptSpool = transcriptSpool
             self.gitBranch = gitBranch
             self.repoName = repoName
             self.agentName = agentName
@@ -591,46 +600,81 @@ public final class AgentHistoryFTSIndex: @unchecked Sendable {
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             """
             var insertFtsStmt: OpaquePointer?
-            if sqlite3_prepare_v2(db, insertFtsSQL, -1, &insertFtsStmt, nil) == SQLITE_OK {
-                for item in itemsToIndex {
+            guard sqlite3_prepare_v2(db, insertFtsSQL, -1, &insertFtsStmt, nil) == SQLITE_OK,
+                  let insertFtsStmt else {
+                throw CocoaError(.fileWriteUnknown)
+            }
+            defer { sqlite3_finalize(insertFtsStmt) }
+            for item in itemsToIndex {
+                let ftsAgent = (item.surfaceTag?.isEmpty == false) ? "\(item.agentName) \(item.surfaceTag!)" : item.agentName
+                var insertedTranscript = false
+                func insertTranscriptChunk(_ transcript: String) throws {
                     sqlite3_reset(insertFtsStmt)
-                    let ftsAgent = (item.surfaceTag?.isEmpty == false) ? "\(item.agentName) \(item.surfaceTag!)" : item.agentName
-                    let transcriptToStore: String
-                    if let topicSegments = item.topicSegments, !topicSegments.isEmpty {
-                        transcriptToStore = "\(item.fullTranscript)\nMilestones: " + topicSegments.joined(separator: " · ")
-                    } else {
-                        transcriptToStore = item.fullTranscript
-                    }
                     sqlite3_bind_text(insertFtsStmt, 1, item.sessionID, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
                     sqlite3_bind_text(insertFtsStmt, 2, item.title, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
                     sqlite3_bind_text(insertFtsStmt, 3, item.firstPrompt, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
-                    sqlite3_bind_text(insertFtsStmt, 4, transcriptToStore, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
+                    sqlite3_bind_text(insertFtsStmt, 4, transcript, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
                     sqlite3_bind_text(insertFtsStmt, 5, item.gitBranch ?? "", -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
                     sqlite3_bind_text(insertFtsStmt, 6, item.repoName, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
                     sqlite3_bind_text(insertFtsStmt, 7, ftsAgent, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
                     sqlite3_bind_text(insertFtsStmt, 8, item.filesEdited, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
                     sqlite3_bind_text(insertFtsStmt, 9, item.toolsCalled, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
                     let stepRes = sqlite3_step(insertFtsStmt)
-                    if stepRes != SQLITE_DONE { logStepFailure(stepRes, context: "insert batch session_fts") }
+                    guard stepRes == SQLITE_DONE else {
+                        logStepFailure(stepRes, context: "insert batch session_fts")
+                        throw CocoaError(.fileWriteUnknown)
+                    }
+                    insertedTranscript = true
                 }
-                sqlite3_finalize(insertFtsStmt)
+
+                if let spool = item.transcriptSpool {
+                    try spool.forEachChunk { try insertTranscriptChunk($0) }
+                } else {
+                    try Self.forEachFTSChunk(item.fullTranscript, insertTranscriptChunk)
+                }
+                if let topicSegments = item.topicSegments, !topicSegments.isEmpty {
+                    try insertTranscriptChunk("Milestones: " + topicSegments.joined(separator: " · "))
+                }
+                if !insertedTranscript { try insertTranscriptChunk("") }
             }
 
             let insertMetaSQL = "INSERT INTO session_index_meta(session_id, transcript_path, mtime, file_size) VALUES (?, ?, ?, ?)"
             var insertMetaStmt: OpaquePointer?
-            if sqlite3_prepare_v2(db, insertMetaSQL, -1, &insertMetaStmt, nil) == SQLITE_OK {
-                for item in itemsToIndex {
-                    sqlite3_reset(insertMetaStmt)
-                    sqlite3_bind_text(insertMetaStmt, 1, item.sessionID, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
-                    sqlite3_bind_text(insertMetaStmt, 2, item.transcriptPath, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
-                    sqlite3_bind_double(insertMetaStmt, 3, item.mtime.timeIntervalSince1970)
-                    sqlite3_bind_int64(insertMetaStmt, 4, Int64(item.fileSize))
-                    let stepRes = sqlite3_step(insertMetaStmt)
-                    if stepRes != SQLITE_DONE { logStepFailure(stepRes, context: "insert batch session_index_meta") }
+            guard sqlite3_prepare_v2(db, insertMetaSQL, -1, &insertMetaStmt, nil) == SQLITE_OK,
+                  let insertMetaStmt else {
+                throw CocoaError(.fileWriteUnknown)
+            }
+            defer { sqlite3_finalize(insertMetaStmt) }
+            for item in itemsToIndex {
+                sqlite3_reset(insertMetaStmt)
+                sqlite3_bind_text(insertMetaStmt, 1, item.sessionID, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
+                sqlite3_bind_text(insertMetaStmt, 2, item.transcriptPath, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
+                sqlite3_bind_double(insertMetaStmt, 3, item.mtime.timeIntervalSince1970)
+                sqlite3_bind_int64(insertMetaStmt, 4, Int64(item.fileSize))
+                let stepRes = sqlite3_step(insertMetaStmt)
+                guard stepRes == SQLITE_DONE else {
+                    logStepFailure(stepRes, context: "insert batch session_index_meta")
+                    throw CocoaError(.fileWriteUnknown)
                 }
-                sqlite3_finalize(insertMetaStmt)
             }
         }
+    }
+
+    private static func forEachFTSChunk(_ text: String, _ body: (String) throws -> Void) throws {
+        let chunkLimit = 256 * 1024
+        let overlap = 16 * 1024
+        var chunk = ""
+        var carry = ""
+        for scalar in text.unicodeScalars {
+            if chunk.utf8.count + scalar.utf8.count > chunkLimit {
+                let combined = carry + chunk
+                try body(combined)
+                carry = String(combined.unicodeScalars.suffix(overlap))
+                chunk = ""
+            }
+            chunk.unicodeScalars.append(scalar)
+        }
+        if !chunk.isEmpty || !carry.isEmpty { try body(carry + chunk) }
     }
 
     /// Searches the FTS5 index for sessions matching query tokens, ranked using bm25() with column weights.
@@ -649,10 +693,11 @@ public final class AgentHistoryFTSIndex: @unchecked Sendable {
             .filter { !$0.isEmpty }
         guard !rawTokens.isEmpty else { return [] }
 
-        let ftsQuery = rawTokens.map { token in
+        let tokenQueries = rawTokens.map { token in
             let escaped = token.replacingOccurrences(of: "\"", with: "\"\"")
             return "\"\(escaped)\"*"
-        }.joined(separator: requireAllTokens ? " AND " : " OR ")
+        }
+        let ftsQuery = tokenQueries.joined(separator: " OR ")
 
         // Column weights matching Swift field weights:
         // 0: session_id UNINDEXED = 0.0
@@ -670,12 +715,27 @@ public final class AgentHistoryFTSIndex: @unchecked Sendable {
         let scope = matchingIDs.map { ids in
             " AND session_id IN (" + ids.indices.map { "?\($0 + 3)" }.joined(separator: ",") + ")"
         } ?? ""
+        // Each transcript may occupy several FTS rows. Match all terms at session scope,
+        // because requiring them in one row loses results across a chunk boundary.
+        let tokenStart = 3 + (matchingIDs?.count ?? 0)
+        let allTerms = requireAllTokens ? tokenQueries.indices.map { offset in
+            " AND session_id IN (SELECT session_id FROM session_fts WHERE session_fts MATCH ?\(tokenStart + offset))"
+        }.joined() : ""
         let sql = """
-        SELECT session_id, \(snippetColumn),
-               bm25(session_fts, 0.0, 3.0, 1.0, 1.0, 2.5, 1.5, 1.5, 2.5, 2.5) AS weighted_rank,
-               \(fileColumn), \(toolColumn)
-        FROM session_fts
-        WHERE session_fts MATCH ?1\(scope)
+        WITH matched AS (
+            SELECT session_id, \(snippetColumn) AS snippet,
+                   bm25(session_fts, 0.0, 3.0, 1.0, 1.0, 2.5, 1.5, 1.5, 2.5, 2.5) AS weighted_rank,
+                   \(fileColumn) AS files_edited, \(toolColumn) AS tools_called
+            FROM session_fts
+            WHERE session_fts MATCH ?1\(scope)\(allTerms)
+        ), deduplicated AS (
+            SELECT session_id, snippet, weighted_rank, files_edited, tools_called,
+                   ROW_NUMBER() OVER (PARTITION BY session_id ORDER BY weighted_rank ASC) AS session_row
+            FROM matched
+        )
+        SELECT session_id, snippet, weighted_rank, files_edited, tools_called
+        FROM deduplicated
+        WHERE session_row = 1
         ORDER BY weighted_rank ASC
         LIMIT ?2;
         """
@@ -687,6 +747,11 @@ public final class AgentHistoryFTSIndex: @unchecked Sendable {
         sqlite3_bind_int(stmt, 2, Int32(limit))
         for (offset, id) in (matchingIDs ?? []).enumerated() {
             sqlite3_bind_text(stmt, Int32(offset + 3), id, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
+        }
+        if requireAllTokens {
+            for (offset, token) in tokenQueries.enumerated() {
+                sqlite3_bind_text(stmt, Int32(tokenStart + offset), token, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
+            }
         }
 
         var results: [AgentHistoryFTSMatch] = []
@@ -753,8 +818,10 @@ public final class AgentHistoryFTSIndex: @unchecked Sendable {
             sqlite3_bind_text(stmt, Int32(offset + 2), id, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
         }
         var matches: [AgentHistoryFTSMatch] = []
+        var seenSessionIDs = Set<String>()
         while sqlite3_step(stmt) == SQLITE_ROW {
             guard let id = sqlite3_column_text(stmt, 0).map({ String(cString: $0) }) else { continue }
+            guard seenSessionIDs.insert(id).inserted else { continue }
             matches.append(AgentHistoryFTSMatch(
                 sessionID: id,
                 snippet: sqlite3_column_text(stmt, 1).map { String(cString: $0) } ?? "",
