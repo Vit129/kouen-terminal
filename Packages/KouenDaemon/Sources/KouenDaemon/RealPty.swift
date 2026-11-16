@@ -144,7 +144,7 @@ public final class RealPty: @unchecked Sendable {
     /// number so reattaching clients can request "give me everything since N".
     private struct ScrollbackEntry {
         let sequence: UInt64
-        let data: Data
+        var data: Data
     }
     struct ScrollbackReplaySegment: Sendable, Equatable {
         let sequence: UInt64
@@ -1117,7 +1117,8 @@ public final class RealPty: @unchecked Sendable {
         }
     }
 
-    private func handleOutput(_ data: Data) {
+    @discardableResult
+    func appendScrollback(_ data: Data) -> UInt64 {
         scrollbackLock.lock()
         let sequence = nextSequence
         nextSequence &+= UInt64(data.count)
@@ -1125,6 +1126,7 @@ public final class RealPty: @unchecked Sendable {
         scrollbackBytes += data.count
         while scrollbackBytes > maxScrollbackBytes, scrollbackHead < scrollback.count {
             scrollbackBytes -= scrollback[scrollbackHead].data.count
+            scrollback[scrollbackHead].data = Data()
             scrollbackHead += 1
         }
         // Physically drop the dead prefix in one batched O(n) shift once it's large — bounding
@@ -1134,6 +1136,16 @@ public final class RealPty: @unchecked Sendable {
             scrollbackHead = 0
         }
         scrollbackLock.unlock()
+        return sequence
+    }
+
+    var retainedScrollbackBytesForTesting: Int {
+        scrollbackLock.lock(); defer { scrollbackLock.unlock() }
+        return scrollback.reduce(0) { $0 + $1.data.count }
+    }
+
+    private func handleOutput(_ data: Data) {
+        let sequence = appendScrollback(data)
 
         // Persist the same bytes off the read hot path (debounced inside `ScrollbackFile`), so the
         // history survives a daemon restart. No-op when the surface isn't persisted.

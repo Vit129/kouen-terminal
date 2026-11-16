@@ -29,7 +29,7 @@ public enum ClaudeTranscriptLine {
     /// The user-visible items in one JSONL line. Drops what isn't conversation: `tool_result`
     /// plumbing, `thinking`, `isMeta` lines, and slash-command / system-reminder wrappers.
     public static func items(from line: Data) -> [TranscriptItem] {
-        guard let json = try? JSONSerialization.jsonObject(with: line) as? [String: Any],
+        guard let json = historyJSONObject(line),
               json["isMeta"] as? Bool != true,
               let msg = json["message"] as? [String: Any] else { return [] }
         let lineID = (json["uuid"] as? String) ?? UUID().uuidString
@@ -68,10 +68,10 @@ public enum ClaudeTranscriptLine {
 
     /// Current model, permission mode, and latest usage from raw JSONL lines (last one wins).
     /// Model comes from assistant `message.model`; mode from `permission-mode`; usage from `message.usage`.
-    public static func meta(from lines: [Data]) -> (model: String?, mode: String?, usage: AgentUsage?) {
+    public static func meta<S: Sequence>(from lines: S) -> (model: String?, mode: String?, usage: AgentUsage?) where S.Element == Data {
         var model: String?, mode: String?, usage: AgentUsage?
         for line in lines {
-            guard let json = try? JSONSerialization.jsonObject(with: line) as? [String: Any] else { continue }
+            guard let json = historyJSONObject(line) else { continue }
             if json["type"] as? String == "permission-mode", let m = json["permissionMode"] as? String { mode = m }
             if let msg = json["message"] as? [String: Any] {
                 if msg["role"] as? String == "assistant", let m = msg["model"] as? String, !m.hasPrefix("<") {

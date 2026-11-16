@@ -10,52 +10,28 @@ public struct GitMetadataProvider: MetadataProvider {
     public func refresh(tab: Tab) -> Tab {
         var updated = tab
         let probePath = tab.worktreePath ?? tab.cwd
-        updated.gitBranch = Self.currentBranch(at: probePath)
+        let result = Self.query(at: probePath, arguments: ["--abbrev-ref", "HEAD"])
+        if !result.unavailable { updated.gitBranch = result.value }
         return updated
     }
 
-    private static func currentBranch(at path: String) -> String? {
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/git")
-        process.arguments = ["-C", path, "rev-parse", "--abbrev-ref", "HEAD"]
-        let pipe = Pipe()
-        process.standardOutput = pipe
-        process.standardError = FileHandle.nullDevice
-        do {
-            try process.run()
-            let data = pipe.fileHandleForReading.readDataToEndOfFile()
-            process.waitUntilExit()
-            guard process.terminationStatus == 0 else { return nil }
-            let branch = String(data: data, encoding: .utf8)?
-                .trimmingCharacters(in: .whitespacesAndNewlines)
-            return branch?.isEmpty == false ? branch : nil
-        } catch {
-            return nil
-        }
+    /// Resolves the root without allowing an unresponsive repository to block indefinitely.
+    public static func topLevel(at path: String) -> String? {
+        query(at: path, arguments: ["--show-toplevel"]).value
     }
 
-    /// The repo root for `path` (`git rev-parse --show-toplevel`), or `nil` outside a git repo.
-    /// Used by `kouenProjectsList` to dedupe open tabs down to the repos they actually belong to
-    /// — a tab's `cwd` may be a subdirectory or a worktree, not the root itself.
-    public static func topLevel(at path: String) -> String? {
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/git")
-        process.arguments = ["-C", path, "rev-parse", "--show-toplevel"]
-        let pipe = Pipe()
-        process.standardOutput = pipe
-        process.standardError = FileHandle.nullDevice
-        do {
-            try process.run()
-            let data = pipe.fileHandleForReading.readDataToEndOfFile()
-            process.waitUntilExit()
-            guard process.terminationStatus == 0 else { return nil }
-            let root = String(data: data, encoding: .utf8)?
-                .trimmingCharacters(in: .whitespacesAndNewlines)
-            return root?.isEmpty == false ? root : nil
-        } catch {
-            return nil
-        }
+    private static func query(at path: String, arguments: [String]) -> (value: String?, unavailable: Bool) {
+        let result = ProcessRunner.run(
+            executable: "/usr/bin/env",
+            arguments: ["GIT_OPTIONAL_LOCKS=0", "/usr/bin/git", "-C", path, "rev-parse"] + arguments,
+            timeout: 3
+        )
+        let unavailable = result.isTimedOut || result.stdoutWasTruncated || result.stderrWasTruncated || result.exitCode == -1
+        guard result.isSuccess else { return (nil, unavailable) }
+        let value = result.stdout.trimmingCharacters(in: .whitespacesAndNewlines)
+        return (value.isEmpty ? nil : value, false)
     }
+
 }
 
 public struct CwdMetadataProvider: MetadataProvider {

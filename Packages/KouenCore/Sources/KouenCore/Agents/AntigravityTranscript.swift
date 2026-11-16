@@ -14,7 +14,7 @@ public enum AntigravityTranscriptLine {
     /// Maps `USER_INPUT` to user items and `PLANNER_RESPONSE` to assistant and tool items.
     /// Skips `SYSTEM_MESSAGE`, `CHECKPOINT`, `GENERIC` (raw tool results), and empty errors.
     public static func items(from line: Data) -> [TranscriptItem] {
-        guard let json = try? JSONSerialization.jsonObject(with: line) as? [String: Any] else { return [] }
+        guard let json = historyJSONObject(line) else { return [] }
         let type = json["type"] as? String ?? ""
         let stepIndex = json["step_index"] as? Int ?? 0
 
@@ -69,10 +69,10 @@ public enum AntigravityTranscriptLine {
     }
 
     /// Extracts model name and token usage from Antigravity steps.
-    public static func meta(from lines: [Data]) -> (model: String?, mode: String?, usage: AgentUsage?) {
+    public static func meta<S: Sequence>(from lines: S) -> (model: String?, mode: String?, usage: AgentUsage?) where S.Element == Data {
         var model: String?, mode: String?, usage: AgentUsage?
         for line in lines {
-            guard let json = try? JSONSerialization.jsonObject(with: line) as? [String: Any] else { continue }
+            guard let json = historyJSONObject(line) else { continue }
             let content = json["content"] as? String ?? ""
             let prefixes = ["Model Selection` from None to ", "Model Selection` to "]
             for prefix in prefixes {

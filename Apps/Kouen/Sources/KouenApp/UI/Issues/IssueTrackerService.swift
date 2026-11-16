@@ -240,7 +240,7 @@ public final class IssueTrackerService: Sendable {
     /// agent-memory/knowledge/patterns/process-pipe-deadlock.md.
     private func runProcess(_ executablePath: String, args: [String]) async throws -> (stdout: String, stderr: String, exitCode: Int32) {
         let res = await ProcessRunner.runAsync(executable: executablePath, arguments: args, timeout: nil)
-        return (res.stdout.trimmingCharacters(in: .whitespacesAndNewlines), res.stderr.trimmingCharacters(in: .whitespacesAndNewlines), res.exitCode)
+        return (res.stdout.trimmingCharacters(in: .whitespacesAndNewlines), res.stderr.trimmingCharacters(in: .whitespacesAndNewlines), res.stdoutWasTruncated ? -1 : res.exitCode) // truncated JSON must not be parsed
     }
 
     // MARK: - Azure DevOps REST

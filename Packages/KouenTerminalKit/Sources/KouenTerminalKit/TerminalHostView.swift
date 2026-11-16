@@ -836,37 +836,134 @@ public final class TerminalHostView: NSView {
 
     final class OutputCoalescer: @unchecked Sendable {
         private let lock = NSLock()
-        private var pendingBatch = Data()
+        private let maxMemoryBytes: Int
+        private var pendingChunks: [Data?] = []
+        private var headOffset = 0
+        private var chunkOffset = 0
+        private var pendingMemoryBytes = 0
+        private var overflowSpool: OutputDiskSpool?
         private var isScheduled = false
 
-        func append(_ data: Data, schedule: () -> Void) {
+        init(maxMemoryBytes: Int = 4 * 1024 * 1024) {
+            self.maxMemoryBytes = maxMemoryBytes
+        }
+
+        func append(_ data: Data, schedule: () -> Void) throws {
+            guard !data.isEmpty else { return }
             lock.lock()
-            pendingBatch.append(data)
+            defer { lock.unlock() }
+            if let overflowSpool {
+                try overflowSpool.append(data)
+            } else if pendingMemoryBytes + data.count <= maxMemoryBytes {
+                pendingChunks.append(data)
+                pendingMemoryBytes += data.count
+            } else {
+                let spool = try OutputDiskSpool()
+                overflowSpool = spool
+                try spool.append(data)
+            }
             if !isScheduled {
                 isScheduled = true
-                lock.unlock()
                 schedule()
-            } else {
-                lock.unlock()
             }
         }
 
         /// Hands out at most `maxBytes` so one huge flood is fed to the emulator in slices
         /// (main stays responsive between them) instead of one multi-MB `receive`. Order is kept;
         /// while `hasMore`, `isScheduled` stays set and the caller reschedules the next slice.
-        func drain(maxBytes: Int = 256 * 1024) -> (data: Data, hasMore: Bool) {
+        func drain(maxBytes: Int = 256 * 1024) throws -> (data: Data, hasMore: Bool) {
             lock.lock()
             defer { lock.unlock() }
-            let batch: Data
-            if pendingBatch.count > maxBytes {
-                batch = pendingBatch.prefix(maxBytes)
-                pendingBatch = Data(pendingBatch.dropFirst(maxBytes))
-            } else {
-                batch = pendingBatch
-                pendingBatch = Data()
+            var batch = Data()
+            batch.reserveCapacity(maxBytes)
+            while batch.count < maxBytes, headOffset < pendingChunks.count {
+                guard let chunk = pendingChunks[headOffset] else { preconditionFailure("Missing queued chunk") }
+                let count = min(maxBytes - batch.count, chunk.count - chunkOffset)
+                batch.append(chunk[chunk.index(chunk.startIndex, offsetBy: chunkOffset)..<chunk.index(chunk.startIndex, offsetBy: chunkOffset + count)])
+                pendingMemoryBytes -= count
+                chunkOffset += count
+                if chunkOffset == chunk.count {
+                    pendingChunks[headOffset] = nil
+                    headOffset += 1
+                    chunkOffset = 0
+                }
+            }
+            if headOffset == pendingChunks.count {
+                pendingChunks.removeAll(keepingCapacity: true)
+                headOffset = 0
+            } else if headOffset >= 64 && headOffset * 2 >= pendingChunks.count {
+                pendingChunks.removeFirst(headOffset)
+                headOffset = 0
+            }
+            if batch.count < maxBytes, let overflowSpool {
+                batch.append(try overflowSpool.read(maxBytes: maxBytes - batch.count))
+                if overflowSpool.isDrained {
+                    self.overflowSpool = nil
+                }
+            }
+            let hasMore = pendingMemoryBytes > 0 || self.overflowSpool?.isDrained == false
+            if !hasMore {
                 isScheduled = false
             }
-            return (batch, isScheduled)
+            return (batch, hasMore)
+        }
+
+        var retainedChunkSlots: Int {
+            lock.lock(); defer { lock.unlock() }
+            return pendingChunks.count
+        }
+
+        var bufferedMemoryBytes: Int {
+            lock.lock(); defer { lock.unlock() }
+            return pendingMemoryBytes
+        }
+
+        var bufferedSpoolBytes: Int {
+            lock.lock(); defer { lock.unlock() }
+            return overflowSpool?.remainingBytes ?? 0
+        }
+    }
+
+    private final class OutputDiskSpool {
+        private let url: URL
+        private let writer: FileHandle
+        private let reader: FileHandle
+        private(set) var writtenBytes = 0
+        private(set) var readBytes = 0
+        var isDrained: Bool { readBytes == writtenBytes }
+        var remainingBytes: Int { writtenBytes - readBytes }
+
+        init() throws {
+            url = FileManager.default.temporaryDirectory.appendingPathComponent("kouen-output-\(UUID().uuidString).spool")
+            guard FileManager.default.createFile(atPath: url.path, contents: nil, attributes: [.posixPermissions: 0o600]) else {
+                throw CocoaError(.fileWriteUnknown)
+            }
+            do {
+                writer = try FileHandle(forWritingTo: url)
+                reader = try FileHandle(forReadingFrom: url)
+            } catch {
+                try? FileManager.default.removeItem(at: url)
+                throw error
+            }
+        }
+
+        func append(_ data: Data) throws {
+            try writer.write(contentsOf: data)
+            writtenBytes += data.count
+        }
+
+        func read(maxBytes: Int) throws -> Data {
+            guard maxBytes > 0, remainingBytes > 0 else { return Data() }
+            try reader.seek(toOffset: UInt64(readBytes))
+            let data = try reader.read(upToCount: min(maxBytes, remainingBytes)) ?? Data()
+            readBytes += data.count
+            return data
+        }
+
+        deinit {
+            try? writer.close()
+            try? reader.close()
+            try? FileManager.default.removeItem(at: url)
         }
     }
 
@@ -880,9 +977,16 @@ public final class TerminalHostView: NSView {
     private func makeOutputDataHandler() -> @Sendable (Data, UInt64) -> Void {
         let coalescer = self.outputCoalescer
         return { [weak self] data, _ in
-            coalescer.append(data) {
+            do {
+                try coalescer.append(data) {
+                    DispatchQueue.main.async { [weak self] in
+                        MainActor.assumeIsolated { self?.feedCoalescedSlice() }
+                    }
+                }
+            } catch {
+                let message = error.localizedDescription
                 DispatchQueue.main.async { [weak self] in
-                    MainActor.assumeIsolated { self?.feedCoalescedSlice() }
+                    MainActor.assumeIsolated { self?.handleOutputBufferFailure(message) }
                 }
             }
         }
@@ -890,13 +994,29 @@ public final class TerminalHostView: NSView {
 
     /// Feeds one capped slice, then re-queues itself (FIFO behind other main work) if more is pending.
     private func feedCoalescedSlice() {
-        let (batch, hasMore) = outputCoalescer.drain()
+        let batch: Data
+        let hasMore: Bool
+        do {
+            (batch, hasMore) = try outputCoalescer.drain()
+        } catch {
+            handleOutputBufferFailure(error.localizedDescription)
+            return
+        }
         if !batch.isEmpty { nativeView.receive(batch) }
         if hasMore {
             DispatchQueue.main.async { [weak self] in
                 MainActor.assumeIsolated { self?.feedCoalescedSlice() }
             }
         }
+    }
+
+    private func handleOutputBufferFailure(_ message: String) {
+        fputs("Kouen: terminal output spool failed for \(surfaceID.uuidString): \(message)\n", kouenStderr)
+        intentionallyDetached = true
+        outputSubscription?.cancel()
+        outputSubscription = nil
+        io.attach(subscription: nil)
+        showDetachedOverlay()
     }
 
     /// Output-stream end handler, shared by the initial connect and the off-main reconnect. If we

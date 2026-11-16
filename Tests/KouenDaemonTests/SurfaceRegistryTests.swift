@@ -935,4 +935,19 @@ final class SurfaceRegistryTests: XCTestCase {
         // union — the property that protects a failed-to-spawn surface (in layout, not in sessions).
         XCTAssertTrue(registry.scrollbackLiveSurfaceKeys().contains(referencedSurface.uuidString))
     }
+    func test_TS_2302_BE_UT_PromptScanRunsOncePerQuietOutputGeneration() {
+        var monitor = SurfaceRegistry.SurfaceMonitor()
+        let now = Date(timeIntervalSince1970: 100)
+        monitor.lastOutput = now
+        monitor.trailingOutput = Data("ordinary output".utf8)
+        monitor.outputGeneration = 1
+        XCTAssertFalse(monitor.claimPromptScan(now: now.addingTimeInterval(0.3)))
+        XCTAssertTrue(monitor.claimPromptScan(now: now.addingTimeInterval(0.5)))
+        XCTAssertFalse(monitor.claimPromptScan(now: now.addingTimeInterval(1)))
+        monitor.outputGeneration += 1
+        monitor.lastOutput = now.addingTimeInterval(1)
+        XCTAssertFalse(monitor.claimPromptScan(now: now.addingTimeInterval(1.3)))
+        XCTAssertTrue(monitor.claimPromptScan(now: now.addingTimeInterval(1.5)))
+    }
+
 }

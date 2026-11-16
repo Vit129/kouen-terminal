@@ -7,11 +7,13 @@ import CoreServices
 @MainActor
 final class ProjectGroupWatcher {
     private final class StreamBox {
+        let rootPath: String
         private var streamRef: FSEventStreamRef?
         private var contextPointer: UnsafeMutableRawPointer?
         let queue: DispatchQueue
 
-        init(streamRef: FSEventStreamRef, contextPointer: UnsafeMutableRawPointer, queue: DispatchQueue) {
+        init(rootPath: String, streamRef: FSEventStreamRef, contextPointer: UnsafeMutableRawPointer, queue: DispatchQueue) {
+            self.rootPath = rootPath
             self.streamRef = streamRef
             self.contextPointer = contextPointer
             self.queue = queue
@@ -81,10 +83,18 @@ final class ProjectGroupWatcher {
 
         // Start new or updated streams
         for item in folders {
+            if let existing = streams[item.id], Self.shouldReplaceStream(existingRootPath: existing.rootPath, newRootPath: item.folder) {
+                existing.stop()
+                streams.removeValue(forKey: item.id)
+            }
             if streams[item.id] == nil {
                 startStream(categoryID: item.id, rootPath: item.folder, onChange: onChange)
             }
         }
+    }
+
+    static func shouldReplaceStream(existingRootPath: String, newRootPath: String) -> Bool {
+        existingRootPath != newRootPath
     }
 
     private func startStream(categoryID: String, rootPath: String, onChange: @MainActor @escaping (String) -> Void) {
@@ -144,7 +154,7 @@ final class ProjectGroupWatcher {
             return
         }
 
-        let box = StreamBox(streamRef: stream, contextPointer: contextPointer, queue: queue)
+        let box = StreamBox(rootPath: rootPath, streamRef: stream, contextPointer: contextPointer, queue: queue)
         FSEventStreamSetDispatchQueue(stream, queue)
         FSEventStreamStart(stream)
         streams[categoryID] = box

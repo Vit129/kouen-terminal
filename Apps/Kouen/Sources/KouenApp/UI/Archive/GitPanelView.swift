@@ -37,6 +37,8 @@ final class GitPanelView: NSView {
     private nonisolated(unsafe) var watchStream: FSEventStreamRef?
     private nonisolated(unsafe) var contextPointer: UnsafeMutableRawPointer?
     private nonisolated(unsafe) var watchDebounce: DispatchWorkItem?
+    /// Callback and deferred release share this serial queue to preserve context lifetime.
+    private let watchQueue = DispatchQueue(label: "com.vit129.kouen.gitpanel.fsevents", qos: .utility)
     /// Set true while our own git operations run to suppress FSEvent self-triggering.
     private nonisolated(unsafe) var suppressingFSEvents = false
 
@@ -46,7 +48,13 @@ final class GitPanelView: NSView {
             FSEventStreamInvalidate(stream)
             FSEventStreamRelease(stream)
         }
-        if let ptr = contextPointer { Unmanaged<WatcherContext>.fromOpaque(ptr).release() }
+        if let ptr = contextPointer {
+            let bitPattern = UInt(bitPattern: ptr)
+            watchQueue.async {
+                let pointer = UnsafeMutableRawPointer(bitPattern: bitPattern)!
+                Unmanaged<WatcherContext>.fromOpaque(pointer).release()
+            }
+        }
         watchDebounce?.cancel()
     }
 
@@ -207,8 +215,7 @@ final class GitPanelView: NSView {
             return
         }
 
-        let queue = DispatchQueue.global(qos: .utility)
-        FSEventStreamSetDispatchQueue(stream, queue)
+        FSEventStreamSetDispatchQueue(stream, watchQueue)
         FSEventStreamStart(stream)
         watchStream = stream
     }
@@ -221,8 +228,12 @@ final class GitPanelView: NSView {
             watchStream = nil
         }
         if let ptr = contextPointer {
-            Unmanaged<WatcherContext>.fromOpaque(ptr).release()
             contextPointer = nil
+            let bitPattern = UInt(bitPattern: ptr)
+            watchQueue.async {
+                let pointer = UnsafeMutableRawPointer(bitPattern: bitPattern)!
+                Unmanaged<WatcherContext>.fromOpaque(pointer).release()
+            }
         }
         watchDebounce?.cancel()
         watchDebounce = nil
