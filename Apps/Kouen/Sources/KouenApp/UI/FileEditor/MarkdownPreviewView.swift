@@ -10,6 +10,7 @@ final class MarkdownPreviewView: NSView, WKNavigationDelegate {
     private let imageHandler = MarkdownImageSchemeHandler()
     private var webView: WKWebView?
     private var isWebViewReady = false
+    private var webViewWasReleased = false
     private var pendingMarkdown: String?
     private var currentFileURL: URL?
     private var currentMarkdown: String = ""
@@ -183,6 +184,7 @@ final class MarkdownPreviewView: NSView, WKNavigationDelegate {
         let effectiveMarkdown = Self.wrapContentIfNeeded(markdown, fileURL: fileURL)
         currentMarkdown = effectiveMarkdown
         currentFileURL = fileURL
+        webViewWasReleased = false
         isWebViewReady = false
         pendingMarkdown = nil
 
@@ -197,7 +199,24 @@ final class MarkdownPreviewView: NSView, WKNavigationDelegate {
         wv.loadHTMLString(html, baseURL: base.url)
     }
 
+    /// Drops the WKWebView (its web-content process) while a non-markdown file or a message is
+    /// showing; the next `update`/`load` recreates it.
+    func releaseWebView() {
+        guard let wv = webView else { return }
+        wv.stopLoading()
+        wv.navigationDelegate = nil
+        wv.removeFromSuperview()
+        webView = nil
+        isWebViewReady = false
+        pendingMarkdown = nil
+        webViewWasReleased = true
+    }
+
     func update(markdown: String) {
+        if webViewWasReleased {
+            load(markdown: markdown, fileURL: currentFileURL)
+            return
+        }
         let effectiveMarkdown = Self.wrapContentIfNeeded(markdown, fileURL: currentFileURL)
         currentMarkdown = effectiveMarkdown
         guard isWebViewReady, let webView else {

@@ -31,8 +31,14 @@ final class SyntaxTextView: NSView {
     /// `isDirty` diffs against this, not against "has any keystroke happened" — editing
     /// text and then undoing back to this exact content must report clean again, so a
     /// close-tab confirmation doesn't fire over a no-op edit.
-    private var savedContent: String = ""
-    var isDirty: Bool { textView.string != savedContent }
+    private var savedContent: String = "" { didSet { savedUTF16Length = savedContent.utf16.count } }
+    private var savedUTF16Length = 0
+    /// A length mismatch proves the buffer changed without bridging and comparing the whole
+    /// string (this is read on every keystroke); only equal-length buffers need the full compare.
+    var isDirty: Bool {
+        if let length = textView.textStorage?.length, length != savedUTF16Length { return true }
+        return textView.string != savedContent
+    }
     /// Fired on every keystroke so a host (tab bar `*` marker, etc.) can re-read `isDirty`.
     var onDirtyChange: (() -> Void)?
 
@@ -669,6 +675,18 @@ private final class SyntaxLineNumberGutterView: NSView {
 enum SyntaxHighlighter {
     static let maxHighlightLength = 300_000
 
+    private static var regexCache: [String: NSRegularExpression] = [:]
+
+    /// Compiling these patterns on every highlight pass (every LSP diagnostics push) is wasted
+    /// work; patterns come from a small fixed set per language, so cache by pattern + options.
+    private static func cachedRegex(_ pattern: String, options: NSRegularExpression.Options = []) -> NSRegularExpression? {
+        let key = "\(options.rawValue):\(pattern)"
+        if let hit = regexCache[key] { return hit }
+        guard let regex = try? NSRegularExpression(pattern: pattern, options: options) else { return nil }
+        regexCache[key] = regex
+        return regex
+    }
+
     static func highlight(_ text: String, fileExtension ext: String) -> NSAttributedString {
         let font = NSFont.monospacedSystemFont(ofSize: 12, weight: .regular)
         let attributed = NSMutableAttributedString(string: text, attributes: [
@@ -682,12 +700,12 @@ enum SyntaxHighlighter {
         let comments = commentPattern(for: ext)
         let strings = stringPattern(for: ext)
 
-        if let comments, let regex = try? NSRegularExpression(pattern: comments, options: .anchorsMatchLines) {
+        if let comments, let regex = cachedRegex(comments, options: .anchorsMatchLines) {
             regex.matches(in: text, range: fullRange).forEach {
                 attributed.addAttribute(.foregroundColor, value: NSColor.systemGreen.withAlphaComponent(0.8), range: $0.range)
             }
         }
-        if let regex = try? NSRegularExpression(pattern: strings, options: [.anchorsMatchLines]) {
+        if let regex = cachedRegex(strings, options: [.anchorsMatchLines]) {
             regex.matches(in: text, range: fullRange).forEach {
                 attributed.addAttribute(.foregroundColor, value: NSColor.systemOrange, range: $0.range)
             }
@@ -695,40 +713,40 @@ enum SyntaxHighlighter {
         let keywords = keywords(for: ext)
         if !keywords.isEmpty {
             let pattern = "\\b(" + keywords.map(NSRegularExpression.escapedPattern(for:)).joined(separator: "|") + ")\\b"
-            if let regex = try? NSRegularExpression(pattern: pattern) {
+            if let regex = cachedRegex(pattern) {
                 regex.matches(in: text, range: fullRange).forEach {
                     attributed.addAttribute(.foregroundColor, value: NSColor.systemBlue, range: $0.range)
                 }
             }
         }
-        if let regex = try? NSRegularExpression(pattern: #"\b\d+(?:\.\d+)?\b"#) {
+        if let regex = cachedRegex(#"\b\d+(?:\.\d+)?\b"#) {
             regex.matches(in: text, range: fullRange).forEach {
                 attributed.addAttribute(.foregroundColor, value: NSColor.systemCyan, range: $0.range)
             }
         }
-        if ["md", "markdown"].contains(ext), let regex = try? NSRegularExpression(pattern: #"^#{1,6}\s+.*$|`[^`]+`|\*\*[^*]+\*\*"#, options: .anchorsMatchLines) {
+        if ["md", "markdown"].contains(ext), let regex = cachedRegex(#"^#{1,6}\s+.*$|`[^`]+`|\*\*[^*]+\*\*"#, options: .anchorsMatchLines) {
             regex.matches(in: text, range: fullRange).forEach {
                 attributed.addAttribute(.foregroundColor, value: KouenDesign.chrome.accent, range: $0.range)
             }
         }
         // Diff/patch: color +lines green, -lines red, @@hunk headers cyan, diff headers bold
         if ["diff", "patch"].contains(ext) {
-            if let regex = try? NSRegularExpression(pattern: #"^\+(?!\+\+).*$"#, options: .anchorsMatchLines) {
+            if let regex = cachedRegex(#"^\+(?!\+\+).*$"#, options: .anchorsMatchLines) {
                 regex.matches(in: text, range: fullRange).forEach {
                     attributed.addAttribute(.foregroundColor, value: NSColor.systemGreen, range: $0.range)
                 }
             }
-            if let regex = try? NSRegularExpression(pattern: #"^-(?!--).*$"#, options: .anchorsMatchLines) {
+            if let regex = cachedRegex(#"^-(?!--).*$"#, options: .anchorsMatchLines) {
                 regex.matches(in: text, range: fullRange).forEach {
                     attributed.addAttribute(.foregroundColor, value: NSColor.systemRed, range: $0.range)
                 }
             }
-            if let regex = try? NSRegularExpression(pattern: #"^@@.*@@.*$"#, options: .anchorsMatchLines) {
+            if let regex = cachedRegex(#"^@@.*@@.*$"#, options: .anchorsMatchLines) {
                 regex.matches(in: text, range: fullRange).forEach {
                     attributed.addAttribute(.foregroundColor, value: NSColor.systemCyan, range: $0.range)
                 }
             }
-            if let regex = try? NSRegularExpression(pattern: #"^(diff --git|---|\+\+\+|index ).*$"#, options: .anchorsMatchLines) {
+            if let regex = cachedRegex(#"^(diff --git|---|\+\+\+|index ).*$"#, options: .anchorsMatchLines) {
                 regex.matches(in: text, range: fullRange).forEach {
                     attributed.addAttributes([.foregroundColor: NSColor.white, .font: NSFont.monospacedSystemFont(ofSize: 12, weight: .bold)], range: $0.range)
                 }

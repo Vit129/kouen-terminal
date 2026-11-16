@@ -46,6 +46,8 @@ final class FileEditorView: NSView {
     func discardChanges() { syntaxView.discardChanges() }
     private let fileWatcher = FileChangeWatcher()
     private let symbolIndex = WorkspaceSymbolIndex()
+    /// A file reload (watcher, save) must not re-crawl the whole workspace when the root is unchanged.
+    private var lastSymbolScanRoot: String?
 
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
@@ -218,6 +220,7 @@ final class FileEditorView: NSView {
         isMarkdownEditMode = false
         modeToggleButton.isHidden = true
         markdownPreviewView.isHidden = true
+        markdownPreviewView.releaseWebView()
         showText(contents, fileExtension: ext, resetScroll: !isReloadingSamePath)
     }
 
@@ -423,6 +426,7 @@ final class FileEditorView: NSView {
     private func showText(_ text: String, fileExtension ext: String, resetScroll: Bool) {
         messageLabel.isHidden = true
         syntaxView.isHidden = false
+        if !quickLookContainer.isHidden { closeQuickLook() }
         quickLookContainer.isHidden = true
         markdownPreviewView.isHidden = true
 
@@ -454,7 +458,10 @@ final class FileEditorView: NSView {
             focusedSurfaceID: coordinator.activeSurfaceID,
             currentFilePath: filePath
         )?.cwd ?? fileDir
-        symbolIndex.scan(root: root)
+        if root != lastSymbolScanRoot {
+            lastSymbolScanRoot = root
+            symbolIndex.scan(root: root)
+        }
         syntaxView.symbolIndex = symbolIndex
         lspSession.open(url: URL(fileURLWithPath: filePath), text: text, fileExtension: ext)
     }
@@ -463,12 +470,24 @@ final class FileEditorView: NSView {
     func teardown() {
         lspSession.close()
         fileWatcher.stop()
+        closeQuickLook()
+        markdownPreviewView.releaseWebView()
+    }
+
+    /// QLPreviewView keeps a QuickLook XPC session alive until `close()` is called.
+    private func closeQuickLook() {
+        for case let preview as QLPreviewView in quickLookContainer.subviews {
+            preview.close()
+            preview.removeFromSuperview()
+        }
     }
 
     private func showMessage(_ message: String) {
         lspSession.close()
         syntaxView.isHidden = true
         markdownPreviewView.isHidden = true
+        markdownPreviewView.releaseWebView()
+        closeQuickLook()
         modeToggleButton.isHidden = true
         quickLookContainer.isHidden = true
         messageLabel.isHidden = false
@@ -479,6 +498,7 @@ final class FileEditorView: NSView {
         lspSession.close()
         syntaxView.isHidden = true
         markdownPreviewView.isHidden = true
+        markdownPreviewView.releaseWebView()
         modeToggleButton.isHidden = true
         messageLabel.isHidden = true
         quickLookContainer.isHidden = false
