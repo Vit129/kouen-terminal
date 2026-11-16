@@ -1021,6 +1021,7 @@ extension CommandPaletteController {
             }
         }()
         let res = ProcessRunner.run(executable: exec, arguments: args, in: root, timeout: 15)
+        guard !res.stdoutWasTruncated, !res.stderrWasTruncated else { return [] }
         if res.exitCode == 1 { return [] }
         guard res.exitCode == 0 || res.exitCode == 2 || res.isTimedOut else { return [] }
         let output = res.stdout

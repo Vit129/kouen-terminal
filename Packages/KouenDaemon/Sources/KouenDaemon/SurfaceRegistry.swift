@@ -53,13 +53,22 @@ public final class SurfaceRegistry: @unchecked Sendable {
     /// Cheap per-surface output state, updated on the PTY read thread and drained by
     /// `processMonitors` on a timer. Kept off `lock` (its own tiny lock) so the hot output
     /// path never contends with layout mutations.
-    private struct SurfaceMonitor {
+    struct SurfaceMonitor {
+        var outputGeneration: UInt64 = 0
+        var scannedGeneration: UInt64 = 0
         var sawOutput = false
         var sawBell = false
         var lastOutput = Date()
         /// OSC-aware bell-scan state, carried across PTY chunks (a sequence can split over reads).
         var bellScan: SurfaceRegistry.BellScanState = .normal
         var trailingOutput: Data = Data()
+
+        mutating func claimPromptScan(now: Date) -> Bool {
+            guard now.timeIntervalSince(lastOutput) >= 0.4, !trailingOutput.isEmpty,
+                  outputGeneration != scannedGeneration else { return false }
+            scannedGeneration = outputGeneration
+            return true
+        }
     }
 
     /// State for the lightweight bell scan in `noteSurfaceOutput`. A BEL (0x07) is a real terminal
@@ -213,6 +222,7 @@ public final class SurfaceRegistry: @unchecked Sendable {
         monitorLock.lock()
         var m = monitors[surfaceKey] ?? SurfaceMonitor()
         m.sawOutput = true
+        m.outputGeneration &+= 1
         m.lastOutput = Date()
         // Parser-aware bell: a raw `data.contains(0x07)` mistakes the OSC-terminator BEL that shell
         // integration emits on every prompt (OSC 133) for a real terminal bell. The scan threads
@@ -253,14 +263,22 @@ public final class SurfaceRegistry: @unchecked Sendable {
     func processMonitors() {
         monitorLock.lock()
         let now = Date()
-        var drained: [String: (sawOutput: Bool, sawBell: Bool, idle: TimeInterval, trailing: Data)] = [:]
-        for (key, m) in monitors {
-            drained[key] = (m.sawOutput, m.sawBell, now.timeIntervalSince(m.lastOutput), m.trailingOutput)
-            monitors[key]?.sawOutput = false
-            monitors[key]?.sawBell = false
+        var drained: [String: (sawOutput: Bool, sawBell: Bool, idle: TimeInterval, generation: UInt64, scan: Bool, trailing: Data)] = [:]
+        for (key, var m) in monitors {
+            let scan = m.claimPromptScan(now: now)
+            drained[key] = (m.sawOutput, m.sawBell, now.timeIntervalSince(m.lastOutput), m.outputGeneration, scan, m.trailingOutput)
+            m.sawOutput = false
+            m.sawBell = false
+            monitors[key] = m
         }
         monitorLock.unlock()
         guard !drained.isEmpty else { return }
+
+        // Prompt decoding and regular expressions do not need the registry lock.
+        let prompts = drained.mapValues { state -> AgentAttentionDetector.AttentionPrompt? in
+            guard state.scan, let text = String(data: state.trailing, encoding: .utf8) else { return nil }
+            return AgentAttentionDetector.detectPrompt(in: text)
+        }
 
         lock.lock()
         defer { lock.unlock() }
@@ -287,16 +305,16 @@ public final class SurfaceRegistry: @unchecked Sendable {
                 .first(where: { $0.id == match.workspaceID })?
                 .sessions.flatMap(\.tabs)
                 .first(where: { $0.id == match.tabID })
-            if st.idle >= 0.4, !st.trailing.isEmpty,
-               let text = String(data: st.trailing, encoding: .utf8),
-               let prompt = AgentAttentionDetector.detectPrompt(in: text) {
+            monitorLock.lock()
+            let generationMatches = monitors[key]?.outputGeneration == st.generation
+            let prompt = generationMatches ? (prompts[key] ?? nil) : nil
+            if prompt != nil, tab?.status != .waiting {
+                monitors[key]?.trailingOutput = Data()
+            }
+            monitorLock.unlock()
+            if let prompt {
                 if tab?.status != .waiting {
                     markWaiting(surfaceKey: key, text: prompt.summary)
-                    // Reset the trailing buffer so it holds only what's happened SINCE this prompt
-                    // was flagged — otherwise the matched prompt text lingers in the tail and the
-                    // self-clear branch below would see it as "still prompting" forever, even once
-                    // the agent has moved on and produced fresh, unrelated output.
-                    resetTrailingOutputLocked(surfaceKey: key)
                     changed = true
                     let notif = AgentNotification(
                         surfaceID: UUID(uuidString: key),
@@ -307,7 +325,7 @@ public final class SurfaceRegistry: @unchecked Sendable {
                     NotificationBus.shared.post(notif)
                     fired.append((.notificationPosted, key))
                 }
-            } else if tab?.status == .waiting, st.sawOutput {
+            } else if generationMatches, tab?.status == .waiting, st.sawOutput {
                 // P46 Pillar 6 gap 1: the agent produced fresh output since the last tick and no
                 // prompt signature remains at the tail — it moved on by itself (no explicit "done"
                 // signal, e.g. no OSC 9;4) rather than the user answering it. Without this, a tab

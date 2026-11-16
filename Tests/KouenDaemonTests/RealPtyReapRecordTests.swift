@@ -108,4 +108,11 @@ final class RealPtyReapRecordTests: XCTestCase {
         XCTAssertEqual(evictedAnswer, neverRecordedAnswer,
                        "an evicted generation is indistinguishable from one never recorded")
     }
+    func test_TS_2301_BE_UT_EvictedScrollbackReleasesPayloadImmediately() {
+        let pty = RealPty(forTesting: ())
+        for _ in 0..<1000 { pty.appendScrollback(Data(repeating: 42, count: 1024)) }
+        XCTAssertEqual(pty.historyBytes, 0)
+        XCTAssertEqual(pty.retainedScrollbackBytesForTesting, 0)
+    }
+
 }

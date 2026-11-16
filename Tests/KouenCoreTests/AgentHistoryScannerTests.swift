@@ -46,6 +46,28 @@ final class AgentHistoryScannerTests: XCTestCase {
         XCTAssertEqual(calls, 1)
     }
 
+    func test_TS_2295_BE_UT_StreamingSequenceRepeatsRecordsAcrossChunkBoundaries() throws {
+        let path = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: path) }
+        let long = String(repeating: "x", count: 140_000)
+        try ("  first  \n\n" + long + "\n last\r\n").write(to: path, atomically: true, encoding: .utf8)
+        let lines = try XCTUnwrap(AgentHistoryJSONLSequence(url: path))
+        let expected = ["first", long, "last"]
+        XCTAssertEqual(lines.count, 3)
+        XCTAssertEqual(lines.map { String(decoding: $0, as: UTF8.self) }, expected)
+        XCTAssertEqual(lines.map { String(decoding: $0, as: UTF8.self) }, expected)
+        XCTAssertTrue(lines.isValid)
+    }
+
+    func test_TS_2294_BE_UT_StreamingReaderRejectsOversizedTerminatedRecord() throws {
+        let path = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: path) }
+        var fixture = Data(repeating: 65, count: AgentHistoryScanner.maxJSONLRecordBytes + 1)
+        fixture.append(10)
+        try fixture.write(to: path)
+        XCTAssertThrowsError(try AgentHistoryScanner.forEachJSONLLine(from: path) { _, _ in })
+    }
+
     func testScanAllReturnsRecords() async {
         let tempDBPath = FileManager.default.temporaryDirectory
             .appendingPathComponent("test_agent_history_\(UUID().uuidString).sqlite").path
@@ -344,6 +366,22 @@ final class AgentHistoryScannerTests: XCTestCase {
         XCTAssertEqual(hits["long-session-42"]?.filesEdited, "IndexTuner.swift")
         XCTAssertEqual(hits["long-session-42"]?.toolsCalled, "Edit Read")
     }
+
+    #if canImport(SQLite3)
+    func test_TS_2297_BE_IT_DeleteFailureRollsBackFTSRows() throws {
+        let path = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".sqlite")
+        defer { try? FileManager.default.removeItem(at: path) }
+        let index = AgentHistoryFTSIndex(dbPath: path.path)
+        index.indexSessionsBatch([.init(sessionID: "fixture", transcriptPath: "/fixture", mtime: Date(), fileSize: 1,
+            title: "persisttoken", firstPrompt: "", fullTranscript: "persisttoken", repoName: "", agentName: "")])
+        var db: OpaquePointer?
+        XCTAssertEqual(sqlite3_open(path.path, &db), SQLITE_OK)
+        defer { sqlite3_close(db) }
+        XCTAssertEqual(sqlite3_exec(db, "CREATE TRIGGER reject_meta_delete BEFORE DELETE ON session_index_meta BEGIN SELECT RAISE(FAIL, 'injected'); END;", nil, nil, nil), SQLITE_OK)
+        index.deleteSession(sessionID: "fixture")
+        XCTAssertEqual(index.searchRanked(query: "persisttoken").map(\.sessionID), ["fixture"])
+    }
+    #endif
 
     func test_TS_2291_BE_IT_DiskBackedFTSChunkSearchDeduplicatesAndReplacesAtomically() throws {
         let path = FileManager.default.temporaryDirectory.appendingPathComponent("history-spool-\(UUID().uuidString).sqlite")

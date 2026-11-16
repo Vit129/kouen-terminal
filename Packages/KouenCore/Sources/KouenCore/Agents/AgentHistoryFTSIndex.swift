@@ -129,20 +129,23 @@ public final class AgentHistoryFTSIndex: @unchecked Sendable {
     }
 
     /// Deletes `id`'s rows from each of `tables` (all keyed by session_id). Caller holds `lock`.
-    private func deleteRows(_ ids: some Sequence<String>, from tables: [String], context: String) {
+    private func deleteRows(_ ids: some Sequence<String>, from tables: [String], context: String) throws {
         for table in tables {
             var stmt: OpaquePointer?
             guard sqlite3_prepare_v2(db, "DELETE FROM \(table) WHERE session_id = ?;", -1, &stmt, nil) == SQLITE_OK else {
                 logStepFailure(SQLITE_ERROR, context: "prepare \(context) \(table)")
-                continue
+                throw CocoaError(.fileWriteUnknown)
             }
+            defer { sqlite3_finalize(stmt) }
             for id in ids {
                 sqlite3_reset(stmt)
                 sqlite3_bind_text(stmt, 1, id, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
                 let rc = sqlite3_step(stmt)
-                if rc != SQLITE_DONE { logStepFailure(rc, context: "\(context) \(table)") }
+                if rc != SQLITE_DONE {
+                    logStepFailure(rc, context: "\(context) \(table)")
+                    throw CocoaError(.fileWriteUnknown)
+                }
             }
-            sqlite3_finalize(stmt)
         }
     }
 
@@ -480,7 +483,7 @@ public final class AgentHistoryFTSIndex: @unchecked Sendable {
         defer { lock.unlock() }
         guard db != nil else { return }
         inTransaction("prune") {
-            deleteRows(deadIDs, from: Self.sessionTables, context: "prune delete")
+            try deleteRows(deadIDs, from: Self.sessionTables, context: "prune delete")
         }
     }
 
@@ -489,7 +492,9 @@ public final class AgentHistoryFTSIndex: @unchecked Sendable {
         lock.lock()
         defer { lock.unlock() }
         guard db != nil else { return }
-        deleteRows([sessionID], from: Self.sessionTables, context: "delete")
+        inTransaction("deleteSession") {
+            try deleteRows([sessionID], from: Self.sessionTables, context: "delete")
+        }
     }
 
     /// Indexes or updates a session in the FTS5 virtual table and metadata table.
@@ -593,7 +598,7 @@ public final class AgentHistoryFTSIndex: @unchecked Sendable {
 
         inTransaction("indexSessionsBatch") {
             let sessionIDs = itemsToIndex.map(\.sessionID)
-            deleteRows(sessionIDs, from: ["session_fts", "session_index_meta"], context: "batch reindex delete")
+            try deleteRows(sessionIDs, from: ["session_fts", "session_index_meta"], context: "batch reindex delete")
 
             let insertFtsSQL = """
             INSERT INTO session_fts(session_id, title, first_prompt, full_transcript, git_branch, repo_name, agent, files_edited, tools_called)

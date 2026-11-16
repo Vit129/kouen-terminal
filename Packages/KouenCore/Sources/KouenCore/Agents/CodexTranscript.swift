@@ -4,7 +4,7 @@ import Foundation
 public enum CodexTranscriptLine {
     /// Extracts user-visible items from one step of Codex's rollout transcript.
     public static func items(from line: Data) -> [TranscriptItem] {
-        guard let json = try? JSONSerialization.jsonObject(with: line) as? [String: Any] else { return [] }
+        guard let json = historyJSONObject(line) else { return [] }
         let type = json["type"] as? String ?? ""
         let lineID = (json["id"] as? String) ?? (json["ordinal"].map { "\($0)" }) ?? UUID().uuidString
         let payload = json["payload"] as? [String: Any]
@@ -47,11 +47,11 @@ public enum CodexTranscriptLine {
     }
 
     /// Extracts model and usage metrics from Codex rollout lines.
-    public static func meta(from lines: [Data]) -> (model: String?, mode: String?, usage: AgentUsage?) {
+    public static func meta<S: Sequence>(from lines: S) -> (model: String?, mode: String?, usage: AgentUsage?) where S.Element == Data {
         var model: String?, mode: String?, usage: AgentUsage?
 
         for line in lines {
-            guard let json = try? JSONSerialization.jsonObject(with: line) as? [String: Any] else { continue }
+            guard let json = historyJSONObject(line) else { continue }
             let type = json["type"] as? String ?? ""
             let payload = json["payload"] as? [String: Any]
 

@@ -428,11 +428,13 @@ public actor AgentHistoryScanner {
         defer { try? handle.close() }
         var pending = Data()
         var consumed = 0
+        var cursor = 0
         var totalBytes = 0
         var lineCount = 0
         var eof = false
 
         func emit(_ range: Range<Int>) throws {
+            guard range.count <= Self.maxJSONLRecordBytes else { throw JSONLReadError.oversizedRecord(range.count) }
             let line = Data(pending[range])
             guard let trimmed = trimmedLines(line).first else { return }
             try body(trimmed, lineCount)
@@ -444,7 +446,6 @@ public actor AgentHistoryScanner {
             eof = chunk.isEmpty
             totalBytes += chunk.count
             pending.append(chunk)
-            var cursor = consumed
             while cursor < pending.count {
                 if pending[cursor] == UInt8(ascii: "\n") {
                     try emit(consumed..<cursor)
@@ -461,6 +462,7 @@ public actor AgentHistoryScanner {
             }
             if consumed > 0 {
                 pending.removeSubrange(0..<consumed)
+                cursor -= consumed
                 consumed = 0
             }
         }
@@ -716,6 +718,8 @@ public actor AgentHistoryScanner {
                         toSave.append(CachedSessionEntry(record: record, mtime: mtime, fileSize: size))
                     }
                     records.append(record)
+                } else if let cached = fileCache[path] {
+                    records.append(cached.record)
                 }
             }
         }
@@ -728,7 +732,7 @@ public actor AgentHistoryScanner {
         return records
     }
 
-    private func parseClaudeTranscript(fileURL: URL) -> AgentSessionRecord? {
+    func parseClaudeTranscript(fileURL: URL) -> AgentSessionRecord? {
         var dummy: [AgentHistoryFTSIndex.SessionIndexItem] = []
         let rec = parseClaudeTranscript(fileURL: fileURL, toIndex: &dummy)
         if !dummy.isEmpty {
@@ -738,7 +742,8 @@ public actor AgentHistoryScanner {
     }
 
     private func parseClaudeTranscript(fileURL: URL, toIndex: inout [AgentHistoryFTSIndex.SessionIndexItem]) -> AgentSessionRecord? {
-        guard let (lines, dataSize) = Self.readJSONLLines(from: fileURL) else { return nil }
+        guard let lines = AgentHistoryJSONLSequence(url: fileURL) else { return nil }
+        let dataSize = lines.fileSize
         guard let transcriptSpool = try? AgentHistoryTranscriptSpool() else { return nil }
 
         let sessionID = fileURL.deletingPathExtension().lastPathComponent
@@ -756,7 +761,7 @@ public actor AgentHistoryScanner {
 
         // 1. Scan prefix for metadata, model name, and first prompt
         for line in lines.prefix(40) {
-            guard let json = try? JSONSerialization.jsonObject(with: line) as? [String: Any] else {
+            guard let json = historyJSONObject(line) else {
                 continue
             }
 
@@ -777,8 +782,8 @@ public actor AgentHistoryScanner {
         }
 
         // 2. Scan suffix for latest turns
-        for line in lines.suffix(Self.turnScanWindow) {
-            guard let json = try? JSONSerialization.jsonObject(with: line) as? [String: Any],
+        for (lineIndex, line) in lines.enumerated() where lineIndex >= max(0, messageCount - Self.turnScanWindow) {
+            guard let json = historyJSONObject(line),
                   let msg = json["message"] as? [String: Any] else {
                 continue
             }
@@ -802,7 +807,7 @@ public actor AgentHistoryScanner {
 
         // Extract full conversation text, tools, and edited files across all lines
         for line in lines {
-            guard let json = try? JSONSerialization.jsonObject(with: line) as? [String: Any],
+            guard let json = historyJSONObject(line),
                   let msg = json["message"] as? [String: Any] else {
                 continue
             }
@@ -862,6 +867,7 @@ public actor AgentHistoryScanner {
         )
 
         let (claudeModel, _, claudeUsage) = ClaudeTranscriptLine.meta(from: lines)
+        guard lines.isValid else { toIndex.removeLast(); return nil }
 
         return AgentSessionRecord(
             id: sessionID,
@@ -1417,6 +1423,8 @@ public actor AgentHistoryScanner {
                     toSave.append(CachedSessionEntry(record: record, mtime: mtime, fileSize: size))
                 }
                 records.append(record)
+            } else if let cached = fileCache[path] {
+                records.append(cached.record)
             }
         }
         if !toIndex.isEmpty {
@@ -1438,7 +1446,8 @@ public actor AgentHistoryScanner {
     }
 
     func parseAntigravityTranscript(sessionID: String, fileURL: URL, toIndex: inout [AgentHistoryFTSIndex.SessionIndexItem]) -> AgentSessionRecord? {
-        guard let (lines, dataSize) = Self.readJSONLLines(from: fileURL) else { return nil }
+        guard let lines = AgentHistoryJSONLSequence(url: fileURL) else { return nil }
+        let dataSize = lines.fileSize
         guard let transcriptSpool = try? AgentHistoryTranscriptSpool() else { return nil }
 
         var firstPrompt: String?
@@ -1449,7 +1458,7 @@ public actor AgentHistoryScanner {
 
         // 1. Scan prefix for first prompt, model, and project path
         for line in lines.prefix(40) {
-            guard let json = try? JSONSerialization.jsonObject(with: line) as? [String: Any] else {
+            guard let json = historyJSONObject(line) else {
                 continue
             }
 
@@ -1495,8 +1504,8 @@ public actor AgentHistoryScanner {
         }
 
         // 2. Scan suffix for latest turns
-        for line in lines.suffix(Self.turnScanWindow) {
-            guard let json = try? JSONSerialization.jsonObject(with: line) as? [String: Any] else {
+        for (lineIndex, line) in lines.enumerated() where lineIndex >= max(0, messageCount - Self.turnScanWindow) {
+            guard let json = historyJSONObject(line) else {
                 continue
             }
 
@@ -1517,7 +1526,7 @@ public actor AgentHistoryScanner {
         var toolsCalled: Set<String> = []
 
         for line in lines {
-            guard let json = try? JSONSerialization.jsonObject(with: line) as? [String: Any] else {
+            guard let json = historyJSONObject(line) else {
                 continue
             }
             let type = json["type"] as? String ?? ""
@@ -1580,6 +1589,7 @@ public actor AgentHistoryScanner {
         )
 
         let agMeta = AntigravityTranscriptLine.meta(from: lines)
+        guard lines.isValid else { toIndex.removeLast(); return nil }
         let resolvedModel = agMeta.model ?? "Gemini"
         let latestUsage = agMeta.usage
 
@@ -1678,6 +1688,8 @@ public actor AgentHistoryScanner {
                 fileCache[path] = FileCacheEntry(mtime: mtime, size: size, record: record)
                 records.append(record)
                 toSave.append(CachedSessionEntry(record: record, mtime: mtime, fileSize: size))
+            } else if let cached = fileCache[path] {
+                records.append(cached.record)
             }
         }
 
@@ -1727,7 +1739,8 @@ public actor AgentHistoryScanner {
         ftsIndex: AgentHistoryFTSIndex? = nil,
         toIndex: inout [AgentHistoryFTSIndex.SessionIndexItem]
     ) -> AgentSessionRecord? {
-        guard let (lines, dataSize) = readJSONLLines(from: fileURL) else { return nil }
+        guard let lines = AgentHistoryJSONLSequence(url: fileURL) else { return nil }
+        let dataSize = lines.fileSize
         guard let transcriptSpool = try? AgentHistoryTranscriptSpool() else { return nil }
 
         var sessionID: String?
@@ -1757,7 +1770,7 @@ public actor AgentHistoryScanner {
         var toolsCalled: Set<String> = []
 
         for line in lines {
-            guard let json = try? JSONSerialization.jsonObject(with: line) as? [String: Any] else { continue }
+            guard let json = historyJSONObject(line) else { continue }
 
             if sessionID == nil {
                 sessionID = json["id"] as? String ?? json["session_id"] as? String
@@ -1857,6 +1870,7 @@ public actor AgentHistoryScanner {
         )
 
         let codexMeta = CodexTranscriptLine.meta(from: lines)
+        guard lines.isValid else { toIndex.removeLast(); return nil }
         let resolvedModel = codexMeta.model
         let latestUsage = codexMeta.usage
 

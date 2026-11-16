@@ -88,7 +88,8 @@ final class ProcessRunnerTests: XCTestCase {
         // The backgrounded sleep inherits stdout and keeps the pipe open after sh exits.
         let res = ProcessRunner.run(executable: "/bin/sh", arguments: ["-c", "echo hi; sleep 20 &"])
         let elapsed = Date().timeIntervalSince(start)
-        XCTAssertTrue(res.isSuccess)
+        XCTAssertFalse(res.isSuccess)
+        XCTAssertTrue(res.stdoutWasTruncated || res.stderrWasTruncated)
         XCTAssertEqual(res.stdout.trimmingCharacters(in: .whitespacesAndNewlines), "hi")
         XCTAssertTrue(elapsed < 5.0, "Expected return soon after sh exits, took \(elapsed)s")
     }
@@ -112,17 +113,43 @@ final class ProcessRunnerTests: XCTestCase {
     func test_TS_2292_BE_IT_OutputCaptureIsBoundedAndReportsTruncation() async {
         let arguments = ["-c", "yes x | head -c 5000000; yes y | head -c 5000000 >&2"]
         let sync = ProcessRunner.run(executable: "/bin/sh", arguments: arguments)
-        XCTAssertTrue(sync.isSuccess)
+        XCTAssertFalse(sync.isSuccess)
+        XCTAssertNotEqual(sync.exitCode, 0)
         XCTAssertEqual(sync.stdout.utf8.count, 4 * 1024 * 1024)
         XCTAssertEqual(sync.stderr.utf8.count, 4 * 1024 * 1024)
         XCTAssertTrue(sync.stdoutWasTruncated)
         XCTAssertTrue(sync.stderrWasTruncated)
 
         let async = await ProcessRunner.runAsync(executable: "/bin/sh", arguments: arguments)
-        XCTAssertTrue(async.isSuccess)
+        XCTAssertFalse(async.isSuccess)
+        XCTAssertNotEqual(async.exitCode, 0)
         XCTAssertEqual(async.stdout.utf8.count, 4 * 1024 * 1024)
         XCTAssertEqual(async.stderr.utf8.count, 4 * 1024 * 1024)
         XCTAssertTrue(async.stdoutWasTruncated)
         XCTAssertTrue(async.stderrWasTruncated)
     }
+    func test_TS_2298_BE_IT_AsyncReturnsWhenDescendantKeepsPipeOpen() async {
+        let start = Date()
+        let result = await ProcessRunner.runAsync(executable: "/bin/sh", arguments: ["-c", "printf ready; sleep 10 &"])
+        XCTAssertLessThan(Date().timeIntervalSince(start), 5)
+        XCTAssertTrue(result.stdout.contains("ready"))
+    }
+
+    func test_TS_2299_BE_IT_AsyncCancellationStopsProcess() async {
+        let task = Task { await ProcessRunner.runAsync(executable: "/bin/sleep", arguments: ["10"]) }
+        task.cancel()
+        let start = Date()
+        let result = await task.value
+        XCTAssertLessThan(Date().timeIntervalSince(start), 5)
+        XCTAssertFalse(result.isSuccess)
+    }
+
+    func test_TS_2300_BE_IT_SyncTimeoutStillAppliesAfterChildClosesPipes() {
+        let start = Date()
+        let result = ProcessRunner.run(executable: "/bin/sh", arguments: ["-c", "exec 1>&- 2>&-; exec sleep 10"], timeout: 0.5)
+        XCTAssertLessThan(Date().timeIntervalSince(start), 5)
+        XCTAssertTrue(result.isTimedOut)
+        XCTAssertFalse(result.isSuccess)
+    }
+
 }

@@ -837,8 +837,9 @@ public final class TerminalHostView: NSView {
     final class OutputCoalescer: @unchecked Sendable {
         private let lock = NSLock()
         private let maxMemoryBytes: Int
-        private var pendingChunks: [Data] = []
+        private var pendingChunks: [Data?] = []
         private var headOffset = 0
+        private var chunkOffset = 0
         private var pendingMemoryBytes = 0
         private var overflowSpool: OutputDiskSpool?
         private var isScheduled = false
@@ -876,18 +877,22 @@ public final class TerminalHostView: NSView {
             var batch = Data()
             batch.reserveCapacity(maxBytes)
             while batch.count < maxBytes, headOffset < pendingChunks.count {
-                let chunk = pendingChunks[headOffset]
-                let count = min(maxBytes - batch.count, chunk.count)
-                batch.append(chunk.prefix(count))
+                guard let chunk = pendingChunks[headOffset] else { preconditionFailure("Missing queued chunk") }
+                let count = min(maxBytes - batch.count, chunk.count - chunkOffset)
+                batch.append(chunk[chunk.index(chunk.startIndex, offsetBy: chunkOffset)..<chunk.index(chunk.startIndex, offsetBy: chunkOffset + count)])
                 pendingMemoryBytes -= count
-                if count == chunk.count {
+                chunkOffset += count
+                if chunkOffset == chunk.count {
+                    pendingChunks[headOffset] = nil
                     headOffset += 1
-                } else {
-                    pendingChunks[headOffset] = Data(chunk.dropFirst(count))
+                    chunkOffset = 0
                 }
             }
             if headOffset == pendingChunks.count {
                 pendingChunks.removeAll(keepingCapacity: true)
+                headOffset = 0
+            } else if headOffset >= 64 && headOffset * 2 >= pendingChunks.count {
+                pendingChunks.removeFirst(headOffset)
                 headOffset = 0
             }
             if batch.count < maxBytes, let overflowSpool {
@@ -901,6 +906,11 @@ public final class TerminalHostView: NSView {
                 isScheduled = false
             }
             return (batch, hasMore)
+        }
+
+        var retainedChunkSlots: Int {
+            lock.lock(); defer { lock.unlock() }
+            return pendingChunks.count
         }
 
         var bufferedMemoryBytes: Int {

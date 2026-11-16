@@ -48,4 +48,16 @@ final class OutputCoalescerTests: XCTestCase {
         XCTAssertEqual(c.bufferedMemoryBytes, 0)
         XCTAssertEqual(c.bufferedSpoolBytes, 0)
     }
+    func test_TS_2293_BE_UT_ContinuousDrainReleasesConsumedChunks() throws {
+        let c = TerminalHostView.OutputCoalescer(maxMemoryBytes: 1024)
+        try c.append(Data(repeating: 1, count: 32)) {}
+        for _ in 0..<10000 {
+            try c.append(Data(repeating: 2, count: 32)) {}
+            let result = try c.drain(maxBytes: 32)
+            XCTAssertTrue(result.hasMore)
+        }
+        XCTAssertLessThanOrEqual(c.retainedChunkSlots, 128)
+        XCTAssertEqual(c.bufferedMemoryBytes, 32)
+    }
+
 }
