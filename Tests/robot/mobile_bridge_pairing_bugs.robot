@@ -118,13 +118,13 @@ Bug 3 - QR Not Printed When No Listener Is Ready
     ${content}=    Get File    ${MOBILE_BRIDGE}
     Should Contain    ${content}    guard anyWSListenerReady else {
     ...    msg=runPairingLoop must guard the token-mint/print path on anyWSListenerReady
-    Should Contain    ${content}    pairingWake.wait()
+    Should Contain    ${content}    wake.wait()
     ...    msg=the not-ready branch must block until a listener is ready instead of polling at 4Hz
-    Should Contain    ${content}    if requested { pairingWake.signal() }
+    Should Contain    ${content}    if requested { wake.signal() }
     ...    msg=listener readiness must wake the on-demand pairing loop
     Should Contain    ${content}    mobile bridge: no WS listener bound — cannot pair
     ...    msg=an unavailable listener must still warn the operator
-    Should Contain    ${content}    pairingWake.wait(timeout: .now() + 2)
+    Should Contain    ${content}    wake.wait(timeout: .now() + 2)
     ...    msg=the warning must debounce past normal listener startup
 
 Pairing Unit Tests Pass

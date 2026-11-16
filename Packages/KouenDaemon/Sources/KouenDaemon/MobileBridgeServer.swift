@@ -75,10 +75,25 @@ public final class MobileBridgeServer: @unchecked Sendable {
     private let lifecycleLock = NSLock()
     private var _isRunning = false
     private var pairingRequested = false
-    private let pairingWake = DispatchSemaphore(value: 0)
+    private var pairingWake = DispatchSemaphore(value: 0)
     var isRunning: Bool {
         get { lifecycleLock.lock(); defer { lifecycleLock.unlock() }; return _isRunning }
-        set { lifecycleLock.lock(); _isRunning = newValue; lifecycleLock.unlock() }
+        set {
+            lifecycleLock.lock()
+            if newValue && !_isRunning { pairingWake = DispatchSemaphore(value: 0) }
+            _isRunning = newValue
+            lifecycleLock.unlock()
+        }
+    }
+
+    func currentPairingWake() -> DispatchSemaphore {
+        lifecycleLock.lock(); defer { lifecycleLock.unlock() }
+        return pairingWake
+    }
+
+    private func isCurrentPairingRun(_ wake: DispatchSemaphore) -> Bool {
+        lifecycleLock.lock(); defer { lifecycleLock.unlock() }
+        return _isRunning && pairingWake === wake
     }
 
     func setWSListener(host: String, ready: Bool) {
@@ -86,8 +101,8 @@ public final class MobileBridgeServer: @unchecked Sendable {
         if ready { wsReadyHosts.insert(host) } else { wsReadyHosts.remove(host) }
         wsReadyLock.unlock()
         if ready {
-            lifecycleLock.lock(); let requested = pairingRequested; lifecycleLock.unlock()
-            if requested { pairingWake.signal() }
+            lifecycleLock.lock(); let requested = pairingRequested; let wake = pairingWake; lifecycleLock.unlock()
+            if requested { wake.signal() }
         }
     }
 
@@ -487,8 +502,10 @@ public final class MobileBridgeServer: @unchecked Sendable {
         pageURLPort: Int,
         tailscaleHost: String?,
         magicDNSName: String?,
+        wake: DispatchSemaphore,
         log: @escaping @Sendable (String) -> Void
     ) {
+        guard isCurrentPairingRun(wake) else { return }
         var currentTailscaleHost = tailscaleHost
         var currentMagicDNSName = magicDNSName
         var serveActive = currentMagicDNSName != nil && Self.isTailscaleServeConfigured(port: pageURLPort)
@@ -540,19 +557,20 @@ public final class MobileBridgeServer: @unchecked Sendable {
         // Each re-check spawns `tailscale` subprocesses; this loop never returns, so drain
         // their autoreleased objects per call instead of never.
         var warnedNoListener = false
-        while isRunning {
-            pairingWake.wait()
-            guard isRunning else { return }
+        while isCurrentPairingRun(wake) {
+            wake.wait()
+            guard isCurrentPairingRun(wake) else { return }
             lifecycleLock.lock(); let requested = pairingRequested; lifecycleLock.unlock()
             guard requested else { continue }
             let hostChanged = autoreleasepool(invoking: recheckTailscale)
+            guard isCurrentPairingRun(wake) else { return }
 
             guard anyWSListenerReady else {
-                if !warnedNoListener, pairingWake.wait(timeout: .now() + 2) == .timedOut, isRunning, !anyWSListenerReady {
+                if !warnedNoListener, wake.wait(timeout: .now() + 2) == .timedOut, isCurrentPairingRun(wake), !anyWSListenerReady {
                     log("mobile bridge: no WS listener bound — cannot pair (is another Kouen daemon holding the port?)")
                     warnedNoListener = true
                 } else if anyWSListenerReady {
-                    pairingWake.signal()
+                    wake.signal()
                 }
                 continue
             }
@@ -2049,12 +2067,14 @@ public final class MobileBridgeServer: @unchecked Sendable {
         }
         log("mobile bridge: listening on \(bindHosts.map { "\($0):\(pageURLPort)" }.joined(separator: ", "))")
 
+        let wake = currentPairingWake()
         DispatchQueue.global().async { [weak self] in
             self?.runPairingLoop(
                 wsPort: UInt16(clamping: pageURLPort),
                 pageURLPort: pageURLPort,
                 tailscaleHost: tailscaleHost,
                 magicDNSName: tailscaleMagicDNSName,
+                wake: wake,
                 log: log
             )
         }
@@ -2066,9 +2086,12 @@ public final class MobileBridgeServer: @unchecked Sendable {
     /// later `start()` doesn't force every phone through the QR flow again.
     public func stop() {
         guard isRunning else { return }
-        isRunning = false
-        lifecycleLock.lock(); pairingRequested = false; lifecycleLock.unlock()
-        pairingWake.signal()
+        lifecycleLock.lock()
+        _isRunning = false
+        pairingRequested = false
+        let wake = pairingWake
+        lifecycleLock.unlock()
+        wake.signal()
         listenersLock.lock()
         listeners.forEach { $0.listener.cancel() }
         listeners.removeAll()
@@ -2098,8 +2121,9 @@ public final class MobileBridgeServer: @unchecked Sendable {
             lifecycleLock.lock()
             let alreadyRequested = pairingRequested
             pairingRequested = true
+            let wake = pairingWake
             lifecycleLock.unlock()
-            if !alreadyRequested { pairingWake.signal() }
+            if !alreadyRequested { wake.signal() }
             return (nil, 0, true)
         }
         let remaining = max(0, Int(pending.expiresAt.timeIntervalSinceNow.rounded()))

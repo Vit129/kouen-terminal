@@ -1155,8 +1155,8 @@
     "semantic_hash": ""
   },
   "Packages/KouenDaemon/Sources/KouenDaemon/MobileBridgeServer.swift": {
-    "mtime": 1794811688.7131472,
-    "ast_hash": "ca76869f4bb9c2b3a97d23b468ec2995",
+    "mtime": 1794812477.5050907,
+    "ast_hash": "fad0d64289426fe551d0bd6c7abf47a4",
     "semantic_hash": ""
   },
   "Packages/KouenDaemon/Sources/KouenDaemon/PairedDeviceStore.swift": {
@@ -2600,8 +2600,8 @@
     "semantic_hash": ""
   },
   "Tests/KouenDaemonTests/MobileBridgePairingTests.swift": {
-    "mtime": 1794811648.2156546,
-    "ast_hash": "f422872e1d565b9204c579cc769585a5",
+    "mtime": 1794812471.1015482,
+    "ast_hash": "2493e83a5b6e845e7e552cf05a62acba",
     "semantic_hash": ""
   },
   "Tests/KouenDaemonTests/MobileBridgeSpawnTests.swift": {
@@ -3040,8 +3040,8 @@
     "semantic_hash": ""
   },
   "Tests/robot/mobile_bridge_pairing_bugs.robot": {
-    "mtime": 1794811688.713394,
-    "ast_hash": "1cfc4e0185177c6ea9548efd95c92b3b",
+    "mtime": 1794812471.1023467,
+    "ast_hash": "af5b880d0487eeb88f579165a3431158",
     "semantic_hash": ""
   },
   "Tests/robot/run.sh": {
@@ -4957,6 +4957,11 @@
   "Tests/KouenAppTests/AppLaunchTempCleanupTests.swift": {
     "mtime": 1794811912.3636584,
     "ast_hash": "a0d76c943e6b36d4aea69205d1bd92e3",
+    "semantic_hash": ""
+  },
+  "graphify-out/memory/query_20261116_065547_lspfilesession_filepreviewcoordinator_lspclient_sh.md": {
+    "mtime": 1794812147.7766328,
+    "ast_hash": "3e49f55f3a20b42333a4ed37a3d10cb6",
     "semantic_hash": ""
   }
 }
