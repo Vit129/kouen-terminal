@@ -47,8 +47,22 @@ private final class TerminalTabBarModel {
     var dragOffsetX: CGFloat = 0
     var dragOriginalIndex: Int?
     var dragTargetIndex: Int?
+    var taskRefreshWorkspaces: [Workspace]?
+    var taskRefreshToken = UUID()
+    @ObservationIgnored let taskRequests = TaskDaemonBridge.SessionTaskRequests()
+    @ObservationIgnored private var taskRefreshTask: Task<Void, Never>?
 
     @ObservationIgnored weak var delegate: TerminalTabBarDelegate?
+
+    func scheduleTaskRefresh() {
+        taskRefreshTask?.cancel()
+        taskRefreshTask = Task { @MainActor [weak self] in
+            try? await Task.sleep(nanoseconds: 500_000_000)
+            guard !Task.isCancelled, let self else { return }
+            self.taskRefreshToken = UUID()
+            self.taskRefreshTask = nil
+        }
+    }
 }
 
 @MainActor
@@ -377,12 +391,6 @@ private struct TerminalTabBarBody: View {
 }
 
 @MainActor
-private final class TabTaskRefreshState {
-    var workspaces: [Workspace]?
-    var task: Task<Void, Never>?
-}
-
-@MainActor
 private struct TabPillView: View {
     var model: TerminalTabBarModel
     let tab: Tab
@@ -397,7 +405,6 @@ private struct TabPillView: View {
     @State private var isHovered = false
     @State private var showsMCPBadge = false
     @State private var tasks: [TaskSummary] = []
-    @State private var taskRefresh = TabTaskRefreshState()
 
     var body: some View {
         let _ = model.chromeEpoch
@@ -585,32 +592,18 @@ private struct TabPillView: View {
             await updateMCPBadge(lastAt: tab.lastMCPControlAt)
         }
         .task(id: tab.id) {
-            taskRefresh.workspaces = SessionCoordinator.shared.snapshot.workspaces
+            model.taskRefreshWorkspaces = SessionCoordinator.shared.snapshot.workspaces
             await updateTasks()
         }
+        .task(id: model.taskRefreshToken) { await updateTasks() }
         .onReceive(NotificationCenter.default.publisher(for: NotificationBus.shared.snapshotChanged)) { _ in
             let workspaces = SessionCoordinator.shared.snapshot.workspaces
-            guard taskRefresh.workspaces != workspaces else { return }
-            taskRefresh.workspaces = workspaces
-            scheduleTaskRefresh()
+            guard model.taskRefreshWorkspaces != workspaces else { return }
+            model.taskRefreshWorkspaces = workspaces
+            model.scheduleTaskRefresh()
         }
         .onReceive(NotificationCenter.default.publisher(for: NotificationBus.shared.tasksChanged)) { _ in
-            scheduleTaskRefresh()
-        }
-        .onDisappear {
-            taskRefresh.task?.cancel()
-            taskRefresh.task = nil
-            taskRefresh.workspaces = nil
-        }
-    }
-
-    private func scheduleTaskRefresh() {
-        // Coalesce snapshot and task events before querying the daemon.
-        taskRefresh.task?.cancel()
-        taskRefresh.task = Task {
-            try? await Task.sleep(nanoseconds: 500_000_000)
-            guard !Task.isCancelled else { return }
-            await updateTasks()
+            model.scheduleTaskRefresh()
         }
     }
 
@@ -731,8 +724,12 @@ private struct TabPillView: View {
             tasks = []
             return
         }
-        let updatedTasks = await TaskDaemonBridge.list(sessionID: sessionID)
+        let refresh = model.taskRefreshToken
+        let updatedTasks = await model.taskRequests.list(sessionID: sessionID, refresh: refresh) {
+            await TaskDaemonBridge.list(sessionID: sessionID)
+        }
         guard !Task.isCancelled else { return }
+        guard refresh == model.taskRefreshToken else { return }
         if tasks != updatedTasks { tasks = updatedTasks }
     }
 }

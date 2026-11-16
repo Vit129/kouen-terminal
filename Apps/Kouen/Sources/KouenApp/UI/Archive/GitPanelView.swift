@@ -19,6 +19,7 @@ final class GitPanelView: NSView {
     /// Bumped on every `refresh()` call so a slower, stale refresh can detect
     /// that a newer one has superseded it and discard its results.
     private var refreshGeneration = 0
+    private var refreshGate = GitPanelRefreshGate()
     private var lastWorktreeOutput = ""
     /// Keyed by the **source** worktree path (the branch being merged), not the repo — a
     /// merge is something the user triggered from that specific row, so the conflict card
@@ -1398,6 +1399,13 @@ final class GitPanelView: NSView {
         guard let path = currentPath else { return }
         // Fix 5: Skip refresh when panel is not visible
         guard window != nil, !isHiddenOrHasHiddenAncestor else { return }
+        guard refreshGate.begin() else {
+            refreshGeneration += 1
+            return
+        }
+        defer {
+            if refreshGate.finish() { Task { await refresh() } }
+        }
         refreshGeneration += 1
         let generation = refreshGeneration
 
@@ -1423,7 +1431,9 @@ final class GitPanelView: NSView {
         // render on the auto-stage round trip below.
         applyState(branch: branch, aheadBehind: aheadBehind, numstat: numstat, porcelain: porcelain, log: log)
         await reconcileMergeConflicts(generation: generation)
+        guard generation == refreshGeneration else { return }
         await refreshWorktrees(generation: generation)
+        guard generation == refreshGeneration else { return }
 
         // Auto-stage unstaged changes that are not manually unstaged, then
         // repaint in the background if that changed anything.
@@ -2230,6 +2240,26 @@ final class GitPanelView: NSView {
         var value = Data()
     }
 
+}
+
+struct GitPanelRefreshGate {
+    private(set) var isRunning = false
+    private var hasPendingRefresh = false
+
+    mutating func begin() -> Bool {
+        guard !isRunning else {
+            hasPendingRefresh = true
+            return false
+        }
+        isRunning = true
+        return true
+    }
+
+    mutating func finish() -> Bool {
+        isRunning = false
+        defer { hasPendingRefresh = false }
+        return hasPendingRefresh
+    }
 }
 
 struct WorktreeEntry {

@@ -163,17 +163,6 @@ final class NotificationCoordinator {
         }
     }
 
-    func updateDockBadge(from snapshot: SessionSnapshot) {
-        guard let app = NSApplication.shared as AnyObject? as? NSApplication else { return }
-        let waiting = snapshot.workspaces.reduce(into: 0) { count, workspace in
-            count += workspace.sessions
-                .flatMap(\.tabs)
-                .filter { $0.status == .waiting }
-                .count
-        }
-        app.dockTile.badgeLabel = waiting > 0 ? "\(waiting)" : nil
-    }
-
     func syncWaitingRings() {
         var waitingSurfaces = Set<SurfaceID>()
         for workspace in coord.snapshot.workspaces {

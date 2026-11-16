@@ -11,6 +11,7 @@ final class DaemonSyncService {
     private unowned let coord: SessionCoordinator
     private let daemon = DaemonSessionService()
     private(set) var snapshot = SessionSnapshot()
+    private var cachedStructureFingerprint: StructureFingerprint?
     private(set) var lastRevision = -1
     private var metadataTask: Task<Void, Never>?
     private(set) var snapshotRefreshTask: Task<Void, Never>?
@@ -379,13 +380,18 @@ final class DaemonSyncService {
     }
 
     private func applySnapshot(_ remote: SessionSnapshot, metadataOnly: Bool, preserveBrowserPanes: Bool = true) {
-        let structureChanged = Self.structureFingerprint(remote) != Self.structureFingerprint(snapshot)
+        let remoteStructure = Self.structureFingerprint(remote)
+        let localStructure = cachedStructureFingerprint ?? Self.structureFingerprint(snapshot)
+        let structureChanged = remoteStructure != localStructure
         let merged = preserveBrowserPanes
             ? Self.snapshotPreservingBrowserPanes(local: snapshot, remote: remote) { [coord] paneID, node in
                 _ = coord.splitPaneCoordinator.removePaneNode(paneID: paneID, from: &node)
             }
             : remote
         snapshot = merged
+        cachedStructureFingerprint = structureChanged && preserveBrowserPanes
+            ? Self.structureFingerprint(merged)
+            : (structureChanged ? remoteStructure : localStructure)
         lastRevision = remote.revision
         if structureChanged {
             coord.structureRevision += 1
@@ -412,7 +418,7 @@ final class DaemonSyncService {
             }
         }
         coord.syncWaitingRings()
-        coord.notificationCoordinator.updateDockBadge(from: remote)
+        coord.updateDockAttentionBadge()
         coord.reflectRemoteActivePane()
         NotificationBus.shared.postSnapshotChanged(SnapshotChangedPayload(
             revision: remote.revision,
@@ -516,22 +522,27 @@ final class DaemonSyncService {
         return rebuilt
     }
 
-    static func structureFingerprint(_ snap: SessionSnapshot) -> String {
+    struct StructureFingerprint: Equatable {
+        let surfaces: Set<UUID>
+        let panes: Set<UUID>
+    }
+
+    static func structureFingerprint(_ snap: SessionSnapshot) -> StructureFingerprint {
         // Hash ALL tabs across every workspace/session so pane kills in non-active tabs
         // trigger structureChanged and prune() runs. allSurfaceIDs() already returns []
         // for .browser nodes, so browser-pane IDs are excluded automatically — no risk
         // of the blink loop (daemon snapshot never contains browser IDs either).
-        let surfaces = snap.workspaces.flatMap { ws in
+        let surfaces = Set(snap.workspaces.flatMap { ws in
             ws.sessions.flatMap { session in
                 session.tabs.flatMap { $0.rootPane.allSurfaceIDs() }
             }
-        }.map(\.uuidString).sorted().joined(separator: ",")
-        let panes = snap.workspaces.flatMap { ws in
+        })
+        let panes = Set(snap.workspaces.flatMap { ws in
             ws.sessions.flatMap { session in
                 session.tabs.flatMap { $0.rootPane.allLeaves() }
             }
-        }.map(\.id.uuidString).sorted().joined(separator: ",")
-        return "\(surfaces)|\(panes)"
+        }.map(\.id))
+        return StructureFingerprint(surfaces: surfaces, panes: panes)
     }
 
     // MARK: - Daemon request
