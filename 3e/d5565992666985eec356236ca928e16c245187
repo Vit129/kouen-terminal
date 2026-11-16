@@ -1,0 +1,63 @@
+Tests/KouenAppTests/GitPanelViewFSEventFilterTests.swift
+  s_f7b9e64705bf34::t_3f748a6704090c 9-19
+Apps/Kouen/Sources/KouenApp/Services/DaemonSyncService.swift
+  s_f7b9e64705bf34::t_7b9dc0d8553ebe 421
+  s_f7b9e64705bf34::t_d8b54d0f51d6a2 383,385,525-530,535,539-540,544-545
+  s_f7b9e64705bf34::t_5a03ab92318fb5 14,384,392-394
+Apps/Kouen/Sources/KouenApp/UI/Archive/GitPanelView.swift
+  s_f7b9e64705bf34::t_5ac91474c68382 1403-1406,1408
+  s_f7b9e64705bf34::t_336c1bc1efa042 1434
+  s_f7b9e64705bf34::t_8d3828668295ae 1436
+  s_f7b9e64705bf34::t_0b3b65ff2ce61a 22,1402,1407,2245-2262
+  s_f7b9e64705bf34::t_24d7de08eb5959 2263-2264
+Tests/KouenCoreTests/SessionPersistenceTests.swift
+  s_f7b9e64705bf34::t_6d46d8f585dcfd 5-15
+Apps/Kouen/Sources/KouenApp/Services/SessionCoordinator.swift
+  s_f7b9e64705bf34::t_80e45ae0e705df 139-140
+  s_f7b9e64705bf34::t_e009c2d94f866b 38,145-146,151-152
+  s_f7b9e64705bf34::t_d57dfd3fb7ff0c 153-154
+Tests/KouenDaemonTests/SurfaceRegistryTests.swift
+  s_f7b9e64705bf34::t_cdca3b68851ecb 13-21
+Apps/Kouen/Sources/KouenApp/UI/Terminal/TerminalTabBarView.swift
+  s_f7b9e64705bf34::t_c24be10d0eb5a2 50-51,53,56-65,595,598,601-603,606
+  s_f7b9e64705bf34::t_8d3828668295ae 52,727-730,732
+Packages/KouenCore/Sources/KouenCore/Persistence/SessionStore.swift
+  s_f7b9e64705bf34::t_6d46d8f585dcfd 51-60
+  s_f7b9e64705bf34::t_8d3828668295ae 45-46
+Tests/KouenTerminalKitTests/OutputCoalescerTests.swift
+  s_f7b9e64705bf34::t_5be5d17d675578 52-60
+Packages/KouenDaemon/Sources/KouenDaemon/SurfaceRegistry.swift
+  s_f7b9e64705bf34::t_79c401a9976886 223-225,229-231,235,1901
+  s_f7b9e64705bf34::t_076135a6357196 236-238
+  s_f7b9e64705bf34::t_48348f8d4235e1 352,815,823,834,846,896,922,969,1604,2084
+Packages/KouenTerminalKit/Sources/KouenTerminalKit/TerminalHostView.swift
+  s_f7b9e64705bf34::t_e009c2d94f866b 849,858,860,869,876,975-976
+Apps/Kouen/Sources/KouenApp/Services/TaskDaemonBridge.swift
+  s_f7b9e64705bf34::t_62d013337166c7 16
+  s_f7b9e64705bf34::t_4e75790efa7539 14,17-19
+  s_f7b9e64705bf34::t_8d3828668295ae 9-13,15
+Packages/KouenDaemon/Sources/KouenDaemon/AgentScanner.swift
+  s_f7b9e64705bf34::t_31eb196732d02f 5,8,31,52-57
+  s_f7b9e64705bf34::t_8d3828668295ae 35
+Tests/KouenAppTests/RegressionBugFixTests.swift
+  s_f7b9e64705bf34::t_af4aeb3896d27b 85,90-92
+  s_f7b9e64705bf34::t_50f7d15bd90e7f 86-89
+  s_f7b9e64705bf34::t_28c967f5dec71b 10-25
+  s_f7b9e64705bf34::t_5be5d17d675578 93-98
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.3",
+  "base_commit_sha": "3ed5565992666985eec356236ca928e16c245187",
+  "prompts": {},
+  "sessions": {
+    "s_f7b9e64705bf34": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1e2b2-36c5-73c1-aa10-10ecf8aac34f",
+        "model": "gpt-6-luna"
+      },
+      "human_author": "Vit129 <vitosk129@gmail.com>"
+    }
+  }
+}
