@@ -398,6 +398,11 @@ public enum ProcessRunner {
             process.currentDirectoryURL = URL(fileURLWithPath: directory)
         }
 
+        return run(process: process, timeout: timeout)
+    }
+
+    /// Reuse the bounded runner for callers that already configure a Process (including fixtures).
+    static func run(process: Process, timeout: TimeInterval?) -> ProcessResult {
         let outPipe = Pipe()
         let errPipe = Pipe()
         process.standardOutput = outPipe

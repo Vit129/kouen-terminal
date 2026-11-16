@@ -500,8 +500,8 @@
     "semantic_hash": ""
   },
   "Apps/Kouen/Sources/KouenApp/UI/Notch/AgentNotchViewModel.swift": {
-    "mtime": 1794828442.5011907,
-    "ast_hash": "4932e46010c0a4e711e9d32fd865ba09",
+    "mtime": 1794835123.7473438,
+    "ast_hash": "f31f6c143da114c87b77ec903053e615",
     "semantic_hash": ""
   },
   "Apps/Kouen/Sources/KouenApp/UI/Notch/NotchGeometry.swift": {
@@ -1070,8 +1070,8 @@
     "semantic_hash": ""
   },
   "Packages/KouenCore/Sources/KouenCore/Remote/SSHTunnelManager.swift": {
-    "mtime": 1794828442.5335443,
-    "ast_hash": "799eb210dfe2b139abcb27aec4b12da8",
+    "mtime": 1794835123.7468548,
+    "ast_hash": "915a25a2192fd95c32c1f5a85e177fef",
     "semantic_hash": ""
   },
   "Packages/KouenCore/Sources/KouenCore/Session/SessionEditor.swift": {
@@ -2070,8 +2070,8 @@
     "semantic_hash": ""
   },
   "Tests/KouenAppTests/NotchLayoutMetricsTests.swift": {
-    "mtime": 1794828442.593199,
-    "ast_hash": "60726e8cfd9056800e3232d126b0ccc3",
+    "mtime": 1794835218.2436152,
+    "ast_hash": "a5b85a452b4af950d825ea815c4b6e6a",
     "semantic_hash": ""
   },
   "Tests/KouenAppTests/PaletteModelTests.swift": {
@@ -2425,8 +2425,8 @@
     "semantic_hash": ""
   },
   "Tests/KouenCoreTests/SSHTunnelManagerTests.swift": {
-    "mtime": 1794828442.610288,
-    "ast_hash": "5863dc71dff12b619446843d066f91a6",
+    "mtime": 1794835086.617571,
+    "ast_hash": "529fd5cd1e000b122948cc47708cd79b",
     "semantic_hash": ""
   },
   "Tests/KouenCoreTests/ServiceInstallerTests.swift": {
@@ -4715,8 +4715,8 @@
     "semantic_hash": ""
   },
   "Packages/KouenCore/Sources/KouenCore/Platform/ProcessRunner.swift": {
-    "mtime": 1794828442.5323143,
-    "ast_hash": "d31c3ead9c4d7bde6b1a81c8942a79c7",
+    "mtime": 1794835123.7465134,
+    "ast_hash": "3817b58b5d4519c2de41cafade34aef0",
     "semantic_hash": ""
   },
   "Tests/KouenCoreTests/ProcessRunnerTests.swift": {
