@@ -1,3 +1,4 @@
+#if canImport(Network) // MobileBridgeServer is Apple-only; not built on Linux
 import Foundation
 import KouenIPC
 import KouenTheme
@@ -27,3 +28,5 @@ extension MobileBridgeServer {
         return "const AGENT_ICONS = " + String(decoding: data, as: UTF8.self) + ";"
     }()
 }
+
+#endif
