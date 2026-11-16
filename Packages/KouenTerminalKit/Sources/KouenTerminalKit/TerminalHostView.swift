@@ -837,6 +837,7 @@ public final class TerminalHostView: NSView {
     final class OutputCoalescer: @unchecked Sendable {
         private let lock = NSLock()
         private let maxMemoryBytes: Int
+        private let maxSpoolBytes: Int
         private var pendingChunks: [Data?] = []
         private var headOffset = 0
         private var chunkOffset = 0
@@ -844,8 +845,9 @@ public final class TerminalHostView: NSView {
         private var overflowSpool: OutputDiskSpool?
         private var isScheduled = false
 
-        init(maxMemoryBytes: Int = 4 * 1024 * 1024) {
+        init(maxMemoryBytes: Int = 4 * 1024 * 1024, maxSpoolBytes: Int = 256 * 1024 * 1024) {
             self.maxMemoryBytes = maxMemoryBytes
+            self.maxSpoolBytes = maxSpoolBytes
         }
 
         func append(_ data: Data, schedule: () -> Void) throws {
@@ -853,14 +855,14 @@ public final class TerminalHostView: NSView {
             lock.lock()
             defer { lock.unlock() }
             if let overflowSpool {
-                try overflowSpool.append(data)
+                try overflowSpool.append(data, limit: maxSpoolBytes)
             } else if pendingMemoryBytes + data.count <= maxMemoryBytes {
                 pendingChunks.append(data)
                 pendingMemoryBytes += data.count
             } else {
                 let spool = try OutputDiskSpool()
                 overflowSpool = spool
-                try spool.append(data)
+                try spool.append(data, limit: maxSpoolBytes)
             }
             if !isScheduled {
                 isScheduled = true
@@ -947,7 +949,8 @@ public final class TerminalHostView: NSView {
             }
         }
 
-        func append(_ data: Data) throws {
+        func append(_ data: Data, limit: Int) throws {
+            guard data.count <= limit - writtenBytes else { throw CocoaError(.fileWriteOutOfSpace) }
             try writer.write(contentsOf: data)
             writtenBytes += data.count
         }

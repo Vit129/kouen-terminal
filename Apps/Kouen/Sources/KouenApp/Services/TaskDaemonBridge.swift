@@ -6,6 +6,17 @@ import KouenCore
 /// every call here goes through `Task.detached(priority: .utility)` so it never blocks
 /// the calling actor (RL-052, same fix `GitPanelView.runGitWithStatus` applies).
 enum TaskDaemonBridge {
+    actor SessionTaskRequests {
+        private var requests: [UUID: (refresh: UUID, task: Task<[TaskSummary], Never>)] = [:]
+
+        func list(sessionID: UUID, refresh: UUID, load: @Sendable @escaping () async -> [TaskSummary]) async -> [TaskSummary] {
+            if let entry = requests[sessionID], entry.refresh == refresh { return await entry.task.value }
+            let task = Task { await load() }
+            requests[sessionID] = (refresh, task)
+            return await task.value
+        }
+    }
+
     static func list(sessionID: UUID?) async -> [TaskSummary] {
         await Task.detached(priority: .utility) {
             guard let response = try? DaemonClient().request(.taskList(sessionID: sessionID)),

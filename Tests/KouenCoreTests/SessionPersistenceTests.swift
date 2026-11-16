@@ -2,6 +2,17 @@ import XCTest
 @testable import KouenCore
 
 final class SessionPersistenceTests: XCTestCase {
+    func test_TS_2320_BE_UT_immediateSaveSupersedesPendingSnapshot() throws {
+        let store = SessionStore()
+        var older = SessionSnapshot()
+        older.revision = 1
+        var newer = older
+        newer.revision = 2
+        store.save(older)
+        try store.saveImmediately(newer)
+        store.flushPendingSaveForTesting()
+        XCTAssertEqual(store.load().revision, 2)
+    }
     private var root: URL?
     private var previousHome: String?
 

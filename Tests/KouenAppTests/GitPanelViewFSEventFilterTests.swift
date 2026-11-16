@@ -6,6 +6,17 @@ import XCTest
 /// swallow the ref/log changes an external `git commit`/`push` produces —
 /// f6ffb0a's blanket `.git/` filter broke exactly that.
 final class GitPanelViewFSEventFilterTests: XCTestCase {
+    func test_TS_2324_BE_UT_refreshGateRunsOneTrailingRefreshWithoutOverlap() {
+        var gate = GitPanelRefreshGate()
+        XCTAssertTrue(gate.begin())
+        XCTAssertFalse(gate.begin())
+        XCTAssertFalse(gate.begin())
+        XCTAssertTrue(gate.isRunning)
+        XCTAssertTrue(gate.finish(), "bursts coalesce into one rerun after active git work completes")
+        XCTAssertTrue(gate.begin())
+        XCTAssertFalse(gate.finish())
+    }
+
     @MainActor
     func test_TS_2284_BE_UT_RapidWatcherStartStopCyclesRetainCallbackContextUntilQueueDrains() {
         let root = FileManager.default.temporaryDirectory

@@ -42,7 +42,19 @@ public final class SessionStore: @unchecked Sendable {
 
     public func saveImmediately(_ snapshot: SessionSnapshot) throws {
         try queue.sync {
+            pendingSave?.cancel()
+            pendingSave = nil
             try writeSnapshot(snapshot)
+        }
+    }
+
+    // Allows a test to execute the queued debounce deterministically without a wall-clock wait.
+    func flushPendingSaveForTesting() {
+        queue.sync {
+            let work = pendingSave
+            pendingSave = nil
+            work?.perform()
+            work?.cancel()
         }
     }
 
