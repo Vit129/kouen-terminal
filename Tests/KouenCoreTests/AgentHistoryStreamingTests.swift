@@ -41,4 +41,41 @@ final class AgentHistoryStreamingTests: XCTestCase {
         XCTAssertEqual(codexRecord?.modelName, "model-test")
         XCTAssertEqual(codexRecord?.latestTurns.last?.content, "last Codex")
     }
+
+    private func tempFile(_ data: Data) throws -> (URL, URL) {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        let url = root.appendingPathComponent("t.jsonl")
+        try data.write(to: url)
+        return (root, url)
+    }
+
+    func test_TS_2297_BE_UT_SequenceStreamsRecordsAcrossChunksAndIsRepeatable() throws {
+        var data = Data()
+        for i in 0..<5000 { data.append(Data("{\"i\":\(i),\"pad\":\"\(String(repeating: "x", count: 40))\"}\n".utf8)) }
+        let (root, url) = try tempFile(data)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let seq = try XCTUnwrap(AgentHistoryJSONLSequence(url: url))
+        XCTAssertEqual(seq.count, 5000)
+        XCTAssertEqual(Array(seq).count, 5000)
+        XCTAssertEqual(seq.enumerated().filter { $0.offset >= 4990 }.count, 10)
+        XCTAssertTrue(seq.isValid)
+    }
+
+    func test_TS_2298_BE_UT_PartialFinalLineDoesNotBreakEarlierRecords() throws {
+        let (root, url) = try tempFile(Data("{\"a\":1}\n{\"b\":2}\n{\"c\":".utf8))
+        defer { try? FileManager.default.removeItem(at: root) }
+        let seq = try XCTUnwrap(AgentHistoryJSONLSequence(url: url))
+        let parsed = seq.compactMap { historyJSONObject($0) }
+        XCTAssertEqual(parsed.count, 2)
+    }
+
+    func test_TS_2299_BE_UT_OversizedRecordRejectedSoCallerKeepsCachedRecord() throws {
+        var data = Data("{\"a\":\"".utf8)
+        data.append(Data(repeating: 0x78, count: AgentHistoryScanner.maxJSONLRecordBytes + 1))
+        data.append(Data("\"}\n".utf8))
+        let (root, url) = try tempFile(data)
+        defer { try? FileManager.default.removeItem(at: root) }
+        XCTAssertNil(AgentHistoryJSONLSequence(url: url))
+    }
 }
