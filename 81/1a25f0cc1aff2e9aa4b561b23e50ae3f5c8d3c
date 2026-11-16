@@ -1,0 +1,77 @@
+Packages/KouenCore/Sources/KouenCore/Agents/CodexTranscript.swift
+  s_236314cd75aa81::t_2df611e8d729f6 50
+  s_236314cd75aa81::t_99d5ab1fe45adb 7,54
+Packages/KouenCore/Sources/KouenCore/Agents/AgentHistoryScanner.swift
+  s_236314cd75aa81::t_99d5ab1fe45adb 764,786,810,1461,1508,1529,1773
+  s_236314cd75aa81::t_107076e2e462a1 721-722,1426-1427,1691-1692
+  s_236314cd75aa81::t_2df611e8d729f6 745-746,785,870,1449-1450,1507,1592,1742-1743,1873
+  s_236314cd75aa81::t_b2c41d53b7ca81 735
+  s_236314cd75aa81::t_6ae362ad017df2 431,437,465
+Packages/KouenDaemon/Sources/KouenDaemon/SurfaceRegistry.swift
+  s_236314cd75aa81::t_009d8d1ce00d93 56-58,65-71,225,266-272,277-282,308-315,328
+Packages/KouenCore/Sources/KouenCore/Platform/ProcessRunner.swift
+  s_236314cd75aa81::t_e54e688a1c42eb 2,4-6,54,60,65,67-69,71,161-167
+  s_236314cd75aa81::t_91525d10dd09b4 40-46,349,405-406,410,415,417,420,425-428,430,432-456
+  s_236314cd75aa81::t_5308775c209ff3 119,142-147,150,152,227-240,285,295,297,329-348,466-468,496,498-500
+  s_236314cd75aa81::t_852e4276203ae8 64,66,70,72-73
+  s_236314cd75aa81::t_cbfa84b51db4f0 3,52-53,55-59,61-63,110-112,171,175,179-183,213-218,276,281-282,286-287
+  s_236314cd75aa81::t_37d75c6af6f5a9 91,291-292
+  s_236314cd75aa81::t_95a7b97c6014a3 29-32,75
+  s_236314cd75aa81::t_4402059303c396 241,350
+Packages/KouenCore/Sources/KouenCore/Agents/AgentHistoryFTSIndex.swift
+  s_236314cd75aa81::t_e245e066668361 132,137,139,144-147,486,495-497,601
+Packages/KouenCore/Sources/KouenCore/Agents/ClaudeTranscript.swift
+  s_236314cd75aa81::t_99d5ab1fe45adb 32,74
+  s_236314cd75aa81::t_2df611e8d729f6 71
+Packages/KouenCore/Sources/KouenCore/Metadata/MetadataProvider.swift
+  s_236314cd75aa81::t_4c95f8ab3b2ffa 18,24-28,31,34
+  s_236314cd75aa81::t_6a51f8860e2f71 13-14,20,23,29-30,32
+  s_236314cd75aa81::t_cb33538e1a6783 19
+Tests/KouenTerminalKitTests/OutputCoalescerTests.swift
+  s_236314cd75aa81::t_f803c133b3bf17 51-62
+Apps/Kouen/Sources/KouenApp/UI/CommandPalette/CommandPaletteController.swift
+  s_236314cd75aa81::t_2fdd4ddb1a681a 1024
+Packages/KouenCore/Sources/KouenCore/Agents/AgentHistoryJSONLSequence.swift
+  s_236314cd75aa81::t_66e7420582e663 14,16-20,23-25,29
+  s_236314cd75aa81::t_99d5ab1fe45adb 3-7
+  s_236314cd75aa81::t_5df9ea9231cb3e 1-2,8-13,15,21-22,26-28,30-92
+Packages/KouenCore/Sources/KouenCore/Agents/AntigravityTranscript.swift
+  s_236314cd75aa81::t_99d5ab1fe45adb 17,75
+  s_236314cd75aa81::t_2df611e8d729f6 72
+Packages/KouenDaemon/Sources/KouenDaemon/RealPty.swift
+  s_236314cd75aa81::t_3bce4178df1fcc 147,1120-1121,1129,1139-1148
+Tests/KouenDaemonTests/SurfaceRegistryTests.swift
+  s_236314cd75aa81::t_6fa5c349b10e36 938-952
+Tests/KouenCoreTests/ProcessRunnerTests.swift
+  s_236314cd75aa81::t_4ca70b1213dac6 116-117,124-125
+  s_236314cd75aa81::t_b118adc4755ce3 91-92,143-149,151
+  s_236314cd75aa81::t_bd1b1e64d65505 131-137
+  s_236314cd75aa81::t_7bf3d0d03c5711 138-142,150,152-154
+Packages/KouenTerminalKit/Sources/KouenTerminalKit/TerminalHostView.swift
+  s_236314cd75aa81::t_75efae44cf6759 840,842,880-882,884-886,888,894-896,911-913
+  s_236314cd75aa81::t_c6277240d4420c 914-915
+Tests/KouenCoreTests/AgentHistoryScannerTests.swift
+  s_236314cd75aa81::t_fcf6b9dc10766c 49-61
+  s_236314cd75aa81::t_2defd479cd9063 62-70
+  s_236314cd75aa81::t_6e8a299d9a7582 370-385
+Tests/KouenCoreTests/AgentHistoryStreamingTests.swift
+  s_236314cd75aa81::t_7ee85c36a3db42 1-44
+Tests/KouenDaemonTests/RealPtyReapRecordTests.swift
+  s_236314cd75aa81::t_4731c7781fef22 111-117
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.3",
+  "base_commit_sha": "811a25f0cc1aff2e9aa4b561b23e50ae3f5c8d3c",
+  "prompts": {},
+  "sessions": {
+    "s_236314cd75aa81": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1e1e6-5e0d-7c81-b4cb-f1e72c10fd06",
+        "model": "gpt-6.1-terra"
+      },
+      "human_author": "Vit129 <vitosk129@gmail.com>"
+    }
+  }
+}
