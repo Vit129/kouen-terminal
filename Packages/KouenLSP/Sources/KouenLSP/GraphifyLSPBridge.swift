@@ -13,18 +13,30 @@ public enum GraphifyLSPBridge {
     }
 
     /// Looks up `sourceFile` (repo-root-relative, matching `graph.json`'s own `source_file`
-    /// field) in `<projectRoot>/graphify-out/graph.json`. Re-reads the file each call — call
-    /// sites are hover-rate (human-paced), not hot-path; add caching if that stops being true.
+    /// field) in `<projectRoot>/graphify-out/graph.json`. The parsed file index is cached per
+    /// root and re-parsed only when the file's mtime changes; the first call per root parses a
+    /// multi-MB file, so callers on the main thread should hop off it.
     public static func lookupFileInfo(sourceFile: String, projectRoot: URL) -> FileGraphInfo? {
         let graphURL = projectRoot.appendingPathComponent("graphify-out/graph.json")
+        guard let mtime = (try? FileManager.default.attributesOfItem(atPath: graphURL.path))?[.modificationDate] as? Date
+        else { return nil }
+        let key = graphURL.standardizedFileURL.path
+        if let cached = graphCache.entry(key: key, mtime: mtime) { return cached[sourceFile] }
         guard let data = try? Data(contentsOf: graphURL),
               let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let nodes = json["nodes"] as? [[String: Any]]
         else { return nil }
-        guard let node = nodes.first(where: { ($0["source_file"] as? String) == sourceFile }) else { return nil }
-        guard let pagerank = node["pagerank"] as? Double else { return nil }
-        return FileGraphInfo(pagerank: pagerank, community: node["community"] as? Int ?? -1)
+        var index: [String: FileGraphInfo] = [:]
+        for node in nodes {
+            guard let file = node["source_file"] as? String, index[file] == nil,
+                  let pagerank = node["pagerank"] as? Double else { continue }
+            index[file] = FileGraphInfo(pagerank: pagerank, community: node["community"] as? Int ?? -1)
+        }
+        graphCache.store(key: key, mtime: mtime, index: index)
+        return index[sourceFile]
     }
+
+    private static let graphCache = GraphIndexCache()
 
     /// Shells out to the `graphify` CLI for anything beyond a flat file-level lookup — `explain`
     /// (plain-language node + neighbors) and `path` (shortest path between two nodes) are its
@@ -49,5 +61,22 @@ public enum GraphifyLSPBridge {
             let data = pipe.fileHandleForReading.readDataToEndOfFile()
             return String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines)
         } catch { return nil }
+    }
+}
+
+private final class GraphIndexCache: @unchecked Sendable {
+    private let lock = NSLock()
+    private var entries: [String: (mtime: Date, index: [String: GraphifyLSPBridge.FileGraphInfo])] = [:]
+
+    func entry(key: String, mtime: Date) -> [String: GraphifyLSPBridge.FileGraphInfo]? {
+        lock.lock(); defer { lock.unlock() }
+        guard let e = entries[key], e.mtime == mtime else { return nil }
+        return e.index
+    }
+
+    func store(key: String, mtime: Date, index: [String: GraphifyLSPBridge.FileGraphInfo]) {
+        lock.lock(); defer { lock.unlock() }
+        if entries.count >= 8 { entries.removeAll() }
+        entries[key] = (mtime, index)
     }
 }

@@ -31,6 +31,7 @@ final class SSETransport: @unchecked Sendable {
     }
     private var sessions: [String: NWConnection] = [:]
     private var _isRunning = false
+    private var stopWaiter: CheckedContinuation<Void, Never>?
     private var isRunning: Bool {
         get {
             stateLock.lock()
@@ -93,9 +94,20 @@ final class SSETransport: @unchecked Sendable {
             self.isRunning = true
             l.start(queue: queue)
 
-            // Keep the async task running until cancelled or stopped
-            while self.isRunning && !Task.isCancelled {
-                try? await Task.sleep(nanoseconds: 100_000_000)
+            // Park until stop() or task cancellation; no polling loop.
+            await withTaskCancellationHandler {
+                await withCheckedContinuation { (waiter: CheckedContinuation<Void, Never>) in
+                    stateLock.lock()
+                    if _isRunning {
+                        stopWaiter = waiter
+                        stateLock.unlock()
+                    } else {
+                        stateLock.unlock()
+                        waiter.resume()
+                    }
+                }
+            } onCancel: {
+                self.stop()
             }
         } catch {
             fputs("kouen-mcp: Failed to bind HTTP server on \(host):\(port): \(error)\n", stderr)
@@ -104,7 +116,12 @@ final class SSETransport: @unchecked Sendable {
     }
 
     public func stop() {
-        self.isRunning = false
+        stateLock.lock()
+        _isRunning = false
+        let waiter = stopWaiter
+        stopWaiter = nil
+        stateLock.unlock()
+        waiter?.resume()
         queue.async {
             for (_, conn) in self.sessions {
                 conn.cancel()
@@ -118,8 +135,19 @@ final class SSETransport: @unchecked Sendable {
 
     // MARK: - Connection & HTTP Handling
 
+    /// A client that connects and then trickles (or never sends) its request line and headers
+    /// would otherwise hold the connection open indefinitely.
+    static let requestDeadline: DispatchTimeInterval = .seconds(10)
+    /// Connections that have not yet produced a full request; only touched on `queue`.
+    private var awaitingRequest = Set<ObjectIdentifier>()
+
     private func handleIncomingConnection(_ conn: NWConnection) {
         conn.start(queue: queue)
+        let id = ObjectIdentifier(conn)
+        awaitingRequest.insert(id)
+        queue.asyncAfter(deadline: .now() + Self.requestDeadline) { [weak self, conn] in
+            if self?.awaitingRequest.remove(id) != nil { conn.cancel() }
+        }
         readHTTPRequest(conn: conn, accumulated: Data())
     }
 
@@ -259,6 +287,7 @@ final class SSETransport: @unchecked Sendable {
     // MARK: - Routing & Dispatch
 
     private func dispatchRequest(conn: NWConnection, method: String, fullPath: String, headers: [String: String], body: Data) {
+        awaitingRequest.remove(ObjectIdentifier(conn))
         // Handle CORS Preflight
         if method == "OPTIONS" {
             sendCORSPreflightResponse(conn: conn)

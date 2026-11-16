@@ -1,7 +1,7 @@
 import Foundation
 import KouenCore
 
-enum TransportError: Error { case invalidUTF8Header, missingContentLength }
+enum TransportError: Error { case invalidUTF8Header, missingContentLength, frameTooLarge }
 
 enum MCPStdioFraming {
     case contentLength
@@ -9,10 +9,17 @@ enum MCPStdioFraming {
 }
 
 final class MCPStdioBuffer {
+    /// Largest accepted `Content-Length` body, and the most unframed bytes (no terminator yet)
+    /// buffered; beyond either, the frame is dropped instead of growing memory without bound.
+    static let maxFrameBytes = 16 * 1024 * 1024
     private var data = Data()
 
     func append(_ newData: Data) {
         data.append(newData)
+        // No complete frame can be this large; a peer streaming unframed bytes must not OOM us.
+        if data.count > Self.maxFrameBytes + 4096 && !data.starts(with: Data("Content-Length:".utf8)) {
+            data.removeAll()
+        }
     }
 
     func nextMessage() throws -> (JSONRPCMessage, MCPStdioFraming)? {
@@ -27,9 +34,16 @@ final class MCPStdioBuffer {
 
     private func nextContentLengthMessage() throws -> (JSONRPCMessage, MCPStdioFraming)? {
         guard let headerRange = data.range(of: Data("\r\n\r\n".utf8)) else {
+            if data.count > 64 * 1024 {
+                data.removeAll()
+                throw TransportError.frameTooLarge
+            }
             return nil
         }
+        // Every error below first removes the bad frame so the caller can keep reading;
+        // otherwise a malformed header would be re-parsed (and re-throw) forever.
         guard let header = String(data: data[..<headerRange.lowerBound], encoding: .utf8) else {
+            data.removeSubrange(..<headerRange.upperBound)
             throw TransportError.invalidUTF8Header
         }
         guard let contentLength = header
@@ -37,16 +51,21 @@ final class MCPStdioBuffer {
             .first(where: { $0.lowercased().hasPrefix("content-length:") })
             .flatMap({ Int($0.split(separator: ":", maxSplits: 1)[1].trimmingCharacters(in: .whitespaces)) })
         else {
+            data.removeSubrange(..<headerRange.upperBound)
             throw TransportError.missingContentLength
+        }
+        guard contentLength >= 0, contentLength <= Self.maxFrameBytes else {
+            data.removeSubrange(..<headerRange.upperBound)
+            throw TransportError.frameTooLarge
         }
 
         let bodyStart = headerRange.upperBound
         let bodyEnd = bodyStart + contentLength
         guard data.count >= bodyEnd else { return nil }
 
-        let message = try JSONDecoder().decode(JSONRPCMessage.self, from: data[bodyStart..<bodyEnd])
+        let body = data[bodyStart..<bodyEnd]
         data.removeSubrange(..<bodyEnd)
-        return (message, .contentLength)
+        return (try JSONDecoder().decode(JSONRPCMessage.self, from: body), .contentLength)
     }
 
     private func nextNewlineMessage() throws -> (JSONRPCMessage, MCPStdioFraming)? {
@@ -110,7 +129,11 @@ final class StdioTransport: @unchecked Sendable {
                 let data = FileHandle.standardInput.availableData
                 if data.isEmpty { break }
                 buffer.append(data)
-                while let (message, framing) = try? buffer.nextMessage() {
+                // A bad frame is already dropped by the buffer; skip it and keep serving.
+                while true {
+                    let next: (JSONRPCMessage, MCPStdioFraming)?
+                    do { next = try buffer.nextMessage() } catch { continue }
+                    guard let (message, framing) = next else { break }
                     self.framingLock.lock()
                     self.framing = framing
                     self.framingLock.unlock()

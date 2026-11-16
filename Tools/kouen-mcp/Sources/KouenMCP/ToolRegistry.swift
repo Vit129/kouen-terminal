@@ -441,6 +441,10 @@ struct ToolRegistry: Sendable {
         guard case let .string(path)? = args["path"] else {
             return (nil, JSONRPCError(code: -32602, message: "Missing 'path' parameter"))
         }
+        if let size = (try? FileManager.default.attributesOfItem(atPath: path))?[.size] as? Int,
+           size > Self.maxReadFileBytes {
+            return (nil, JSONRPCError(code: -32000, message: "File too large to read (\(size) bytes, limit \(Self.maxReadFileBytes)): \(path)"))
+        }
         guard let data = FileManager.default.contents(atPath: path),
               let content = String(data: data, encoding: .utf8) else {
             return (nil, JSONRPCError(code: -32000, message: "Cannot read file: \(path)"))
@@ -849,7 +853,7 @@ struct ToolRegistry: Sendable {
         let cwd: String?
         if case let .string(c)? = args["cwd"] { cwd = c } else { cwd = nil }
 
-        let (stdout, stderr, code) = await shell(command, cwd: cwd)
+        let (stdout, stderr, code) = await shell(command, cwd: cwd, timeout: 600)
         return (.object([
             "content": .array([.object([
                 "type": .string("text"),
@@ -1168,18 +1172,33 @@ struct ToolRegistry: Sendable {
 
     // MARK: - Helpers
 
+    static let maxReadFileBytes = 10 * 1024 * 1024
+    static let maxShellOutputBytes = 4 * 1024 * 1024
+    static let shellTimeoutSeconds: TimeInterval = 120
+
     /// Drains one pipe to EOF off-main via GCD (not `Task.detached`, which shares Swift's
     /// fixed cooperative pool and can starve under bursty concurrent calls) — same pattern
-    /// as `GitStatusProvider.status(rootPath:)`.
-    private func drainPipe(_ pipe: Pipe) async -> Data {
-        await withCheckedContinuation { (continuation: CheckedContinuation<Data, Never>) in
+    /// as `GitStatusProvider.status(rootPath:)`. Keeps at most `limit` bytes but always reads to
+    /// EOF, so a chatty child can neither fill the pipe and deadlock nor grow this process.
+    private func drainPipe(_ pipe: Pipe, limit: Int = ToolRegistry.maxShellOutputBytes) async -> (Data, Bool) {
+        await withCheckedContinuation { (continuation: CheckedContinuation<(Data, Bool), Never>) in
             DispatchQueue.global(qos: .userInitiated).async {
-                continuation.resume(returning: pipe.fileHandleForReading.readDataToEndOfFile())
+                var kept = Data()
+                var truncated = false
+                let handle = pipe.fileHandleForReading
+                while true {
+                    let chunk = handle.availableData
+                    if chunk.isEmpty { break }
+                    let room = limit - kept.count
+                    if chunk.count > room { truncated = true }
+                    if room > 0 { kept.append(chunk.prefix(room)) }
+                }
+                continuation.resume(returning: (kept, truncated))
             }
         }
     }
 
-    private func shell(_ command: String, cwd: String?) async -> (String, String, Int32) {
+    func shell(_ command: String, cwd: String?, timeout: TimeInterval = ToolRegistry.shellTimeoutSeconds) async -> (String, String, Int32) {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/bin/sh")
         process.arguments = ["-c", command]
@@ -1191,6 +1210,14 @@ struct ToolRegistry: Sendable {
         } catch {
             return ("", error.localizedDescription, -1)
         }
+        // A hung command must not wedge the (sequential) MCP stdio loop forever: SIGTERM at the
+        // deadline, SIGKILL if it ignores that.
+        let killer = ShellKiller(process: process)
+        let timer = DispatchSource.makeTimerSource(queue: .global())
+        timer.schedule(deadline: .now() + timeout)
+        timer.setEventHandler { killer.fire() }
+        timer.resume()
+        defer { timer.cancel() }
         // Drain both pipes CONCURRENTLY, before waitUntilExit(): this helper runs arbitrary
         // shell commands for MCP tools (git log, builds, etc.) whose output can exceed the
         // pipe buffer on either stream — reading sequentially (or after waitUntilExit())
@@ -1198,12 +1225,15 @@ struct ToolRegistry: Sendable {
         // agent-memory/knowledge/patterns/process-pipe-deadlock.md.
         async let outDataTask = drainPipe(outPipe)
         async let errDataTask = drainPipe(errPipe)
-        let (outData, errData) = await (outDataTask, errDataTask)
+        let ((outData, outCut), (errData, errCut)) = await (outDataTask, errDataTask)
         process.waitUntilExit()
-        let out = String(data: outData, encoding: .utf8)?
+        var out = String(data: outData, encoding: .utf8)?
             .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-        let err = String(data: errData, encoding: .utf8)?
+        var err = String(data: errData, encoding: .utf8)?
             .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        if outCut { out += "\n[stdout truncated at \(Self.maxShellOutputBytes) bytes]" }
+        if errCut { err += "\n[stderr truncated at \(Self.maxShellOutputBytes) bytes]" }
+        if killer.didFire { err += "\n[timed out after \(Int(timeout))s and was terminated]" }
         return (out, err, process.terminationStatus)
     }
 
@@ -1268,5 +1298,26 @@ struct ToolRegistry: Sendable {
     private func intArg(_ value: AnyCodable?, default defaultValue: Int) -> Int {
         guard case let .int(i)? = value else { return defaultValue }
         return i
+    }
+}
+
+/// SIGTERMs a process at its deadline and SIGKILLs it two seconds later if it is still running.
+private final class ShellKiller: @unchecked Sendable {
+    private let process: Process
+    private let lock = NSLock()
+    private var fired = false
+
+    init(process: Process) { self.process = process }
+
+    var didFire: Bool { lock.lock(); defer { lock.unlock() }; return fired }
+
+    func fire() {
+        guard process.isRunning else { return }
+        lock.lock(); fired = true; lock.unlock()
+        process.terminate()
+        let pid = process.processIdentifier
+        DispatchQueue.global().asyncAfter(deadline: .now() + 2) { [process] in
+            if process.isRunning { kill(pid, SIGKILL) }
+        }
     }
 }
