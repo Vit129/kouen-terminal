@@ -1,0 +1,27 @@
+Apps/Kouen/Sources/KouenApp/UI/FileEditor/FileEditorView.swift
+  s_3546f3791531e1::t_90374114fd4a05 49-50,223,429,461-464,473-482,489-490,501
+Apps/Kouen/Sources/KouenApp/UI/FileEditor/FileViewerViewController.swift
+  s_3546f3791531e1::t_5278c537be0b15 20-21,222,273,302,318-339,345
+Apps/Kouen/Sources/KouenApp/UI/FileEditor/MarkdownPreviewView.swift
+  s_3546f3791531e1::t_9775d599b3af86 13,187,202-214,216-219
+Apps/Kouen/Sources/KouenApp/UI/FileEditor/SyntaxTextView.swift
+  s_3546f3791531e1::t_df83ad35974c16 34-41,678-689,703,708,716,722,727,734,739,744,749
+Tests/KouenAppTests/FilePreviewReleaseTests.swift
+  s_3546f3791531e1::t_77ea5ce2bf64d1 1-28
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.3",
+  "base_commit_sha": "f956e0edfa3244ed8dd4178e154a02cd632b5b87",
+  "prompts": {},
+  "sessions": {
+    "s_3546f3791531e1": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d9313ef0-6765-42f0-9d15-df1f99a3cab1",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Vit129 <vitosk129@gmail.com>"
+    }
+  }
+}
