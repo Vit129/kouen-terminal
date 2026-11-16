@@ -17,7 +17,8 @@ final class FileViewerViewController: NSViewController {
     private let modeButton = KouenDesign.softIconButton(symbol: "pencil", tooltip: "Edit / View Source (⌘E)", size: 24)
     private let syntaxView = SyntaxTextView()
     private let markdownPreviewView = MarkdownPreviewView(frame: .zero)
-    private let quickLookView = QLPreviewView(frame: .zero, style: .normal)
+    /// Created on first QuickLook file, closed and dropped when another kind of file shows.
+    private var quickLookView: QLPreviewView?
     private let messageLabel = NSTextField(labelWithString: "")
     private let fileWatcher = FileChangeWatcher()
     // LSP integration (hover, go-to-definition, diagnostics) enabled.
@@ -177,13 +178,6 @@ final class FileViewerViewController: NSViewController {
         }
         view.addSubview(markdownPreviewView)
 
-        if let quickLookView {
-            quickLookView.translatesAutoresizingMaskIntoConstraints = false
-            quickLookView.autostarts = true
-            quickLookView.isHidden = true
-            view.addSubview(quickLookView)
-        }
-
         // LSP diagnostics
         lspSession.onDiagnostics = { [weak self] diagnostics in
             self?.syntaxView.setDiagnostics(diagnostics)
@@ -200,14 +194,6 @@ final class FileViewerViewController: NSViewController {
             markdownPreviewView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             markdownPreviewView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
         ]
-        if let quickLookView {
-            constraints.append(contentsOf: [
-                quickLookView.topAnchor.constraint(equalTo: header.bottomAnchor),
-                quickLookView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-                quickLookView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-                quickLookView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
-            ])
-        }
         NSLayoutConstraint.activate(constraints)
     }
 
@@ -233,7 +219,7 @@ final class FileViewerViewController: NSViewController {
         lspSession.close()
         messageLabel.isHidden = true
         syntaxView.isHidden = true
-        quickLookView?.isHidden = true
+        hideQuickLook()
         markdownPreviewView.isHidden = false
         modeButton.isHidden = false
         updateModeButtonUI()
@@ -284,7 +270,7 @@ final class FileViewerViewController: NSViewController {
 
     private func showText(_ text: String, url: URL, fileExtension ext: String, resetScroll: Bool) {
         messageLabel.isHidden = true
-        quickLookView?.isHidden = true
+        hideQuickLook()
         markdownPreviewView.isHidden = true
         syntaxView.isHidden = false
         syntaxView.load(text: text, fileExtension: ext, resetScroll: resetScroll)
@@ -313,7 +299,7 @@ final class FileViewerViewController: NSViewController {
 
     private func showQuickLook(_ url: URL) {
         lspSession.close()
-        guard let quickLookView else {
+        guard let quickLookView = quickLookView ?? makeQuickLookView() else {
             showMessage("Unable to start Quick Look preview.")
             return
         }
@@ -329,12 +315,34 @@ final class FileViewerViewController: NSViewController {
         quickLookView.isHidden = false
     }
 
+    private func makeQuickLookView() -> QLPreviewView? {
+        guard let preview = QLPreviewView(frame: .zero, style: .normal) else { return nil }
+        preview.translatesAutoresizingMaskIntoConstraints = false
+        preview.autostarts = true
+        view.addSubview(preview)
+        NSLayoutConstraint.activate([
+            preview.topAnchor.constraint(equalTo: header.bottomAnchor),
+            preview.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            preview.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            preview.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+        ])
+        quickLookView = preview
+        return preview
+    }
+
+    /// QLPreviewView holds a QuickLook XPC session until `close()`.
+    private func hideQuickLook() {
+        quickLookView?.close()
+        quickLookView?.removeFromSuperview()
+        quickLookView = nil
+    }
+
     private func showMessage(_ message: String) {
         lspSession.close()
         modeButton.isHidden = true
         markdownPreviewView.isHidden = true
         syntaxView.isHidden = true
-        quickLookView?.isHidden = true
+        hideQuickLook()
         messageLabel.isHidden = false
         messageLabel.stringValue = message
     }

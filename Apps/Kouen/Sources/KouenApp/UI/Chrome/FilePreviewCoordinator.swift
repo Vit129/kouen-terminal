@@ -245,6 +245,7 @@ final class FilePreviewCoordinator {
 
     func hideFileEditorSplit() {
         guard let panel = fileEditorPanel else { return }
+        fileEditorView?.teardown()
         panel.removeFromSuperview()
         editorDivider?.removeFromSuperview()
         fileEditorPanel = nil

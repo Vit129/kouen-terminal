@@ -3,13 +3,13 @@ _Auto-generated from GRAPH_REPORT.md · do not edit manually_
 _Regen: `graphify update .`_
 
 ## Summary
-- 20327 nodes · 58649 edges · 2690 communities (1555 shown, 1135 thin omitted)
-- Extraction: 85% EXTRACTED · 15% INFERRED · 0% AMBIGUOUS · INFERRED: 8656 edges (avg confidence: 0.74)
+- 20371 nodes · 58791 edges · 2690 communities (1554 shown, 1136 thin omitted)
+- Extraction: 85% EXTRACTED · 15% INFERRED · 0% AMBIGUOUS · INFERRED: 8691 edges (avg confidence: 0.74)
 - Token cost: 0 input · 0 output
 
 
 ## Graph Freshness
-- Built from commit: `efa54122`
+- Built from commit: `578a0a41`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -32,17 +32,19 @@ A high-degree node isn't always architecturally central - a widely-used
 utility/config file can rack up more edges than a real coupler while only
 ever touching one area. This ranks by how many DIFFERENT communities a
 node's neighbors span, not by raw edge count.
-1. `IPCRequest` - bridges 186 areas (211 edges)
-2. `Command` - bridges 101 areas (108 edges)
-3. `AgentKind` - bridges 81 areas (176 edges)
-4. `IPCResponse` - bridges 79 areas (107 edges)
-5. `KouenTerminalSurfaceView` - bridges 74 areas (346 edges)
-6. `SessionCoordinator` - bridges 69 areas (237 edges)
-7. `NSView` - bridges 65 areas (193 edges)
-8. `KouenGridTerminal` - bridges 65 areas (117 edges)
-9. `SurfaceRegistry` - bridges 64 areas (232 edges)
+1. `IPCRequest` - bridges 191 areas (211 edges)
+2. `Command` - bridges 102 areas (108 edges)
+3. `AgentKind` - bridges 87 areas (176 edges)
+4. `IPCResponse` - bridges 82 areas (107 edges)
+5. `KouenTerminalSurfaceView` - bridges 75 areas (346 edges)
+6. `SurfaceRegistry` - bridges 67 areas (232 edges)
+7. `SessionCoordinator` - bridges 66 areas (237 edges)
+8. `KouenGridTerminal` - bridges 66 areas (117 edges)
+9. `NSView` - bridges 65 areas (193 edges)
 
 ## Surprising Connections (you probably didn't know these)
+- `.selectedHost` --references--> `RemoteHost`  [INFERRED]
+  Apps/Kouen/Sources/KouenApp/Settings/SwiftUI/SettingsRemoteView.swift → Packages/KouenCore/Sources/KouenCore/Remote/RemoteHostStore.swift
 - `.terms` --calls--> `SearchMatcher`  [INFERRED]
   Apps/Kouen/Sources/KouenApp/UI/History/HistorySearchEvidence.swift → Packages/KouenCore/Sources/KouenCore/Search/SearchMatcher.swift
 - `DaemonSyncService` --calls--> `DaemonSessionService`  [INFERRED]
@@ -51,8 +53,6 @@ node's neighbors span, not by raw edge count.
   Apps/Kouen/Sources/KouenApp/Services/RemoteHostsService.swift → Packages/KouenCore/Sources/KouenCore/Remote/RemoteHostStore.swift
 - `.selectWorkspace(byIndex:)` --references--> `SessionSnapshot`  [INFERRED]
   Apps/Kouen/Sources/KouenApp/Services/SessionCoordinator.swift → Packages/KouenIPC/Sources/KouenIPC/SessionSnapshot.swift
-- `ThemeImportController` --calls--> `ThemeFileService`  [INFERRED]
-  Apps/Kouen/Sources/KouenApp/Services/ThemeImportController.swift → Packages/KouenTheme/Sources/KouenTheme/ThemeFileService.swift
 
 
 _Full map → GRAPH_REPORT.md · query: `graphify query "..."`_

@@ -95,14 +95,48 @@ public actor LSPClient {
         return []
     }
 
-    public func shutdown() async {
-        if process?.isRunning == true {
+    public func changeDocument(url: URL, text: String, version: Int) async throws {
+        // Full-text sync: the server advertises no incremental ranges from this client.
+        try await notify(method: "textDocument/didChange", params: .object([
+            "textDocument": .object([
+                "uri": .string(url.absoluteString),
+                "version": .int(version),
+            ]),
+            "contentChanges": .array([.object(["text": .string(text)])]),
+        ]))
+    }
+
+    public func closeDocument(url: URL) async throws {
+        try await notify(method: "textDocument/didClose", params: .object([
+            "textDocument": .object(["uri": .string(url.absoluteString)]),
+        ]))
+    }
+
+    /// Asks the server to shut down, but never waits longer than `timeout` for the reply
+    /// (a hung server must not pin its process and pipes), then terminates and, if it
+    /// ignores SIGTERM, SIGKILLs it.
+    public func shutdown(timeout: Duration = .seconds(2)) async {
+        if let proc = process, proc.isRunning {
+            let watchdog = Task { [weak self] in
+                try await Task.sleep(for: timeout)
+                await self?.failAllPending(LSPClientError.requestFailed("shutdown timed out"))
+            }
             _ = try? await request(method: "shutdown", params: nil)
+            watchdog.cancel()
             try? await notify(method: "exit", params: nil)
         }
         stdoutPipe?.fileHandleForReading.readabilityHandler = nil
         readerTask?.cancel()
-        process?.terminate()
+        if let proc = process, proc.isRunning {
+            proc.terminate()
+            let doomed = UncheckedProcess(proc)
+            Task.detached {
+                try? await Task.sleep(for: .seconds(1))
+                if doomed.process.isRunning { kill(doomed.process.processIdentifier, SIGKILL) }
+            }
+        }
+        failAllPending(LSPClientError.processNotRunning)
+        continuation.finish()
         process = nil
         stdinPipe = nil
         stdoutPipe = nil
@@ -172,7 +206,14 @@ public actor LSPClient {
 
     private func finishReading() {
         stdoutPipe?.fileHandleForReading.readabilityHandler = nil
+        failAllPending(LSPClientError.processNotRunning)
         continuation.finish()
+    }
+
+    private func failAllPending(_ error: Error) {
+        let waiting = pending
+        pending.removeAll()
+        for (_, continuation) in waiting { continuation.resume(throwing: error) }
     }
 
     private func handle(_ message: LSPMessage) {
@@ -198,4 +239,11 @@ public actor LSPClient {
             ]),
         ])
     }
+}
+
+/// Carries a `Process` into a detached task for the SIGKILL fallback; it only reads
+/// `isRunning`/`processIdentifier`, which Foundation allows from any thread.
+private struct UncheckedProcess: @unchecked Sendable {
+    let process: Process
+    init(_ process: Process) { self.process = process }
 }
