@@ -140,4 +140,20 @@ final class ParserRobustnessTests: XCTestCase {
         let grid = term.readGrid()!
         XCTAssertEqual(grid.cell(row: 0, col: 0)?.codepoint, UInt32(UnicodeScalar("d").value))
     }
+    func test_TS_2363_BE_UT_largeStringCapacityIsReleasedAfterDispatchAndAbort() throws {
+        let term = TerminalEmulator(cols: 4, rows: 2)
+        let parser = VTParser(handler: term)
+        for prefix in ["\u{1b}]1337;", "\u{1b}_G", "\u{1b}Pq"] {
+            for terminator in ["\u{07}", "\u{1b}\\", "\u{18}"] {
+                parser.feed(Array((prefix + String(repeating: "A", count: (1 << 20) + 1)).utf8))
+                parser.feed(Array(terminator.utf8))
+                for name in ["oscBuffer", "stringBuffer"] {
+                    let buffer = try XCTUnwrap(Mirror(reflecting: parser).children.first { $0.label == name }?.value as? [UInt8])
+                    XCTAssertTrue(buffer.isEmpty)
+                    XCTAssertLessThanOrEqual(buffer.capacity, 1 << 20, "\(prefix) / \(terminator)")
+                }
+            }
+        }
+    }
+
 }

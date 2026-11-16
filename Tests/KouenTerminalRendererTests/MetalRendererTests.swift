@@ -1541,6 +1541,24 @@ final class MetalRendererTests: XCTestCase {
         assertColor(center, r: 0, g: 255, b: 0, label: "block glyph green", tolerance: 32)
     }
 
+    func test_TS_2364_BE_UT_emptyImageFrameReleasesCachedTextures() throws {
+        let (device, renderer) = try makeRenderer()
+        let (w, h) = renderer.surfacePixelSize(columns: 2, rows: 2)
+        let target = try XCTUnwrap(makeTarget(device, width: w, height: h))
+        var f = frame(" ", cols: 2, rows: 2)
+        let image = DecodedImage(rgba: [255, 0, 0, 255], pixelWidth: 1, pixelHeight: 1)
+        f.images = [FrameImage(id: 1, column: 0, row: 0, columns: 1, rows: 1, z: 0, image: image)]
+        renderer.render(f, to: target, clearColor: .init(red: 0, green: 0, blue: 0, alpha: 1))
+        let cache = try XCTUnwrap(Mirror(reflecting: renderer).children.first { $0.label == "imageCache" }?.value as? ImageTextureCache)
+        func textureCount() throws -> Int {
+            try XCTUnwrap(Mirror(reflecting: cache).children.first { $0.label == "textures" }?.value as? [Int: MTLTexture]).count
+        }
+        XCTAssertEqual(try textureCount(), 1)
+        f.images = []
+        renderer.render(f, to: target, clearColor: .init(red: 0, green: 0, blue: 0, alpha: 1))
+        XCTAssertEqual(try textureCount(), 0)
+    }
+
     func testInlineImageRendersOverCell() throws {
         let (device, renderer) = try makeRenderer()
         let (w, h) = renderer.surfacePixelSize(columns: 2, rows: 2)

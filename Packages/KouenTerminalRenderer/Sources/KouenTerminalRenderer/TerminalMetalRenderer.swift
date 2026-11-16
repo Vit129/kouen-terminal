@@ -1584,8 +1584,8 @@ public final class TerminalMetalRenderer {
         ox: Float,
         oy: Float
     ) -> Int {
-        guard !images.isEmpty else { return 0 }
         imageCache.prune(keeping: Set(images.map { $0.id }))
+        guard !images.isEmpty else { return 0 }
         let cellW = Float(cellPixelWidth), cellH = Float(cellPixelHeight)
         var drawn = 0
         encoder.setRenderPipelineState(imagePipeline)
