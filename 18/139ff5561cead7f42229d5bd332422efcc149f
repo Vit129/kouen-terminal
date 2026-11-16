@@ -1,0 +1,25 @@
+Tests/KouenMCPTests/McpHardeningTests.swift
+  s_3546f3791531e1::t_ec7f3800f6b0e9 1-45
+Tools/kouen-mcp/Sources/KouenMCP/SSETransport.swift
+  s_3546f3791531e1::t_e71d7802c76c5b 34,97-110,119-124,138-143,146-150,290
+Tools/kouen-mcp/Sources/KouenMCP/StdioTransport.swift
+  s_3546f3791531e1::t_f224fab39af566 4,12-14,19-22,37-40,43-44,46,54,57-60,66,68,132-136
+Tools/kouen-mcp/Sources/KouenMCP/ToolRegistry.swift
+  s_3546f3791531e1::t_92a69293eb427a 444-447,1175-1178,1181-1184,1186-1196,1201,1213-1220,1228,1230,1232,1234-1236,1303-1323
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.3",
+  "base_commit_sha": "18139ff5561cead7f42229d5bd332422efcc149f",
+  "prompts": {},
+  "sessions": {
+    "s_3546f3791531e1": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d9313ef0-6765-42f0-9d15-df1f99a3cab1",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Vit129 <vitosk129@gmail.com>"
+    }
+  }
+}
