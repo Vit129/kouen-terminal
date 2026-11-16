@@ -3520,8 +3520,8 @@
     "semantic_hash": ""
   },
   "Tests/KouenCoreTests/GitMetadataProviderTests.swift": {
-    "mtime": 1794810110.0764184,
-    "ast_hash": "4164e2d8ec66c1c32c34e2ec47f92bcc",
+    "mtime": 1794834540.521136,
+    "ast_hash": "1e7e686ce591ab9ea3cd3a5d7bd9766b",
     "semantic_hash": ""
   },
   "Tests/KouenAppTests/TaskDashboardGroupingTests.swift": {
@@ -4967,6 +4967,11 @@
   "Tests/KouenCoreTests/SQLiteAvailability.swift": {
     "mtime": 1794827493.8800783,
     "ast_hash": "7219f00cccbb9e5d9531cb2d447e5964",
+    "semantic_hash": ""
+  },
+  "graphify-out/memory/query_20261116_130946_gitmetadataprovidertests_root_git_repository.md": {
+    "mtime": 1794834586.151436,
+    "ast_hash": "28bde527b8f589d4422d28c9aed73741",
     "semantic_hash": ""
   }
 }
