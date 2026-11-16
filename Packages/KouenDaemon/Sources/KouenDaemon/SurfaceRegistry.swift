@@ -220,22 +220,23 @@ public final class SurfaceRegistry: @unchecked Sendable {
     /// spinning a real PTY — same reasoning as `processMonitors` below.
     func noteSurfaceOutput(surfaceKey: String, data: Data) {
         monitorLock.lock()
-        var m = monitors[surfaceKey] ?? SurfaceMonitor()
-        m.sawOutput = true
-        m.outputGeneration &+= 1
-        m.lastOutput = Date()
+        monitors[surfaceKey, default: SurfaceMonitor()].sawOutput = true
+        monitors[surfaceKey, default: SurfaceMonitor()].outputGeneration &+= 1
+        monitors[surfaceKey, default: SurfaceMonitor()].lastOutput = Date()
         // Parser-aware bell: a raw `data.contains(0x07)` mistakes the OSC-terminator BEL that shell
         // integration emits on every prompt (OSC 133) for a real terminal bell. The scan threads
         // its state through `m.bellScan` so a sequence spanning chunks is still handled correctly.
-        if Self.scanForBell(data, state: &m.bellScan) { m.sawBell = true }
-        m.trailingOutput.append(data)
+        if Self.scanForBell(data, state: &monitors[surfaceKey, default: SurfaceMonitor()].bellScan) {
+            monitors[surfaceKey, default: SurfaceMonitor()].sawBell = true
+        }
         // P46 Pillar 6 gap 1: 1024 bytes was too small to reliably keep a full prompt signature
         // (e.g. a boxed "Allow tool?" prompt with surrounding ANSI framing) in the tail once
         // a wrapped CLI prints padding/borders around it — widened to 4096.
-        if m.trailingOutput.count > 4096 {
-            m.trailingOutput.removeFirst(m.trailingOutput.count - 4096)
+        monitors[surfaceKey, default: SurfaceMonitor()].trailingOutput.append(data)
+        let tailCount = monitors[surfaceKey, default: SurfaceMonitor()].trailingOutput.count
+        if tailCount > 4096 {
+            monitors[surfaceKey, default: SurfaceMonitor()].trailingOutput.removeFirst(tailCount - 4096)
         }
-        monitors[surfaceKey] = m
         monitorLock.unlock()
     }
 
@@ -348,7 +349,7 @@ public final class SurfaceRegistry: @unchecked Sendable {
                 changed = true; fired.append((.paneSilence, key))
             }
         }
-        if changed { commit() }
+        if changed { commit(immediate: false) }
         for (event, key) in fired { fireHookLocked(event, surfaceKey: key) }
         if !orphans.isEmpty {
             monitorLock.lock()
@@ -811,7 +812,7 @@ public final class SurfaceRegistry: @unchecked Sendable {
                 return .error("Surface not found")
             }
             session.write(text)
-            if clearWaitingStatusLocked(surfaceKey: surfaceID) { commit() }
+            if clearWaitingStatusLocked(surfaceKey: surfaceID) { commit(immediate: false) }
             return .ok
         case let .sendData(surfaceID, data, origin):
             if let rejection = checkWriteOriginLocked(surfaceID: surfaceID, origin: origin) { return rejection }
@@ -819,7 +820,7 @@ public final class SurfaceRegistry: @unchecked Sendable {
                 return .error("Surface not found")
             }
             session.write(data)
-            if clearWaitingStatusLocked(surfaceKey: surfaceID) { commit() }
+            if clearWaitingStatusLocked(surfaceKey: surfaceID) { commit(immediate: false) }
             return .ok
         case let .notify(surfaceID, title, body):
             let notification = AgentNotification(
@@ -830,7 +831,7 @@ public final class SurfaceRegistry: @unchecked Sendable {
             )
             NotificationBus.shared.post(notification)
             markWaiting(surfaceKey: surfaceID, text: body)
-            commit()
+            commit(immediate: false)
             fireHookLocked(.notificationPosted, surfaceKey: surfaceID)
             return .ok
         case let .notifyDone(surfaceID, title, body):
@@ -842,7 +843,7 @@ public final class SurfaceRegistry: @unchecked Sendable {
             )
             NotificationBus.shared.post(notification)
             markDone(surfaceKey: surfaceID, text: body)
-            commit()
+            commit(immediate: false)
             fireHookLocked(.notificationPosted, surfaceKey: surfaceID)
             // P46 Phase 3: a Stop-hook "turn finished normally" is the closest signal this daemon
             // has to "one agent tool-execution cycle completed" — snapshot the working tree so
@@ -892,7 +893,7 @@ public final class SurfaceRegistry: @unchecked Sendable {
             if let uuid = UUID(uuidString: surfaceID) {
                 editor.clearTabNotification(surfaceID: uuid)
             }
-            commit()
+            commit(immediate: false)
             return .ok
         case let .updateTabTitle(surfaceID, title):
             // OSC/program-driven rename. Honor `allow-rename` (global) and the
@@ -918,7 +919,7 @@ public final class SurfaceRegistry: @unchecked Sendable {
         case let .updateTabCwd(surfaceID, path):
             if let uuid = UUID(uuidString: surfaceID) {
                 editor.updateTabCwd(surfaceID: uuid, path: path)
-                commit()
+                commit(immediate: false)
             }
             return .ok
         case let .updateTabGitBranch(workspaceID, tabID, branch):
@@ -965,7 +966,7 @@ public final class SurfaceRegistry: @unchecked Sendable {
             let bytes = KeyTokenParser.encode(keys: keys)
             if let session = sessions[surfaceID] {
                 session.write(bytes)
-                if clearWaitingStatusLocked(surfaceKey: surfaceID) { commit() }
+                if clearWaitingStatusLocked(surfaceKey: surfaceID) { commit(immediate: false) }
                 return .ok
             }
             return .error("Surface not found")
@@ -1600,7 +1601,7 @@ public final class SurfaceRegistry: @unchecked Sendable {
                 _ = clearWaitingStatusLocked(surfaceKey: surfaceKey)
             }
         }
-        commit()
+        commit(immediate: false)
         for surfaceKey in transitioned { fireHookLocked(.agentStateChanged, surfaceKey: surfaceKey) }
     }
 
@@ -1897,7 +1898,7 @@ public final class SurfaceRegistry: @unchecked Sendable {
                 changed = true
             }
         }
-        if changed { commit() }
+        if changed { commit(immediate: false) }
     }
 
     /// Count of identified clients, injected by `DaemonServer` (which owns the FDs) for
@@ -2080,7 +2081,7 @@ public final class SurfaceRegistry: @unchecked Sendable {
             status: .error,
             notificationText: summary
         )
-        commit()
+        commit(immediate: false)
         onAgentStatusReachedTerminal?(surfaceKey)
     }
 

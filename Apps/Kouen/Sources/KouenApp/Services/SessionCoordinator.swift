@@ -35,6 +35,7 @@ final class SessionCoordinator: NSObject {
     let terminalHosts = TerminalPaneRegistry()
     private var lastDaemonErrorNotice: Date?
     private let snapshotCoalescer = SnapshotCoalescer()
+    private var lastDockWaitingCount: Int?
 
     var activeTabCWD: String? {
         guard let cwd = snapshot.activeWorkspace?.activeTab?.cwd, !cwd.isEmpty else { return nil }
@@ -135,14 +136,20 @@ final class SessionCoordinator: NSObject {
     }
 
     func updateDockAttentionBadge() {
+        // NSApp is nil when there is no NSApplication (e.g. under xctest).
+        guard let app = NSApp else { return }
         let allTabs = snapshot.workspaces
             .flatMap { $0.sessions }
             .flatMap { $0.tabs }
         let waitingCount = allTabs.filter { $0.status == .waiting }.count
-        // NSApp is nil when there is no NSApplication (e.g. under xctest).
-        guard let app = NSApp else { return }
+        guard Self.dockWaitingCountChanged(previous: lastDockWaitingCount, current: waitingCount) else { return }
+        lastDockWaitingCount = waitingCount
         app.dockTile.badgeLabel = waitingCount > 0 ? "\(waitingCount)" : nil
         app.dockTile.display()
+    }
+
+    static func dockWaitingCountChanged(previous: Int?, current: Int) -> Bool {
+        previous != current
     }
 
     // MARK: - Remote daemon

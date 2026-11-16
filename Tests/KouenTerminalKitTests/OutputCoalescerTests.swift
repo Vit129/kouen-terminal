@@ -61,6 +61,16 @@ final class OutputCoalescerTests: XCTestCase {
         XCTAssertTrue(drained.data.isEmpty)
         XCTAssertFalse(drained.hasMore)
     }
+
+    func test_TS_2323_BE_UT_spoolLimitThrowsInsteadOfDroppingOutput() throws {
+        let c = TerminalHostView.OutputCoalescer(maxMemoryBytes: 4, maxSpoolBytes: 5)
+        try c.append(Data([1, 2, 3, 4])) {}
+        try c.append(Data([5, 6])) {}
+        XCTAssertEqual(c.bufferedSpoolBytes, 2)
+        XCTAssertThrowsError(try c.append(Data([7, 8, 9, 10])) {})
+        XCTAssertEqual(c.bufferedSpoolBytes, 2, "failed append must preserve already buffered bytes for the overlay failure path")
+    }
+
     func test_TS_2293_BE_UT_ContinuousDrainReleasesConsumedChunks() throws {
         let c = TerminalHostView.OutputCoalescer(maxMemoryBytes: 1024)
         try c.append(Data(repeating: 1, count: 32)) {}

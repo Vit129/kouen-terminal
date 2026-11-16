@@ -10,6 +10,15 @@ final class SurfaceRegistryTests: XCTestCase {
     private var previousHome: String?
     private var previousShell: String?
 
+    func test_TS_2321_BE_UT_outputMonitorRecordsPTYOutput() {
+        let registry = SurfaceRegistry()
+        let key = UUID().uuidString
+        XCTAssertNil(registry.surfaceIdleTime(for: key))
+        registry.noteSurfaceOutput(surfaceKey: key, data: Data("prompt> ".utf8))
+        XCTAssertNotNil(registry.surfaceIdleTime(for: key))
+        registry.stopMonitoring()
+    }
+
     override func setUpWithError() throws {
         previousHome = getenv("KOUEN_HOME").map { String(cString: $0) }
         previousShell = getenv("SHELL").map { String(cString: $0) }

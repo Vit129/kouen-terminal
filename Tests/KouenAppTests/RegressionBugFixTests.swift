@@ -7,6 +7,22 @@ import KouenCore
 ///   - shellQuoted correctness for cd navigation
 @MainActor
 final class RegressionBugFixTests: XCTestCase {
+    private actor TaskRequestCounter {
+        private(set) var count = 0
+        func load() -> [TaskSummary] { count += 1; return [] }
+    }
+
+    func test_TS_2320_BE_UT_taskRequestsAreSharedForEntireRefresh() async {
+        let requests = TaskDaemonBridge.SessionTaskRequests()
+        let counter = TaskRequestCounter()
+        let session = UUID()
+        let refresh = UUID()
+        _ = await requests.list(sessionID: session, refresh: refresh) { await counter.load() }
+        _ = await requests.list(sessionID: session, refresh: refresh) { await counter.load() }
+        _ = await requests.list(sessionID: session, refresh: UUID()) { await counter.load() }
+        let count = await counter.count
+        XCTAssertEqual(count, 2)
+    }
 
     // MARK: - Helpers
 
@@ -64,6 +80,20 @@ final class RegressionBugFixTests: XCTestCase {
             DaemonSyncService.structureFingerprint(snap),
             "Fingerprint must be deterministic for an unchanged snapshot"
         )
+    }
+
+    func test_TS_2320_BE_UT_structureFingerprintUsesStableSetIdentity() {
+        let firstLeaf = PaneLeaf()
+        let secondLeaf = PaneLeaf()
+        let first = snap(tabs: [Tab(rootPane: .leaf(firstLeaf)), Tab(rootPane: .leaf(secondLeaf))])
+        let reordered = snap(tabs: [Tab(rootPane: .leaf(secondLeaf)), Tab(rootPane: .leaf(firstLeaf))])
+        XCTAssertEqual(DaemonSyncService.structureFingerprint(first), DaemonSyncService.structureFingerprint(reordered))
+    }
+
+    func test_TS_2322_BE_UT_dockBadgeUpdatesOnlyForWaitingCountChanges() {
+        XCTAssertTrue(SessionCoordinator.dockWaitingCountChanged(previous: nil, current: 0))
+        XCTAssertFalse(SessionCoordinator.dockWaitingCountChanged(previous: 2, current: 2))
+        XCTAssertTrue(SessionCoordinator.dockWaitingCountChanged(previous: 2, current: 1))
     }
 
     // MARK: - structureFingerprint: browser pane exclusion
