@@ -853,7 +853,7 @@ struct ToolRegistry: Sendable {
         let cwd: String?
         if case let .string(c)? = args["cwd"] { cwd = c } else { cwd = nil }
 
-        let (stdout, stderr, code) = await shell(command, cwd: cwd)
+        let (stdout, stderr, code) = await shell(command, cwd: cwd, timeout: 600)
         return (.object([
             "content": .array([.object([
                 "type": .string("text"),
