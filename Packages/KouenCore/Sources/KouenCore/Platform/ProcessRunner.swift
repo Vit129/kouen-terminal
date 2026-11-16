@@ -88,7 +88,7 @@ public struct ProcessResult: Sendable, Equatable {
     public var isSuccess: Bool { exitCode == 0 }
 
     public init(exitCode: Int32, stdout: String, stderr: String = "", isTimedOut: Bool = false, stdoutWasTruncated: Bool = false, stderrWasTruncated: Bool = false) {
-        self.exitCode = exitCode == 0 && (stdoutWasTruncated || stderrWasTruncated) ? -1 : exitCode
+        self.exitCode = exitCode
         self.stdout = stdout
         self.stderr = stderr
         self.isTimedOut = isTimedOut
@@ -297,7 +297,8 @@ private final class AsyncRunCoordinator: @unchecked Sendable {
             let note = cancelled ? "Process cancelled" : "Process timed out after \(timeoutVal ?? 0)s"
             stderrStr = stderrStr.isEmpty ? note : "\(stderrStr)\n\(note)"
         } else {
-            exitCode = rawStatus
+            // Drain never finished (pipe held open): output is unreliable, so do not report success.
+            exitCode = rawStatus == 0 && (outData == nil || errData == nil) ? -1 : rawStatus
         }
 
         continuation.resume(returning: ProcessResult(
@@ -436,7 +437,10 @@ public enum ProcessRunner {
                 _ = exited.wait(timeout: .now() + 1.5)
             }
         }
-        let drainDeadline = deadline ?? (.now() + 2)
+        // After exit, always allow a short grace so a process finishing right at the deadline is not
+        // reported as timed out; a descendant holding the pipe open is still cut off by this bound.
+        let graceDeadline: DispatchTime = .now() + 0.5
+        let drainDeadline = deadline.map { max($0, graceDeadline) } ?? (.now() + 2)
         let incomplete = group.wait(timeout: drainDeadline) == .timedOut
         if incomplete {
             if deadline != nil { timedOut = true }
@@ -450,7 +454,7 @@ public enum ProcessRunner {
             stderr = stderr.isEmpty ? note : "\(stderr)\n\(note)"
         }
         let status: Int32 = process.isRunning ? -1 : process.terminationStatus
-        return ProcessResult(exitCode: timedOut && status == 0 ? -1 : status,
+        return ProcessResult(exitCode: (timedOut || incomplete) && status == 0 ? -1 : status,
                              stdout: stdout, stderr: stderr, isTimedOut: timedOut,
                              stdoutWasTruncated: incomplete || outBuf.isTruncated(),
                              stderrWasTruncated: incomplete || errBuf.isTruncated())

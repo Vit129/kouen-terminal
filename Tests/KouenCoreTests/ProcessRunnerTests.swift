@@ -113,16 +113,12 @@ final class ProcessRunnerTests: XCTestCase {
     func test_TS_2292_BE_IT_OutputCaptureIsBoundedAndReportsTruncation() async {
         let arguments = ["-c", "yes x | head -c 5000000; yes y | head -c 5000000 >&2"]
         let sync = ProcessRunner.run(executable: "/bin/sh", arguments: arguments)
-        XCTAssertFalse(sync.isSuccess)
-        XCTAssertNotEqual(sync.exitCode, 0)
         XCTAssertEqual(sync.stdout.utf8.count, 4 * 1024 * 1024)
         XCTAssertEqual(sync.stderr.utf8.count, 4 * 1024 * 1024)
         XCTAssertTrue(sync.stdoutWasTruncated)
         XCTAssertTrue(sync.stderrWasTruncated)
 
         let async = await ProcessRunner.runAsync(executable: "/bin/sh", arguments: arguments)
-        XCTAssertFalse(async.isSuccess)
-        XCTAssertNotEqual(async.exitCode, 0)
         XCTAssertEqual(async.stdout.utf8.count, 4 * 1024 * 1024)
         XCTAssertEqual(async.stderr.utf8.count, 4 * 1024 * 1024)
         XCTAssertTrue(async.stdoutWasTruncated)
@@ -152,4 +148,18 @@ final class ProcessRunnerTests: XCTestCase {
         XCTAssertFalse(result.isSuccess)
     }
 
+
+    func test_TS_2300_BE_UT_TruncatedOutputKeepsRealExitCode() {
+        let res = ProcessRunner.run(executable: "/bin/sh", arguments: ["-c", "yes x | head -c 5000000"])
+        XCTAssertEqual(res.exitCode, 0)
+        XCTAssertTrue(res.isSuccess)
+        XCTAssertTrue(res.stdoutWasTruncated)
+    }
+
+    func test_TS_2301_BE_UT_ProcessExitingNearTimeoutIsNotTimedOut() {
+        let res = ProcessRunner.run(executable: "/bin/sh", arguments: ["-c", "sleep 0.9; echo done"], timeout: 1)
+        XCTAssertFalse(res.isTimedOut)
+        XCTAssertEqual(res.exitCode, 0)
+        XCTAssertEqual(res.stdout.trimmingCharacters(in: .whitespacesAndNewlines), "done")
+    }
 }
