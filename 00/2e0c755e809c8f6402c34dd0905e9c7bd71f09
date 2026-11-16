@@ -1,0 +1,27 @@
+Packages/KouenDaemon/Sources/KouenDaemon/MobileBridgeAgentIcons.swift
+  s_3546f3791531e1::t_b4553543431393 1,31-32
+Packages/KouenDaemon/Sources/KouenDaemon/MobileBridgeTextWrap.swift
+  s_3546f3791531e1::t_8cb8e4ebdb5e58 1,25-26
+Packages/KouenDaemon/Sources/KouenDaemon/MobileBridgeWebAssets.swift
+  s_3546f3791531e1::t_ec298fbec3d9b3 1,1276-1277
+Packages/KouenDaemon/Sources/KouenDaemon/TranscriptFileWatcher.swift
+  s_3546f3791531e1::t_de413ce71ca69e 1,44-45
+Tests/KouenCoreTests/ProcessRunnerTests.swift
+  s_3546f3791531e1::t_e5d68c0467e943 160
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.3",
+  "base_commit_sha": "002e0c755e809c8f6402c34dd0905e9c7bd71f09",
+  "prompts": {},
+  "sessions": {
+    "s_3546f3791531e1": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d9313ef0-6765-42f0-9d15-df1f99a3cab1",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Vit129 <vitosk129@gmail.com>"
+    }
+  }
+}
