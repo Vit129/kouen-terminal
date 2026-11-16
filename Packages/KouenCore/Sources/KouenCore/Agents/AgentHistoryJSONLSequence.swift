@@ -2,7 +2,11 @@ import Foundation
 
 /// Drain temporary Foundation JSON objects once per record during long history scans.
 func historyJSONObject(_ line: Data) -> [String: Any]? {
+    #if canImport(ObjectiveC)
     autoreleasepool { try? JSONSerialization.jsonObject(with: line) as? [String: Any] }
+    #else
+    try? JSONSerialization.jsonObject(with: line) as? [String: Any]
+    #endif
 }
 
 /// Repeatable bounded reader for history parser passes. Errors remain visible to the caller.
