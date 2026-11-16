@@ -446,7 +446,8 @@ final class AgentHistoryMultiAgentCoverageTests: XCTestCase {
 
     // MARK: - [TS-P55-012] FTS Search Indexing Surface Tags
 
-    func testFTSSearchMatchesSurfaceTags() {
+    func testFTSSearchMatchesSurfaceTags() throws {
+        try skipUnlessSQLiteAvailable()
         let tempDBPath = FileManager.default.temporaryDirectory
             .appendingPathComponent("fts_surface_\(UUID().uuidString).sqlite").path
         defer {

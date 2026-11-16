@@ -288,7 +288,8 @@ final class AgentHistoryScannerTests: XCTestCase {
 
     // MARK: - SQLite FTS5 Full-Transcript Index & Incremental Re-index (Slice C)
 
-    func testFTSIndexIncrementalReindexChecksMtimeAndSize() {
+    func testFTSIndexIncrementalReindexChecksMtimeAndSize() throws {
+        try skipUnlessSQLiteAvailable()
         let tempDB = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("test_fts_\(UUID().uuidString).sqlite")
         defer { try? FileManager.default.removeItem(at: tempDB) }
 
@@ -326,7 +327,8 @@ final class AgentHistoryScannerTests: XCTestCase {
         XCTAssertTrue(index.needsReindex(sessionID: "sess-1", mtime: initialDate, fileSize: 4096))
     }
 
-    func testFTSIndexMatchesDeepInLongTranscriptBeyondLast60Lines() {
+    func testFTSIndexMatchesDeepInLongTranscriptBeyondLast60Lines() throws {
+        try skipUnlessSQLiteAvailable()
         let tempDB = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("test_fts_deep_\(UUID().uuidString).sqlite")
         defer { try? FileManager.default.removeItem(at: tempDB) }
 
@@ -384,6 +386,7 @@ final class AgentHistoryScannerTests: XCTestCase {
     #endif
 
     func test_TS_2291_BE_IT_DiskBackedFTSChunkSearchDeduplicatesAndReplacesAtomically() throws {
+        try skipUnlessSQLiteAvailable()
         let path = FileManager.default.temporaryDirectory.appendingPathComponent("history-spool-\(UUID().uuidString).sqlite")
         defer {
             try? FileManager.default.removeItem(at: path)
@@ -418,6 +421,7 @@ final class AgentHistoryScannerTests: XCTestCase {
     }
 
     func test_TS_2292_BE_IT_AllSearchTermsCanSpanTranscriptChunks() throws {
+        try skipUnlessSQLiteAvailable()
         let path = FileManager.default.temporaryDirectory.appendingPathComponent("history-fts-\(UUID().uuidString).sqlite")
         defer { try? FileManager.default.removeItem(at: path) }
         let index = AgentHistoryFTSIndex(dbPath: path.path)
@@ -439,7 +443,8 @@ final class AgentHistoryScannerTests: XCTestCase {
         XCTAssertEqual(chunks.joined(), "1234567🙂tail")
     }
 
-    func testFTSIndexRespectsLimit() {
+    func testFTSIndexRespectsLimit() throws {
+        try skipUnlessSQLiteAvailable()
         let tempDB = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("test_fts_limit_\(UUID().uuidString).sqlite")
         defer { try? FileManager.default.removeItem(at: tempDB) }
 
@@ -471,7 +476,8 @@ final class AgentHistoryScannerTests: XCTestCase {
 
     // MARK: - Regression Tests for Defects 1-4
 
-    func testGhostSessionsPrunedWhenTranscriptDeletedOnDisk() {
+    func testGhostSessionsPrunedWhenTranscriptDeletedOnDisk() throws {
+        try skipUnlessSQLiteAvailable()
         let tempDB = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("test_prune_\(UUID().uuidString).sqlite")
         let tempTranscript = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("test_transcript_\(UUID().uuidString).jsonl")
         defer {
@@ -506,7 +512,8 @@ final class AgentHistoryScannerTests: XCTestCase {
 
     // A scan that misses a transcript (e.g. one agent's dir was unreadable this round) must not
     // drop a session whose file still exists — only files gone from disk are ghosts.
-    func testPruneKeepsUnseenSessionWhoseTranscriptStillExists() {
+    func testPruneKeepsUnseenSessionWhoseTranscriptStillExists() throws {
+        try skipUnlessSQLiteAvailable()
         let tempDB = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("test_prune_keep_\(UUID().uuidString).sqlite")
         let tempTranscript = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("test_transcript_\(UUID().uuidString).jsonl")
         defer {
