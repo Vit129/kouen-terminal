@@ -105,7 +105,8 @@ final class AgentNotchViewModel: ObservableObject {
         let rowStack = CGFloat(rowCount) * 38 + CGFloat(max(0, rowCount - 1)) * 5
         let ideal = 20 + 30 + 6 + rowStack + (hasOverflowRows ? 18 : 0)
         let minimum: CGFloat = rows.isEmpty ? 86 : 98
-        openContentHeight = min(CGFloat(geometry.openHeight), max(minimum, ideal.rounded(.up)))
+        let newHeight = min(CGFloat(geometry.openHeight), max(minimum, ideal.rounded(.up)))
+        if openContentHeight != newHeight { openContentHeight = newHeight }
     }
 
     // MARK: - Data refresh
@@ -147,6 +148,8 @@ final class AgentNotchViewModel: ObservableObject {
         if rows != updatedRows {
             rows = updatedRows
         }
+        let activeRowIDs = Set(updatedRows.map(\.id))
+        lastPeekAt = lastPeekAt.filter { activeRowIDs.contains($0.key) }
         if rowProgress != progress {
             rowProgress = progress
         }

@@ -1,8 +1,20 @@
+import Combine
 import XCTest
 import KouenCore
 @testable import KouenApp
 
 final class NotchLayoutMetricsTests: XCTestCase {
+    @MainActor
+    func test_TS_2367_BE_UT_unchangedNotchHeightDoesNotPublish() {
+        let model = AgentNotchViewModel()
+        model.updateGeometry(NotchLayoutMetrics.compute(for: .init(minX: 0, minY: 0, width: 1500, height: 900)))
+        var publications = 0
+        let subscription = model.$openContentHeight.dropFirst().sink { _ in publications += 1 }
+        model.updateGeometry(NotchLayoutMetrics.compute(for: .init(minX: 0, minY: 0, width: 1600, height: 900)))
+        XCTAssertEqual(publications, 0)
+        withExtendedLifetime(subscription) {}
+    }
+
     func testNonNotchScreenUsesCenteredFallbackPill() {
         let metrics = NotchLayoutMetrics.compute(for: NotchScreenMetrics(
             minX: 0,

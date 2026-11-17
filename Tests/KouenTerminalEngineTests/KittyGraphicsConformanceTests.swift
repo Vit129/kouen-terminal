@@ -117,4 +117,52 @@ final class KittyGraphicsConformanceTests: XCTestCase {
         term.feed("\u{1b}_Gi=1,a=d\u{1b}\\")
         XCTAssertEqual(term.readGrid().images.count, 1, "deleting id=1 must not touch id=2's placement")
     }
+    func test_TS_2361_BE_UT_kittyPendingSharesByteBudgetAcrossIDs() {
+        let term = TerminalEmulator(cols: 4, rows: 2)
+        term.kittyStorageByteLimit = 32
+        let payload = rgbaPayload(2, 2) // 24 encoded bytes per pending transfer
+        let out = responses(term) {
+            $0.feed("\u{1b}_Gf=32,s=2,v=2,i=1,a=t,m=1;\(payload)\u{1b}\\")
+            $0.feed("\u{1b}_Gf=32,s=2,v=2,i=2,a=t,m=1;\(payload)\u{1b}\\")
+        }
+        XCTAssertTrue(out.contains { $0.contains("ENOMEM") })
+        term.feed("\u{1b}_Gi=1,m=0;\u{1b}\\")
+        term.feed("\u{1b}_Gi=1,a=p\u{1b}\\")
+        XCTAssertEqual(term.readGrid().images.count, 1, "accepted transfer must still complete")
+    }
+
+    func test_TS_2362_BE_UT_kittyTransmittedImagesShareByteBudget() {
+        let term = TerminalEmulator(cols: 4, rows: 2)
+        term.kittyStorageByteLimit = 32
+        let payload = rgbaPayload(2, 2) // 16 decoded bytes
+        for id in 1...3 {
+            term.feed("\u{1b}_Gf=32,s=2,v=2,i=\(id),a=t;\(payload)\u{1b}\\")
+        }
+        let out = responses(term) { $0.feed("\u{1b}_Gi=1,a=p\u{1b}\\") }
+        XCTAssertTrue(out.contains { $0.contains("ENOENT") })
+        term.feed("\u{1b}_Gi=3,a=p\u{1b}\\")
+        XCTAssertEqual(term.readGrid().images.count, 1)
+    }
+
+    func test_TS_2368_BE_UT_kittyReplacementDoesNotDoubleCountStoredPixels() {
+        let term = TerminalEmulator(cols: 4, rows: 2)
+        term.kittyStorageByteLimit = 16
+        let payload = rgbaPayload(2, 2)
+        let out = responses(term) {
+            for _ in 0..<2 { $0.feed("\u{1b}_Gf=32,s=2,v=2,i=1,a=t;\(payload)\u{1b}\\") }
+        }
+        XCTAssertEqual(out.filter { $0.contains("OK") }.count, 2)
+    }
+
+    func test_TS_2369_BE_UT_pendingAndTransmittedImagesShareOneBudget() {
+        let term = TerminalEmulator(cols: 4, rows: 2)
+        term.kittyStorageByteLimit = 32
+        let payload = rgbaPayload(2, 2)
+        let out = responses(term) {
+            $0.feed("\u{1b}_Gf=32,s=2,v=2,i=1,a=t,m=1;\(payload)\u{1b}\\")
+            $0.feed("\u{1b}_Gf=32,s=2,v=2,i=2,a=t;\(payload)\u{1b}\\")
+        }
+        XCTAssertTrue(out.contains { $0.contains("ENOMEM") })
+    }
+
 }

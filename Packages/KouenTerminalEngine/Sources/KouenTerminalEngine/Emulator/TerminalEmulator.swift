@@ -103,6 +103,7 @@ public final class TerminalEmulator: VTParserHandler {
     /// In-flight Kitty graphics chunk reassembly, keyed by image id. The first chunk carries the
     /// control keys (format/dims); later chunks append payload until `m=0`.
     private var kittyPending: [Int: (command: KittyGraphicsCommand, payload: [UInt8])] = [:]
+    var kittyStorageByteLimit = 64 << 20
     private let maxKittyPendingBytes = 32 << 20
     /// The per-image byte cap bounds one in-flight transfer, but image ids are free integers —
     /// a hostile stream can open many distinct ids that each send `m=1` and never finish. Cap the
@@ -416,9 +417,18 @@ public final class TerminalEmulator: VTParserHandler {
         current.placeImage(image, cols: cols, rows: rows, z: z)
     }
 
+    private var kittyRetainedBytes: Int {
+        kittyPending.values.reduce(0) { $0 + $1.payload.count }
+            + kittyTransmittedImages.values.reduce(0) { $0 + $1.rgba.count }
+    }
+
     private func handleKittyGraphics(_ cmd: KittyGraphicsCommand) {
         let key = cmd.imageID
         if cmd.moreChunks {
+            guard cmd.payload.count <= kittyStorageByteLimit - kittyRetainedBytes else {
+                respondKitty(cmd, message: "ENOMEM:kitty storage budget exceeded", isError: true)
+                return
+            }
             if var pending = kittyPending[key] {
                 // Bound total reassembly memory, but KEEP the entry (with its first chunk's control
                 // keys) so the final chunk still resolves the original dims/format. Append only up
@@ -433,7 +443,9 @@ public final class TerminalEmulator: VTParserHandler {
                 // New in-flight image: drop all pending reassembly if we're at the id cap, so a
                 // flood of never-finished `m=1` chunks under distinct ids can't grow the map.
                 if kittyPending.count >= maxKittyPendingImages { kittyPending.removeAll() }
-                kittyPending[key] = (cmd, cmd.payload) // first chunk holds the control keys
+                var control = cmd
+                control.payload = [] // Don't retain a second copy when later chunks trigger COW.
+                kittyPending[key] = (control, Array(cmd.payload.prefix(maxKittyPendingBytes)))
             }
             return
         }
@@ -443,6 +455,11 @@ public final class TerminalEmulator: VTParserHandler {
         if let pending = kittyPending.removeValue(forKey: key) {
             base = pending.command
             payload = pending.payload
+            guard cmd.payload.count <= maxKittyPendingBytes - payload.count,
+                  cmd.payload.count <= kittyStorageByteLimit - kittyRetainedBytes - payload.count else {
+                respondKitty(base, message: "ENOMEM:kitty storage budget exceeded", isError: true)
+                return
+            }
             payload.append(contentsOf: cmd.payload)
         } else {
             base = cmd
@@ -469,8 +486,15 @@ public final class TerminalEmulator: VTParserHandler {
                 respondKitty(base, message: "OK", isError: false)
                 return
             }
-            if kittyTransmittedImages.count >= maxKittyTransmittedImages {
+            let replacedBytes = kittyTransmittedImages[base.imageID]?.rgba.count ?? 0
+            if kittyTransmittedImages.count >= maxKittyTransmittedImages
+                || image.rgba.count > kittyStorageByteLimit - kittyRetainedBytes + replacedBytes {
                 kittyTransmittedImages.removeAll() // same flood guard as kittyPending
+            }
+            let retainedReplacementBytes = kittyTransmittedImages[base.imageID]?.rgba.count ?? 0
+            guard image.rgba.count <= kittyStorageByteLimit - kittyRetainedBytes + retainedReplacementBytes else {
+                respondKitty(base, message: "ENOMEM:kitty storage budget exceeded", isError: true)
+                return
             }
             kittyTransmittedImages[base.imageID] = image
             respondKitty(base, message: "OK", isError: false)

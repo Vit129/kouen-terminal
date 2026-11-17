@@ -185,23 +185,12 @@ public final class SSHTunnelManager: @unchecked Sendable {
             p.arguments = a
             return p
         })(args)
-        let stdoutPipe = Pipe()
-        process.standardOutput = stdoutPipe
-        process.standardError = FileHandle.nullDevice
-        do {
-            try process.run()
-        } catch {
-            throw SSHTunnelError.launchFailed("\(error)")
-        }
-        let data = stdoutPipe.fileHandleForReading.readDataToEndOfFile()
-        process.waitUntilExit()
-
-        guard process.terminationStatus == 0 else {
+        let result = ProcessRunner.run(process: process, timeout: max(0.001, timeout))
+        guard result.isSuccess, !result.stdoutWasTruncated else {
             throw SSHTunnelError.launchFailed(
-                "ssh exited with status \(process.terminationStatus) while detecting the remote socket "
-                    + "path — check the host is reachable and `kouen-cli` is on its PATH")
+                "ssh socket detection failed (status \(result.exitCode)): \(result.stderr)")
         }
-        let path = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        let path = result.stdout.trimmingCharacters(in: .whitespacesAndNewlines)
         guard path.hasPrefix("/"), isSafeArgumentToken(path), !path.contains(":") else {
             throw SSHTunnelError.invalidConfiguration("remote returned an unexpected socket path: '\(path)'")
         }

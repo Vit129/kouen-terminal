@@ -194,8 +194,8 @@ final class VTParser {
     func reset() {
         state = .ground
         clearCSI()
-        oscBuffer.removeAll(keepingCapacity: true)
-        stringBuffer.removeAll(keepingCapacity: true)
+        oscBuffer.removeAll(keepingCapacity: oscBuffer.capacity <= 1 << 20)
+        stringBuffer.removeAll(keepingCapacity: stringBuffer.capacity <= 1 << 20)
         sawESCInString = false
         utf8Remaining = 0
     }
@@ -333,8 +333,8 @@ final class VTParser {
         // unterminated OSC/DCS/APC string state would keep consuming output until
         // the next ESC or BEL arrives.
         if byte == 0x18 || byte == 0x1A, state != .ground {
-            oscBuffer.removeAll(keepingCapacity: true)
-            stringBuffer.removeAll(keepingCapacity: true)
+            oscBuffer.removeAll(keepingCapacity: oscBuffer.capacity <= 1 << 20)
+            stringBuffer.removeAll(keepingCapacity: stringBuffer.capacity <= 1 << 20)
             sawESCInString = false
             clearCSI()
             state = .ground
@@ -424,12 +424,12 @@ final class VTParser {
         case 0x5B: // '['
             state = .csiEntry
         case 0x5D: // ']'
-            oscBuffer.removeAll(keepingCapacity: true)
+            oscBuffer.removeAll(keepingCapacity: oscBuffer.capacity <= 1 << 20)
             state = .oscString
         case 0x50: // DCS 'P' — capture (Sixel)
-            stringKind = .dcs; stringBuffer.removeAll(keepingCapacity: true); state = .stringCapture
+            stringKind = .dcs; stringBuffer.removeAll(keepingCapacity: stringBuffer.capacity <= 1 << 20); state = .stringCapture
         case 0x5F: // APC '_' — capture (Kitty graphics)
-            stringKind = .apc; stringBuffer.removeAll(keepingCapacity: true); state = .stringCapture
+            stringKind = .apc; stringBuffer.removeAll(keepingCapacity: stringBuffer.capacity <= 1 << 20); state = .stringCapture
         case 0x58, 0x5E: // SOS 'X', PM '^' — no payload of interest, discard
             state = .stringConsume
         case 0x20 ... 0x2F: // intermediate
@@ -605,12 +605,12 @@ final class VTParser {
             sawESCInString = false
             if byte == 0x5C { // backslash → ST terminates the string
                 handler.parserOSC(oscBuffer)
-                oscBuffer.removeAll(keepingCapacity: true)
+                oscBuffer.removeAll(keepingCapacity: oscBuffer.capacity <= 1 << 20)
                 state = .ground
                 return
             }
             // A lone ESC inside OSC aborts the string and reprocesses from ground.
-            oscBuffer.removeAll(keepingCapacity: true)
+            oscBuffer.removeAll(keepingCapacity: oscBuffer.capacity <= 1 << 20)
             state = .ground
             feedFromGround(byte)
             return
@@ -618,7 +618,7 @@ final class VTParser {
         switch byte {
         case 0x07: // BEL terminates OSC
             handler.parserOSC(oscBuffer)
-            oscBuffer.removeAll(keepingCapacity: true)
+            oscBuffer.removeAll(keepingCapacity: oscBuffer.capacity <= 1 << 20)
             state = .ground
         case 0x1B:
             sawESCInString = true
@@ -667,7 +667,7 @@ final class VTParser {
             sawESCInString = false
             if byte == 0x5C { dispatchCapturedString(); state = .ground; return }
             // A lone ESC aborts the string and reprocesses from ground.
-            stringBuffer.removeAll(keepingCapacity: true)
+            stringBuffer.removeAll(keepingCapacity: stringBuffer.capacity <= 1 << 20)
             state = .ground
             feedFromGround(byte)
             return
@@ -687,7 +687,7 @@ final class VTParser {
         case .dcs: handler.parserDCS(stringBuffer)
         case .apc: handler.parserAPC(stringBuffer)
         }
-        stringBuffer.removeAll(keepingCapacity: true)
+        stringBuffer.removeAll(keepingCapacity: stringBuffer.capacity <= 1 << 20)
     }
 
     /// Reprocess a byte as if freshly arriving in the ground state. Used when a string

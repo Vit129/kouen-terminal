@@ -287,6 +287,22 @@ final class SSHTunnelManagerTests: XCTestCase {
 
     // MARK: - Socket-path detection
 
+    func test_TS_2365_BE_UT_socketDetectionHasDeadlineAfterConnection() {
+        XCTAssertThrowsError(try SSHTunnelManager.detectSocketPath(
+            sshTarget: "fixture", timeout: 0.05,
+            makeProcess: { _ in
+                let process = Process()
+                process.executableURL = URL(fileURLWithPath: "/bin/sleep")
+                process.arguments = ["3"]
+                return process
+            })) { error in
+            guard case let SSHTunnelError.launchFailed(message) = error else {
+                return XCTFail("expected timeout launch failure, got \(error)")
+            }
+            XCTAssertTrue(message.contains("timed out"))
+        }
+    }
+
     func testDetectSocketPathTrimsAndReturnsRemoteStdout() throws {
         let path = try SSHTunnelManager.detectSocketPath(
             sshTarget: "rob@devbox",
