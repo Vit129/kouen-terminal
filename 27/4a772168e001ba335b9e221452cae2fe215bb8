@@ -1,0 +1,28 @@
+Scripts/graphify-commit.sh
+  s_387b614b8c4a18::t_ef4b322a802667 4
+Scripts/test_graphify_commit.py
+  s_387b614b8c4a18::t_ef4b322a802667 179
+  s_387b614b8c4a18::t_b5a033b9a41010 149-178,180-181
+ARCHITECTURE.md
+  s_387b614b8c4a18::t_ef4b322a802667 342
+rules/build-release.md
+  s_387b614b8c4a18::t_ef4b322a802667 45,47-49
+Scripts/start.mjs
+  s_387b614b8c4a18::t_ef4b322a802667 30-35,268
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.3",
+  "base_commit_sha": "274a772168e001ba335b9e221452cae2fe215bb8",
+  "prompts": {},
+  "sessions": {
+    "s_387b614b8c4a18": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1e744-bb29-71b0-be46-d5a3a0bb6d9c",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "Vit129 <vitosk129@gmail.com>"
+    }
+  }
+}
