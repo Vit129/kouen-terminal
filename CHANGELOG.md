@@ -7,6 +7,9 @@ has a matching `vX.Y.Z` tag and a signed, notarized DMG on
 [GitHub Releases](https://github.com/Vit129/kouen-terminal/releases).
 ## [Unreleased]
 
+### Added
+- Toggle the K menu-bar icon in Settings → Appearance, with immediate updates and a saved preference.
+
 ### Fixed
 - Index appended JSONL history records without replacing unchanged FTS chunks; preserve transactional replacement for rewritten transcripts.
 - Share immutable Metal resources between terminal panes and release them with the last renderer.

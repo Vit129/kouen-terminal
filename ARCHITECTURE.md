@@ -351,3 +351,7 @@ Offline Marked/Highlight/Mermaid/DOMPurify bundles are injected as WKUserScripts
 - Hidden Notch panels retain lightweight activity/peek transition detection but defer published HUD rows, agent sorting, progress detail and layout updates. Revealing the panel refreshes details before ordering it front.
 - SSH tunnel leases store child and owner birth identities in the private tunnels directory. Startup cleanup signals only a matching ssh child whose original owner is gone; live owners, reused child PIDs and unreadable live processes are preserved. Legacy tunnels without ownership leases are not guessed at.
 - JSONL FTS indexing retains a transactionally stored byte cursor and SHA-256 prefix fingerprint. A verified append extracts only new complete records into a disk spool; truncation or prefix rewrite replaces that session atomically. Prefix verification and session metadata collection may still read earlier bytes; this is incremental FTS extraction, not a claim that every scanner pass is incremental. Platforms without CryptoKit keep the existing full extraction path.
+
+## Menu-bar icon visibility
+
+`KouenSettings.showMenuBarIcon` defaults to true, including decoding older settings files. The Appearance toggle writes through `SettingsModel.update`; the existing settings/snapshot notification refreshes `MenuBarController` visibility synchronously on the main actor. The same status item/menu is retained while hidden, and startup reads the persisted value.

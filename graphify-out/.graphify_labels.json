@@ -2687,5 +2687,10 @@
   "2685": ".printSnapshot",
   "2686": "KouenCLI+Settings.swift",
   "2687": "TimeInterval",
-  "2688": "KouenCLI+Undo.swift"
+  "2688": "KouenCLI+Undo.swift",
+  "2689": "KouenCLI+Undo.swift",
+  "2690": "KouenCLI+Verify.swift",
+  "2691": "KouenCLI+Wake.swift",
+  "2692": "DispatchSourceSignal",
+  "2693": "WKUIDelegate"
 }
