@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Source from commit entrypoints after the final product/version edits.
 prepare_graph_for_commit() {
+  [[ "${GRAPHIFY_AUTO_REFRESH:-1}" = "0" ]] && return 0
   [[ -d graphify-out ]] || { echo "Graphify setup missing; stopping before commit." >&2; return 1; }
   PYTHONHASHSEED=0 graphify update . || return
   local tracked=() file

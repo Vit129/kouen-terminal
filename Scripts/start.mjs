@@ -27,7 +27,12 @@ const nextVersions = nextPatch ? ` (${nextPatch} / ${nextMinor} / ${nextMajor})`
 
 function runCommand(command, args) {
   return new Promise((resolve, reject) => {
-    const child = spawn(command, args, { stdio: 'inherit' });
+    const child = spawn(command, args, {
+      stdio: 'inherit',
+      // Every menu route, including nested release commits and Git hooks, stays
+      // independent of automatic knowledge-graph refreshes.
+      env: { ...process.env, GRAPHIFY_AUTO_REFRESH: '0', GRAPHIFY_SKIP_HOOK: '1' },
+    });
     child.on('close', (code) => {
       if (code === 0) {
         resolve();
@@ -260,8 +265,7 @@ async function main() {
       console.log(`\n✅ Selected: ${options.find(o => o.value === choice)?.display || choice}\n`);
     }
 
-    // Each commit helper awaits Graphify after its final source/version edits.
-    // Preview does not prepare commits.
+    // All selected commands inherit the menu policy from runCommand.
     if (choice === 'commit-push-merge') {
       const cpmArgs = [];
       if (commitMessage) {
