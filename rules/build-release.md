@@ -42,8 +42,10 @@ Full cycle: verify → bump → commit+push → prod → CHANGELOG → tag → G
 
 No worktree nested inside `.kouen-worktrees/`: never `git worktree add` a path under an existing `.kouen-worktrees/<name>` checkout. Create new worktrees only from the main repo root (`~/Git/Personal/kouen-terminal/.kouen-worktrees/<new-name>`), never from inside another worktree.
 
-## Graphify before every delivery commit
+## Graphify refresh policy
 
-Normal commit+push, full-cycle (including skip), direct version bump, and final changelog commits await `Scripts/graphify-commit.sh` after the last source/version edits. Refresh failures stop before commit/push. Tracked graph artifacts join the product/version files in the same commit; untracked queries/caches remain local. `GRAPHIFY_SKIP_HOOK=1` suppresses only the redundant post-commit Graphify refresh. Other Git hooks still run. A dirty main checkout, including graph edits, blocks worktree release rather than being discarded.
+`make start` never runs Graphify automatically for any option or shortcut. Its child commands inherit `GRAPHIFY_AUTO_REFRESH=0` and `GRAPHIFY_SKIP_HOOK=1`, so commit preparation and post-commit hooks skip refreshes throughout the selected flow. Run `graphify update .` explicitly when needed.
+
+Outside the menu, normal commit+push, full-cycle (including skip), direct version bump, and final changelog commits await `Scripts/graphify-commit.sh` after the last source/version edits. Refresh failures stop before commit/push. Tracked graph artifacts join the product/version files in the same commit; untracked queries/caches remain local. `GRAPHIFY_SKIP_HOOK=1` suppresses only the redundant post-commit Graphify refresh. Other Git hooks still run. A dirty main checkout, including graph edits, blocks worktree release rather than being discarded.
 
 The Git panel's commit and Commit & Push actions use the daemon's `GitCommitCommand` preparation, including on other graphified repositories. The daemon stops before Git on refresh failure; Push of already committed history does not create a new commit.

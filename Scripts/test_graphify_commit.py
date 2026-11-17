@@ -146,5 +146,38 @@ exit(result.exitCode)
         self.assertEqual(self.git("rev-list", "--count", "HEAD"), "1")
 
 
+class StartMenuGraphifyTests(unittest.TestCase):
+    def test_TS_2370_BE_IT_all_menu_choices_skip_graphify(self):
+        scratch = ROOT / ".tmp"
+        scratch.mkdir(exist_ok=True)
+        with tempfile.TemporaryDirectory(dir=scratch, prefix="menu-graphify-") as directory:
+            root = Path(directory)
+            for folder in ["Scripts", "bin", ".githooks", "graphify-out"]:
+                (root / folder).mkdir()
+            for name in ["start.mjs", "graphify-commit.sh"]:
+                shutil.copyfile(ROOT / "Scripts" / name, root / "Scripts" / name)
+            shutil.copyfile(ROOT / ".githooks/post-commit", root / ".githooks/post-commit")
+            # Exercise both refresh paths from each selected command, without builds,
+            # Git writes, preview cleanup, or publishing anything.
+            probe = "#!/bin/bash\nset -eu\nsource Scripts/graphify-commit.sh\nprepare_graph_for_commit\nbash .githooks/post-commit\necho dispatched >> calls\n"
+            for name in ["Scripts/commit-push-merge.sh", "Scripts/full-cycle.sh", "Scripts/run.sh", "bin/make"]:
+                path = root / name
+                path.write_text(probe)
+                path.chmod(0o755)
+            graphify = root / "bin/graphify"
+            graphify.write_text("#!/bin/sh\necho invoked >> graphify-called\nexit 9\n")
+            graphify.chmod(0o755)
+            env = {**os.environ, "PATH": str(root / "bin") + os.pathsep + os.environ["PATH"]}
+            for key in ["START_CHOICE", "CHOICE", "GRAPHIFY_AUTO_REFRESH", "GRAPHIFY_SKIP_HOOK"]:
+                env.pop(key, None)
+            for choice in ["1", "2", "3", "patch", "minor", "major", "skip"]:
+                with self.subTest(choice=choice):
+                    result = subprocess.run(["node", "Scripts/start.mjs", choice, "--yes"],
+                                            cwd=root, env=env, capture_output=True, text=True)
+                    self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                    self.assertFalse((root / "graphify-called").exists())
+            self.assertEqual(len((root / "calls").read_text().splitlines()) if (root / "calls").exists() else 0, 9)
+
+
 if __name__ == "__main__":
     unittest.main()
