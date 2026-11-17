@@ -5,11 +5,6 @@ All notable changes to Kouen are documented here. The format is based on
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Each released version
 has a matching `vX.Y.Z` tag and a signed, notarized DMG on
 [GitHub Releases](https://github.com/Vit129/kouen-terminal/releases).
-## [Unreleased]
-
-### Changed
-- Improve performance and responsiveness
-
 ## [4.23.0] - 2026-11-17
 
 ### Added
@@ -21,6 +16,7 @@ has a matching `vX.Y.Z` tag and a signed, notarized DMG on
 - Release markdown webview/QuickLook when hidden, skip redundant symbol scan, cheaper dirty check, cached regexes ([`f956e0e`](https://github.com/Vit129/kouen-terminal/commit/f956e0edfa3244ed8dd4178e154a02cd632b5b87))
 - Drop bad stdio frames and cap sizes, shell timeout and output cap, readFile cap, SSE parked wait and request deadline ([`18139ff`](https://github.com/Vit129/kouen-terminal/commit/18139ff5561cead7f42229d5bd332422efcc149f))
 - Finish incremental history and resource lifecycle fixes ([`700a303`](https://github.com/Vit129/kouen-terminal/commit/700a3034ac7da45e77660d5c96cb74ca9f42543f))
+- Improve performance and responsiveness (release v4.23.0) ([`c12b800`](https://github.com/Vit129/kouen-terminal/commit/c12b800bc538d9c5f90363a9e128bd58c1550fca))
 
 ### Fixed
 - Stream JSONL parsing and bound history scan memory ([`c7dbda6`](https://github.com/Vit129/kouen-terminal/commit/c7dbda6aaa52321c1600d4bb229766c23bab70bb))
@@ -37,18 +33,6 @@ has a matching `vX.Y.Z` tag and a signed, notarized DMG on
 - Guard TranscriptFileWatcher tests for Linux ([`234b886`](https://github.com/Vit129/kouen-terminal/commit/234b886bafeaea9a612b24c3239e073d1c9f1d3d))
 - Skip SQLite-FTS history tests on Linux ([`9d095bc`](https://github.com/Vit129/kouen-terminal/commit/9d095bc37e55eb2d991b2579c8b7d073c98d0b94))
 - Disable automatic Graphify in start menu ([`274a772`](https://github.com/Vit129/kouen-terminal/commit/274a772168e001ba335b9e221452cae2fe215bb8))
-
-
-## [Unreleased]
-
-### Added
-- Toggle the K menu-bar icon in Settings → Appearance, with immediate updates and a saved preference.
-
-### Fixed
-- Index appended JSONL history records without replacing unchanged FTS chunks; preserve transactional replacement for rewritten transcripts.
-- Share immutable Metal resources between terminal panes and release them with the last renderer.
-- Defer hidden Notch HUD detail updates while retaining attention and completion peeks.
-- Track SSH tunnel process ownership across launches and clean up verified orphan processes without signalling reused PIDs.
 
 ## [4.22.16] - 2026-11-15
 
