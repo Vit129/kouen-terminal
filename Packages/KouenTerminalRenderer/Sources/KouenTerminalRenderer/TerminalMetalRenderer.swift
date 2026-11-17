@@ -249,6 +249,7 @@ public final class TerminalMetalRenderer {
     public private(set) var stats = TerminalRenderStats()
     public var glyphAtlasStats: GlyphAtlasStats { atlas.stats }
 
+    let sharedResources: SharedMetalResources
     private let commandQueue: MTLCommandQueue
     private let bgPipeline: MTLRenderPipelineState
     private let glyphPipeline: MTLRenderPipelineState
@@ -328,7 +329,8 @@ public final class TerminalMetalRenderer {
         atlasSize: Int = 1024,
         atlasMaxPages: Int = 4
     ) {
-        guard let queue = device.makeCommandQueue() else { return nil }
+        guard let resources = SharedMetalResources.acquire(device: device) else { return nil }
+        sharedResources = resources
         let rasterizer = GlyphRasterizer(fontFamily: fontFamily, size: fontSize, scale: scale)
         guard let atlas = GlyphAtlas(
             device: device,
@@ -342,54 +344,27 @@ public final class TerminalMetalRenderer {
         self.cellPixelHeight = max(1, Int((metrics.height * scale).rounded()))
         self.ascentPixels = Int((metrics.ascent * scale).rounded())
 
-        do {
-            let library = try device.makeLibrary(source: MetalShaders.source, options: nil)
-            bgPipeline = try Self.makePipeline(
-                device: device, library: library,
-                vertex: "bg_vertex", fragment: "bg_fragment", blending: false
-            )
-            glyphPipeline = try Self.makePipeline(
-                device: device, library: library,
-                vertex: "glyph_vertex", fragment: "glyph_fragment", blending: true
-            )
-            decoPipeline = try Self.makePipeline(
-                device: device, library: library,
-                vertex: "deco_vertex", fragment: "deco_fragment", blending: true
-            )
-            imagePipeline = try Self.makePipeline(
-                device: device, library: library,
-                vertex: "image_vertex", fragment: "image_fragment", blending: true
-            )
-            overlayPipeline = try? Self.makePipeline(
-                device: device, library: library,
-                vertex: "overlay_vertex", fragment: "overlay_fragment", blending: true
-            )
-        } catch {
-            return nil
-        }
+        bgPipeline = resources.bgPipeline
+        glyphPipeline = resources.glyphPipeline
+        decoPipeline = resources.decoPipeline
+        imagePipeline = resources.imagePipeline
+        overlayPipeline = resources.overlayPipeline
         self.imageCache = ImageTextureCache(device: device)
         self.bgInstanceBuffer = DynamicInstanceBuffer(device: device, ringSize: Self.maxFramesInFlight, label: "bg-instances")
         self.glyphInstanceBuffer = DynamicInstanceBuffer(device: device, ringSize: Self.maxFramesInFlight, label: "glyph-instances")
         self.decoInstanceBuffer = DynamicInstanceBuffer(device: device, ringSize: Self.maxFramesInFlight, label: "deco-instances")
 
-        let sd = MTLSamplerDescriptor()
-        sd.minFilter = .linear
-        sd.magFilter = .linear
-        sd.sAddressMode = .clampToEdge
-        sd.tAddressMode = .clampToEdge
-        guard let sampler = device.makeSamplerState(descriptor: sd) else { return nil }
-
         self.device = device
-        self.commandQueue = queue
+        self.commandQueue = resources.commandQueue
         self.atlas = atlas
-        self.sampler = sampler
+        self.sampler = resources.sampler
     }
 
     public func purgeImageCache() {
         imageCache.removeAll()
     }
 
-    private static func makePipeline(
+    static func makePipeline(
         device: MTLDevice, library: MTLLibrary,
         vertex: String, fragment: String, blending: Bool
     ) throws -> MTLRenderPipelineState {

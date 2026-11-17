@@ -149,7 +149,7 @@ public final class AgentHistoryFTSIndex: @unchecked Sendable {
         }
     }
 
-    private static let sessionTables = ["session_records", "session_fts", "session_index_meta"]
+    private static let sessionTables = ["session_records", "session_fts", "session_index_meta", "session_fts_cursor"]
 
     private func openDatabase() {
         lock.lock()
@@ -187,6 +187,7 @@ public final class AgentHistoryFTSIndex: @unchecked Sendable {
             exec("DROP INDEX IF EXISTS idx_session_records_updated_at;", context: "migrate")
             exec("DROP TABLE IF EXISTS session_fts;", context: "migrate")
             exec("DROP TABLE IF EXISTS session_index_meta;", context: "migrate")
+            exec("DROP TABLE IF EXISTS session_fts_cursor;", context: "migrate")
             exec("PRAGMA user_version = \(Self.schemaVersion);", context: "migrate")
         }
 
@@ -199,6 +200,7 @@ public final class AgentHistoryFTSIndex: @unchecked Sendable {
         );
         """
         exec(createMetaSQL, context: "create session_index_meta")
+        exec("CREATE TABLE IF NOT EXISTS session_fts_cursor (session_id TEXT PRIMARY KEY, transcript_path TEXT NOT NULL, byte_offset INTEGER NOT NULL, digest TEXT NOT NULL);", context: "create session_fts_cursor")
 
         let createRecordsSQL = """
         CREATE TABLE IF NOT EXISTS session_records (
@@ -244,27 +246,33 @@ public final class AgentHistoryFTSIndex: @unchecked Sendable {
         exec(createFtsSQL, context: "create session_fts")
     }
 
+    func incrementalCursor(sessionID: String, path: String) -> AgentHistoryIncrementalFTS.Cursor? {
+        lock.lock()
+        defer { lock.unlock() }
+        return incrementalCursorLocked(sessionID: sessionID, path: path)
+    }
+
+    private func incrementalCursorLocked(sessionID: String, path: String) -> AgentHistoryIncrementalFTS.Cursor? {
+        var stmt: OpaquePointer?
+        guard sqlite3_prepare_v2(db, "SELECT byte_offset, digest FROM session_fts_cursor WHERE session_id = ? AND transcript_path = ?", -1, &stmt, nil) == SQLITE_OK else { return nil }
+        defer { sqlite3_finalize(stmt) }
+        sqlite3_bind_text(stmt, 1, sessionID, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
+        sqlite3_bind_text(stmt, 2, path, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
+        guard sqlite3_step(stmt) == SQLITE_ROW, let digest = sqlite3_column_text(stmt, 1) else { return nil }
+        return AgentHistoryIncrementalFTS.Cursor(offset: Int(sqlite3_column_int64(stmt, 0)), digest: String(cString: digest))
+    }
+
     /// Checks if a session needs to be re-indexed based on mtime and file size.
     public func needsReindex(sessionID: String, mtime: Date, fileSize: Int) -> Bool {
         lock.lock()
         defer { lock.unlock() }
         guard let db else { return true }
-
-        let sql = "SELECT mtime, file_size FROM session_index_meta WHERE session_id = ?"
         var stmt: OpaquePointer?
-        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else { return true }
+        guard sqlite3_prepare_v2(db, "SELECT mtime, file_size FROM session_index_meta WHERE session_id = ?", -1, &stmt, nil) == SQLITE_OK else { return true }
         defer { sqlite3_finalize(stmt) }
-
         sqlite3_bind_text(stmt, 1, sessionID, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
-        if sqlite3_step(stmt) == SQLITE_ROW {
-            let existingMtime = sqlite3_column_double(stmt, 0)
-            let existingSize = sqlite3_column_int64(stmt, 1)
-            let diff = abs(existingMtime - mtime.timeIntervalSince1970)
-            if diff < 0.001 && existingSize == Int64(fileSize) {
-                return false
-            }
-        }
-        return true
+        guard sqlite3_step(stmt) == SQLITE_ROW else { return true }
+        return abs(sqlite3_column_double(stmt, 0) - mtime.timeIntervalSince1970) >= 0.001 || sqlite3_column_int64(stmt, 1) != Int64(fileSize)
     }
 
     /// Persists multiple agent session records and their file metadata in a single transaction
@@ -553,6 +561,11 @@ public final class AgentHistoryFTSIndex: @unchecked Sendable {
         public let topicSegments: [String]?
         public let filesEdited: String
         public let toolsCalled: String
+        var incremental: AgentHistoryIncrementalFTS.Result? = nil
+        var incrementalJSONL: Bool = false
+        var projectPath: String? = nil
+        var transcriptModifiedAt: Date? = nil
+        var incrementalFiles: String = ""
 
         public init(
             sessionID: String,
@@ -592,7 +605,29 @@ public final class AgentHistoryFTSIndex: @unchecked Sendable {
     #if canImport(SQLite3)
     /// Indexes a batch of sessions in a single SQLite transaction with prepared statement reuse.
     public func indexSessionsBatch(_ items: [SessionIndexItem]) {
-        let itemsToIndex = items.filter { needsReindex(sessionID: $0.sessionID, mtime: $0.mtime, fileSize: $0.fileSize) }
+        let itemsToIndex = items.filter { needsReindex(sessionID: $0.sessionID, mtime: $0.mtime, fileSize: $0.fileSize) }.map { item in
+            var item = item
+            let provider: AgentKind?
+            if item.agentName == AgentKind.claudeCode.displayName { provider = .claudeCode }
+            else if item.agentName == AgentKind.antigravity.displayName { provider = .antigravity }
+            else if item.agentName == AgentKind.codex.displayName { provider = .codex }
+            else { provider = nil }
+            if let provider, item.incrementalJSONL {
+                let previous = incrementalCursor(sessionID: item.sessionID, path: item.transcriptPath)
+                item.incremental = AgentHistoryIncrementalFTS.extract(url: URL(fileURLWithPath: item.transcriptPath), previous: previous, provider: provider)
+                if let update = item.incremental {
+                    let symbols = item.projectPath.map { GraphifyIndexCache.shared.enrich(files: update.files, projectPath: $0) } ?? []
+                    item.incrementalFiles = update.files.union(symbols).joined(separator: " ")
+                }
+            }
+            return item
+        }.filter { item in
+            // A failed JSONL snapshot must retain the old index and cursor for retry.
+            if item.incrementalJSONL {
+                return item.incremental != nil
+            }
+            return true
+        }
         guard !itemsToIndex.isEmpty else { return }
 
         lock.lock()
@@ -600,8 +635,18 @@ public final class AgentHistoryFTSIndex: @unchecked Sendable {
         guard let db else { return }
 
         inTransaction("indexSessionsBatch") {
-            let sessionIDs = itemsToIndex.map(\.sessionID)
-            try deleteRows(sessionIDs, from: ["session_fts", "session_index_meta"], context: "batch reindex delete")
+            for item in itemsToIndex {
+                let current = incrementalCursorLocked(sessionID: item.sessionID, path: item.transcriptPath)
+                if let update = item.incremental {
+                    guard current?.offset == update.previous?.offset, current?.digest == update.previous?.digest,
+                          update.fileSize == item.fileSize, update.matches(path: item.transcriptPath),
+                          item.transcriptModifiedAt.map({ $0 == update.modified }) ?? true else { throw CocoaError(.fileWriteUnknown) }
+                }
+                if item.incremental?.append != true {
+                    try deleteRows([item.sessionID], from: ["session_fts", "session_fts_cursor"], context: "batch reindex delete")
+                }
+                try deleteRows([item.sessionID], from: ["session_index_meta"], context: "batch metadata delete")
+            }
 
             let insertFtsSQL = """
             INSERT INTO session_fts(session_id, title, first_prompt, full_transcript, git_branch, repo_name, agent, files_edited, tools_called)
@@ -625,8 +670,10 @@ public final class AgentHistoryFTSIndex: @unchecked Sendable {
                     sqlite3_bind_text(insertFtsStmt, 5, item.gitBranch ?? "", -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
                     sqlite3_bind_text(insertFtsStmt, 6, item.repoName, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
                     sqlite3_bind_text(insertFtsStmt, 7, ftsAgent, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
-                    sqlite3_bind_text(insertFtsStmt, 8, item.filesEdited, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
-                    sqlite3_bind_text(insertFtsStmt, 9, item.toolsCalled, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
+                    let files = item.incremental == nil ? item.filesEdited : item.incrementalFiles
+                    let tools = item.incremental.map { $0.tools.joined(separator: " ") } ?? item.toolsCalled
+                    sqlite3_bind_text(insertFtsStmt, 8, files, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
+                    sqlite3_bind_text(insertFtsStmt, 9, tools, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
                     let stepRes = sqlite3_step(insertFtsStmt)
                     guard stepRes == SQLITE_DONE else {
                         logStepFailure(stepRes, context: "insert batch session_fts")
@@ -635,15 +682,32 @@ public final class AgentHistoryFTSIndex: @unchecked Sendable {
                     insertedTranscript = true
                 }
 
-                if let spool = item.transcriptSpool {
+                if let update = item.incremental {
+                    if update.hasText { try update.spool.forEachChunk { try insertTranscriptChunk($0) } }
+                    else if !update.files.isEmpty || !update.tools.isEmpty { try insertTranscriptChunk("") }
+                } else if let spool = item.transcriptSpool {
                     try spool.forEachChunk { try insertTranscriptChunk($0) }
                 } else {
                     try Self.forEachFTSChunk(item.fullTranscript, insertTranscriptChunk)
                 }
-                if let topicSegments = item.topicSegments, !topicSegments.isEmpty {
+                if item.incremental?.append != true, let topicSegments = item.topicSegments, !topicSegments.isEmpty {
                     try insertTranscriptChunk("Milestones: " + topicSegments.joined(separator: " · "))
                 }
-                if !insertedTranscript { try insertTranscriptChunk("") }
+                if !insertedTranscript && item.incremental?.append != true { try insertTranscriptChunk("") }
+            }
+
+            let cursorSQL = "INSERT OR REPLACE INTO session_fts_cursor(session_id, transcript_path, byte_offset, digest) VALUES (?, ?, ?, ?)"
+            var cursorStmt: OpaquePointer?
+            guard sqlite3_prepare_v2(db, cursorSQL, -1, &cursorStmt, nil) == SQLITE_OK, let cursorStmt else { throw CocoaError(.fileWriteUnknown) }
+            defer { sqlite3_finalize(cursorStmt) }
+            for item in itemsToIndex {
+                guard let update = item.incremental else { continue }
+                sqlite3_reset(cursorStmt)
+                sqlite3_bind_text(cursorStmt, 1, item.sessionID, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
+                sqlite3_bind_text(cursorStmt, 2, item.transcriptPath, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
+                sqlite3_bind_int64(cursorStmt, 3, Int64(update.cursor.offset))
+                sqlite3_bind_text(cursorStmt, 4, update.cursor.digest, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
+                guard sqlite3_step(cursorStmt) == SQLITE_DONE else { throw CocoaError(.fileWriteUnknown) }
             }
 
             let insertMetaSQL = "INSERT INTO session_index_meta(session_id, transcript_path, mtime, file_size) VALUES (?, ?, ?, ?)"
@@ -852,6 +916,7 @@ public final class AgentHistoryFTSIndex: @unchecked Sendable {
         return dict
     }
     #else
+    func incrementalCursor(sessionID: String, path: String) -> AgentHistoryIncrementalFTS.Cursor? { nil }
     public func needsReindex(sessionID: String, mtime: Date, fileSize: Int) -> Bool { false }
     public func indexSession(
         sessionID: String,

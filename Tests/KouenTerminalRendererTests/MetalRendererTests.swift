@@ -47,6 +47,28 @@ final class MetalRendererTests: XCTestCase {
         )
     }
 
+    func test_TS_2371_BE_IT_renderersShareImmutableDeviceResources() throws {
+        let (device, first) = try makeRenderer()
+        let second = try makeRenderer(device: device)
+        for name in ["commandQueue", "bgPipeline", "glyphPipeline", "decoPipeline", "imagePipeline", "sampler"] {
+            let lhs = try XCTUnwrap(Mirror(reflecting: first).children.first { $0.label == name }?.value as AnyObject?)
+            let rhs = try XCTUnwrap(Mirror(reflecting: second).children.first { $0.label == name }?.value as AnyObject?)
+            XCTAssertTrue(lhs === rhs, "Device resource \(name) must be shared across panes")
+        }
+    }
+
+    func test_TS_2388_BE_IT_sharedDeviceResourcesReleaseWithLastRenderer() throws {
+        guard let device = MTLCreateSystemDefaultDevice() else { throw XCTSkip("No Metal device") }
+        weak var resources: SharedMetalResources?
+        try autoreleasepool {
+            let first = try makeRenderer(device: device)
+            let second = try makeRenderer(device: device)
+            resources = first.sharedResources
+            XCTAssertTrue(first.sharedResources === second.sharedResources)
+        }
+        XCTAssertNil(resources, "The cache must not retain GPU resources after every pane closes")
+    }
+
     private func makeAtlas(_ device: MTLDevice, size: Int = 1024, maxPages: Int = 4) throws -> GlyphAtlas {
         let rasterizer = GlyphRasterizer(fontFamily: "Menlo", size: 14, scale: 2)
         return try XCTUnwrap(

@@ -742,9 +742,9 @@ public actor AgentHistoryScanner {
     }
 
     private func parseClaudeTranscript(fileURL: URL, toIndex: inout [AgentHistoryFTSIndex.SessionIndexItem]) -> AgentSessionRecord? {
+        let fileURL = URL(fileURLWithPath: fileURL.path)
         guard let lines = AgentHistoryJSONLSequence(url: fileURL) else { return nil }
         let dataSize = lines.fileSize
-        guard let transcriptSpool = try? AgentHistoryTranscriptSpool() else { return nil }
 
         let sessionID = fileURL.deletingPathExtension().lastPathComponent
         var cwd: String?
@@ -796,6 +796,8 @@ public actor AgentHistoryScanner {
             }
         }
 
+        #if !canImport(CryptoKit)
+        guard let transcriptSpool = try? AgentHistoryTranscriptSpool() else { return nil }
         var hasTranscriptText = false
         func appendTranscript(_ text: String) throws {
             if hasTranscriptText { try transcriptSpool.append("\n") }
@@ -837,6 +839,11 @@ public actor AgentHistoryScanner {
             }
         }
 
+        #else
+        let filesEdited: Set<String> = []
+        let toolsCalled: Set<String> = []
+        #endif
+
         let finalCwd = cwd ?? FileManager.default.homeDirectoryForCurrentUser.path
         let projectName = (finalCwd as NSString).lastPathComponent
         let title = firstPrompt?.components(separatedBy: .newlines).first(where: { !$0.isEmpty }) ?? "Claude Session \(sessionID.prefix(8))"
@@ -847,6 +854,12 @@ public actor AgentHistoryScanner {
         let graphifySymbols = GraphifyIndexCache.shared.enrich(files: filesEdited, projectPath: finalCwd)
         let allFilesEdited = filesEdited.union(graphifySymbols).joined(separator: " ")
 
+        #if canImport(CryptoKit)
+        let fallbackSpool: AgentHistoryTranscriptSpool? = nil
+        #else
+        let fallbackSpool: AgentHistoryTranscriptSpool? = transcriptSpool
+        #endif
+
         toIndex.append(
             AgentHistoryFTSIndex.SessionIndexItem(
                 sessionID: sessionID,
@@ -856,7 +869,7 @@ public actor AgentHistoryScanner {
                 title: title,
                 firstPrompt: firstPrompt ?? "",
                 fullTranscript: "",
-                transcriptSpool: transcriptSpool,
+                transcriptSpool: fallbackSpool,
                 gitBranch: gitBranch,
                 repoName: projectName,
                 agentName: AgentKind.claudeCode.displayName,
@@ -865,6 +878,12 @@ public actor AgentHistoryScanner {
                 toolsCalled: toolsCalled.joined(separator: " ")
             )
         )
+
+        #if canImport(CryptoKit)
+        toIndex[toIndex.count - 1].incrementalJSONL = true
+        toIndex[toIndex.count - 1].transcriptModifiedAt = modDate
+        toIndex[toIndex.count - 1].projectPath = finalCwd
+        #endif
 
         let (claudeModel, _, claudeUsage) = ClaudeTranscriptLine.meta(from: lines)
         guard lines.isValid else { toIndex.removeLast(); return nil }
@@ -1229,7 +1248,11 @@ public actor AgentHistoryScanner {
 
             var firstPrompt: String = preview.isEmpty ? title : preview
             var turns: [AgentHistoryTurn] = []
+            #if canImport(CryptoKit)
+            let fullTranscript: String = ""
+            #else
             var fullTranscript: String = ""
+            #endif
             var transcriptPath: String = dbPath
             var fileSize: Int = 0
             var messageCount = stepCount
@@ -1265,7 +1288,9 @@ public actor AgentHistoryScanner {
                     if !lines.isEmpty {
                         messageCount = max(messageCount, lines.count)
                         var promptFound = false
+                        #if !canImport(CryptoKit)
                         var parts: [String] = []
+                        #endif
                         for line in lines {
                             // One scan is a single long async job, so autoreleased JSON objects
                             // would otherwise pile up until the whole scan returns.
@@ -1274,7 +1299,9 @@ public actor AgentHistoryScanner {
                                 return antigravityTurn(json)
                             }
                             if let (role, trimmed) = turn {
+                                #if !canImport(CryptoKit)
                                 parts.append(trimmed)
+                                #endif
                                 if role == "YOU" && !promptFound {
                                     firstPrompt = trimmed
                                     promptFound = true
@@ -1285,7 +1312,9 @@ public actor AgentHistoryScanner {
                         let agMeta = AntigravityTranscriptLine.meta(from: lines.map { Data($0) })
                         latestUsage = agMeta.usage
                         detectedModel = agMeta.model
+                        #if !canImport(CryptoKit)
                         fullTranscript = parts.joined(separator: "\n")
+                        #endif
                     }
                 }
             }
@@ -1318,6 +1347,13 @@ public actor AgentHistoryScanner {
                     toolsCalled: ""
                 )
             )
+
+            #if canImport(CryptoKit)
+            if transcriptPath.hasSuffix(".jsonl") {
+                toIndex[toIndex.count - 1].incrementalJSONL = true
+                toIndex[toIndex.count - 1].projectPath = finalPath
+            }
+            #endif
 
             let record = AgentSessionRecord(
                 id: conversationID,
@@ -1446,9 +1482,9 @@ public actor AgentHistoryScanner {
     }
 
     func parseAntigravityTranscript(sessionID: String, fileURL: URL, toIndex: inout [AgentHistoryFTSIndex.SessionIndexItem]) -> AgentSessionRecord? {
+        let fileURL = URL(fileURLWithPath: fileURL.path)
         guard let lines = AgentHistoryJSONLSequence(url: fileURL) else { return nil }
         let dataSize = lines.fileSize
-        guard let transcriptSpool = try? AgentHistoryTranscriptSpool() else { return nil }
 
         var firstPrompt: String?
         var projectPath: String?
@@ -1516,6 +1552,8 @@ public actor AgentHistoryScanner {
             }
         }
 
+        #if !canImport(CryptoKit)
+        guard let transcriptSpool = try? AgentHistoryTranscriptSpool() else { return nil }
         var hasTranscriptText = false
         func appendTranscript(_ text: String) throws {
             if hasTranscriptText { try transcriptSpool.append("\n") }
@@ -1558,6 +1596,11 @@ public actor AgentHistoryScanner {
             }
         }
 
+        #else
+        let filesEdited: Set<String> = []
+        let toolsCalled: Set<String> = []
+        #endif
+
         let homePath = FileManager.default.homeDirectoryForCurrentUser.path
         let finalPath = projectPath ?? homePath
         let projectName = (finalPath as NSString).lastPathComponent
@@ -1569,6 +1612,12 @@ public actor AgentHistoryScanner {
         let graphifySymbols = GraphifyIndexCache.shared.enrich(files: filesEdited, projectPath: finalPath)
         let allFilesEdited = filesEdited.union(graphifySymbols).joined(separator: " ")
 
+        #if canImport(CryptoKit)
+        let fallbackSpool: AgentHistoryTranscriptSpool? = nil
+        #else
+        let fallbackSpool: AgentHistoryTranscriptSpool? = transcriptSpool
+        #endif
+
         toIndex.append(
             AgentHistoryFTSIndex.SessionIndexItem(
                 sessionID: sessionID,
@@ -1578,7 +1627,7 @@ public actor AgentHistoryScanner {
                 title: title,
                 firstPrompt: firstPrompt ?? "",
                 fullTranscript: "",
-                transcriptSpool: transcriptSpool,
+                transcriptSpool: fallbackSpool,
                 gitBranch: nil,
                 repoName: projectName,
                 agentName: AgentKind.antigravity.displayName,
@@ -1587,6 +1636,12 @@ public actor AgentHistoryScanner {
                 toolsCalled: toolsCalled.joined(separator: " ")
             )
         )
+
+        #if canImport(CryptoKit)
+        toIndex[toIndex.count - 1].incrementalJSONL = true
+        toIndex[toIndex.count - 1].transcriptModifiedAt = modDate
+        toIndex[toIndex.count - 1].projectPath = finalPath
+        #endif
 
         let agMeta = AntigravityTranscriptLine.meta(from: lines)
         guard lines.isValid else { toIndex.removeLast(); return nil }
@@ -1739,9 +1794,9 @@ public actor AgentHistoryScanner {
         ftsIndex: AgentHistoryFTSIndex? = nil,
         toIndex: inout [AgentHistoryFTSIndex.SessionIndexItem]
     ) -> AgentSessionRecord? {
+        let fileURL = URL(fileURLWithPath: fileURL.path)
         guard let lines = AgentHistoryJSONLSequence(url: fileURL) else { return nil }
         let dataSize = lines.fileSize
-        guard let transcriptSpool = try? AgentHistoryTranscriptSpool() else { return nil }
 
         var sessionID: String?
         var cwd: String?
@@ -1760,6 +1815,8 @@ public actor AgentHistoryScanner {
             return out.trimmingCharacters(in: .whitespacesAndNewlines)
         }
 
+        #if !canImport(CryptoKit)
+        guard let transcriptSpool = try? AgentHistoryTranscriptSpool() else { return nil }
         var hasTranscriptText = false
         func appendTranscript(_ text: String) throws {
             if hasTranscriptText { try transcriptSpool.append("\n") }
@@ -1768,6 +1825,11 @@ public actor AgentHistoryScanner {
         }
         var filesEdited: Set<String> = []
         var toolsCalled: Set<String> = []
+
+        #else
+        let filesEdited: Set<String> = []
+        let toolsCalled: Set<String> = []
+        #endif
 
         for line in lines {
             guard let json = historyJSONObject(line) else { continue }
@@ -1792,6 +1854,7 @@ public actor AgentHistoryScanner {
                 continue
             }
 
+            #if !canImport(CryptoKit)
             let itemType = (payload?["type"] as? String) ?? type
             if itemType == "function_call" {
                 let name = (payload?["name"] as? String) ?? (json["name"] as? String) ?? ""
@@ -1807,6 +1870,7 @@ public actor AgentHistoryScanner {
                 }
             }
 
+            #endif
             let isMessage = (type == "message") || (type == "response_item" && payload?["type"] as? String == "message")
             if isMessage {
                 let role = ((payload?["role"] ?? json["role"]) as? String)?.lowercased() ?? ""
@@ -1821,7 +1885,9 @@ public actor AgentHistoryScanner {
                             continue
                         }
 
+                        #if !canImport(CryptoKit)
                         do { try appendTranscript(text) } catch { return nil }
+                        #endif
                         messageCount += 1
                         if firstPrompt == nil && role == "user" {
                             firstPrompt = text
@@ -1849,6 +1915,12 @@ public actor AgentHistoryScanner {
         let graphifySymbols = GraphifyIndexCache.shared.enrich(files: filesEdited, projectPath: finalCwd)
         let allFilesEdited = filesEdited.union(graphifySymbols).joined(separator: " ")
 
+        #if canImport(CryptoKit)
+        let fallbackSpool: AgentHistoryTranscriptSpool? = nil
+        #else
+        let fallbackSpool: AgentHistoryTranscriptSpool? = transcriptSpool
+        #endif
+
         toIndex.append(
             AgentHistoryFTSIndex.SessionIndexItem(
                 sessionID: resolvedID,
@@ -1858,7 +1930,7 @@ public actor AgentHistoryScanner {
                 title: title,
                 firstPrompt: firstPrompt ?? "",
                 fullTranscript: "",
-                transcriptSpool: transcriptSpool,
+                transcriptSpool: fallbackSpool,
                 gitBranch: gitBranch,
                 repoName: projectName,
                 agentName: AgentKind.codex.displayName,
@@ -1868,6 +1940,12 @@ public actor AgentHistoryScanner {
                 toolsCalled: toolsCalled.joined(separator: " ")
             )
         )
+
+        #if canImport(CryptoKit)
+        toIndex[toIndex.count - 1].incrementalJSONL = true
+        toIndex[toIndex.count - 1].transcriptModifiedAt = modDate
+        toIndex[toIndex.count - 1].projectPath = finalCwd
+        #endif
 
         let codexMeta = CodexTranscriptLine.meta(from: lines)
         guard lines.isValid else { toIndex.removeLast(); return nil }

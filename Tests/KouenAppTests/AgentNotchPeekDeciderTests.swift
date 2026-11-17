@@ -1,3 +1,4 @@
+import Combine
 import XCTest
 import KouenCore
 @testable import KouenApp
@@ -89,6 +90,39 @@ final class AgentNotchPeekDeciderTests: XCTestCase {
             ]
         )
         XCTAssertEqual(events.map(\.reason), [.needsInput, .finished], "needs-input outranks finished")
+    }
+
+    @MainActor
+    func test_TS_2372_FE_IT_hiddenRefreshDefersRowsButPreservesAttentionPeeks() {
+        let model = AgentNotchViewModel()
+        let working = row(id: "hidden", activity: .working, waiting: false)
+        var publications = 0
+        let subscription = model.$rows.dropFirst().sink { _ in publications += 1 }
+        model.updateRows([working], publishDetails: false)
+        XCTAssertTrue(model.rows.isEmpty)
+        XCTAssertEqual(publications, 0)
+        XCTAssertEqual(model.workingCount, 1, "Visibility must still see hidden activity")
+        var waiting = working
+        waiting.waitingCount = 1
+        model.updateRows([waiting], publishDetails: false)
+        XCTAssertTrue(model.isPeeking, "Hidden must not swallow approval transitions")
+        XCTAssertEqual(model.rows, [waiting])
+        model.close()
+        withExtendedLifetime(subscription) {}
+    }
+
+    @MainActor
+    func test_TS_2373_FE_IT_revealPublishesLatestHiddenRowsAndRemovedRowsStayRemoved() {
+        let model = AgentNotchViewModel()
+        let working = row(id: "hidden", activity: .working, waiting: false)
+        model.updateRows([working], publishDetails: false)
+        model.updateRows([working], publishDetails: true)
+        XCTAssertEqual(model.rows, [working])
+        model.updateRows([], publishDetails: false)
+        XCTAssertEqual(model.workingCount, 0)
+        model.updateRows([], publishDetails: true)
+        XCTAssertTrue(model.rows.isEmpty)
+        XCTAssertEqual(model.sessionCount, 0)
     }
 
     private func row(id: String, activity: AgentActivity?, waiting: Bool) -> AgentNotchRowSummary {

@@ -5,6 +5,14 @@ All notable changes to Kouen are documented here. The format is based on
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Each released version
 has a matching `vX.Y.Z` tag and a signed, notarized DMG on
 [GitHub Releases](https://github.com/Vit129/kouen-terminal/releases).
+## [Unreleased]
+
+### Fixed
+- Index appended JSONL history records without replacing unchanged FTS chunks; preserve transactional replacement for rewritten transcripts.
+- Share immutable Metal resources between terminal panes and release them with the last renderer.
+- Defer hidden Notch HUD detail updates while retaining attention and completion peeks.
+- Track SSH tunnel process ownership across launches and clean up verified orphan processes without signalling reused PIDs.
+
 ## [4.22.16] - 2026-11-15
 
 ### Changed

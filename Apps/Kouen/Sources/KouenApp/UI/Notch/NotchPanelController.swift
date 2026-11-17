@@ -65,6 +65,7 @@ final class NotchPanelController: NSObject {
             ? (model.workingCount > 0 || model.waitingCount > 0 || model.presentation != .closed)
             : model.isPeeking
         if shouldShow {
+            if panel?.isVisible != true { model.refreshFromCoordinator() }
             panel?.orderFrontRegardless()
         } else {
             panel?.orderOut(nil)
@@ -222,7 +223,11 @@ final class NotchPanelController: NSObject {
         guard !note.snapshotPayload.metadataOnly else { return }
         // cmux pattern: coalesce snapshot bursts → one model refresh per runloop turn.
         // Geometry stays frozen here — only screen changes (screenParametersChanged) move the panel.
-        coalescer.signal { [weak self] in self?.model.refreshFromCoordinator() }
+        coalescer.signal { [weak self] in
+            guard let self, !Self.isVorssaintRunning else { return }
+            self.model.refreshFromCoordinator(publishDetails: self.panel?.isVisible == true)
+            self.applyIdleVisibility()
+        }
     }
 
     @objc private func screenParametersChanged(_ note: Notification) {

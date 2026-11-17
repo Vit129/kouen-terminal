@@ -72,6 +72,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             ScriptHookCoordinator.shared.start()
         }
         DispatchQueue.global(qos: .utility).async {
+            // Reap birth-verified SSH orphans without delaying the first frame.
+            _ = SSHTunnelManager.shared
             ShellIntegration.refreshInstalledScripts()
         }
         // Follow the macOS system appearance for auto light/dark theme switching. The startup
