@@ -1123,7 +1123,6 @@ public actor AgentHistoryScanner {
         return Date.distantPast
     }
 
-    #if canImport(SQLite3)
     /// One History turn from an agy transcript event: the user's request, or the agent's reply. A
     /// reply with no text (agy often answers with tool calls only) becomes "tool: first arg", so a
     /// session where the agent only ran commands doesn't look like it never answered.
@@ -1167,6 +1166,7 @@ public actor AgentHistoryScanner {
         turns.append(AgentHistoryTurn(role: role, content: content))
     }
 
+    #if canImport(SQLite3)
     public static func readAntigravitySummaries(
         dbPath: String,
         brainDir: URL,

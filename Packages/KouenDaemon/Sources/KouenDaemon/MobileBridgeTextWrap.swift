@@ -1,3 +1,4 @@
+#if canImport(Network) // MobileBridgeServer is Apple-only; not built on Linux
 // Line-wrapping rules for the Companion page (`MobileBridgeServer.embeddedPageHTML`), kept apart
 // from the layout CSS. Shared by every agent (Claude, Codex, agy, Copilot): all their output arrives
 // as plain text, so none of these differ per agent. Text wraps instead of ending in "…", so nothing
@@ -21,3 +22,5 @@ extension MobileBridgeServer {
       .toast span:last-child{white-space:nowrap}
       """
 }
+
+#endif

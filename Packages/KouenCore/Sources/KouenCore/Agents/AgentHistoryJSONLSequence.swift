@@ -1,5 +1,10 @@
 import Foundation
 
+#if !canImport(ObjectiveC)
+/// Linux has no autorelease pools; run the body directly so history scanning compiles there.
+func autoreleasepool<T>(invoking body: () throws -> T) rethrows -> T { try body() }
+#endif
+
 /// Drain temporary Foundation JSON objects once per record during long history scans.
 func historyJSONObject(_ line: Data) -> [String: Any]? {
     autoreleasepool { try? JSONSerialization.jsonObject(with: line) as? [String: Any] }

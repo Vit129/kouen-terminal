@@ -6,7 +6,7 @@
 extension ReleaseNotes {
     public static let current = ReleaseNotes(
         version: "4.22.16",
-        changelogDigest: "42e5815626408b9f",
+        changelogDigest: "6ab03f3733c6552f",
         sections: [
             Section(title: "Changed", items: [
                 "Arm only for the focused pane, scan off main with carry-over (e3630f0)",
@@ -15,12 +15,10 @@ extension ReleaseNotes {
                 "Skip the 0.5s cwd probe for silent surfaces (c10339d)",
             ]),
             Section(title: "Documentation", items: [
-                "Record that the fleet/tab-bar memory guards have landed (29e70e0)",
                 "Retain verified Kouen query results (9521d67)",
                 "Retain wave 1 query result (34a8d4e)",
             ]),
             Section(title: "Fixed", items: [
-                "Stop fleet/tab-bar republishing on unchanged snapshots (8901aa8)",
                 "Preserve staged index when restoring checkpoint (8729b55)",
                 "Match output triggers split across chunks (fc27787)",
                 "Cap console log line length (05f5cee)",

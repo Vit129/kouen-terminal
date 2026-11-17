@@ -197,6 +197,14 @@ final class MobileBridgeContractTests: XCTestCase {
         XCTAssertLessThan(duration, 2.0)
     }
 
+    func test_TS_2310_BE_UT_timeoutKillsProcessIgnoringTermination() {
+        let result = MobileBridgeServer.runProcess(
+            executableURL: URL(fileURLWithPath: "/bin/sh"),
+            arguments: ["-c", "trap '' TERM; while :; do :; done"], timeoutSeconds: 0.5)
+        XCTAssertTrue(result.timedOut)
+        XCTAssertNotEqual(result.status, 0)
+    }
+
     func testParseGitDiffHandlesRenamesAndSpaces() {
         let sampleDiff = """
         diff --git a/old path/old file.txt b/new path/new file.txt

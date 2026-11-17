@@ -1,3 +1,4 @@
+#if canImport(Network) // MobileBridgeServer is Apple-only; not built on Linux
 import Foundation
 
 /// Fires `onEvent` when the file at `url` is written to, extended, deleted or renamed.
@@ -40,3 +41,5 @@ final class TranscriptFileWatcher: @unchecked Sendable {
 
     deinit { source.cancel() }
 }
+
+#endif

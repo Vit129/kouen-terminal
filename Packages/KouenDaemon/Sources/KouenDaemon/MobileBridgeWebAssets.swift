@@ -1,3 +1,4 @@
+#if canImport(Network) // MobileBridgeServer is Apple-only; not built on Linux
 import Foundation
 
 // MARK: - Embedded Mobile Companion Web Assets (HTML, CSS, JS, Manifest, Service Worker, Icon)
@@ -1272,3 +1273,5 @@ extension MobileBridgeServer {
     }()
 
 }
+
+#endif
