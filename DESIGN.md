@@ -28,6 +28,13 @@ Source: `KouenDesign.swift`
 - Draggable chrome (title strip, sidebar header, tab bar) all zoom the window on double-click via one helper, `NSView.zoomWindowIfDoubleClick(_:)`
 - Surfaces added since the original audit, all built from the same tokens: Agent Notch HUD (`UI/Notch/`, off by default, hidden while Vorssaint's notch is running), Attention Beacon dot, Agent Inbox panel, Automations/Jobs fleet view, session History view, Issue Tracker panel
 
+### Session History
+- Keep history rows compact: one session title, a single metadata line, and search evidence only while searching. Show token usage and transcript content in selected-session details.
+- Keep repository scope and agent filters visible at narrow sidebar widths; agent shortcuts scroll horizontally while the trailing More menu remains fixed. The More menu holds other providers and shortcut management.
+- Shortcut management numbers the selected agents and lets users drag the handle to reorder them; selection changes append and removal closes the gaps.
+- Search counts distinguish matching sessions from searchable sessions under the active scope and agent filters. Empty results offer clear/reset actions.
+- Selected details label the first prompt and latest turns, identify speaker roles, and show worktree availability before resume actions.
+
 ## Avoid
 - System accent blue in chrome
 - Raw shadows on AppKit layers outside `applyShadow` presets. Known exceptions in SwiftUI views: the notch status-dot glow (`AgentNotchRootView`) and the tab pill (`TerminalTabBarView`)

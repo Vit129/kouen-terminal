@@ -742,6 +742,11 @@ final class KouenSidebarPanelViewController: NSViewController {
 
     /// Resumes in a new session, the same as ⌘T, so it gets its own entry in the tab bar.
     private func resumeAgentSession(_ record: AgentSessionRecord) {
+        var isDirectory: ObjCBool = false
+        guard record.worktreeAvailable,
+              FileManager.default.fileExists(atPath: record.projectPath, isDirectory: &isDirectory),
+              isDirectory.boolValue else { return }
+
         let cmd = Self.resumeCommand(for: record)
         let req = DefaultTerminalLaunchRequest(
             command: cmd,
