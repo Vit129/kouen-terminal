@@ -8,8 +8,7 @@ has a matching `vX.Y.Z` tag and a signed, notarized DMG on
 ## [4.23.1] - 2026-11-17
 
 ### Added
-- Improve session history and agent shortcuts
-
+- Improve session history and agent shortcuts (release v4.23.1) ([`c97d980`](https://github.com/Vit129/kouen-terminal/commit/c97d980e6f19d309e1caa3f102905ed85cf4d81c))
 
 ## [4.23.0] - 2026-11-17
 
