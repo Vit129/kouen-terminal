@@ -36,6 +36,8 @@ The maintainer (Vit129). Personal hard fork of `robzilla1738/harness-terminal`, 
 - **Agent browser panes clean up after themselves** — a browser pane an agent opened closes when that agent goes idle (v4.20.9)
 - **`kouen-mcp` remote transport** — HTTP/SSE in addition to stdio, with secure defaults
 
+- **Optional menu-bar icon** — show or hide the K status item immediately from Settings → Appearance; remember the preference across launches. Settings stays accessible with ⌘,.
+
 ## Out of Scope
 - General consumer distribution (personal fork, not shipped as a product)
 - Non-macOS GUI (daemon/CLI/core build headless on Linux; GUI is macOS 15+ only)

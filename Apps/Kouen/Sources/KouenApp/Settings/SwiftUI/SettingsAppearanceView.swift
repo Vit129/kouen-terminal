@@ -11,6 +11,7 @@ struct SettingsAppearanceView: View {
     var body: some View {
         Form {
             themeSection
+            menuBarSection
             windowSection
         }
         .formStyle(.grouped)
@@ -79,6 +80,17 @@ struct SettingsAppearanceView: View {
                 Button("Reset to defaults") { confirmReset() }
                     .buttonStyle(.link)
             }
+        }
+    }
+
+    private var menuBarSection: some View {
+        Section("Menu Bar") {
+            Toggle("Show menu bar icon", isOn: Binding(
+                get: { model.settings.showMenuBarIcon },
+                set: { model.update(\.showMenuBarIcon, $0) }
+            ))
+            .accessibilityIdentifier("chk_showMenuBarIcon_appearancePage")
+            .help("Show the K icon in the macOS menu bar. Reopen Settings with ⌘, to turn it back on.")
         }
     }
 

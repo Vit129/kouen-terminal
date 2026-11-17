@@ -2,6 +2,24 @@ import XCTest
 @testable import KouenCore
 
 final class KouenSettingsTests: XCTestCase {
+    func test_TS_2400_BE_UT_menuBarIconDefaultsVisibleForExistingSettings() throws {
+        XCTAssertTrue(KouenSettings().showMenuBarIcon)
+        let legacy = try JSONDecoder().decode(KouenSettings.self, from: Data("{\"sidebarVisible\":false}".utf8))
+        XCTAssertTrue(legacy.showMenuBarIcon)
+        XCTAssertFalse(legacy.sidebarVisible)
+    }
+
+    func test_TS_2401_BE_IT_menuBarIconVisibilityPersistsBothValues() throws {
+        try withTemporaryKouenHome { _ in
+            for visible in [false, true] {
+                var settings = KouenSettings()
+                settings.showMenuBarIcon = visible
+                try settings.save()
+                XCTAssertEqual(KouenSettings.load().showMenuBarIcon, visible)
+            }
+        }
+    }
+
     private let colorMigrationKey = "KouenColorFidelityMigrationV1"
 
     func testSidebarOnRightLoadPreservesTrue() throws {

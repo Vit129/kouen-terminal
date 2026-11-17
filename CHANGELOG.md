@@ -7,6 +7,43 @@ has a matching `vX.Y.Z` tag and a signed, notarized DMG on
 [GitHub Releases](https://github.com/Vit129/kouen-terminal/releases).
 ## [Unreleased]
 
+### Changed
+- Improve performance and responsiveness
+
+## [4.23.0] - 2026-11-17
+
+### Added
+- Let users hide the menu bar icon ([`45fb779`](https://github.com/Vit129/kouen-terminal/commit/45fb7790ae2253097e02a900793ccf5be2d58e8e))
+
+### Changed
+- Brief 2 hot-path fixes (fingerprint, cwd probe, debounced commits, task request sharing, git refresh gate, dock badge, spool cap) ([`078177e`](https://github.com/Vit129/kouen-terminal/commit/078177e9c5f3388c1d9a1e4a0c53c0bb573eaf3e))
+- Tear down LSP on editor hide, reuse client, bounded shutdown, cached graph lookup ([`330fd2e`](https://github.com/Vit129/kouen-terminal/commit/330fd2e8c64f8cbe5ecb7d2229d369958c680e47))
+- Release markdown webview/QuickLook when hidden, skip redundant symbol scan, cheaper dirty check, cached regexes ([`f956e0e`](https://github.com/Vit129/kouen-terminal/commit/f956e0edfa3244ed8dd4178e154a02cd632b5b87))
+- Drop bad stdio frames and cap sizes, shell timeout and output cap, readFile cap, SSE parked wait and request deadline ([`18139ff`](https://github.com/Vit129/kouen-terminal/commit/18139ff5561cead7f42229d5bd332422efcc149f))
+- Finish incremental history and resource lifecycle fixes ([`700a303`](https://github.com/Vit129/kouen-terminal/commit/700a3034ac7da45e77660d5c96cb74ca9f42543f))
+
+### Fixed
+- Stream JSONL parsing and bound history scan memory ([`c7dbda6`](https://github.com/Vit129/kouen-terminal/commit/c7dbda6aaa52321c1600d4bb229766c23bab70bb))
+- Keep real exit code on truncated output; drain grace after exit ([`23bdec8`](https://github.com/Vit129/kouen-terminal/commit/23bdec8f13d135d990aaa886b593245bac984313))
+- Allow runCommand up to 600s; keep 120s for quick helpers ([`764b95c`](https://github.com/Vit129/kouen-terminal/commit/764b95c167b3524fd4956eb302082021daf70803))
+- Bound terminal image retention and release idle buffers ([`70cfbbc`](https://github.com/Vit129/kouen-terminal/commit/70cfbbcf86a4d051d44d4f444a4522894837312b))
+- Bound SSH socket detection and notch state retention ([`f0fb764`](https://github.com/Vit129/kouen-terminal/commit/f0fb76428d3f88dfd06abb05c8b8a158cba92e9f))
+- Release resources when panes close ([`e36acbf`](https://github.com/Vit129/kouen-terminal/commit/e36acbfbc69faf0e9b18b8f4cfc177f2d44c71ff))
+- Isolate pairing loop wakeups across restarts ([`8a1a640`](https://github.com/Vit129/kouen-terminal/commit/8a1a6402f458f599d46fb0b012e0e020b0fdc09b))
+- Linux build of history index and stale release-notes digest ([`0e471e6`](https://github.com/Vit129/kouen-terminal/commit/0e471e66550f803dee702b71c7288fb8720f0d06))
+- Autoreleasepool shim for Linux history scanner ([`28f2c1e`](https://github.com/Vit129/kouen-terminal/commit/28f2c1ef2bce62af7d9f9b9dffc241e695bd2cd8))
+- Keep agy turn helpers outside the SQLite3 guard ([`6611167`](https://github.com/Vit129/kouen-terminal/commit/66111672ff4109ed85f3bac140d4a190e5576ad8))
+- Guard Apple-only MobileBridge files for Linux; widen ProcessRunner timeout margin ([`002e0c7`](https://github.com/Vit129/kouen-terminal/commit/002e0c755e809c8f6402c34dd0905e9c7bd71f09))
+- Guard TranscriptFileWatcher tests for Linux ([`234b886`](https://github.com/Vit129/kouen-terminal/commit/234b886bafeaea9a612b24c3239e073d1c9f1d3d))
+- Skip SQLite-FTS history tests on Linux ([`9d095bc`](https://github.com/Vit129/kouen-terminal/commit/9d095bc37e55eb2d991b2579c8b7d073c98d0b94))
+- Disable automatic Graphify in start menu ([`274a772`](https://github.com/Vit129/kouen-terminal/commit/274a772168e001ba335b9e221452cae2fe215bb8))
+
+
+## [Unreleased]
+
+### Added
+- Toggle the K menu-bar icon in Settings → Appearance, with immediate updates and a saved preference.
+
 ### Fixed
 - Index appended JSONL history records without replacing unchanged FTS chunks; preserve transactional replacement for rewritten transcripts.
 - Share immutable Metal resources between terminal panes and release them with the last renderer.

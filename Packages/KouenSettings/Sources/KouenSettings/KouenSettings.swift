@@ -80,6 +80,8 @@ public struct KouenSettings: Codable, Sendable, Equatable {
     /// the window opens at its built-in default size, centered. Window-level only — the
     /// frame is persisted via `NSWindow.setFrameAutosaveName`.
     public var restoreWindowSize: Bool
+    /// Show the K status item independently of the Agent Notch HUD.
+    public var showMenuBarIcon: Bool
     public var backgroundOpacity: Float
     public var backgroundBlur: Int
     public var windowPaddingX: Float
@@ -372,6 +374,7 @@ public struct KouenSettings: Codable, Sendable, Equatable {
         sidebarCollapsedOnLaunch: Bool = false,
         sidebarWidth: Float? = nil,
         restoreWindowSize: Bool = false,
+        showMenuBarIcon: Bool = true,
         backgroundOpacity: Float = 0.63,
         backgroundBlur: Int = 16,
         windowPaddingX: Float = 14,
@@ -454,6 +457,7 @@ public struct KouenSettings: Codable, Sendable, Equatable {
         self.sidebarCollapsedOnLaunch = sidebarCollapsedOnLaunch
         self.sidebarWidth = sidebarWidth
         self.restoreWindowSize = restoreWindowSize
+        self.showMenuBarIcon = showMenuBarIcon
         self.backgroundOpacity = backgroundOpacity
         self.backgroundBlur = backgroundBlur
         self.windowPaddingX = KouenSettings.clampedPadding(windowPaddingX)
@@ -620,6 +624,7 @@ public struct KouenSettings: Codable, Sendable, Equatable {
         sidebarCollapsedOnLaunch = try container.decodeIfPresent(Bool.self, forKey: .sidebarCollapsedOnLaunch) ?? fallback.sidebarCollapsedOnLaunch
         sidebarWidth = try container.decodeIfPresent(Float.self, forKey: .sidebarWidth) ?? fallback.sidebarWidth
         restoreWindowSize = try container.decodeIfPresent(Bool.self, forKey: .restoreWindowSize) ?? fallback.restoreWindowSize
+        showMenuBarIcon = try container.decodeIfPresent(Bool.self, forKey: .showMenuBarIcon) ?? true
         backgroundOpacity = try container.decodeIfPresent(Float.self, forKey: .backgroundOpacity) ?? fallback.backgroundOpacity
         backgroundBlur = try container.decodeIfPresent(Int.self, forKey: .backgroundBlur) ?? fallback.backgroundBlur
         windowPaddingX = KouenSettings.clampedPadding(

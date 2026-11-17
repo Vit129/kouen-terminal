@@ -10,9 +10,15 @@ import KouenCore
 /// (`menuNeedsUpdate`) so it always reflects live state.
 @MainActor
 final class MenuBarController: NSObject, NSMenuDelegate {
-    private let statusItem: NSStatusItem
+    let statusItem: NSStatusItem
+    private let visibilityProvider: () -> Bool
 
-    override init() {
+    override convenience init() {
+        self.init(visibilityProvider: { SessionCoordinator.shared.settings.showMenuBarIcon })
+    }
+
+    init(visibilityProvider: @escaping () -> Bool) {
+        self.visibilityProvider = visibilityProvider
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         super.init()
         if let button = statusItem.button {
@@ -23,6 +29,17 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         let menu = NSMenu()
         menu.delegate = self
         statusItem.menu = menu
+        statusItem.isVisible = visibilityProvider()
+        NotificationCenter.default.addObserver(
+            self, selector: #selector(settingsChanged(_:)),
+            name: NotificationBus.shared.snapshotChanged, object: nil)
+    }
+
+    deinit { NotificationCenter.default.removeObserver(self) }
+
+    @objc private func settingsChanged(_ notification: Notification) {
+        let visible = visibilityProvider()
+        if statusItem.isVisible != visible { statusItem.isVisible = visible }
     }
 
     // MARK: - Menu

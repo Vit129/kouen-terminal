@@ -36,3 +36,7 @@ Source: `KouenDesign.swift`
 ---
 Sourced from `KouenDesign.swift` (`UI/Shared/`), `KouenChrome.swift`, and Sidebar view files as of 2026-07-18; all tokens re-verified against source 2026-09-30 (spacing, radius, motion, font sizes, typography, shadow presets, palette tokens, status styles, glass-effect runtime lookup, `tabBarHeight`/`tabPillHeight`). Not verified: literal palette values per theme, and the Sidebar view files listed originally.
 Surface list re-checked 2026-10-07 against v4.20.11: Quick Terminal, the sidebar project-header context menu and the Files-tab inline preview no longer exist; the notch yields to Vorssaint. Token values were not re-verified since 2026-09-30.
+
+## Menu-bar icon preference
+
+Appearance contains a native “Menu Bar” section with “Show menu bar icon”, enabled by default. Changes apply immediately and persist; the help text points to ⌘, to reopen Settings after hiding the icon. This preference is independent of the Agent Notch HUD.
