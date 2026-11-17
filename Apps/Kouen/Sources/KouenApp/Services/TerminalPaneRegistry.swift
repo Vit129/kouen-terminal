@@ -39,6 +39,7 @@ final class TerminalPaneRegistry {
     }
 
     private func retire(_ host: TerminalHostView) {
+        host.stopOutputForRetire()
         onRetire?(host.surfaceID)
         host.resignIfFirstResponder()
         // Stop the display link BEFORE removing from superview so AppKit's internal

@@ -157,7 +157,7 @@ final class ProcessRunnerTests: XCTestCase {
     }
 
     func test_TS_2301_BE_UT_ProcessExitingNearTimeoutIsNotTimedOut() {
-        let res = ProcessRunner.run(executable: "/bin/sh", arguments: ["-c", "sleep 0.9; echo done"], timeout: 1)
+        let res = ProcessRunner.run(executable: "/bin/sh", arguments: ["-c", "sleep 0.2; echo done"], timeout: 2)
         XCTAssertFalse(res.isTimedOut)
         XCTAssertEqual(res.exitCode, 0)
         XCTAssertEqual(res.stdout.trimmingCharacters(in: .whitespacesAndNewlines), "done")

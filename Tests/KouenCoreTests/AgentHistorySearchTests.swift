@@ -16,7 +16,8 @@ final class AgentHistorySearchTests: XCTestCase {
         return (AgentHistoryFTSIndex(dbPath: url.path), url)
     }
 
-    func testExactBranchBeatsPartialMatchesEvenWhenFTSLimitIsSmall() {
+    func testExactBranchBeatsPartialMatchesEvenWhenFTSLimitIsSmall() throws {
+        try skipUnlessSQLiteAvailable()
         let (index, url) = tempIndex()
         defer { try? FileManager.default.removeItem(at: url) }
         let branch = "refactor/sprint-report-logic-buckets"
@@ -34,7 +35,8 @@ final class AgentHistorySearchTests: XCTestCase {
         XCTAssertEqual(hits.first?.record.id, target.id)
     }
 
-    func testScopedSearchFindsDeepTranscriptDespiteMoreGlobalMatchesThanLimit() {
+    func testScopedSearchFindsDeepTranscriptDespiteMoreGlobalMatchesThanLimit() throws {
+        try skipUnlessSQLiteAvailable()
         let (index, url) = tempIndex()
         defer { try? FileManager.default.removeItem(at: url) }
         for n in 0..<5 {
@@ -55,7 +57,8 @@ final class AgentHistorySearchTests: XCTestCase {
         XCTAssertTrue(hits.first?.snippet?.localizedCaseInsensitiveContains("deepseek") == true)
     }
 
-    func testEvidenceAfterInitialBatchCanBeLoadedOnDemand() {
+    func testEvidenceAfterInitialBatchCanBeLoadedOnDemand() throws {
+        try skipUnlessSQLiteAvailable()
         let (index, url) = tempIndex()
         defer { try? FileManager.default.removeItem(at: url) }
         var records: [AgentSessionRecord] = []
@@ -77,7 +80,8 @@ final class AgentHistorySearchTests: XCTestCase {
         XCTAssertNil(AgentHistorySearch.evidence(query: "nonexistent", record: later.record, index: index))
     }
 
-    func testIndexedFileAndToolMatchesProvideTheirOwnEvidence() {
+    func testIndexedFileAndToolMatchesProvideTheirOwnEvidence() throws {
+        try skipUnlessSQLiteAvailable()
         let (index, url) = tempIndex()
         defer { try? FileManager.default.removeItem(at: url) }
         let rec = record("metadata", title: "Work", project: "repo")
@@ -97,7 +101,8 @@ final class AgentHistorySearchTests: XCTestCase {
         XCTAssertNil(tool?.snippet)
     }
 
-    func testMetadataOnlyMatchDoesNotReturnUnrelatedTranscriptSnippet() {
+    func testMetadataOnlyMatchDoesNotReturnUnrelatedTranscriptSnippet() throws {
+        try skipUnlessSQLiteAvailable()
         let (index, url) = tempIndex()
         defer { try? FileManager.default.removeItem(at: url) }
         let branch = "refactor/logic-structure"
@@ -111,7 +116,8 @@ final class AgentHistorySearchTests: XCTestCase {
         XCTAssertEqual(result.first?.snippet, "")
     }
 
-    func testThaiSubstringFindsDeepTranscriptOutsideRecentTurns() {
+    func testThaiSubstringFindsDeepTranscriptOutsideRecentTurns() throws {
+        try skipUnlessSQLiteAvailable()
         let (index, url) = tempIndex()
         defer { try? FileManager.default.removeItem(at: url) }
         index.indexSession(
@@ -125,7 +131,8 @@ final class AgentHistorySearchTests: XCTestCase {
         XCTAssertTrue(hits.first?.snippet?.contains("ทดสอบ") == true)
     }
 
-    func testLongQueryRanksAllWordsAboveSingleCommonWord() {
+    func testLongQueryRanksAllWordsAboveSingleCommonWord() throws {
+        try skipUnlessSQLiteAvailable()
         let (index, url) = tempIndex()
         defer { try? FileManager.default.removeItem(at: url) }
         let complete = record("long-complete", title: "Misc", project: "repo")
@@ -143,7 +150,8 @@ final class AgentHistorySearchTests: XCTestCase {
         XCTAssertTrue(hits.first?.snippet?.contains("payment") == true)
     }
 
-    func testFindsSessionWhoseOnlyMatchIsDeepInTranscript() {
+    func testFindsSessionWhoseOnlyMatchIsDeepInTranscript() throws {
+        try skipUnlessSQLiteAvailable()
         let (index, url) = tempIndex()
         defer { try? FileManager.default.removeItem(at: url) }
         index.indexSession(
@@ -159,7 +167,8 @@ final class AgentHistorySearchTests: XCTestCase {
         XCTAssertEqual(hits.map(\.record.id), ["deep"])
     }
 
-    func testTitleMatchOutranksTranscriptOnlyMatch() {
+    func testTitleMatchOutranksTranscriptOnlyMatch() throws {
+        try skipUnlessSQLiteAvailable()
         let (index, url) = tempIndex()
         defer { try? FileManager.default.removeItem(at: url) }
         index.indexSession(
@@ -175,7 +184,8 @@ final class AgentHistorySearchTests: XCTestCase {
         XCTAssertEqual(hits.map(\.record.id), ["title", "chat"])
     }
 
-    func testRareWordsBeatCommonWords() {
+    func testRareWordsBeatCommonWords() throws {
+        try skipUnlessSQLiteAvailable()
         let (index, url) = tempIndex()
         defer { try? FileManager.default.removeItem(at: url) }
         // "kouen" and "agent" appear in every session; only one session is about the browser pane.
@@ -187,23 +197,27 @@ final class AgentHistorySearchTests: XCTestCase {
         XCTAssertFalse(hits.contains { $0.record.id.hasPrefix("g") }, "common words alone must not carry a match")
     }
 
-    func testUnweightedMatchHistoryKeepsHalfTheTokensRule() {
+    func testUnweightedMatchHistoryKeepsHalfTheTokensRule() throws {
+        try skipUnlessSQLiteAvailable()
         let matcher = SearchMatcher(query: "alpha beta gamma delta")
         XCTAssertNotNil(matcher.matchHistory(title: "alpha beta"))
         XCTAssertNil(matcher.matchHistory(title: "alpha"))
     }
 
-    func testBm25BoostGrowsWithStrongerMatchAndStaysBelowOne() {
+    func testBm25BoostGrowsWithStrongerMatchAndStaysBelowOne() throws {
+        try skipUnlessSQLiteAvailable()
         XCTAssertEqual(AgentHistorySearch.bm25Boost(0), 0)
         XCTAssertGreaterThan(AgentHistorySearch.bm25Boost(-8), AgentHistorySearch.bm25Boost(-1))
         XCTAssertLessThan(AgentHistorySearch.bm25Boost(-1_000), 1)
     }
 
-    func testEmptyQueryReturnsNothing() {
+    func testEmptyQueryReturnsNothing() throws {
+        try skipUnlessSQLiteAvailable()
         XCTAssertTrue(AgentHistorySearch.rank(query: "  ", records: [record("a", title: "x", project: "r")]).isEmpty)
     }
 
-    func testSaveAndLoadCachedSessionRecords() {
+    func testSaveAndLoadCachedSessionRecords() throws {
+        try skipUnlessSQLiteAvailable()
         let (index, url) = tempIndex()
         defer { try? FileManager.default.removeItem(at: url) }
 
@@ -262,7 +276,8 @@ final class AgentHistorySearchTests: XCTestCase {
         XCTAssertEqual(afterDelete.count, 0)
     }
 
-    func testFastPathFTSUsedForStandardQuery() {
+    func testFastPathFTSUsedForStandardQuery() throws {
+        try skipUnlessSQLiteAvailable()
         let (index, url) = tempIndex()
         defer { try? FileManager.default.removeItem(at: url) }
 
@@ -274,7 +289,8 @@ final class AgentHistorySearchTests: XCTestCase {
         XCTAssertEqual(hits[0].record.id, "sess-fast")
     }
 
-    func testThaiQueryFindsUnsegmentedMatch() {
+    func testThaiQueryFindsUnsegmentedMatch() throws {
+        try skipUnlessSQLiteAvailable()
         let (index, url) = tempIndex()
         defer { try? FileManager.default.removeItem(at: url) }
 
@@ -287,7 +303,8 @@ final class AgentHistorySearchTests: XCTestCase {
         XCTAssertEqual(hits[0].record.id, "sess-thai")
     }
 
-    func testUnindexedRecordsFoundBeyond200Limit() {
+    func testUnindexedRecordsFoundBeyond200Limit() throws {
+        try skipUnlessSQLiteAvailable()
         let (index, url) = tempIndex()
         defer { try? FileManager.default.removeItem(at: url) }
 
@@ -305,7 +322,8 @@ final class AgentHistorySearchTests: XCTestCase {
         XCTAssertEqual(hits[0].record.id, "sess-target")
     }
 
-    func testRepresentativeQueryRankingQuality() {
+    func testRepresentativeQueryRankingQuality() throws {
+        try skipUnlessSQLiteAvailable()
         let (index, url) = tempIndex()
         defer { try? FileManager.default.removeItem(at: url) }
 
@@ -350,7 +368,8 @@ final class AgentHistorySearchTests: XCTestCase {
         XCTAssertEqual(hits[2].record.id, "sess-transcript")
     }
 
-    func testMultiTermMatchOutranksSingleTermMatch() {
+    func testMultiTermMatchOutranksSingleTermMatch() throws {
+        try skipUnlessSQLiteAvailable()
         let (index, url) = tempIndex()
         defer { try? FileManager.default.removeItem(at: url) }
 
@@ -378,7 +397,8 @@ final class AgentHistorySearchTests: XCTestCase {
         XCTAssertEqual(hits[1].record.id, "sess-one")
     }
 
-    func testIndexSessionsBatchIndexesMultipleSessionsInSingleTransaction() {
+    func testIndexSessionsBatchIndexesMultipleSessionsInSingleTransaction() throws {
+        try skipUnlessSQLiteAvailable()
         let (index, url) = tempIndex()
         defer { try? FileManager.default.removeItem(at: url) }
 
@@ -402,7 +422,8 @@ final class AgentHistorySearchTests: XCTestCase {
         XCTAssertEqual(matches2.map(\.sessionID), ["batch-2"])
     }
 
-    func testIndexSessionsBatchWithMixedUnchangedAndChangedSessions() {
+    func testIndexSessionsBatchWithMixedUnchangedAndChangedSessions() throws {
+        try skipUnlessSQLiteAvailable()
         let tempDB = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("test_batch_mixed_\(UUID().uuidString).sqlite")
         defer { try? FileManager.default.removeItem(at: tempDB) }
 

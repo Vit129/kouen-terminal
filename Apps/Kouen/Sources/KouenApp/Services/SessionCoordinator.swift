@@ -45,7 +45,9 @@ final class SessionCoordinator: NSObject {
     private override init() {
         super.init()
         terminalHosts.onRetire = { [weak self] surfaceID in
-            SecureInputMonitor.shared.release(surfaceID)
+            SecureInputMonitor.shared.retire(surfaceID)
+            PromptQueue.shared.forget(surfaceID)
+            SurfaceProgressTracker.shared.forget(surfaceID)
             ActivityAssertionManager.shared.releaseAssertions(forSurface: surfaceID)
             if self?.runSurfaceID == surfaceID { self?.runSurfaceID = nil }
         }

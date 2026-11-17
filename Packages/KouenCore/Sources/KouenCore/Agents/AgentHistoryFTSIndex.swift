@@ -534,6 +534,8 @@ public final class AgentHistoryFTSIndex: @unchecked Sendable {
         ])
     }
 
+    #endif
+
     /// Payload for batch session indexing.
     public struct SessionIndexItem: Sendable {
         public let sessionID: String
@@ -587,6 +589,7 @@ public final class AgentHistoryFTSIndex: @unchecked Sendable {
         }
     }
 
+    #if canImport(SQLite3)
     /// Indexes a batch of sessions in a single SQLite transaction with prepared statement reuse.
     public func indexSessionsBatch(_ items: [SessionIndexItem]) {
         let itemsToIndex = items.filter { needsReindex(sessionID: $0.sessionID, mtime: $0.mtime, fileSize: $0.fileSize) }
@@ -866,6 +869,7 @@ public final class AgentHistoryFTSIndex: @unchecked Sendable {
         surfaceTag: String? = nil,
         topicSegments: [String]? = nil
     ) {}
+    public func indexSessionsBatch(_ items: [SessionIndexItem]) {}
     public func saveRecordsBatch(_ entries: [(record: AgentSessionRecord, mtime: Date, fileSize: Int)]) {}
     public func saveRecordsBatch(_ entries: [CachedSessionEntry]) {}
     public func saveRecord(_ record: AgentSessionRecord, mtime: Date, fileSize: Int) {}

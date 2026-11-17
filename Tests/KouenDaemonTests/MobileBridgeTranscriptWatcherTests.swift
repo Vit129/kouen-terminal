@@ -1,3 +1,4 @@
+#if canImport(Network) // TranscriptFileWatcher is Apple-only; not built on Linux
 import Foundation
 import XCTest
 @testable import KouenDaemonCore
@@ -36,3 +37,5 @@ final class MobileBridgeTranscriptWatcherTests: XCTestCase {
         XCTAssertNil(TranscriptFileWatcher(url: url, queue: .main) { _ in })
     }
 }
+
+#endif
