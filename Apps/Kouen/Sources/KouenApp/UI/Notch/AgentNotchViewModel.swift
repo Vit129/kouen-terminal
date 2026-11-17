@@ -25,6 +25,8 @@ final class AgentNotchViewModel: ObservableObject {
     /// Claude Code keep-alives indeterminate). Rendered as "working · 47%" + underline bar.
     @Published private(set) var rowProgress: [String: Int] = [:]
 
+    private var latestRows: [AgentNotchRowSummary] = []
+
     private var hoverTask: Task<Void, Never>?
     private var peekDismissTask: Task<Void, Never>?
     private var isHovering = false
@@ -50,11 +52,11 @@ final class AgentNotchViewModel: ObservableObject {
     }
 
     var waitingCount: Int {
-        rows.reduce(0) { $0 + $1.waitingCount }
+        latestRows.reduce(0) { $0 + $1.waitingCount }
     }
 
     var workingCount: Int {
-        rows.filter { $0.agentActivity == .working }.count
+        latestRows.filter { $0.agentActivity == .working }.count
     }
 
     var agentCount: Int {
@@ -111,18 +113,18 @@ final class AgentNotchViewModel: ObservableObject {
 
     // MARK: - Data refresh
 
-    func refreshFromCoordinator() {
+    func refreshFromCoordinator(publishDetails: Bool = true) {
         let coordinator = SessionCoordinator.shared
         let newOpenOnHover = coordinator.settings.notchOpenOnHover
         if openOnHover != newOpenOnHover {
             openOnHover = newOpenOnHover
         }
         let currentAgents = coordinator.agentsList()
-        let newAgents = AgentNotchProjection.sortedAgents(currentAgents)
-        if agents != newAgents {
-            agents = newAgents
-        }
         var updatedRows = AgentNotchProjection.rows(from: coordinator.snapshot, agents: currentAgents)
+        if publishDetails {
+            let newAgents = AgentNotchProjection.sortedAgents(currentAgents)
+            if agents != newAgents { agents = newAgents }
+        }
         // Reconcile OSC 9;4 progress state with detector-driven activity. The projection
         // derives agentActivity from the daemon snapshot (AgentDetector), which Claude Code
         // doesn't keep at .working between turns. SurfaceProgressTracker is the
@@ -141,24 +143,29 @@ final class AgentNotchViewModel: ObservableObject {
             if surfaces.contains(where: { tracker.isActive($0) }) {
                 updatedRows[i].agentActivity = .working
             }
-            if let percent = surfaces.compactMap({ tracker.progressPercent($0) }).first {
+            if publishDetails, let percent = surfaces.compactMap({ tracker.progressPercent($0) }).first {
                 progress[updatedRows[i].id] = percent
             }
         }
-        if rows != updatedRows {
-            rows = updatedRows
-        }
-        let activeRowIDs = Set(updatedRows.map(\.id))
-        lastPeekAt = lastPeekAt.filter { activeRowIDs.contains($0.key) }
+        updateRows(updatedRows, publishDetails: publishDetails)
+        guard publishDetails else { return }
         if rowProgress != progress {
             rowProgress = progress
         }
-        let newSessionCount = Set(updatedRows.map(\.sessionID)).count
-        if sessionCount != newSessionCount {
-            sessionCount = newSessionCount
-        }
-        recomputeOpenContentHeight()
+    }
+
+    /// Keep transition detection live while hidden without publishing the full HUD
+    /// or constructing its progress/layout state. Revealing it refreshes details first.
+    func updateRows(_ updatedRows: [AgentNotchRowSummary], publishDetails: Bool) {
+        latestRows = updatedRows
+        let activeRowIDs = Set(updatedRows.map(\.id))
+        lastPeekAt = lastPeekAt.filter { activeRowIDs.contains($0.key) }
         considerPeek()
+        guard publishDetails || isPeeking else { return }
+        if rows != updatedRows { rows = updatedRows }
+        let newSessionCount = Set(updatedRows.map(\.sessionID)).count
+        if sessionCount != newSessionCount { sessionCount = newSessionCount }
+        recomputeOpenContentHeight()
     }
 
     // MARK: - Peek
@@ -167,7 +174,7 @@ final class AgentNotchViewModel: ObservableObject {
     /// transition. Suppressed while Kouen is frontmost (the user already sees the tab
     /// dot), while the HUD is open, and per-row for `peekCooldown` after a peek.
     private func considerPeek() {
-        let (events, next) = AgentNotchPeekDecider.decide(previous: peekStates, rows: rows)
+        let (events, next) = AgentNotchPeekDecider.decide(previous: peekStates, rows: latestRows)
         peekStates = next
         guard !events.isEmpty, !isOpen else { return }
         // Allow peek even when Kouen is frontmost (user sees the notch pop for attention

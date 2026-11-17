@@ -19,16 +19,16 @@ final class AgentHistoryJSONLSequence: Sequence {
     private let modifiedAt: Date
 
     var isValid: Bool {
-        guard !failed, let values = try? url.resourceValues(forKeys: [.contentModificationDateKey, .fileSizeKey]) else { return false }
+        guard !failed, let values = try? URL(fileURLWithPath: url.path).resourceValues(forKeys: [.contentModificationDateKey, .fileSizeKey]) else { return false }
         return values.fileSize == fileSize && values.contentModificationDate == modifiedAt
     }
 
     init?(url: URL) {
-        self.url = url
-        guard let values = try? url.resourceValues(forKeys: [.contentModificationDateKey, .fileSizeKey]),
+        self.url = URL(fileURLWithPath: url.path)
+        guard let values = try? self.url.resourceValues(forKeys: [.contentModificationDateKey, .fileSizeKey]),
               let modifiedAt = values.contentModificationDate else { return nil }
         self.modifiedAt = modifiedAt
-        guard let result = try? AgentHistoryScanner.forEachJSONLLine(from: url, { _, _ in }), result.lineCount > 0 else { return nil }
+        guard let result = try? AgentHistoryScanner.forEachJSONLLine(from: self.url, { _, _ in }), result.lineCount > 0 else { return nil }
         count = result.lineCount
         fileSize = result.fileSize
         guard values.fileSize == fileSize, isValid else { return nil }

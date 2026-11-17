@@ -41,6 +41,7 @@ public final class SSHTunnelManager: @unchecked Sendable {
         }
     }
 
+    private let leaseStore: SSHTunnelLeaseStore?
     private let lock = NSLock()
     private var tunnels: [String: Tunnel] = [:]
     /// Whether the process-exit cleanup hook has been installed (guarded by `lock`).
@@ -65,6 +66,8 @@ public final class SSHTunnelManager: @unchecked Sendable {
         makeTunnelProcess: ((RemoteHost, URL) throws -> Process)?,
         reachabilityProbe: ((Endpoint) -> Bool)?
     ) {
+        leaseStore = makeTunnelProcess == nil ? SSHTunnelLeaseStore(directory: KouenPaths.tunnelsDirectory) : nil
+        leaseStore?.sweep()
         self.makeTunnelProcess = makeTunnelProcess ?? SSHTunnelManager.defaultTunnelProcess
         self.reachabilityProbe = reachabilityProbe ?? SSHTunnelManager.defaultReachabilityProbe
     }
@@ -116,6 +119,7 @@ public final class SSHTunnelManager: @unchecked Sendable {
         lock.unlock()
         guard let tunnel else { return }
         if tunnel.process.isRunning { tunnel.process.terminate() }
+        if !tunnel.process.isRunning { leaseStore?.remove(process: tunnel.process, socket: tunnel.localSocket) }
         try? FileManager.default.removeItem(at: tunnel.localSocket)
     }
 
@@ -126,6 +130,7 @@ public final class SSHTunnelManager: @unchecked Sendable {
         lock.unlock()
         for (_, tunnel) in all {
             if tunnel.process.isRunning { tunnel.process.terminate() }
+            if !tunnel.process.isRunning { leaseStore?.remove(process: tunnel.process, socket: tunnel.localSocket) }
             try? FileManager.default.removeItem(at: tunnel.localSocket)
         }
     }
@@ -140,12 +145,16 @@ public final class SSHTunnelManager: @unchecked Sendable {
         try? FileManager.default.removeItem(at: localSocket)
 
         let process = try makeTunnelProcess(host, localSocket)
+        if let leaseStore {
+            process.terminationHandler = { child in leaseStore.remove(process: child, socket: localSocket) }
+        }
 
         do {
             try process.run()
         } catch {
             throw SSHTunnelError.launchFailed("\(error)")
         }
+        leaseStore?.record(process: process, socket: localSocket)
         lock.lock()
         tunnels[host.name] = Tunnel(process: process, localSocket: localSocket)
         let needsCleanupHook = !exitCleanupRegistered
@@ -154,7 +163,7 @@ public final class SSHTunnelManager: @unchecked Sendable {
         // Reap the ssh child + forwarded socket on normal process exit — without this,
         // every kouen-cli invocation that opened a tunnel leaves an orphaned ssh
         // process and a stale socket in runtime/tunnels/ behind.
-        if needsCleanupHook {
+        if needsCleanupHook, leaseStore != nil {
             atexit { SSHTunnelManager.shared.stopAll() }
         }
     }
@@ -291,11 +300,11 @@ public final class SSHTunnelManager: @unchecked Sendable {
 
     // MARK: - Production defaults for the injectable seams
 
-    /// The shipping `ssh -N -L …` child: `/usr/bin/env ssh …` with stdout/stderr silenced.
+    /// The shipping `ssh -N -L …` child: `/usr/bin/ssh …` with stdout/stderr silenced.
     private static func defaultTunnelProcess(_ host: RemoteHost, _ localSocket: URL) throws -> Process {
         let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
-        process.arguments = try sshArguments(for: host, localSocket: localSocket)
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/ssh")
+        process.arguments = Array(try sshArguments(for: host, localSocket: localSocket).dropFirst())
         // Silence ssh's own chatter; failures surface as the process exiting + the readiness timeout.
         process.standardOutput = FileHandle.nullDevice
         process.standardError = FileHandle.nullDevice
