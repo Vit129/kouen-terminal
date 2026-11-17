@@ -1,0 +1,78 @@
+DESIGN.md
+  s_b1f4773250cfeb::t_b68ed120fd7a77 33
+  s_b1f4773250cfeb::t_768afd577341a7 34
+  s_b1f4773250cfeb::t_2465cb73900c67 31-32,35-37
+Tests/KouenAppTests/AgentSessionHistoryModelTests.swift
+  s_b1f4773250cfeb::t_968b73c7b2c18f 89,94,294,302
+  s_b1f4773250cfeb::t_8a013a88326fb3 329-344,359-361,363-368
+  s_b1f4773250cfeb::t_8dd8d32d3a08d4 346-348,356,358
+  s_b1f4773250cfeb::t_814ddb68407d39 349-355,357
+  s_b1f4773250cfeb::t_1292ac8a7a3b01 73-77
+  s_b1f4773250cfeb::t_26e8d3795665cb 345
+  s_b1f4773250cfeb::t_be3a718692c126 326
+  s_b1f4773250cfeb::t_48b9db6f5c8bbb 362
+  s_b1f4773250cfeb::t_85f8a33db9650b 327-328
+Apps/Kouen/Sources/KouenApp/UI/History/AgentSessionHistoryView.swift
+  s_b1f4773250cfeb::t_cad0fb7a5bd2d2 14,230-231,256-260
+  s_b1f4773250cfeb::t_edef25e0199f73 104,124-129,294-299,310-311,332,925
+  s_b1f4773250cfeb::t_a1f67e9a84f136 111-112,119-120
+  s_b1f4773250cfeb::t_6cabfb436adb83 541-549,651,667,715-716,753,761,814,816-818,916,921-924
+  s_b1f4773250cfeb::t_356cd79cbad97e 265
+  s_b1f4773250cfeb::t_58d887723cf7b0 807,809-811
+  s_b1f4773250cfeb::t_0ed8ce317fc4bf 204-211,214-217,219-220,222,224,227-229,232-234,236-237,242-243,248-250,253-255,262-264,266,268-284,286-290,292-293,329-331
+  s_b1f4773250cfeb::t_0b00611b20bcb4 36,74-75,107-110,113-118,121,123,200,202,235,238-241,244-247,251-252,261,267,307,325-328
+  s_b1f4773250cfeb::t_836b39ac2e23a0 333
+  s_b1f4773250cfeb::t_b67ac512b49aab 926
+Apps/Kouen/Sources/KouenApp/UI/Sidebar/KouenSidebarPanelViewController.swift
+  s_b1f4773250cfeb::t_ad6387527aa436 745-749
+Apps/Kouen/Sources/KouenApp/UI/History/AgentSessionShortcutManagerView.swift
+  s_b1f4773250cfeb::t_814ddb68407d39 215
+  s_b1f4773250cfeb::t_a22f520b8c83e2 7,166
+  s_b1f4773250cfeb::t_a80ee135599932 144-148
+  s_b1f4773250cfeb::t_877fd4669f6aca 1-3,5,10,12,16-39,105-110,117-143,149-158,225-226
+  s_b1f4773250cfeb::t_f1dcca5a36dbb1 11
+  s_b1f4773250cfeb::t_8dd8d32d3a08d4 40-50,59-69,99-104,111-116,219-220
+  s_b1f4773250cfeb::t_9b77f6b30a166f 75-88
+  s_b1f4773250cfeb::t_768afd577341a7 4,6,8-9,13-15,51-58,70-74,89-98,159-165,167-214,216-218,221-224
+Apps/Kouen/Sources/KouenApp/UI/History/AgentSessionHistoryModel.swift
+  s_b1f4773250cfeb::t_cadcee41b96e52 275-280
+  s_b1f4773250cfeb::t_814ddb68407d39 246-258
+  s_b1f4773250cfeb::t_97a5e0ef378eca 127,430,446,472,494,515-516,575,578
+  s_b1f4773250cfeb::t_87cd4da1abcfe9 85-87,112,155-156,170-171,174-175,237-245,259-274,281
+  s_b1f4773250cfeb::t_772dfd5642cc56 282
+Apps/Kouen/Sources/KouenApp/UI/History/HistorySessionDetailsView.swift
+  s_b1f4773250cfeb::t_800ee99d748112 1-6,14-55,58-59,61-107
+  s_b1f4773250cfeb::t_11576ded8f0338 7-13,56-57,60
+Apps/Kouen/Sources/KouenApp/Resources/Info.plist
+  s_335f67cab1d596::t_c05d83ce4be759 100,115
+CHANGELOG.md
+  s_335f67cab1d596::t_8fbd0843971b00 8-13
+Packages/KouenCore/Sources/KouenCore/KouenVersion.swift
+  s_335f67cab1d596::t_9ec93b7122e6e4 15,18
+Packages/KouenCore/Sources/KouenCore/ReleaseNotes/GeneratedReleaseNotes.swift
+  s_b1f4773250cfeb::t_26d098f7ce9ade 1,8-9,12
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.3",
+  "base_commit_sha": "295f8e6822c4b6acd9c5040e2e61e1ba9be44958",
+  "prompts": {},
+  "sessions": {
+    "s_335f67cab1d596": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1e9d3-4614-7fa2-a4c7-dd41b9a777fd",
+        "model": "unknown"
+      },
+      "human_author": "Vit129 <vitosk129@gmail.com>"
+    },
+    "s_b1f4773250cfeb": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1e871-ed70-77a2-b694-17527eff01b3",
+        "model": "gpt-6-luna"
+      },
+      "human_author": "Vit129 <vitosk129@gmail.com>"
+    }
+  }
+}
