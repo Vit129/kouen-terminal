@@ -70,6 +70,11 @@ final class AgentSessionHistoryModelTests: XCTestCase {
         XCTAssertEqual(model.windowedRecords.count, 1)
         XCTAssertEqual(model.groupedRecords.first?.title, "Best matches")
         XCTAssertEqual(model.groupedRecords.first?.records.count, 1)
+
+        model.searchQuery = ""
+        model.applyFilterNow()
+        XCTAssertEqual(model.filteredRecords.count, 2, "Clearing search restores the unsearched records")
+        XCTAssertEqual(model.searchableRecordsCount, 2)
     }
 
     func testSearchHonorsSelectedRepositoryAndFindsOldSessions() {
@@ -81,10 +86,12 @@ final class AgentSessionHistoryModelTests: XCTestCase {
             query: "sprint", scope: .repo, records: [own, other], activeCWD: "/repo/one",
             resolver: resolver, initialCache: [:])
         XCTAssertEqual(scoped.filtered.map(\.id), ["own"])
+        XCTAssertEqual(scoped.searchableCount, 1)
         let all = AgentSessionHistoryModel.computeFiltered(
             query: "sprint", scope: .all, records: [own, other], activeCWD: "/repo/one",
             resolver: resolver, initialCache: [:])
         XCTAssertEqual(Set(all.filtered.map(\.id)), Set(["own", "other"]))
+        XCTAssertEqual(all.searchableCount, 2)
     }
 
     func testSearchingDoesNotCollapseMatchingSessionsAcrossRepos() {
@@ -284,6 +291,7 @@ final class AgentSessionHistoryModelTests: XCTestCase {
 
         // 1. Default: empty selectedAgents -> all records shown
         XCTAssertEqual(model.filteredRecords.count, 4)
+        XCTAssertEqual(model.searchableRecordsCount, 4)
         XCTAssertEqual(model.availableAgentKinds, [.claudeCode, .codex, .copilot, .antigravity])
 
         // 2. Single selection: toggle claudeCode -> only r1
@@ -291,6 +299,7 @@ final class AgentSessionHistoryModelTests: XCTestCase {
         XCTAssertEqual(model.selectedAgents, [.claudeCode])
         model.applyFilterNow()
         XCTAssertEqual(model.filteredRecords.map(\.id), ["r1"])
+        XCTAssertEqual(model.searchableRecordsCount, 1)
 
         // 3. Multi-selection: toggle copilot -> r1 and r3
         model.toggleAgentFilter(.copilot)
@@ -314,6 +323,49 @@ final class AgentSessionHistoryModelTests: XCTestCase {
         model.searchQuery = "Task"
         model.applyFilterNow()
         XCTAssertEqual(model.filteredRecords.map(\.id), ["r4"])
+        XCTAssertEqual(model.searchableRecordsCount, 1)
+    }
+
+    func testAgentShortcutOrderPersistsAndNormalizesWithoutChangingFilters() {
+        let suiteName = "AgentSessionHistoryModelTests.\(UUID().uuidString)"
+        let preferences = UserDefaults(suiteName: suiteName)!
+        defer { preferences.removePersistentDomain(forName: suiteName) }
+
+        let model = AgentSessionHistoryModel(userDefaults: preferences)
+        XCTAssertEqual(model.agentShortcutKinds, [.claudeCode, .codex, .antigravity, .copilot])
+
+        model.selectedAgents = [.cursor]
+        model.setAgentShortcutKinds([.grok, .codex, .grok, .cursor, .pi, .gemini, .aider])
+        XCTAssertEqual(model.agentShortcutKinds, [.grok, .codex, .cursor, .pi, .gemini])
+        XCTAssertEqual(model.selectedAgents, [.cursor], "Changing shortcuts must not change active agent filters")
+
+        let restored = AgentSessionHistoryModel(userDefaults: preferences)
+        XCTAssertEqual(restored.agentShortcutKinds, [.grok, .codex, .cursor, .pi, .gemini])
+
+        restored.selectedAgents = [.cursor]
+        restored.setAgentShortcutKinds([.codex, .grok, .cursor, .pi, .gemini])
+        XCTAssertEqual(restored.agentShortcutKinds, [.codex, .grok, .cursor, .pi, .gemini], "Reordering shortcuts persists their visible order")
+        XCTAssertEqual(restored.selectedAgents, [.cursor], "Reordering shortcuts must not change active agent filters")
+
+        restored.setAgentShortcutKinds([.grok, .codex, .cursor, .pi, .gemini])
+        restored.moveAgentShortcut(.grok, to: .codex)
+        XCTAssertEqual(restored.agentShortcutKinds, [.codex, .grok, .cursor, .pi, .gemini], "Dropping on the next shortcut moves into its former slot")
+        restored.moveAgentShortcut(.codex, to: .gemini)
+        XCTAssertEqual(restored.agentShortcutKinds, [.grok, .cursor, .pi, .gemini, .codex], "Dropping on the last shortcut supports moving to the end")
+        XCTAssertEqual(restored.selectedAgents, [.cursor])
+        let reordered = AgentSessionHistoryModel(userDefaults: preferences)
+        XCTAssertEqual(reordered.agentShortcutKinds, [.grok, .cursor, .pi, .gemini, .codex])
+
+        preferences.set(["gemini", "unknown-agent", "gemini", "aider", "goose", "pi", "hermes", "codex"], forKey: AgentSessionHistoryModel.agentShortcutKindsDefaultsKey)
+        let normalized = AgentSessionHistoryModel(userDefaults: preferences)
+        XCTAssertEqual(normalized.agentShortcutKinds, [.gemini, .aider, .goose, .pi, .hermes])
+        XCTAssertEqual(preferences.stringArray(forKey: AgentSessionHistoryModel.agentShortcutKindsDefaultsKey), ["gemini", "aider", "goose", "pi", "hermes"])
+
+        normalized.toggleAgentShortcut(.grok)
+        XCTAssertEqual(normalized.agentShortcutKinds, [.gemini, .aider, .goose, .pi, .hermes])
+        normalized.toggleAgentShortcut(.aider)
+        normalized.toggleAgentShortcut(.grok)
+        XCTAssertEqual(normalized.agentShortcutKinds, [.gemini, .goose, .pi, .hermes, .grok])
     }
 
     func testCrossRepoTaskGrouping() {

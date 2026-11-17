@@ -82,6 +82,9 @@ public enum AgentHistoryDateGroup: String, CaseIterable, Comparable {
 
 @MainActor
 public final class AgentSessionHistoryModel: ObservableObject {
+    static let agentShortcutKindsDefaultsKey = "Kouen.AgentSessionHistory.shortcutAgentKinds"
+    static let defaultAgentShortcutKinds: [AgentKind] = [.claudeCode, .codex, .antigravity, .copilot]
+
     @Published public var records: [AgentSessionRecord] = [] {
         didSet {
             scheduleFilter(debounceMs: 0)
@@ -106,6 +109,7 @@ public final class AgentSessionHistoryModel: ObservableObject {
             scheduleFilter(debounceMs: 0)
         }
     }
+    @Published public private(set) var agentShortcutKinds: [AgentKind]
     @Published public var filteredRecords: [AgentSessionRecord] = [] {
         didSet {
             recomputeDerivedLists()
@@ -120,6 +124,7 @@ public final class AgentSessionHistoryModel: ObservableObject {
     @Published public var collapsedSections: Set<String> = []
     @Published public var isLoading: Bool = false
     @Published public private(set) var isSearching: Bool = false
+    @Published public private(set) var searchableRecordsCount: Int = 0
     @Published public private(set) var selectedRecordID: String?
 
     /// How many records beyond the default 14-day window are currently revealed via "Load More".
@@ -147,6 +152,8 @@ public final class AgentSessionHistoryModel: ObservableObject {
     /// Active CWD provider injected for testing or production.
     public var activeCWDProvider: @Sendable () -> String
 
+    private let preferences: UserDefaults
+
     /// Memoized repo root cache keyed by projectPath.
     private var repoRootCache: [String: String] = [:]
 
@@ -160,9 +167,12 @@ public final class AgentSessionHistoryModel: ObservableObject {
 
     public init(
         repoRootResolver: @escaping @Sendable (String) -> String? = { WorktreeManager().repoRoot(for: $0) },
-        activeCWDProvider: (@Sendable () -> String)? = nil
+        activeCWDProvider: (@Sendable () -> String)? = nil,
+        userDefaults: UserDefaults = .standard
     ) {
         self.repoRootResolver = repoRootResolver
+        self.preferences = userDefaults
+        self.agentShortcutKinds = Self.loadAgentShortcutKinds(from: userDefaults)
         if let activeCWDProvider {
             self.activeCWDProvider = activeCWDProvider
         } else {
@@ -222,6 +232,52 @@ public final class AgentSessionHistoryModel: ObservableObject {
         } else {
             selectedAgents.insert(kind)
         }
+    }
+
+    /// Persists the ordered, visible agent shortcut list without changing active filters.
+    public func setAgentShortcutKinds(_ kinds: [AgentKind]) {
+        var seen = Set<AgentKind>()
+        let normalized = Array(kinds.filter { seen.insert($0).inserted }.prefix(5))
+        guard normalized != agentShortcutKinds else { return }
+        agentShortcutKinds = normalized
+        preferences.set(normalized.map(\.rawValue), forKey: Self.agentShortcutKindsDefaultsKey)
+    }
+
+    /// Moves a selected shortcut into the destination shortcut's current slot.
+    public func moveAgentShortcut(_ kind: AgentKind, to destination: AgentKind) {
+        var kinds = agentShortcutKinds
+        guard
+            kind != destination,
+            let sourceIndex = kinds.firstIndex(of: kind),
+            let destinationIndex = kinds.firstIndex(of: destination)
+        else { return }
+        kinds.remove(at: sourceIndex)
+        kinds.insert(kind, at: min(destinationIndex, kinds.count))
+        setAgentShortcutKinds(kinds)
+    }
+
+    public func toggleAgentShortcut(_ kind: AgentKind) {
+        var kinds = agentShortcutKinds
+        if let index = kinds.firstIndex(of: kind) {
+            kinds.remove(at: index)
+        } else if kinds.count < 5 {
+            kinds.append(kind)
+        }
+        setAgentShortcutKinds(kinds)
+    }
+
+    private static func loadAgentShortcutKinds(from preferences: UserDefaults) -> [AgentKind] {
+        guard preferences.object(forKey: agentShortcutKindsDefaultsKey) != nil else {
+            return defaultAgentShortcutKinds
+        }
+        let savedValues = preferences.stringArray(forKey: agentShortcutKindsDefaultsKey) ?? []
+        var seen = Set<AgentKind>()
+        let normalized = Array(savedValues.compactMap(AgentKind.init(rawValue:)).filter { seen.insert($0).inserted }.prefix(5))
+        let normalizedValues = normalized.map(\.rawValue)
+        if savedValues != normalizedValues {
+            preferences.set(normalizedValues, forKey: agentShortcutKindsDefaultsKey)
+        }
+        return normalized
     }
 
     public var availableAgentKinds: [AgentKind] {
@@ -371,7 +427,7 @@ public final class AgentSessionHistoryModel: ObservableObject {
         filterTask = nil
         isSearching = false
         let state = historySignposter.beginInterval("applyFilterNow")
-        let (filtered, newCache, snippets, matchLocations, semanticIDs, metadata, hydratedIDs) = Self.computeFiltered(
+        let (filtered, newCache, snippets, matchLocations, semanticIDs, metadata, hydratedIDs, searchableCount) = Self.computeFiltered(
             query: searchQuery,
             scope: selectedScope,
             selectedAgents: selectedAgents,
@@ -387,6 +443,7 @@ public final class AgentSessionHistoryModel: ObservableObject {
         self.hydratedEvidenceIDs = hydratedIDs
         self.searchMatchLocations = matchLocations
         self.semanticMatchIDs = semanticIDs
+        self.searchableRecordsCount = searchableCount
         self.filteredRecords = filtered
     }
 
@@ -412,7 +469,7 @@ public final class AgentSessionHistoryModel: ObservableObject {
             if Task.isCancelled { return }
 
             let state = historySignposter.beginInterval("computeFiltered")
-            let (filtered, newCache, snippets, matchLocations, semanticIDs, metadata, hydratedIDs) = Self.computeFiltered(
+            let (filtered, newCache, snippets, matchLocations, semanticIDs, metadata, hydratedIDs, searchableCount) = Self.computeFiltered(
                 query: currentQuery,
                 scope: currentScope,
                 selectedAgents: currentAgents,
@@ -434,6 +491,7 @@ public final class AgentSessionHistoryModel: ObservableObject {
                 self.hydratedEvidenceIDs = hydratedIDs
                 self.searchMatchLocations = matchLocations
                 self.semanticMatchIDs = semanticIDs
+                self.searchableRecordsCount = searchableCount
                 self.filteredRecords = filtered
             }
         }
@@ -454,7 +512,8 @@ public final class AgentSessionHistoryModel: ObservableObject {
         matchLocations: [String: AgentSessionRecord.MatchLocationInfo],
         semanticMatchIDs: Set<String>,
         metadata: [String: [String: String]],
-        hydratedIDs: Set<String>
+        hydratedIDs: Set<String>,
+        searchableCount: Int
     ) {
         let baseRecords: [AgentSessionRecord]
         if selectedAgents.isEmpty {
@@ -513,10 +572,10 @@ public final class AgentSessionHistoryModel: ObservableObject {
                     snippets[hit.record.id] = snippet
                 }
             }
-            return (hits.map(\.record), cache, snippets, matchLocations, semanticMatchIDs, metadata, Set(hits.prefix(50).map { $0.record.id }))
+            return (hits.map(\.record), cache, snippets, matchLocations, semanticMatchIDs, metadata, Set(hits.prefix(50).map { $0.record.id }), scopedRecords.count)
         }
 
-        return (scopedRecords, cache, [:], [:], [], [:], [])
+        return (scopedRecords, cache, [:], [:], [], [:], [], scopedRecords.count)
     }
 
     /// Fetch evidence only when a result outside the initial screen becomes visible.

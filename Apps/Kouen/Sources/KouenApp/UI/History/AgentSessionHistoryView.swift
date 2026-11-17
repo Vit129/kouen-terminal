@@ -11,6 +11,7 @@ public struct AgentSessionHistoryView: View {
     var onGoToTab: ((AgentSessionRecord) -> Void)?
 
     @FocusState private var isSearchFocused: Bool
+    @State private var isManagingAgentShortcuts = false
 
     public init(
         model: AgentSessionHistoryModel,
@@ -32,7 +33,7 @@ public struct AgentSessionHistoryView: View {
                 Image(systemName: "magnifyingglass")
                     .font(.system(size: 11))
                     .foregroundStyle(Color(nsColor: c.textTertiary))
-                TextField("Search sessions", text: $model.searchQuery)
+                TextField("Search prompts, conversations, and session details", text: $model.searchQuery)
                     .textFieldStyle(.plain)
                     .font(.system(size: 11))
                     .focused($isSearchFocused)
@@ -70,8 +71,8 @@ public struct AgentSessionHistoryView: View {
             .padding(.horizontal, KouenDesign.Spacing.sm)
             .padding(.bottom, KouenDesign.Spacing.xs)
 
-            // Agent Filter Chips (Claude / Codex / Copilot / Antigravity)
-            agentChipsView
+            // Compact multi-select agent filter
+            agentFilterMenu
                 .padding(.horizontal, KouenDesign.Spacing.sm)
                 .padding(.bottom, KouenDesign.Spacing.xs)
 
@@ -100,13 +101,32 @@ public struct AgentSessionHistoryView: View {
                     Image(systemName: "clock.arrow.circlepath")
                         .font(.system(size: 24))
                         .foregroundStyle(Color(nsColor: c.textTertiary))
-                    Text(model.searchQuery.isEmpty ? "No session history found" : "No sessions match \"\(model.searchQuery)\"")
+                    Text(emptyStateTitle)
                         .font(.system(size: 11, weight: .medium))
                         .foregroundStyle(Color(nsColor: c.textSecondary))
-                    // Cloud Agents started on the web leave no local transcript to scan (P55).
-                    Text("Antigravity Cloud Agents live on antigravity.google.com")
+                    if !model.searchQuery.isEmpty || model.selectedScope != .repo || !model.selectedAgents.isEmpty {
+                        HStack(spacing: 8) {
+                            if !model.searchQuery.isEmpty {
+                                Button("Clear search") { model.searchQuery = "" }
+                                    .buttonStyle(.plain)
+                                    .foregroundStyle(Color(nsColor: c.accent))
+                            }
+                            Button("Reset filters") {
+                                model.searchQuery = ""
+                                model.selectedScope = .repo
+                                model.selectedAgents.removeAll()
+                            }
+                            .buttonStyle(.plain)
+                            .foregroundStyle(Color(nsColor: c.accent))
+                        }
                         .font(.system(size: 10))
-                        .foregroundStyle(Color(nsColor: c.textTertiary))
+                    }
+                    if model.records.isEmpty && model.searchQuery.isEmpty {
+                        // Cloud Agents started on the web leave no local transcript to scan (P55).
+                        Text("Antigravity Cloud Agents live on antigravity.google.com")
+                            .font(.system(size: 10))
+                            .foregroundStyle(Color(nsColor: c.textTertiary))
+                    }
                     Spacer()
                 }
             } else {
@@ -177,63 +197,106 @@ public struct AgentSessionHistoryView: View {
         }
     }
 
-    // MARK: - Agent Filter Chips
+    // MARK: - Agent Filter Menu
     @ViewBuilder
-    private var agentChipsView: some View {
+    private var agentFilterMenu: some View {
         let c = KouenDesign.chrome
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 4) {
-                ForEach(model.availableAgentKinds, id: \.self) { kind in
-                    let isSelected = model.selectedAgents.contains(kind)
-                    let brandColor = Color(nsColor: NSColor.fromHex(kind.dotHex) ?? .secondaryLabelColor)
+        HStack(spacing: 4) {
+            agentFilterChip(title: "All", kind: nil)
+                .fixedSize()
+
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 4) {
+                    ForEach(model.agentShortcutKinds, id: \.self) { kind in
+                        agentFilterChip(title: kind.filterChipName, kind: kind)
+                    }
+                }
+                .padding(.horizontal, 1)
+            }
+            .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading)
+            .layoutPriority(0)
+
+            Menu {
+                ForEach(AgentKind.allCases.filter { !model.agentShortcutKinds.contains($0) }, id: \.self) { kind in
                     Button {
                         model.toggleAgentFilter(kind)
                     } label: {
-                        HStack(spacing: 3.5) {
-                            Image(nsImage: AgentIconRenderer.templateOrMonogramImage(for: kind, size: 9))
-                                .resizable()
-                                .frame(width: 9, height: 9)
-                                .foregroundStyle(isSelected ? brandColor : Color(nsColor: c.textTertiary))
-
-                            Text(kind.filterChipName)
-                                .font(.system(size: 10, weight: isSelected ? .semibold : .regular))
-                                .foregroundStyle(isSelected ? Color(nsColor: c.textPrimary) : Color(nsColor: c.textSecondary))
-                        }
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 2.5)
-                        .background(
-                            isSelected
-                                ? brandColor.opacity(0.14)
-                                : Color(nsColor: c.surfaceElevated)
-                        )
-                        .clipShape(Capsule())
-                        .overlay(
-                            Capsule()
-                                .stroke(
-                                    isSelected
-                                        ? brandColor.opacity(0.55)
-                                        : Color(nsColor: c.border),
-                                    lineWidth: 1
-                                )
-                        )
+                        Label(kind.displayName, systemImage: model.selectedAgents.contains(kind) ? "checkmark" : "circle")
                     }
-                    .buttonStyle(.plain)
                 }
 
-                if !model.selectedAgents.isEmpty {
-                    Button {
-                        model.selectedAgents.removeAll()
-                    } label: {
-                        Image(systemName: "xmark.circle.fill")
-                            .font(.system(size: 10))
-                            .foregroundStyle(Color(nsColor: c.textTertiary))
-                    }
-                    .buttonStyle(.plain)
-                    .help("Clear AI filter")
+                Divider()
+
+                Button {
+                    isManagingAgentShortcuts = true
+                } label: {
+                    Label("Manage shortcuts…", systemImage: "slider.horizontal.3")
                 }
+            } label: {
+                HStack(spacing: 4) {
+                    Text("More")
+                    Image(systemName: "chevron.down")
+                        .font(.system(size: 8, weight: .semibold))
+                }
+                .font(.system(size: 10, weight: .medium))
+                .foregroundStyle(Color(nsColor: c.textSecondary))
+                .padding(.horizontal, 6)
+                .padding(.vertical, 4)
+                .background(Color(nsColor: c.surfaceElevated))
+                .clipShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
+                .overlay(RoundedRectangle(cornerRadius: 5).stroke(Color(nsColor: c.border), lineWidth: 1))
+                .contentShape(Rectangle())
             }
-            .padding(.horizontal, 1)
+            .fixedSize()
+            .menuStyle(.borderlessButton)
+            .menuIndicator(.hidden)
+            .help("More agent filters and shortcut settings")
         }
+        .accessibilityElement(children: .contain)
+        .popover(isPresented: $isManagingAgentShortcuts, arrowEdge: .bottom) {
+            AgentSessionShortcutManagerView(model: model) {
+                isManagingAgentShortcuts = false
+            }
+        }
+    }
+
+    private func agentFilterChip(title: String, kind: AgentKind?) -> some View {
+        let c = KouenDesign.chrome
+        let isSelected = kind.map { model.selectedAgents.contains($0) } ?? model.selectedAgents.isEmpty
+        let tint = kind.flatMap { NSColor.fromHex($0.dotHex) } ?? c.accent
+
+        return Button {
+            if let kind {
+                model.toggleAgentFilter(kind)
+            } else {
+                model.selectedAgents.removeAll()
+            }
+        } label: {
+            HStack(spacing: 4) {
+                if let kind {
+                    Image(nsImage: AgentIconRenderer.templateOrMonogramImage(for: kind, size: 9))
+                        .resizable()
+                        .frame(width: 9, height: 9)
+                        .foregroundStyle(Color(nsColor: tint))
+                }
+                Text(title)
+                    .font(.system(size: 10, weight: isSelected ? .semibold : .regular))
+                    .foregroundStyle(Color(nsColor: isSelected ? c.textPrimary : c.textSecondary))
+            }
+            .padding(.horizontal, 6)
+            .padding(.vertical, 3)
+            .background(isSelected ? Color(nsColor: tint).opacity(0.14) : Color(nsColor: c.surfaceElevated))
+            .clipShape(Capsule())
+            .overlay(Capsule().stroke(isSelected ? Color(nsColor: tint).opacity(0.55) : Color(nsColor: c.border), lineWidth: 1))
+        }
+        .buttonStyle(.plain)
+        .help(kind.map { "Show only \($0.displayName) sessions" } ?? "Show sessions from all agents")
+    }
+
+    private var emptyStateTitle: String {
+        if !model.searchQuery.isEmpty { return "No sessions match this search" }
+        if !model.selectedAgents.isEmpty || model.selectedScope != .repo { return "No sessions match these filters" }
+        return "No session history found"
     }
 
     // MARK: - Sub-header
@@ -241,9 +304,11 @@ public struct AgentSessionHistoryView: View {
     private var subHeaderView: some View {
         let c = KouenDesign.chrome
         HStack(alignment: .center) {
-            Text(model.isLoading ? "Scanning history… results may be incomplete" : model.isSearching ? "Searching…" : "\(model.windowedRecords.count) shown · \(model.records.count) recent")
+            Text(historyCountText)
                 .font(.system(size: 10))
                 .foregroundStyle(Color(nsColor: c.textTertiary))
+                .lineLimit(1)
+                .help("Counts use the current repository scope and selected agent filters")
             Spacer()
             Button {
                 model.refresh(force: true)
@@ -255,6 +320,15 @@ public struct AgentSessionHistoryView: View {
             .buttonStyle(.plain)
             .help("Refresh history from disk")
         }
+    }
+
+    private var historyCountText: String {
+        if model.isLoading { return "Scanning history… results may be incomplete" }
+        if model.isSearching { return "Searching…" }
+        if !model.searchQuery.isEmpty {
+            return "\(model.filteredRecords.count) of \(model.searchableRecordsCount) sessions"
+        }
+        return "\(model.windowedRecords.count) of \(model.filteredRecords.count) sessions"
     }
 
     // MARK: - Section
@@ -349,24 +423,6 @@ public struct AgentSessionHistoryView: View {
                     .lineLimit(1)
                     .frame(maxWidth: .infinity, alignment: .leading)
 
-                    if !isCrossRepoGroup, let breadcrumbs = record.topicBreadcrumbs {
-                        HStack(spacing: 3) {
-                            Image(systemName: "signpost.right.and.left")
-                                .font(.system(size: 8))
-                                .foregroundStyle(Color(nsColor: c.textTertiary))
-                            highlightedText(
-                                breadcrumbs,
-                                query: model.searchQuery,
-                                baseColor: c.textTertiary,
-                                highlightColor: NSColor.controlAccentColor,
-                                fontSize: 8.5,
-                                weight: .regular
-                            )
-                            .lineLimit(1)
-                        }
-                        .padding(.top, 0.5)
-                    }
-
                     if isCrossRepoGroup {
                         // Line 2 for Cross-Repo group: age · ⇄ same task in N repos
                         HStack(spacing: 4) {
@@ -456,16 +512,6 @@ public struct AgentSessionHistoryView: View {
                                     .foregroundStyle(Color(nsColor: c.textSecondary))
                             }
 
-                            if let usage = record.usage, let summary = usage.shortSummary {
-                                Text(summary)
-                                    .font(.system(size: 8, weight: .medium))
-                                    .padding(.horizontal, 3)
-                                    .padding(.vertical, 1)
-                                    .background(Color.blue.opacity(0.12))
-                                    .cornerRadius(3)
-                                    .foregroundStyle(Color.blue)
-                            }
-
                             if isLive {
                                 HStack(spacing: 2) {
                                     Circle()
@@ -491,6 +537,15 @@ public struct AgentSessionHistoryView: View {
                             Text(relativeDate(record.updatedAt))
                                 .font(.system(size: 9))
                                 .foregroundStyle(Color(nsColor: c.textTertiary))
+
+                            if !record.worktreeAvailable {
+                                Text("·")
+                                    .font(.system(size: 8))
+                                    .foregroundStyle(Color(nsColor: c.textTertiary))
+                                Text("worktree unavailable")
+                                    .font(.system(size: 8.5, weight: .medium))
+                                    .foregroundStyle(Color(nsColor: c.danger))
+                            }
 
                             if showRepo && !record.projectName.isEmpty {
                                 Text("·")
@@ -593,17 +648,7 @@ public struct AgentSessionHistoryView: View {
                                         .foregroundStyle(Color(nsColor: c.textTertiary))
                                     Spacer()
                                 }
-                                if let snippet = latestTurnSnippet(for: sib) {
-                                    highlightedText(
-                                        snippet,
-                                        query: model.searchQuery,
-                                        baseColor: c.textSecondary,
-                                        highlightColor: NSColor.controlAccentColor,
-                                        fontSize: 9.5,
-                                        weight: .regular
-                                    )
-                                    .lineLimit(2)
-                                }
+                                HistorySessionDetailsView(record: sib)
                                 HStack(spacing: 0) {
                                     Spacer()
                                     splitActionButton(for: sib, isLive: sibIsLive)
@@ -619,54 +664,7 @@ public struct AgentSessionHistoryView: View {
                     .padding(.top, 4)
                 } else {
                     VStack(alignment: .leading, spacing: 4) {
-                        if let snippet = latestTurnSnippet(for: record) {
-                            highlightedText(
-                                snippet,
-                                query: model.searchQuery,
-                                baseColor: c.textPrimary,
-                                highlightColor: NSColor.controlAccentColor,
-                                fontSize: 10,
-                                weight: .regular
-                            )
-                            .lineLimit(3)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(.vertical, 1)
-                        }
-                        if let usage = record.usage {
-                            HStack(spacing: 8) {
-                                if let ctx = usage.contextTokens ?? usage.inputTokens {
-                                    HStack(spacing: 2) {
-                                        Text("ctx:")
-                                            .font(.system(size: 8.5))
-                                            .foregroundStyle(Color(nsColor: c.textTertiary))
-                                        Text("\(ctx)")
-                                            .font(.system(size: 8.5, weight: .medium))
-                                            .foregroundStyle(Color(nsColor: c.textSecondary))
-                                    }
-                                }
-                                if let out = usage.outputTokens {
-                                    HStack(spacing: 2) {
-                                        Text("out:")
-                                            .font(.system(size: 8.5))
-                                            .foregroundStyle(Color(nsColor: c.textTertiary))
-                                        Text("\(out)")
-                                            .font(.system(size: 8.5, weight: .medium))
-                                            .foregroundStyle(Color(nsColor: c.textSecondary))
-                                    }
-                                }
-                                if let cost = usage.totalCostUSD {
-                                    HStack(spacing: 2) {
-                                        Text("cost:")
-                                            .font(.system(size: 8.5))
-                                            .foregroundStyle(Color(nsColor: c.textTertiary))
-                                        Text(String(format: "$%.3f", cost))
-                                            .font(.system(size: 8.5, weight: .medium))
-                                            .foregroundStyle(Color(nsColor: c.textSecondary))
-                                    }
-                                }
-                            }
-                            .padding(.vertical, 1)
-                        }
+                        HistorySessionDetailsView(record: record)
 
                         HStack(spacing: 0) {
                             Spacer()
@@ -714,6 +712,8 @@ public struct AgentSessionHistoryView: View {
                 .foregroundStyle(Color.white)
             }
             .buttonStyle(.plain)
+            .disabled(!isLive && !canResume(record))
+            .help(!isLive && !canResume(record) ? "This session's worktree is unavailable" : mainTitle)
 
             Divider()
                 .frame(height: 12)
@@ -750,6 +750,7 @@ public struct AgentSessionHistoryView: View {
         } label: {
             Label(mainTitle, systemImage: mainIcon)
         }
+        .disabled(!isLive && !canResume(record))
 
         if isLive {
             Button {
@@ -757,6 +758,7 @@ public struct AgentSessionHistoryView: View {
             } label: {
                 Label("Resume in new tab", systemImage: "play.fill")
             }
+            .disabled(!canResume(record))
         }
 
         if !candidates.isEmpty {
@@ -802,14 +804,18 @@ public struct AgentSessionHistoryView: View {
             .filter { $0 != .cursor && $0 != record.agentKind }
             .sorted { $0.displayName < $1.displayName }
 
-        menu.addItem(makeMenuItem(title: mainTitle, systemImage: mainIcon) { [self] in
+        let primaryItem = makeMenuItem(title: mainTitle, systemImage: mainIcon) { [self] in
             self.triggerPrimaryAction(for: record)
-        })
+        }
+        primaryItem.isEnabled = isLive || canResume(record)
+        menu.addItem(primaryItem)
 
         if isLive {
-            menu.addItem(makeMenuItem(title: "Resume in new tab", systemImage: "play.fill") { [self] in
+            let resumeItem = makeMenuItem(title: "Resume in new tab", systemImage: "play.fill") { [self] in
                 self.onResume?(record)
-            })
+            }
+            resumeItem.isEnabled = canResume(record)
+            menu.addItem(resumeItem)
         }
 
         if !candidates.isEmpty {
@@ -907,8 +913,15 @@ public struct AgentSessionHistoryView: View {
         if isLive, let onGoToTab {
             onGoToTab(record)
         } else {
+            guard canResume(record) else { return }
             onResume?(record)
         }
+    }
+
+    private func canResume(_ record: AgentSessionRecord) -> Bool {
+        guard record.worktreeAvailable else { return false }
+        var isDirectory: ObjCBool = false
+        return FileManager.default.fileExists(atPath: record.projectPath, isDirectory: &isDirectory) && isDirectory.boolValue
     }
 
     private func copyResumeCommand(_ record: AgentSessionRecord, turnIndex: Int? = nil) {
