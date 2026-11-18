@@ -1,0 +1,93 @@
+Apps/Kouen/Sources/KouenApp/UI/Sidebar/ProjectMoveReviewView.swift
+  s_975d374818ab68::t_666572a2bd4d33 27
+  s_975d374818ab68::t_101863fd4d290d 120
+  s_975d374818ab68::t_6054bb7ccc9cb7 101-119,121-126,147,179
+  s_975d374818ab68::t_9f3d1d7fe15ccc 38-54,57-74,76-90,92,94-99,129,131-132,134-146,148,150-152,156
+  s_975d374818ab68::t_3a1bbd62d86ad9 7,15-16,24-26,28-29,56,75,91,93,100,127,133,154-155,180
+  s_975d374818ab68::t_51cd9900121c84 23
+  s_975d374818ab68::t_ff34f98a783fd7 31-37
+  s_975d374818ab68::t_461fae42cdebd0 8,17-22
+Apps/Kouen/Sources/KouenApp/UI/Sidebar/ProjectDirectoryTree.swift
+  s_975d374818ab68::t_98f4b42f9f9588 66,125,135,161,191,225,230,236,239,283-284,289,322-326,328-330,360
+  s_975d374818ab68::t_3690e712963602 116-117,217-223,252-262,266-279,281,286-288,290-291,293-294,296-310,314-317,320,327,334,337,342-346,354
+  s_975d374818ab68::t_2ff8e86e3cc402 445-451,588-593
+  s_975d374818ab68::t_64b23d36592502 349-352
+  s_975d374818ab68::t_9f3d1d7fe15ccc 452-463,465,467-469,471-507,509-513,516-518,521,523-524,526-529,531-543,545-574,580,582-584,586
+  s_975d374818ab68::t_b3edaa92cc3689 280,282,336
+  s_975d374818ab68::t_81dba311114f8b 347
+  s_975d374818ab68::t_3fc6b0165bc258 98,100
+  s_975d374818ab68::t_be047f30396776 70,318-319,321,331-333
+  s_975d374818ab68::t_11d64d58cea5f4 263-265,292,295
+  s_975d374818ab68::t_b8c991a2cf2b54 577-579
+  s_57b54754110592::t_c8e4a45181d934 335
+Apps/Kouen/Sources/KouenApp/UI/Sidebar/ProjectWorkspaceSheetFrame.swift
+  s_975d374818ab68::t_8fcb552d23c6eb 1-64
+Apps/Kouen/Sources/KouenApp/UI/Chrome/ContentAreaViewController.swift
+  s_975d374818ab68::t_36213af426aaca 11-15,54,91-93,105,130,134,138,167
+  s_975d374818ab68::t_709186cf428437 158
+  s_975d374818ab68::t_458dc15bd00dbf 129,131-133,135-137,139-140
+Apps/Kouen/Sources/KouenApp/UI/Sidebar/SidebarSessionListView.swift
+  s_975d374818ab68::t_ca80641c8ccfde 26,98-114,116,119-122,124-156,158-172,174-177,180-186,188-221
+  s_975d374818ab68::t_666572a2bd4d33 85-94
+  s_975d374818ab68::t_037f2fcaec83bb 407,422,428-432,498
+  s_975d374818ab68::t_172e9f40a6996b 173
+  s_975d374818ab68::t_fb0891f4756713 19,237-238,329,372
+  s_975d374818ab68::t_79d5334170575d 35-49,51,178-179,187
+Apps/Kouen/Sources/KouenApp/UI/History/AgentSessionHistoryView.swift
+  s_975d374818ab68::t_be5350a8cf8ee8 63
+Apps/Kouen/Sources/KouenApp/UI/Sidebar/KouenSidebarPanelViewController.swift
+  s_975d374818ab68::t_cf73bd0033ea68 1481-1482
+  s_975d374818ab68::t_543e72d9702253 528-530,674,1476-1480,1483-1486,1490-1497
+  s_975d374818ab68::t_dfe0379fd864a8 538,1233,1487-1488,1511
+  s_975d374818ab68::t_d0d5b4dd872951 643,657-673,1489
+  s_c664f592f52810::t_a1bcb7af3fcbe5 675
+Apps/Kouen/Sources/KouenApp/UI/Chrome/MainSplitViewController.swift
+  s_975d374818ab68::t_666572a2bd4d33 601,605
+  s_975d374818ab68::t_4a7aa213111ec0 659
+  s_975d374818ab68::t_d363724b36ab44 33,113-116,630,656-658,678,700-705,727-737,760-761
+  s_57b54754110592::t_21f108d6e1dd07 660,762-763
+Apps/Kouen/Sources/KouenApp/UI/History/SessionHistoryPanelController.swift
+  s_975d374818ab68::t_769783d8450e54 1-158
+Apps/Kouen/Sources/KouenApp/UI/History/AgentSessionHistoryModel.swift
+  s_975d374818ab68::t_666572a2bd4d33 5,175,470
+  s_975d374818ab68::t_47b11c0bb50bab 42-44,156-157,177,192-202,496,514,547,580-581,583-584,586-594
+  s_975d374818ab68::t_bffb0792dd9cf4 166-167,203-218,537
+  s_975d374818ab68::t_5162763bcf76ee 538
+  s_57b54754110592::t_8281753a652104 539-540
+Apps/Kouen/Sources/KouenApp/UI/Sidebar/SidebarListModel.swift
+  s_975d374818ab68::t_292abe971aa2dd 100,183-188,308,374,450
+Apps/Kouen/Sources/KouenApp/UI/Sidebar/ProjectReconciliation.swift
+  s_975d374818ab68::t_e285cd221a1070 47-51
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.3",
+  "base_commit_sha": "2f767e528f70e00e77d9d6dbf82458e5374128ec",
+  "prompts": {},
+  "sessions": {
+    "s_57b54754110592": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7860b657-e5ae-49bd-92e1-c3eb70cfb06d",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Vit129 <vitosk129@gmail.com>"
+    },
+    "s_975d374818ab68": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1ed8c-3d51-77b3-add8-88c3472dcba3",
+        "model": "gpt-6-luna"
+      },
+      "human_author": "Vit129 <vitosk129@gmail.com>"
+    },
+    "s_c664f592f52810": {
+      "agent_id": {
+        "tool": "github-copilot-cli",
+        "id": "6f8c097b-1287-46e4-886d-c2897110751c",
+        "model": "deepseek"
+      },
+      "human_author": "Vit129 <vitosk129@gmail.com>"
+    }
+  }
+}
