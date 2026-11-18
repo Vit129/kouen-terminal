@@ -15,14 +15,12 @@ Commands:
   run       Re-open the existing Kouen.app without rebuilding
   build     Run swift build
   stop      Stop preview app
-  graphify  Refresh graphify-out without committed HTML output
 
 Examples:
   make debug              # alias for make preview
   make prod               # build (release) + open
   make run                # just re-open the existing build
   Scripts/run.sh preview  # isolated preview
-  Scripts/run.sh graphify
 USAGE
 }
 
@@ -92,10 +90,6 @@ case "$command" in
     ;;
   stop)
     exec make preview-stop
-    ;;
-  graphify)
-    graphify update . --force
-    find graphify-out -type f -name '*.html' -delete
     ;;
   -h|--help|help)
     usage

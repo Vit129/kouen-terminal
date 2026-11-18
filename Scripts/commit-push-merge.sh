@@ -15,7 +15,6 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
-source "$ROOT/Scripts/graphify-commit.sh"
 
 msg="${COMMIT_MESSAGE:-}"
 auto_yes=0
@@ -47,8 +46,6 @@ while (($#)); do
   esac
 done
 
-prepare_graph_for_commit
-
 if [[ -n "$(git status --porcelain)" ]]; then
   echo ""
   git status -s
@@ -76,10 +73,9 @@ if [[ -n "$(git status --porcelain)" ]]; then
     echo "Empty commit message — aborting." >&2
     exit 1
   fi
-  # Preserve the existing commit-all product behavior without adding local graph queries/caches.
   product=()
   while IFS= read -r -d '' file; do
-    [[ "$file" == graphify-out/* ]] || product+=("$file")
+    product+=("$file")
   done < <(git ls-files -z --modified --deleted --others --exclude-standard)
   if ((${#product[@]})); then git add -- "${product[@]}"; fi
 
@@ -94,7 +90,7 @@ if [[ -n "$(git status --porcelain)" ]]; then
     fi
   fi
 
-  GRAPHIFY_SKIP_HOOK=1 git commit -m "$msg"
+  git commit -m "$msg"
 else
   echo "Nothing to commit — using existing commit(s)."
 fi

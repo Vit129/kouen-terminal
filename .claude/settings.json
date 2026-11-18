@@ -77,15 +77,6 @@
         ]
       },
       {
-        "matcher": "Bash|Grep|Read|Glob",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "f=\"$CLAUDE_PROJECT_DIR/.claude/hooks/graphify-guard.py\"; [ -f \"$f\" ] || exit 0; CLAUDE_HOME=\"$CLAUDE_PROJECT_DIR/.claude\" exec python3 \"$f\" pre"
-          }
-        ]
-      },
-      {
         "matcher": "Write|Edit",
         "hooks": [
           {
@@ -106,15 +97,6 @@
         ]
       },
       {
-        "matcher": "Bash|mcp__graphify__.*",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "f=\"$CLAUDE_PROJECT_DIR/.claude/hooks/graphify-guard.py\"; [ -f \"$f\" ] || exit 0; CLAUDE_HOME=\"$CLAUDE_PROJECT_DIR/.claude\" exec python3 \"$f\" post"
-          }
-        ]
-      },
-      {
         "matcher": "Bash",
         "hooks": [
           {
@@ -125,15 +107,6 @@
       }
     ],
     "Stop": [
-      {
-        "matcher": "*",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "f=\"$CLAUDE_PROJECT_DIR/.claude/hooks/graphify-guard.py\"; [ -f \"$f\" ] || exit 0; CLAUDE_HOME=\"$CLAUDE_PROJECT_DIR/.claude\" exec python3 \"$f\" stop"
-          }
-        ]
-      },
       {
         "matcher": "*",
         "hooks": [
@@ -195,14 +168,6 @@
       "env": {
         "KOUEN_MCP_ALLOW_CONTROL": "1"
       }
-    },
-    "graphify": {
-      "command": "/Users/supavit.cho/.local/share/uv/tools/graphifyy/bin/graphify-mcp",
-      "args": [
-        "graphify-out/graph.json",
-        "--transport",
-        "stdio"
-      ]
     }
   }
 }

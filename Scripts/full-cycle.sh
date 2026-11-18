@@ -8,7 +8,6 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
-source "$ROOT/Scripts/graphify-commit.sh"
 
 usage() {
   cat <<'USAGE'
@@ -107,7 +106,7 @@ rollback_version_bump() {
 # Ask before build/version preparation: the release notes and release commit both use this
 # message. Do not let an empty answer fall through to a later, confusing changelog failure.
 if [[ -z "$COMMIT_MSG" && "$NO_BUMP" -eq 0 ]] \
-  && [[ -n "$(git status --porcelain -- ':!graphify-out')" ]]; then
+  && [[ -n "$(git status --porcelain)" ]]; then
   if [[ "$AUTO_YES" -eq 1 || ! -t 0 ]]; then
     echo "❌ A commit message is required for uncommitted release work." >&2
     echo "Use: make start patch msg=\"fix: ...\"" >&2
@@ -173,8 +172,7 @@ if [[ "$git_dir" == *"worktrees"* ]]; then
   git pull --ff-only origin main
 elif [[ "$prior_branch" != "main" ]]; then
   echo "Code merged to main — syncing local checkout."
-  # main already carries the refreshed graph committed with the code; skip the background rebuild.
-  GRAPHIFY_SKIP_HOOK=1 git checkout main
+  git checkout main
   git pull --ff-only origin main
   git branch -d "$prior_branch" 2>/dev/null || true
 fi
@@ -290,9 +288,8 @@ fi
 
 # Commit the updated CHANGELOG
 git add CHANGELOG.md docs/CHANGELOG-archive.md 2>/dev/null || git add CHANGELOG.md
-prepare_graph_for_commit
 if ! git diff --cached --quiet; then
-  GRAPHIFY_SKIP_HOOK=1 git commit -m "chore(release): update CHANGELOG for ${TAG}"
+  git commit -m "chore(release): update CHANGELOG for ${TAG}"
 fi
 
 git tag -f "$TAG" -m "$TAG"

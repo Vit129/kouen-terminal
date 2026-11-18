@@ -66,6 +66,8 @@ dist/
 **/graphify-out/.last-refresh.log
 # Transient rebuild-in-progress lock (PID file), toggled by graphify itself.
 **/graphify-out/.rebuild.lock
+# Code-index output (local only, never committed)
+**/graphify-out/
 .robot-output/
 # Robot Framework's own default output location/names (run from the repo root or Tests/)
 /log.html
