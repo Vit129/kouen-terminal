@@ -1,0 +1,27 @@
+Scripts/full-cycle.sh
+  s_975d374818ab68::t_46b025dd4f860a 298-310,312
+Apps/Kouen/Sources/KouenApp/Resources/Info.plist
+  s_975d374818ab68::t_8516ca02e265ef 100,115
+CHANGELOG.md
+  s_975d374818ab68::t_de6bb3f4e68151 8-19
+Packages/KouenCore/Sources/KouenCore/KouenVersion.swift
+  s_975d374818ab68::t_cc5fcab59f0359 15,18
+Packages/KouenCore/Sources/KouenCore/ReleaseNotes/GeneratedReleaseNotes.swift
+  s_975d374818ab68::t_8468d390cd60a9 1,8-9,12-13
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.3",
+  "base_commit_sha": "5e8a30dc7709117ea41cb2a8a839520e7b4ea614",
+  "prompts": {},
+  "sessions": {
+    "s_975d374818ab68": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1ed8c-3d51-77b3-add8-88c3472dcba3",
+        "model": "gpt-6-luna"
+      },
+      "human_author": "Vit129 <vitosk129@gmail.com>"
+    }
+  }
+}
