@@ -51,7 +51,7 @@ let platformProducts: [Product] = [
 // `kouen-cli`'s `attach-window` compositor renders through KouenCompositor, so the CLI
 // is now completely headless on both macOS and Linux.
 let cliDependencies: [Target.Dependency] = [
-    "KouenCore", "KouenTerminalEngine", "KouenCopyMode", "KouenCompositor", "KouenTheme",
+    "KouenCore", "KouenGit", "KouenTerminalEngine", "KouenCopyMode", "KouenCompositor", "KouenTheme",
     "KouenLSP", "CKouenSys",
 ]
 let cliExclude: [String] = []
@@ -164,7 +164,7 @@ let platformTestTargets: [Target] = [
 let platformDependencies: [Package.Dependency] = []
 let platformProducts: [Product] = []
 let cliDependencies: [Target.Dependency] = [
-    "KouenCore", "KouenTerminalEngine", "KouenCopyMode", "KouenCompositor", "KouenTheme", "KouenLSP", "CKouenSys",
+    "KouenCore", "KouenGit", "KouenTerminalEngine", "KouenCopyMode", "KouenCompositor", "KouenTheme", "KouenLSP", "CKouenSys",
 ]
 let cliExclude: [String] = []
 let platformTargets: [Target] = []

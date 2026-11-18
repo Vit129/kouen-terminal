@@ -90,6 +90,7 @@ public func agentWaitChannel(surfaceKey: String) -> String { "agent-status:\(sur
 
 public enum IPCRequest: Codable, Sendable {
     case ping
+    case workspaceOpen(projectPath: String, branch: String, create: Bool)
     case listWorkspaces
     case listSurfaces
     /// List every running agent (one row per tab carrying a detected `Tab.agent`)

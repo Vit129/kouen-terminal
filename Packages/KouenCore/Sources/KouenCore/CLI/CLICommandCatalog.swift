@@ -25,6 +25,8 @@ public struct CLICommand: Sendable, Equatable {
 public enum CLICommandCatalog {
     public static let commands: [CLICommand] = [
         // Query / inspection
+        .init("project", "List, scan, and reconcile projects"),
+        .init("workspace", "Open a project branch"),
         .init("doctor", "Diagnose the daemon, socket, paths, and integrations", json: true),
         .init("version", "Print CLI and daemon versions", aliases: ["--version", "-v"], json: true),
         .init("color-check", "Print ANSI/256/truecolor diagnostic swatches"),

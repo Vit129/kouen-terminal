@@ -216,6 +216,10 @@ extension KouenCLI {
           lsp definition <file>:<line>:<col> [--json]
           lsp diagnostics <file> [--json]
           completions <zsh|fish|bash>                 (print a shell completion script to stdout)
+          project list [--json]                      (list project IDs and paths)
+          project scan <root> [--json]               (discover primary Git repositories)
+          project reconcile <group> --dry-run [--root <folder>] [--json] (preview possible moves)
+          workspace open [<project>] --branch <branch> [--create] [--json]
           list-workspaces [--json] [--pretty]
           list-surfaces [--json] [--pretty]
           list-sessions [--json] [--pretty]

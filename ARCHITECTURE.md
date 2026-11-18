@@ -126,6 +126,8 @@ no breakpoints, no Run button.
 
 ## Architecture Decisions (dated log)
 
+**Workspace CLI.** Folder import, watched rescan and CLI discovery share one repository scanner. A reconciliation preview proposes moves without writing project settings. Applying a move revalidates it and preserves the project record. The Projects header refreshes category scans and Git worktree state; linked worktrees whose checkout directories were removed are omitted while missing primary projects remain eligible for move reconciliation. The daemon resolves workspace opens against live checkout and session state so concurrent requests do not create duplicate sessions.
+
 **2026-09-21 — Agent safety net: shadow-git checkpoints + write-origin arbitration, not a VCS-level solution.**
 P46 needed "undo the agent's last turn" and "don't let an agent clobber human work" without
 requiring every project to adopt worktree-per-agent. Two decisions:

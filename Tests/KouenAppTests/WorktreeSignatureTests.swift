@@ -38,4 +38,51 @@ final class WorktreeSignatureTests: XCTestCase {
         XCTAssertNil(SidebarListModel.worktreeSignature(rootPath: repo.appendingPathComponent("wt").path),
                      "a linked worktree has a .git file, so callers fall back to the timer")
     }
+
+    @MainActor
+    func testDiscoveredWorktreesCollapseAndMissingCheckoutDisappears_TC0001_FE_IT() async throws {
+        let repo = FileManager.default.temporaryDirectory.resolvingSymlinksInPath()
+            .appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: repo) }
+        try FileManager.default.createDirectory(at: repo, withIntermediateDirectories: true)
+        try git(["init", "-q"], in: repo)
+        try git(["commit", "-q", "--allow-empty", "-m", "initial"], in: repo)
+        let worktree = repo.appendingPathComponent("checkout")
+        try git(["worktree", "add", "-q", "--detach", worktree.path], in: repo)
+
+        let suite = UUID().uuidString
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let store = ProjectStore(userDefaults: defaults)
+        store.projects = [ProjectEntry(path: repo.path, categoryID: nil)]
+        let model = SidebarListModel()
+        model.projectStore = store
+
+        let disclosureID = "worktrees-\(repo.path)"
+        model.updateWorktrees()
+        let discovered = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+            MainActor.assumeIsolated { model.rows.contains { $0.id == disclosureID } }
+        }, object: nil)
+        await fulfillment(of: [discovered], timeout: 10)
+        let checkout = try XCTUnwrap(model.projectWorktrees[repo.path]?.first { !$0.isMain })
+        XCTAssertEqual((checkout.path as NSString).lastPathComponent, "checkout")
+        let checkoutID = "sess-wt-\(checkout.path)"
+        XCTAssertTrue(model.rows.contains { $0.id == "sess-idle-\(repo.path)" })
+        XCTAssertFalse(model.rows.contains { $0.id == checkoutID })
+
+        model.toggleWorktreeCollapse(rootPath: repo.path)
+        XCTAssertTrue(model.rows.contains { $0.id == checkoutID })
+
+        let signature = SidebarListModel.worktreeSignature(rootPath: repo.path)
+        try FileManager.default.removeItem(at: worktree)
+        XCTAssertEqual(SidebarListModel.worktreeSignature(rootPath: repo.path), signature)
+        await model.refreshProjects()
+
+        let removed = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+            MainActor.assumeIsolated { !model.rows.contains { $0.id == disclosureID || $0.id == checkoutID } }
+        }, object: nil)
+        await fulfillment(of: [removed], timeout: 10)
+        XCTAssertTrue(model.rows.contains { $0.id == "sess-idle-\(repo.path)" })
+    }
+
 }

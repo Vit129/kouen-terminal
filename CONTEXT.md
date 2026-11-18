@@ -28,6 +28,12 @@ _Avoid_: Auto-merge loop, Unchecked retry
 The existing worktree-per-branch-per-agent isolation (`WorktreeManager`), exposed as an MCP-addressable CRUD resource (`kouen-mcp` tools to create/list/delete).
 _Avoid_: Workspace
 
+**Project**:
+A registered repository checkout with a display name, a path and optional group membership. A linked Git worktree belongs to its project.
+
+**Project reconciliation**:
+A reviewed update to a saved project path after the checkout moves. A preview reports proposed and ambiguous moves without writing settings.
+
 **Workspace**:
 A window-level container of sessions (`WorkspaceID` in `SessionEditor.swift`), distinctly separated from a Git Worktree.
 _Avoid_: Worktree, Project container

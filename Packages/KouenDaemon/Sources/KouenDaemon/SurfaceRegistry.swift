@@ -9,6 +9,7 @@ public final class SurfaceRegistry: @unchecked Sendable {
     private var editor = SessionEditor()
     private let store = SessionStore()
     private let lock = NSLock()
+    private let workspaceOpenLock = NSLock()
     private let bufferStore = PasteBufferStore()
     private let taskStore = TaskStore()
     private let automationStore = AutomationStore()
@@ -492,6 +493,11 @@ public final class SurfaceRegistry: @unchecked Sendable {
                 completion(response)
             }
             return true
+        case let .workspaceOpen(projectPath, branch, create):
+            queue.async { [weak self] in
+                completion(self?.openWorkspaceProject(projectPath, branch: branch, create: create) ?? .error("Daemon unavailable"))
+            }
+            return true
         case .worktreeList, .worktreeCreate, .worktreeRemove:
             queue.async { completion(Self.worktreeResponse(for: request) ?? .error("unsupported request")) }
             return true
@@ -506,6 +512,76 @@ public final class SurfaceRegistry: @unchecked Sendable {
         }
     }
 
+    private func openWorkspaceProject(_ project: String, branch: String, create: Bool) -> IPCResponse {
+        workspaceOpenLock.lock()
+        defer { workspaceOpenLock.unlock() }
+        let repo = URL(fileURLWithPath: project).standardizedFileURL.resolvingSymlinksInPath().path
+        let manager = WorktreeManager()
+        var isDirectory: ObjCBool = false
+        guard !branch.isEmpty, !branch.hasPrefix("-"),
+              FileManager.default.fileExists(atPath: repo + "/.git", isDirectory: &isDirectory), isDirectory.boolValue else {
+            return .error("Project is unavailable or branch is invalid")
+        }
+        var checkouts = manager.list(repoPath: repo)
+        var matches = checkouts.filter { $0.branch == branch && !$0.bare }
+        guard matches.count <= 1 else { return .error("Branch has multiple checkouts") }
+        var created: String?
+        if matches.isEmpty {
+            guard create else { return .error("Branch has no checkout; pass --create") }
+            let existing = ProcessRunner.run(executable: "git", arguments: ["show-ref", "--verify", "--quiet", "refs/heads/" + branch], in: repo, timeout: 10).isSuccess
+            guard let path = manager.create(repoPath: repo, sessionID: UUID().uuidString.lowercased(), branch: branch, checkoutExisting: existing) else {
+                return .error("Could not create worktree for branch")
+            }
+            created = path
+            checkouts = manager.list(repoPath: repo)
+            matches = checkouts.filter { $0.branch == branch && !$0.bare }
+            guard matches.count == 1 else {
+                _ = manager.remove(repoPath: repo, worktreePath: path)
+                return .error("Created checkout could not be verified")
+            }
+        }
+        let checkout = URL(fileURLWithPath: matches[0].path).standardizedFileURL.resolvingSymlinksInPath().path
+        guard manager.currentBranch(at: checkout) == branch else {
+            if let created { _ = manager.remove(repoPath: repo, worktreePath: created) }
+            return .error("Checkout branch changed or is unavailable")
+        }
+        let checkoutPaths = checkouts.map { URL(fileURLWithPath: $0.path).standardizedFileURL.resolvingSymlinksInPath().path }
+            .sorted { $0.count > $1.count }
+        acquireRegistryLock()
+        let existing = editor.snapshot.workspaces.flatMap { workspace in
+            workspace.sessions.filter { session in
+                session.tabs.contains { tab in
+                    let path = URL(fileURLWithPath: tab.worktreePath ?? tab.cwd).standardizedFileURL.resolvingSymlinksInPath().path
+                    return checkoutPaths.first { path == $0 || path.hasPrefix($0 + "/") } == checkout
+                }
+            }.map { (workspace.id, $0.id) }
+        }
+        if existing.count > 1 {
+            lock.unlock()
+            return .error("Multiple sessions match this checkout")
+        }
+        if let match = existing.first {
+            _ = editor.selectWorkspace(match.0)
+            _ = editor.selectSession(workspaceID: match.0, sessionID: match.1)
+            commit()
+            lock.unlock()
+            return .sessionID(match.1)
+        }
+        guard let workspaceID = editor.snapshot.activeWorkspaceID,
+              let sessionID = editor.addSession(to: workspaceID, cwd: checkout, name: branch) else {
+            lock.unlock()
+            if let created { _ = manager.remove(repoPath: repo, worktreePath: created) }
+            return .error("No active workspace")
+        }
+        if checkout != repo { editor.setWorktree(sessionID: sessionID, worktreePath: checkout, parentRepoPath: repo, taskName: nil) }
+        ensureSessionSurfaces(sessionID: sessionID, shell: nil)
+        commit()
+        fireHookLocked(.afterNewSession)
+        fireHookLocked(.sessionCreated)
+        lock.unlock()
+        return .sessionID(sessionID)
+    }
+
     public func handle(_ request: IPCRequest) -> IPCResponse {
         acquireRegistryLock()
         defer { lock.unlock() }
@@ -518,6 +594,8 @@ public final class SurfaceRegistry: @unchecked Sendable {
             return .ok // intercepted at connection layer; never reaches here
         case .swarmSpawn, .swarmSend, .swarmTerminate, .swarmList:
             return .ok // intercepted at connection layer; never reaches here
+        case .workspaceOpen:
+            return .error("Workspace open requires asynchronous dispatch")
         case .ping:
             return .pong
         case .listWorkspaces:

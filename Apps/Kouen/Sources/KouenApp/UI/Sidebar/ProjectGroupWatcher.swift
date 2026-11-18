@@ -1,4 +1,5 @@
 import Foundation
+import KouenCore
 
 /// Watches category roots and immediate child Git metadata without recursive traversal.
 @MainActor
@@ -7,22 +8,34 @@ final class ProjectGroupWatcher {
     private final class StreamBox {
         let rootPath: String
         private var sources: [String: DispatchSourceFileSystemObject] = [:]
+        private var refreshTask: Task<Void, Never>?
 
         init(rootPath: String) { self.rootPath = rootPath }
 
         func start(onEvent: @escaping @MainActor () -> Void) {
             watch(rootPath, root: true, onEvent: onEvent)
+            for path in ProjectGroupWatcher.shallowWatchPaths(rootPath: rootPath).dropFirst() {
+                watch(path, root: false, onEvent: onEvent)
+            }
             refreshGitWatches(onEvent: onEvent)
         }
 
         func refreshGitWatches(onEvent: @escaping @MainActor () -> Void) {
-            let desired = Set(ProjectGroupWatcher.shallowWatchPaths(rootPath: rootPath).dropFirst())
-            let stale = sources.keys.filter { $0 != rootPath && !desired.contains($0) }
-            for path in stale {
-                sources.removeValue(forKey: path)?.cancel()
-            }
-            for path in desired where sources[path] == nil {
-                watch(path, root: false, onEvent: onEvent)
+            refreshTask?.cancel()
+            let path = rootPath
+            refreshTask = Task { [weak self] in
+                let paths = await Task.detached(priority: .utility) {
+                    ProjectGroupWatcher.discoveryWatchPaths(rootPath: path)
+                }.value
+                guard !Task.isCancelled, let self else { return }
+                let desired = Set(paths)
+                let stale = self.sources.keys.filter { $0 != self.rootPath && !desired.contains($0) }
+                for path in stale { self.sources.removeValue(forKey: path)?.cancel() }
+                for path in desired where self.sources[path] == nil {
+                    self.watch(path, root: false, onEvent: onEvent)
+                }
+                // Cover filesystem changes that occurred while watches were being installed.
+                onEvent()
             }
         }
 
@@ -34,7 +47,7 @@ final class ProjectGroupWatcher {
                 eventMask: [.write, .delete, .rename, .extend, .attrib],
                 queue: .main)
             source.setEventHandler { [weak self] in
-                if root { self?.refreshGitWatches(onEvent: onEvent) }
+                self?.refreshGitWatches(onEvent: onEvent)
                 onEvent()
             }
             source.setCancelHandler { close(fd) }
@@ -43,6 +56,7 @@ final class ProjectGroupWatcher {
         }
 
         func stop() {
+            refreshTask?.cancel()
             sources.values.forEach { $0.cancel() }
             sources.removeAll()
         }
@@ -64,6 +78,10 @@ final class ProjectGroupWatcher {
             return child.path
         }
         return [rootPath] + childPaths
+    }
+
+    nonisolated static func discoveryWatchPaths(rootPath: String) -> [String] {
+        (try? WorkspaceRepositoryScanner.watchDirectories(root: rootPath)) ?? [rootPath]
     }
 
     func update(folders: [(id: String, folder: String)], onChange: @MainActor @escaping (String) -> Void) {

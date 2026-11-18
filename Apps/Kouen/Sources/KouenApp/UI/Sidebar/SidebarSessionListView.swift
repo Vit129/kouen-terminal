@@ -143,6 +143,28 @@ struct SidebarSessionListView: View {
             )
             .frame(height: 26)
 
+        case let .worktreeDisclosure(path, count, isExpanded):
+            Button {
+                model.toggleWorktreeCollapse(rootPath: path)
+            } label: {
+                HStack(spacing: 6) {
+                    Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
+                        .font(.system(size: 8, weight: .semibold))
+                    Text(count == 1 ? "1 discovered worktree" : "\(count) discovered worktrees")
+                        .font(.system(size: 11))
+                        .lineLimit(1)
+                    Spacer(minLength: 0)
+                }
+                .foregroundStyle(Color(nsColor: KouenDesign.chrome.textSecondary))
+                .padding(.leading, 26)
+                .padding(.trailing, 8)
+                .frame(height: 24)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("btn_discoveredWorktrees-\(path)_projectsSidebar")
+            .accessibilityHint(isExpanded ? "Collapses discovered worktrees" : "Expands discovered worktrees")
+
         case let .sessionItem(card):
             SidebarSessionCardRow(
                 card: card,
@@ -191,6 +213,7 @@ private struct SidebarGroupHeaderRow: View {
     var onAdd: () -> Void
 
     @State private var isHovered = false
+    @State private var reviewingMoves = false
 
     var body: some View {
         let c = KouenDesign.chrome
@@ -227,38 +250,45 @@ private struct SidebarGroupHeaderRow: View {
                 .buttonStyle(.plain)
                 .frame(width: 20, height: 20)
                 .help("Add repository to \(name)")
-
-                Menu {
-                    Button("Add Repository to \(name)...") { onAdd() }
-                    Divider()
-                    Button("Delete Group", role: .destructive) {
-                        let alert = NSAlert()
-                        alert.messageText = "Delete Group '\(name)'?"
-                        let countText = count == 1 ? "1 repository" : "\(count) repositories"
-                        alert.informativeText = "Are you sure you want to delete this group? All \(countText) in this group will be removed from your project list.\n\n(Your files on disk will not be deleted.)"
-                        alert.alertStyle = .warning
-                        alert.addButton(withTitle: "Delete Group and Repositories")
-                        alert.addButton(withTitle: "Cancel")
-                        if alert.runModal() == .alertFirstButtonReturn {
-                            model.projectStore?.removeCategoryAndProjects(id)
-                            model.scheduleRebuild()
-                        }
-                    }
-                } label: {
-                    Image(systemName: "ellipsis")
-                        .font(.system(size: 10, weight: .medium))
-                        .foregroundStyle(Color(nsColor: c.textSecondary))
-                }
-                .menuStyle(.borderlessButton)
-                .menuIndicator(.hidden)
-                .frame(width: 20, height: 20)
-                .help("Group options")
             }
+
+            Menu {
+                Button("Add Repository to \(name)...") { onAdd() }
+                Button("Review Moved Repositories…") { reviewingMoves = true }
+                    .accessibilityIdentifier("project-group-review-moves")
+                Divider()
+                Button("Delete Group", role: .destructive) {
+                    let alert = NSAlert()
+                    alert.messageText = "Delete Group '\(name)'?"
+                    let countText = count == 1 ? "1 repository" : "\(count) repositories"
+                    alert.informativeText = "Are you sure you want to delete this group? All \(countText) in this group will be removed from your project list.\n\n(Your files on disk will not be deleted.)"
+                    alert.alertStyle = .warning
+                    alert.addButton(withTitle: "Delete Group and Repositories")
+                    alert.addButton(withTitle: "Cancel")
+                    if alert.runModal() == .alertFirstButtonReturn {
+                        model.projectStore?.removeCategoryAndProjects(id)
+                        model.scheduleRebuild()
+                    }
+                }
+            } label: {
+                Image(systemName: "ellipsis")
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundStyle(Color(nsColor: c.textSecondary))
+            }
+            .menuStyle(.borderlessButton)
+            .menuIndicator(.hidden)
+            .frame(width: 20, height: 20)
+            .accessibilityLabel("Options for \(name)")
+            .accessibilityIdentifier("btn_groupOptions-\(id)_projectsSidebar")
+            .help("Group options")
         }
         .padding(.horizontal, KouenDesign.horizontalInset)
         .contentShape(Rectangle())
         .onTapGesture { onToggleCollapse() }
         .onHover { isHovered = $0 }
+        .sheet(isPresented: $reviewingMoves) {
+            if let store = model.projectStore { ProjectMoveReviewView(categoryID: id, store: store) }
+        }
     }
 }
 
@@ -404,7 +434,13 @@ private struct SidebarProjectHeaderRow: View {
         panel.prompt = "Relocate"
         panel.message = "Choose the new folder for \(item.name)"
         guard panel.runModal() == .OK, let url = panel.url else { return }
-        model.projectStore?.relocateProject(item.path, to: url.path)
+        guard model.projectStore?.relocateProject(item.path, to: url.path) == true else {
+            let alert = NSAlert()
+            alert.messageText = "Could not relocate repository"
+            alert.informativeText = "The destination must be an untracked primary repository, and the original path must still be missing."
+            alert.runModal()
+            return
+        }
         model.scheduleRebuild()
     }
 

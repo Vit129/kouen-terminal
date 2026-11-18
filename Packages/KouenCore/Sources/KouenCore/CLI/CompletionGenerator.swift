@@ -31,6 +31,8 @@ public enum CompletionGenerator {
         complete -c kouen-cli -f -n "not __fish_seen_subcommand_from $__kouen_cli_subcommands" \\
             -a "$__kouen_cli_subcommands"
 
+        complete -c kouen-cli -n "__fish_seen_subcommand_from project" -a "list scan reconcile"
+        complete -c kouen-cli -n "__fish_seen_subcommand_from workspace" -a "open"
         complete -c kouen-cli -n "__fish_seen_subcommand_from new-tab new-session" -l workspace -d "Workspace name or UUID"
         complete -c kouen-cli -n "__fish_seen_subcommand_from new-tab new-session" -l cwd       -d "Working directory"
         complete -c kouen-cli -n "__fish_seen_subcommand_from new-split" -l tab        -d "Tab UUID"
@@ -87,6 +89,8 @@ public enum CompletionGenerator {
           fi
           case "${words[2]}" in
             completions) (( CURRENT == 3 )) && compadd zsh fish bash ;;
+            project) (( CURRENT == 3 )) && compadd list scan reconcile ;;
+            workspace) (( CURRENT == 3 )) && compadd open ;;
           esac
         }
 
@@ -120,6 +124,12 @@ public enum CompletionGenerator {
           if [ "$COMP_CWORD" -eq 1 ]; then
             COMPREPLY=( $(compgen -W "$commands" -- "$cur") )
             return 0
+          fi
+          if [ "$COMP_CWORD" -eq 2 ] && [ "${COMP_WORDS[1]}" = "project" ]; then
+            COMPREPLY=( $(compgen -W "list scan reconcile" -- "$cur") ); return 0
+          fi
+          if [ "$COMP_CWORD" -eq 2 ] && [ "${COMP_WORDS[1]}" = "workspace" ]; then
+            COMPREPLY=( $(compgen -W "open" -- "$cur") ); return 0
           fi
           if [ "$COMP_CWORD" -eq 2 ] && [ "${COMP_WORDS[1]}" = "completions" ]; then
             COMPREPLY=( $(compgen -W "zsh fish bash" -- "$cur") )

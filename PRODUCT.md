@@ -29,6 +29,7 @@ The maintainer (Vit129). Personal hard fork of `robzilla1738/harness-terminal`, 
 - **`kouen-cli history`/`task pack-pr`** — cross-session agent transcript search/resume, and PR-description assembly from a tracked feature's diff/gates/checklist
 - **Orchestrator & Agent Swarm (P44)** — a CLI agent decomposes a goal into Tasks, spawns headless or interactive Workers, and drives them to merge-ready with a bounded auto-fix loop; inline task status on tabs and sidebar
 - **Automations & Jobs view** — scheduled agent launches (`kouenAutomation*` MCP tools) with a Jobs fleet view and result viewer
+- **Workspace navigation** — import and refresh primary Git checkouts, review moved repositories in one batch, clear deleted worktree checkouts from the sidebar, and open a project branch from the CLI. Creating a branch and worktree requires an explicit flag.
 - **Worktree-first sessions** — worktree lineage/drift tracking, per-ticket isolated worktrees from the Issue Tracker, auto-isolate that no longer strands the primary checkout (P45, P47)
 - **History across agents** — Claude Code, Codex, Antigravity, Copilot and VS Code Copilot Chat sessions in one list, resume in place, or hand off between agents (v4.20.0); ◀ ▶ previous/next-session buttons beside the sidebar toggle (P48)
 - **Per-agent launch modes** — local, remote-control or cloud per agent via a data-driven launch table (P50); default is remote-control so sessions appear in the vendor's mobile/desktop app while staying on the Mac

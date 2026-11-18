@@ -24,6 +24,7 @@ struct RepoGitMetadata: Sendable, Equatable {
 enum SidebarSessionRow: Identifiable {
     case groupHeader(id: String, name: String, rootPath: String?, count: Int, isCollapsed: Bool, status: BoardColumnKind)
     case projectHeader(SidebarProjectHeaderItem)
+    case worktreeDisclosure(projectPath: String, count: Int, isExpanded: Bool)
     case sessionItem(SidebarSessionCardItem)
     case divider
 
@@ -31,6 +32,7 @@ enum SidebarSessionRow: Identifiable {
         switch self {
         case let .groupHeader(id, _, _, _, _, _): "group-\(id)"
         case let .projectHeader(p): "proj-\(p.path)"
+        case let .worktreeDisclosure(path, _, _): "worktrees-\(path)"
         case let .sessionItem(s): "sess-\(s.id)"
         case .divider: "divider"
         }
@@ -95,7 +97,7 @@ final class SidebarListModel {
 
     var collapsedGroups = Set<String>()
     var collapsedProjects = Set<String>()
-    var collapsedWorktreeGroups = Set<String>() // tracks EXPANDED groups (inverted: default = collapsed)
+    private var expandedWorktreeGroups = Set<String>()
     private(set) var projectWorktrees: [String: [SidebarWorktreeEntry]] = [:]
     var pinnedRepos: Set<String> = {
         let array = UserDefaults.standard.stringArray(forKey: "kouen.sidebar.pinnedRepos") ?? []
@@ -188,10 +190,10 @@ final class SidebarListModel {
     }
 
     func toggleWorktreeCollapse(rootPath: String) {
-        if collapsedWorktreeGroups.contains(rootPath) {
-            collapsedWorktreeGroups.remove(rootPath)
+        if expandedWorktreeGroups.contains(rootPath) {
+            expandedWorktreeGroups.remove(rootPath)
         } else {
-            collapsedWorktreeGroups.insert(rootPath)
+            expandedWorktreeGroups.insert(rootPath)
         }
         rebuildRows()
     }
@@ -220,15 +222,23 @@ final class SidebarListModel {
 
     func updateWorktrees(force: Bool = false) {
         let rootPaths = Set(sessions.map { repoRootForSession($0) })
+            .union(projectStore?.projects.compactMap { project in
+                let metadataPath = project.path + "/.git/worktrees"
+                return projectWorktrees[project.path] != nil || FileManager.default.fileExists(atPath: metadataPath)
+                    ? project.path : nil
+            } ?? [])
         let now = Date()
         for rootPath in rootPaths {
             if !force, let lastFetch = lastWorktreeFetchTime[rootPath],
                now.timeIntervalSince(lastFetch) < 3.0 { continue }
             lastWorktreeFetchTime[rootPath] = now
             // Snapshots arrive constantly while a pane prints; only spawn git when a worktree's
-            // HEAD moved or one was added/removed (both touch these files).
+            // HEAD moved, registrations changed, or a known checkout disappeared from disk.
             let signature = Self.worktreeSignature(rootPath: rootPath)
-            if !force, let signature, signature == lastWorktreeSignature[rootPath] { continue }
+            let hasMissingWorktree = projectWorktrees[rootPath]?.contains {
+                !FileManager.default.fileExists(atPath: $0.path)
+            } ?? false
+            if !force, !hasMissingWorktree, let signature, signature == lastWorktreeSignature[rootPath] { continue }
             lastWorktreeSignature[rootPath] = signature
             Task {
                 let worktrees = await self.fetchWorktrees(for: rootPath)
@@ -238,6 +248,15 @@ final class SidebarListModel {
                 }
             }
         }
+    }
+
+    /// Refreshes the visible project catalog and forces Git to re-read linked worktrees.
+    /// Missing worktree directories are omitted by `fetchWorktrees`; registered primary
+    /// projects remain in the catalog so moved repositories can still be reconciled.
+    func refreshProjects() async {
+        await projectStore?.syncAllWatchedCategories()
+        rebuildRows()
+        updateWorktrees(force: true)
     }
 
     // MARK: - Row rebuild
@@ -260,9 +279,7 @@ final class SidebarListModel {
         guard let store = projectStore else { return }
         for session in sessions {
             let root = repoRootForSession(session)
-            var isDir: ObjCBool = false
-            if !root.isEmpty, root != "Other",
-               FileManager.default.fileExists(atPath: root + "/.git", isDirectory: &isDir), isDir.boolValue {
+            if !root.isEmpty, root != "Other", WorkspaceRepositoryScanner.isPrimaryRepository(root) {
                 store.addProject(root)
             }
         }
@@ -342,18 +359,18 @@ final class SidebarListModel {
         let extraWorktrees = rawWorktrees.filter { wt in
             guard !wt.isMain else { return false }
             return !matchingSessions.contains { sess in
-                sess.tabs.contains { $0.cwd == wt.path }
+                sess.tabs.contains { $0.cwd == wt.path || $0.cwd.hasPrefix(wt.path + "/") }
             }
         }
 
-        let hasWorktrees = !rawWorktrees.isEmpty
+        let hasWorktrees = rawWorktrees.contains { !$0.isMain }
         let isCollapsed = collapsedProjects.contains(project.path)
         let headerItem = SidebarProjectHeaderItem(
             path: project.path,
             name: displayName,
             categoryID: project.categoryID,
             hasWorktrees: hasWorktrees,
-            sessionsCount: matchingSessions.count + extraWorktrees.count,
+            sessionsCount: matchingSessions.count,
             isCollapsed: isCollapsed,
             isMissing: !FileManager.default.fileExists(atPath: project.path)
         )
@@ -400,30 +417,7 @@ final class SidebarListModel {
             result.append(.sessionItem(cardItem))
         }
 
-        // 4. Append idle worktrees (other tasks/worktrees)
-        for wt in extraWorktrees {
-            let cardItem = SidebarSessionCardItem(
-                id: "wt-\(wt.path)",
-                projectPath: project.path,
-                categoryID: project.categoryID,
-                title: wt.branch,
-                branch: wt.branch,
-                subtitle: KouenDesign.shortenPath(wt.path),
-                isRunning: false,
-                isSelected: false,
-                isDirty: false,
-                sessionID: nil,
-                worktreePath: wt.path,
-                agentKind: nil,
-                subagentsCount: 0,
-                localhostPort: nil
-            )
-            result.append(.sessionItem(cardItem))
-        }
-
-        // 5. If no active sessions and no extra worktrees, emit an idle session row "⚪ main"
-        // exactly matching pasted-1789655422-D1DABBD7.png!
-        if matchingSessions.isEmpty && extraWorktrees.isEmpty {
+        if matchingSessions.isEmpty {
             let branch = gitStatuses[project.path]?.branch ?? "main"
             let cardItem = SidebarSessionCardItem(
                 id: "idle-\(project.path)",
@@ -443,6 +437,31 @@ final class SidebarListModel {
             )
             result.append(.sessionItem(cardItem))
             fetchGitStatusForProject(project.path)
+        }
+
+        guard !extraWorktrees.isEmpty else { return }
+        let isExpanded = expandedWorktreeGroups.contains(project.path)
+        result.append(.worktreeDisclosure(projectPath: project.path, count: extraWorktrees.count, isExpanded: isExpanded))
+        guard isExpanded else { return }
+
+        for wt in extraWorktrees {
+            let cardItem = SidebarSessionCardItem(
+                id: "wt-\(wt.path)",
+                projectPath: project.path,
+                categoryID: project.categoryID,
+                title: wt.branch,
+                branch: wt.branch,
+                subtitle: KouenDesign.shortenPath(wt.path),
+                isRunning: false,
+                isSelected: false,
+                isDirty: false,
+                sessionID: nil,
+                worktreePath: wt.path,
+                agentKind: nil,
+                subagentsCount: 0,
+                localhostPort: nil
+            )
+            result.append(.sessionItem(cardItem))
         }
     }
 
@@ -595,7 +614,10 @@ final class SidebarListModel {
             let infos = GitService.shared.listWorktrees(for: rootPath)
             guard !infos.isEmpty else { return [] }
             let manager = WorktreeManager()
-            return infos.enumerated().compactMap { index, wt in
+            return infos.enumerated().compactMap { index, wt -> SidebarWorktreeEntry? in
+                var isDirectory: ObjCBool = false
+                guard FileManager.default.fileExists(atPath: wt.path, isDirectory: &isDirectory),
+                      isDirectory.boolValue else { return nil }
                 let isMain = index == 0
                 let branch = wt.branch ?? "detached"
                 let base = isMain ? "main" : (manager.baseBranch(for: branch, in: rootPath) ?? "main")

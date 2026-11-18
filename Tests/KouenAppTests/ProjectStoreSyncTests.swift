@@ -54,7 +54,7 @@ final class ProjectStoreSyncTests: XCTestCase {
 
     // MARK: - [TS-P54-003] [FE-UT] Sync Prunes Deleted Repo
     @MainActor
-    func testSyncCategoryPrunesDeletedRepo() async throws {
+    func testSyncCategoryPreservesMissingRepo() async throws {
         let repoA = tempDirURL.appendingPathComponent("repoA")
         let gitDirA = repoA.appendingPathComponent(".git")
         try FileManager.default.createDirectory(at: gitDirA, withIntermediateDirectories: true)
@@ -69,7 +69,7 @@ final class ProjectStoreSyncTests: XCTestCase {
         try FileManager.default.removeItem(at: repoA)
 
         await store.syncCategory(id: cat.id)
-        XCTAssertFalse(store.projects.contains { $0.path == repoA.path }, "Deleted repoA should be pruned from category")
+        XCTAssertTrue(store.projects.contains { $0.path == repoA.path }, "Missing entries must be preserved")
     }
 
     // MARK: - [TS-P54-004] [FE-UT] Manual Removal Adds to ExcludedPaths

@@ -28,6 +28,13 @@ Source: `KouenDesign.swift`
 - Draggable chrome (title strip, sidebar header, tab bar) all zoom the window on double-click via one helper, `NSView.zoomWindowIfDoubleClick(_:)`
 - Surfaces added since the original audit, all built from the same tokens: Agent Notch HUD (`UI/Notch/`, off by default, hidden while Vorssaint's notch is running), Attention Beacon dot, Agent Inbox panel, Automations/Jobs fleet view, session History view, Issue Tracker panel
 
+### Projects
+
+- Show running sessions and the idle repository row above a compact, collapsed-by-default disclosure for discovered worktrees. Show the count on the disclosure and include only worktrees whose directories still exist.
+- Keep a refresh action next to Add in the Projects header; refresh rescans source folders and reloads linked worktrees so deleted checkout directories leave the sidebar.
+
+- Folder import and rescan show primary Git checkout candidates. Reconciliation presents the saved and proposed paths together, with an explicit action for uncertain matches.
+
 ### Session History
 - Keep history rows compact: one session title, a single metadata line, and search evidence only while searching. Show token usage and transcript content in selected-session details.
 - Keep repository scope and agent filters visible at narrow sidebar widths; agent shortcuts scroll horizontally while the trailing More menu remains fixed. The More menu holds other providers and shortcut management.

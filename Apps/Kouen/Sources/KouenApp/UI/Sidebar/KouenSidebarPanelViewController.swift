@@ -482,6 +482,12 @@ final class KouenSidebarPanelViewController: NSViewController {
         sidebarSectionModel.onAddProject = { [weak self] in
             self?.addSession()
         }
+        sidebarSectionModel.onRefreshProjects = { [weak self] in
+            guard let self else { return }
+            Task { @MainActor [weak self] in
+                await self?.sidebarListModel.refreshProjects()
+            }
+        }
         sidebarSectionModel.onAddJob = { [weak self] in
             self?.promptNewAutomation()
         }
@@ -1329,6 +1335,7 @@ final class KouenSidebarPanelViewController: NSViewController {
         // Skip entirely when session data hasn't changed (common on metadata-only ticks).
         // SwiftUI model sync — always update so badges/agent status stay fresh
         sidebarListModel.update(from: snap)
+        sidebarListModel.updateWorktrees()
 
         updateRepoSectionHeader()
     }
@@ -1426,7 +1433,7 @@ final class KouenSidebarPanelViewController: NSViewController {
                 if scan.isMultiRepo {
                     self.presentCategorySheet(for: url.path)
                 } else {
-                    self.finalizeAddProject(paths: [url.path], categoryID: nil)
+                    self.finalizeAddProject(paths: scan.items.map(\.path), categoryID: nil)
                 }
             }
         }
@@ -1437,11 +1444,11 @@ final class KouenSidebarPanelViewController: NSViewController {
     func presentCategorySheet(for path: String) {
         let scan = FolderScanner.inspect(path: path)
         guard scan.isMultiRepo else {
-            finalizeAddProject(paths: [path], categoryID: nil)
+            finalizeAddProject(paths: scan.items.map(\.path), categoryID: nil)
             return
         }
         guard let window = view.window else {
-            finalizeAddProject(paths: [path], categoryID: nil)
+            finalizeAddProject(paths: scan.items.map(\.path), categoryID: nil)
             return
         }
         let sheet = AddToWorkspaceSheet(

@@ -10,13 +10,29 @@ import KouenTheme
 @main
 struct KouenCLI {
     static func main() async {
-        let args = Array(CommandLine.arguments.dropFirst())
+        let args = normalizeWorkspaceArguments(Array(CommandLine.arguments.dropFirst()))
         guard let command = args.first else {
             printUsage()
             exit(1)
         }
         do {
             switch command {
+            case "workspace-project-list":
+                try workspaceProjectList(args)
+                return
+            case "workspace-reconcile":
+                try workspaceReconcile(args)
+                return
+            case "workspace-scan":
+                let root = flagValue(args, flag: "--path") ?? FileManager.default.currentDirectoryPath
+                let paths = try WorkspaceRepositoryScanner.scan(root: root)
+                if args.contains("--json") {
+                    let data = try JSONEncoder().encode(paths)
+                    print(String(decoding: data, as: UTF8.self))
+                } else {
+                    paths.forEach { print($0) }
+                }
+                return
             case "color-check":
                 printColorCheck(args)
                 return
@@ -83,6 +99,19 @@ struct KouenCLI {
 
             let client = try makeClient(args)
             switch command {
+            case "workspace-open":
+                guard let branch = flagValue(args, flag: "--branch"), !branch.isEmpty else {
+                    fputs("Usage: kouen-cli workspace-open [--project path] --branch branch [--create] [--json]\n", kouenStderr)
+                    exit(1)
+                }
+                let project = try resolveWorkspaceProject(args)
+                let response = try checkedRequest(client, .workspaceOpen(projectPath: project, branch: branch, create: args.contains("--create")))
+                guard case let .sessionID(id) = response else { throw DaemonClientError.unexpectedResponse }
+                _ = try? client.request(.activateGUIWindow)
+                if args.contains("--json") {
+                    let data = try JSONEncoder().encode(["sessionID": id.uuidString])
+                    print(String(decoding: data, as: UTF8.self))
+                } else { print(id.uuidString) }
             case "list-workspaces":
                 try printWorkspaces(args, client: client)
             case "list-surfaces":

@@ -239,6 +239,7 @@ final class SidebarSectionModel {
     var chromeEpoch: Int = 0
     var selectedTab: Int = 0
     var onAddProject: (() -> Void)? = nil
+    var onRefreshProjects: (() -> Void)? = nil
     var onAddJob: (() -> Void)? = nil
 }
 
@@ -310,6 +311,17 @@ struct SidebarSectionLabelView: View {
             Spacer()
 
             if model.selectedTab == 0 {
+                Button {
+                    model.onRefreshProjects?()
+                } label: {
+                    Image(systemName: "arrow.clockwise")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundColor(Color(nsColor: c.textSecondary))
+                }
+                .buttonStyle(.plain)
+                .help("Refresh projects and worktrees")
+                .accessibilityIdentifier("btn_refreshProjects_projectsSidebar")
+
                 Button {
                     model.onAddProject?()
                 } label: {

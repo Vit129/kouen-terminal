@@ -37,8 +37,22 @@ struct ProjectCategory: Codable, Hashable, Identifiable {
 struct ProjectEntry: Codable, Equatable, Identifiable {
     var path: String
     var categoryID: String?     // nil → "Uncategorized"
+    var stableID: String
 
-    var id: String { path }
+    var id: String { stableID }
+
+    init(path: String, categoryID: String? = nil, stableID: String = UUID().uuidString) {
+        self.path = path
+        self.categoryID = categoryID
+        self.stableID = stableID
+    }
+
+    init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        path = try values.decode(String.self, forKey: .path)
+        categoryID = try values.decodeIfPresent(String.self, forKey: .categoryID)
+        stableID = try values.decodeIfPresent(String.self, forKey: .stableID) ?? UUID().uuidString
+    }
 }
 
 // MARK: - Store
@@ -99,6 +113,11 @@ final class ProjectStore {
             projects = decoded.filter {
                 !$0.path.hasSuffix("/.git") && ($0.path as NSString).lastPathComponent != ".git" && $0.path != home
             }
+            if let rows = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]],
+               rows.contains(where: { $0["stableID"] == nil }),
+               let migrated = try? JSONEncoder().encode(projects) {
+                userDefaults.set(migrated, forKey: Self.projectsKey)
+            }
         }
     }
 
@@ -116,11 +135,8 @@ final class ProjectStore {
         let existing = Set(projects.map(\.path))
         let legacyPaths = (userDefaults.stringArray(forKey: "RecentProjectPaths") ?? [])
             .filter { path in
-                var isDir: ObjCBool = false
-                // Same rule as SidebarListModel.update: only a real repo root (`.git` directory),
-                // else stale recents re-import worktrees and non-repo folders on every launch.
                 return !existing.contains(path) && path != home
-                    && FileManager.default.fileExists(atPath: path + "/.git", isDirectory: &isDir) && isDir.boolValue
+                    && WorkspaceRepositoryScanner.isPrimaryRepository(path)
             }
         guard !legacyPaths.isEmpty else { return }
         for path in legacyPaths {
@@ -149,15 +165,11 @@ final class ProjectStore {
         KouenSidebarPanelViewController.recordRecentProject(path)
     }
 
-    /// Points an existing project at its new folder, keeping its group.
-    func relocateProject(_ oldPath: String, to newPath: String) {
-        guard let idx = projects.firstIndex(where: { $0.path == oldPath }) else { return }
-        if projects.contains(where: { $0.path == newPath }) {
-            projects.remove(at: idx)   // new location already tracked — just drop the stale one
-        } else {
-            projects[idx].path = newPath
-        }
-        save()
+    /// Relocation follows the same non-destructive validation as batch reconciliation.
+    @discardableResult
+    func relocateProject(_ oldPath: String, to newPath: String) -> Bool {
+        guard let preview = previewMoves([oldPath: newPath]) else { return false }
+        return applyMoves(preview)
     }
 
     func removeProject(_ path: String) {
@@ -233,16 +245,26 @@ final class ProjectStore {
 
         // Perform scan off-main thread (P53 rule: no FS walk on main)
         let discoveredItems = await Task.detached(priority: .utility) {
-            let scan = FolderScanner.inspect(path: sourceFolder, maxDepth: 1)
+            let scan = FolderScanner.inspect(path: sourceFolder)
             return scan.items
         }.value
 
+        // The category can change while the background scan is running.
+        guard let currentCategory = categories.first(where: { $0.id == id }),
+              currentCategory == category else { return }
         var changed = false
         var currentProjects = self.projects
 
+        // Keep possible moves unregistered until the user reviews them.
+        let missing = currentProjects.filter {
+            $0.categoryID == id && !FileManager.default.fileExists(atPath: $0.path)
+        }.map(\.path)
+        let possibleMoves = Set(WorkspaceReconciliation.candidates(
+            missing: missing, discovered: discoveredItems.map(\.path)
+        ).map(\.newPath))
         // 1. Add new items under sourceFolder that are not excluded
         for item in discoveredItems {
-            if excluded.contains(item.path) { continue }
+            if excluded.contains(item.path) || possibleMoves.contains(item.path) { continue }
             if !currentProjects.contains(where: { $0.path == item.path }) {
                 currentProjects.append(ProjectEntry(path: item.path, categoryID: id))
                 changed = true
@@ -251,18 +273,6 @@ final class ProjectStore {
                 currentProjects[pIdx].categoryID = id
                 changed = true
             }
-        }
-
-        // 2. Remove items under sourceFolder that no longer exist on disk
-        let fm = FileManager.default
-        currentProjects.removeAll { entry in
-            guard entry.categoryID == id, entry.path.hasPrefix(sourceFolder) else { return false }
-            let exists = fm.fileExists(atPath: entry.path)
-            if !exists {
-                changed = true
-                return true
-            }
-            return false
         }
 
         if changed {
@@ -316,132 +326,13 @@ struct DiscoveredRepoItem: Identifiable, Hashable, Sendable {
 }
 
 enum FolderScanner: Sendable {
-    private static let ignoredDirNames: Set<String> = [
-        ".DS_Store", ".git", ".Trash", ".build", "node_modules", "DerivedData",
-        ".gradle", ".idea", ".vscode", "Pods", "Carthage", "target", "dist",
-        "build", "vendor", ".venv", "venv", "__pycache__"
-    ]
-
     static func inspect(path: String, maxDepth: Int = 3) -> (isMultiRepo: Bool, items: [DiscoveredRepoItem]) {
-        let fm = FileManager.default
-        let hasOwnGit = isDirectGitRepo(at: path)
-
-        guard let contents = try? fm.contentsOfDirectory(atPath: path) else {
-            let name = (path as NSString).lastPathComponent
-            return (false, [DiscoveredRepoItem(id: path, name: name, path: path, isGitRepo: hasOwnGit, isEnvFolder: name.hasPrefix("."))])
+        let paths = (try? WorkspaceRepositoryScanner.scan(root: path, maxDepth: maxDepth)) ?? []
+        let items = paths.map { repo in
+            DiscoveredRepoItem(id: repo, name: (repo as NSString).lastPathComponent,
+                               path: repo, isGitRepo: true, isEnvFolder: false)
         }
-
-        var candidates: [DiscoveredRepoItem] = []
-        for item in contents {
-            if ignoredDirNames.contains(item) { continue }
-            let isEnv = item.hasPrefix(".claude") || item.hasPrefix(".copilot") || item.hasPrefix(".gemini") || item.hasPrefix(".cursor")
-            if item.hasPrefix(".") && !isEnv {
-                continue
-            }
-            let itemPath = (path as NSString).appendingPathComponent(item)
-            var isDir: ObjCBool = false
-            guard fm.fileExists(atPath: itemPath, isDirectory: &isDir), isDir.boolValue else {
-                continue
-            }
-
-            if isDirectGitRepo(at: itemPath) {
-                candidates.append(DiscoveredRepoItem(
-                    id: itemPath,
-                    name: item,
-                    path: itemPath,
-                    isGitRepo: true,
-                    isEnvFolder: isEnv,
-                    isSelected: true
-                ))
-            } else if isEnv {
-                candidates.append(DiscoveredRepoItem(
-                    id: itemPath,
-                    name: item,
-                    path: itemPath,
-                    isGitRepo: false,
-                    isEnvFolder: true,
-                    isSelected: true
-                ))
-            } else {
-                // Search deeper up to maxDepth (default 3 levels) for git repos
-                var nestedRepos: [DiscoveredRepoItem] = []
-                scanForGitRepos(at: itemPath, basePath: path, currentDepth: 2, maxDepth: maxDepth, results: &nestedRepos)
-
-                if !nestedRepos.isEmpty {
-                    candidates.append(contentsOf: nestedRepos)
-                } else {
-                    candidates.append(DiscoveredRepoItem(
-                        id: itemPath,
-                        name: item,
-                        path: itemPath,
-                        isGitRepo: false,
-                        isEnvFolder: false,
-                        isSelected: true
-                    ))
-                }
-            }
-        }
-
-        if (candidates.count > 1 || (candidates.count == 1 && candidates.first?.path != path)) && !hasOwnGit {
-            return (true, candidates.sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending })
-        } else {
-            let name = (path as NSString).lastPathComponent
-            return (false, [DiscoveredRepoItem(id: path, name: name, path: path, isGitRepo: hasOwnGit, isEnvFolder: name.hasPrefix("."))])
-        }
-    }
-
-    private static func isDirectGitRepo(at path: String) -> Bool {
-        let fm = FileManager.default
-        let gitPath = (path as NSString).appendingPathComponent(".git")
-        return fm.fileExists(atPath: gitPath)
-    }
-
-    private static func scanForGitRepos(
-        at dirPath: String,
-        basePath: String,
-        currentDepth: Int,
-        maxDepth: Int,
-        results: inout [DiscoveredRepoItem]
-    ) {
-        let fm = FileManager.default
-        guard let entries = try? fm.contentsOfDirectory(atPath: dirPath) else { return }
-
-        for entry in entries {
-            if ignoredDirNames.contains(entry) || entry.hasPrefix(".") { continue }
-
-            let entryPath = (dirPath as NSString).appendingPathComponent(entry)
-            var isDir: ObjCBool = false
-            guard fm.fileExists(atPath: entryPath, isDirectory: &isDir), isDir.boolValue else {
-                continue
-            }
-
-            if isDirectGitRepo(at: entryPath) {
-                let relName: String
-                if entryPath.hasPrefix(basePath) {
-                    let suffix = String(entryPath.dropFirst(basePath.count))
-                    relName = suffix.hasPrefix("/") ? String(suffix.dropFirst()) : suffix
-                } else {
-                    relName = entry
-                }
-
-                results.append(DiscoveredRepoItem(
-                    id: entryPath,
-                    name: relName,
-                    path: entryPath,
-                    isGitRepo: true,
-                    isEnvFolder: false,
-                    isSelected: true
-                ))
-            } else if currentDepth < maxDepth {
-                scanForGitRepos(
-                    at: entryPath,
-                    basePath: basePath,
-                    currentDepth: currentDepth + 1,
-                    maxDepth: maxDepth,
-                    results: &results
-                )
-            }
-        }
+        return (items.count != 1 || items.first?.path != path, items)
     }
 }
 
@@ -619,7 +510,7 @@ struct AddToWorkspaceSheet: View {
 
                 Button("No, import separately") {
                     let selected = items.filter(\.isSelected).map(\.path)
-                    let chosen = selected.isEmpty ? [folderPath] : selected
+                    let chosen = selected
                     onConfirm(chosen, nil) // nil = separate / uncategorized
                 }
                 .keyboardShortcut(.cancelAction)
@@ -628,8 +519,9 @@ struct AddToWorkspaceSheet: View {
 
                 Button("Yes, import as group") {
                     let selected = items.filter(\.isSelected).map(\.path)
-                    let chosen = selected.isEmpty ? [folderPath] : selected
+                    let chosen = selected
 
+                    guard !chosen.isEmpty else { return }
                     let trimmedGroup = groupName.trimmingCharacters(in: .whitespaces)
                     var targetCatID: String? = nil
                     if !trimmedGroup.isEmpty {
