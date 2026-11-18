@@ -16,7 +16,7 @@
 
 ## Method
 
-For each gap: confirmed via `grep`/`graphify query` against current source, not assumed
+For each gap: confirmed via `grep` against current source, not assumed
 from the old doc. Gaps the codebase already covers are marked **matched, not a gap** and
 excluded from phases below.
 

@@ -34,7 +34,7 @@ the feature's `[FEATURE]-architecture.md`, columns exactly:
   any existing duplication.
 
 **The Nth-Occurrence Rule** (what turns a `create` into a `create-centralized`): during
-step 2 of the Existing Asset Scan (graphify query / grep for a similar symbol), if the
+step 2 of the Existing Asset Scan (grep for a similar symbol), if the
 *same* non-trivial logic pattern — not merely a similar-sounding name — turns up already
 implemented **independently in 2 or more places** that don't already share a common
 call site, the correct move for this task (which would otherwise be the 3rd copy) is:

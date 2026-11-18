@@ -11,7 +11,7 @@ project already uses:
    `util/`, `common/`, `base/`, a per-package root file like `paths.py`/`config.py`, or a
    dedicated package in a multi-package repo). Look for what's actually reused, not for a
    specific folder name to match.
-2. If `graphify-out/` exists, query it (`mcp__graphify__query_graph`) for a similar symbol/concept; otherwise `grep -r` other feature/module folders by
+2. `grep -r` other feature/module folders by
    keyword (translate non-English intent to English terms first).
 3. Classify: does exactly what's needed → **reuse** (use as-is); close but missing a
    method/parameter → **extend** (keep the existing signature backward-compatible — see

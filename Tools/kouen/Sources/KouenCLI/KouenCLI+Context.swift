@@ -66,15 +66,6 @@ extension KouenCLI {
             let output = await engine.resolveError(cwd: cwd, daemonClient: client, activeSurfaceID: activeSurface)
             print(output)
 
-        case "graph":
-            guard args.count >= 2 else {
-                fputs("Usage: kouen context graph <query>\n", kouenStderr)
-                exit(1)
-            }
-            let query = args.dropFirst().joined(separator: " ")
-            let output = engine.resolveGraph(query: query, cwd: cwd)
-            print(output)
-
         case "issue":
             let output = engine.resolveIssue(cwd: cwd)
             print(output)
@@ -120,7 +111,6 @@ extension KouenCLI {
           pane <surfaceID> [--tail N] Capture tail output of a specific pane
           last                        Capture recent output from active pane
           error                       Extract latest compiler or runtime error stacktrace
-          graph <query>               Query Graphify AST summary for a symbol or feature
           issue                       Output current SDLC feature and checklist
           inject "<template>"         Resolve all @-mentions (@diff, @file:x, @last, @error)
 

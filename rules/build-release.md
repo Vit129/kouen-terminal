@@ -41,7 +41,3 @@ Full cycle: verify → bump → commit+push → prod → CHANGELOG → tag → G
 ## Worktree constraint
 
 No worktree nested inside `.kouen-worktrees/`: never `git worktree add` a path under an existing `.kouen-worktrees/<name>` checkout. Create new worktrees only from the main repo root (`~/Git/Personal/kouen-terminal/.kouen-worktrees/<new-name>`), never from inside another worktree.
-
-## Graphify refresh policy
-
-The Git panel's commit and Commit & Push actions use the daemon's `GitCommitCommand` preparation, including on other graphified repositories. The daemon stops before Git on refresh failure; Push of already committed history does not create a new commit.

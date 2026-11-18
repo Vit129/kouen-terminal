@@ -5,7 +5,7 @@ import Foundation
 /// Test-Before-Deliver rule ("run the project's static type/syntax checker if one exists")
 /// applied automatically after each agent turn instead of only at Done-gate time. Tier 2 is the
 /// project's own full test command; ponytail: "targeted" here means "the project's own test
-/// command," not per-file test selection (that needs build-graph knowledge — e.g. Graphify —
+/// command," not per-file test selection (that needs build-graph knowledge —
 /// this runner doesn't have; upgrade path if false-negative-from-irrelevant-test-noise becomes
 /// a real problem).
 public struct VerificationResult: Sendable, Equatable {

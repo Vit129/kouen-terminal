@@ -851,8 +851,7 @@ public actor AgentHistoryScanner {
         let fileSize = (try? fileURL.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? dataSize
 
         let topicSegments = AgentSessionRecord.detectTopicSegments(title: title, firstPrompt: firstPrompt ?? "", turns: turns)
-        let graphifySymbols = GraphifyIndexCache.shared.enrich(files: filesEdited, projectPath: finalCwd)
-        let allFilesEdited = filesEdited.union(graphifySymbols).joined(separator: " ")
+        let allFilesEdited = filesEdited.joined(separator: " ")
 
         #if canImport(CryptoKit)
         let fallbackSpool: AgentHistoryTranscriptSpool? = nil
@@ -1609,8 +1608,7 @@ public actor AgentHistoryScanner {
         let fileSize = (try? fileURL.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? dataSize
 
         let topicSegments = AgentSessionRecord.detectTopicSegments(title: title, firstPrompt: firstPrompt ?? "", turns: turns)
-        let graphifySymbols = GraphifyIndexCache.shared.enrich(files: filesEdited, projectPath: finalPath)
-        let allFilesEdited = filesEdited.union(graphifySymbols).joined(separator: " ")
+        let allFilesEdited = filesEdited.joined(separator: " ")
 
         #if canImport(CryptoKit)
         let fallbackSpool: AgentHistoryTranscriptSpool? = nil
@@ -1912,8 +1910,7 @@ public actor AgentHistoryScanner {
         let fileSize = (try? fileURL.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? dataSize
 
         let topicSegments = AgentSessionRecord.detectTopicSegments(title: title, firstPrompt: firstPrompt ?? "", turns: turns)
-        let graphifySymbols = GraphifyIndexCache.shared.enrich(files: filesEdited, projectPath: finalCwd)
-        let allFilesEdited = filesEdited.union(graphifySymbols).joined(separator: " ")
+        let allFilesEdited = filesEdited.joined(separator: " ")
 
         #if canImport(CryptoKit)
         let fallbackSpool: AgentHistoryTranscriptSpool? = nil

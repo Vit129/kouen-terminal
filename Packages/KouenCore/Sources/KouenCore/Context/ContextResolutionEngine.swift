@@ -59,18 +59,6 @@ public struct ContextResolutionEngine: Sendable {
             resolved = resolved.replacingOccurrences(of: "@last", with: lastContent)
         }
 
-        // 6. @graph:<symbol>
-        let graphRegex = try? NSRegularExpression(pattern: #"@graph:([^\s]+)"#)
-        if let matches = graphRegex?.matches(in: resolved, range: NSRange(resolved.startIndex..., in: resolved)) {
-            for match in matches.reversed() {
-                guard let range = Range(match.range, in: resolved),
-                      let symRange = Range(match.range(at: 1), in: resolved) else { continue }
-                let query = String(resolved[symRange])
-                let content = resolveGraph(query: query, cwd: cwd)
-                resolved.replaceSubrange(range, with: content)
-            }
-        }
-
         // 7. @issue
         if resolved.contains("@issue") {
             let issueContent = resolveIssue(cwd: cwd)
@@ -197,19 +185,6 @@ public struct ContextResolutionEngine: Sendable {
         }
 
         return "### Captured Error / Stacktrace:\n```text\n\(errorLines.joined(separator: "\n"))\n```"
-    }
-
-    /// Resolves Graphify AST knowledge for a symbol or query.
-    public func resolveGraph(query: String, cwd: String) -> String {
-        let graphSummaryPath = (cwd as NSString).appendingPathComponent("graphify-out/GRAPH_SUMMARY.md")
-        if FileManager.default.fileExists(atPath: graphSummaryPath),
-           let content = try? String(contentsOfFile: graphSummaryPath, encoding: .utf8) {
-            let matchingLines = content.components(separatedBy: .newlines).filter { $0.localizedCaseInsensitiveContains(query) }
-            if !matchingLines.isEmpty {
-                return "### Knowledge Graph for '\(query)':\n" + matchingLines.prefix(15).joined(separator: "\n")
-            }
-        }
-        return "[Knowledge graph query for '\(query)': no direct match found in graphify-out]"
     }
 
     /// Resolves active issue/feature task from FeatureStore.

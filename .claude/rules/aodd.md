@@ -66,7 +66,7 @@ Routing table: search with Haiku, check with Sonnet, escalate to the advisor.
 | Work | 1. Do it | 2. Check it | 3. Too hard |
 |---|---|---|---|
 | Search, lookup, research (web, docs, papers, past sessions), file/log/transcript sweeps and summaries | **Haiku** subagent(s), in parallel when independent; returns facts + sources/paths, no dumps | **Sonnet**: reads the cited files/sources itself before anything is built on it | `advisor` agent (Fable/Opus) |
-| Code lookup (graphify `query_graph`, `get_neighbors`, `blast_radius`, `search_text`, or grep) | **Haiku** subagent returns file paths + edges | **Sonnet** reads in full every file it will edit or judge; never edits from a Haiku summary | `advisor` |
+| Code lookup (`rg` or the configured code-search backend) | **Haiku** subagent returns file paths + edges | **Sonnet** reads in full every file it will edit or judge; never edits from a Haiku summary | `advisor` |
 | Run build / test / dev server / deploy already approved, verify a page or endpoint | **Haiku**, reports pass/fail + output excerpt | **Sonnet** re-checks the excerpt against the brief | n/a |
 | Write or change code, debug, plan, design, review a diff | **Sonnet** (the main session when it runs Sonnet, else a Sonnet subagent) | main session reviews every diff | `advisor` when two attempts failed, the choice is hard to reverse, or the trade-off is unclear |
 
@@ -85,7 +85,7 @@ Haiku (the cheap model) does the git and ops mechanics end to end:
 
 - `git fetch` / status / log / diff freely; always `git fetch` before reporting ahead/behind or "pushed".
 - Choose what to commit: read status + diff, stage only the files that belong to the task, by path (never `git add -A`); a file whose owner is unclear (another session's edit) → ask the big model.
-- Resolve merge conflicts. If the conflict needs understanding the code's intent, send the big model a short summary naming the files and hunks, and let it decide. Graphify (query / neighbors / blast_radius), when installed, guides the lookup.
+- Resolve merge conflicts. If the conflict needs understanding the code's intent, send the big model a short summary naming the files and hunks, and let it decide.
 - Rewrite history only on its own unmerged branch (rebase, squash, amend; push with `--force-with-lease` to that branch only), never on `main`/`master` or a merged branch.
 - Commit, push the branch, open the PR, post-merge cleanup (delete a branch only after the PR state is MERGED), run sync/install/backup scripts, status checks, summaries.
 - After the CEO approves in words ("merge", "deploy"): merge the PR, run the deploy, write to production data. Never before that approval.

@@ -184,7 +184,7 @@ def curate(calls, today: date | None = None):
     for i, a in enumerate(keys):
         for b in keys[i + 1:]:
             if Path(a).parent.name == Path(b).parent.name:
-                continue  # same skill copied into several projects (e.g. graphify), not a merge candidate
+                continue  # same skill copied into several projects, not a merge candidate
             u = descs[a] | descs[b]
             if u and len(descs[a] & descs[b]) / len(u) >= OVERLAP:
                 overlap.append((Path(a).parent.name, Path(b).parent.name))

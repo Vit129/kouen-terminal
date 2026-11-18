@@ -53,23 +53,19 @@ Ask yourself: "Would a senior engineer say this is overcomplicated?" If yes, sim
 - **Mark a deliberate shortcut** that has a known ceiling (global lock, O(n²) scan, naive heuristic) with a comment `shortcut: <the limit>, <when to upgrade>` (older code may say `ponytail:`). List them with `git grep -nE '(#|//|/[*]) ?(shortcut|ponytail):'`; a marker with no upgrade trigger is debt that rots, flag it `no-trigger`.
 - **Never lazy about:** understanding the problem, input validation at trust boundaries, error handling that prevents data loss, security, accessibility, calibration real hardware needs, anything explicitly requested. Non-trivial logic leaves ONE runnable check behind (a small assert-based self-check or one test file); trivial one-liners need none.
 
-- Never write or open report-style HTML files with large embedded data (for example graphify's `graph.html`, or a test/coverage report) in the workspace: they burn tokens and context. For graphify use `query`/`path`/`explain`; write other documents and reports as Markdown or plain text.
+- Never write or open report-style HTML files with large embedded data (for example a code-graph visualization, or a test/coverage report) in the workspace: they burn tokens and context. Write other documents and reports as Markdown or plain text.
 
-## 3. Graph Before & After Edit
+## 3. Search Before Edit
 
-If `graphify-out/graph.json` exists at or above the project root, **find and change code through graphify** (optional tool, installed separately; MCP `mcp__graphify__*` or the CLI, same functions):
+Find code with `rg` and `Read`; use whatever code-search backend the environment provides. No specific tool is assumed.
 
 | To do | Use |
 |---|---|
-| find a symbol / concept / file | `query "<q>"`, `explain "<symbol>" --snippet` (get_snippet) |
-| find exact text, error message, config key | `graphify grep "<text>"` (search_text) — hits show their enclosing symbol |
-| who is affected by a change | `affected "<symbol>"`, `affected --git-diff` (blast_radius) |
-| where a Python parameter flows | `flow "<fn>" --param p --to "<sink regex>"` (trace_flow) |
-| rename / replace / insert / delete a symbol | `edit rename\|replace\|insert-after\|delete "<symbol>" ...` — dry run first, `--apply` to write |
+| find a symbol / concept / file | `rg "<q>"`, then `Read` the file |
+| find exact text, error message, config key | `rg "<text>"` |
+| who is affected by a change | `rg` the symbol name across source and tests |
 
-Raw `grep`/`find` are for the cases the graph cannot answer: confirming a caller list is exhaustive before changing a signature (the graph can miss dynamic or attribute calls), files graphify does not index, or editing a specific known line — say so when you use them. Skip all of this for trivial changes (typos, config values, docs).
-
-**After modifying code:** run `graphify update .` (AST-only, no API cost) before declaring work done.
+`rg` is the final check for a change that must reach every caller. Skip all of this for trivial changes (typos, config values, docs).
 
 ## 4. Surgical Changes
 
@@ -168,7 +164,7 @@ Each step names what to read or call next. **[hook]** means the step is enforced
 
 | Step | Do | Read / call |
 |---|---|---|
-| 1. Orient | Project root `ARCHITECTURE.md`, `CONTEXT.md`; find code via graphify if the project has `graphify-out/`; past decisions in the project's memory (`knowledge/`, `plans/`) | `rules/product-design.md` |
+| 1. Orient | Project root `ARCHITECTURE.md`, `CONTEXT.md`; find code with `rg`; past decisions in the project's memory (`knowledge/`, `plans/`) | `rules/product-design.md` |
 | 2. Size it | AODD triage in `rules/aodd.md`. Small: just do it. Medium: Architecture-First (§1, § Anti-Monolith), `chief-of-staff` light. Large: suggest `/ai-sdlc` in one line, `chief-of-staff` full | `skills/chief-of-staff` |
 | 3. Branch | New branch from `main` before the first edit (rule only; the hook blocks switching away from uncommitted work, not editing on `main`) | your project's git conventions |
 | 4. Place code | Logic vs UI vs Tests split (§6) & Anti-Monolith pattern (target 300–400 lines); structure work → blueprint | `rules/coding/project-blueprint.md`, `project-blueprint` skill |

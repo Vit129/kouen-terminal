@@ -8,7 +8,7 @@ import UserNotifications
 /// happens INSIDE Apple's framework code — it's not a catchable Swift error, so no amount of
 /// do/try/catch around the call can protect against it (see
 /// `agent-memory/knowledge/bugs/zombie-crash-macos26.md` and
-/// `REVIEW-graphify-kouen-2026-07-03.md` Part 3 for the original crash report).
+/// the 2026-07-03 review's Part 3 for the original crash report).
 ///
 /// The only way to detect "did the last attempt survive" without ever hard-crashing the app is a
 /// flag written to disk BEFORE the risky call and cleared immediately after. If the app relaunches

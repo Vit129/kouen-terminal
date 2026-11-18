@@ -74,7 +74,7 @@ it into `ARCHITECTURE.md`. For a trivial one-line note, nothing more is needed.
 
 - `rules/ai-sdlc-workflow.md`'s Architect phase — reads `PRODUCT.md` if present, checks new feature scope against it before designing; writes/updates ARCHITECTURE.md, and updates `CONTEXT.md` as design resolves bounded contexts and terms.
 - `uxui-designer` — Phase 0 reads `DESIGN.md` if present as the existing design system (skip regenerating tokens); Context Gathering reads `PRODUCT.md` for target audience/use cases instead of asking when already documented.
-- Any skill starting new-feature or UI work on a project root containing these files should read them first, the same way `graphify-out/GRAPH_SUMMARY.md` is read for code impact when graphify is used.
+- Any skill starting new-feature or UI work on a project root containing these files should read them first.
 
 ### Reading Priority for Agents & Devs
 

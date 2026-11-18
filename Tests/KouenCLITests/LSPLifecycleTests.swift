@@ -21,25 +21,4 @@ final class LSPLifecycleTests: XCTestCase {
             XCTAssertEqual(error as? LSPClientError, .processNotRunning)
         }
     }
-
-    func test_TS_2341_BE_UT_graphifyLookupReparsesOnlyWhenMtimeChanges() throws {
-        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
-        let dir = root.appendingPathComponent("graphify-out")
-        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-        defer { try? FileManager.default.removeItem(at: root) }
-        let graph = dir.appendingPathComponent("graph.json")
-        func write(_ rank: Double, mtime: Date) throws {
-            let data = try JSONSerialization.data(withJSONObject: ["nodes": [["source_file": "a.swift", "pagerank": rank, "community": 1]]])
-            try data.write(to: graph)
-            try FileManager.default.setAttributes([.modificationDate: mtime], ofItemAtPath: graph.path)
-        }
-        let t0 = Date(timeIntervalSince1970: 1_700_000_000)
-        try write(0.1, mtime: t0)
-        XCTAssertEqual(GraphifyLSPBridge.lookupFileInfo(sourceFile: "a.swift", projectRoot: root)?.pagerank, 0.1)
-        // Same mtime, different content: the cached index must be served (no re-parse).
-        try write(0.2, mtime: t0)
-        XCTAssertEqual(GraphifyLSPBridge.lookupFileInfo(sourceFile: "a.swift", projectRoot: root)?.pagerank, 0.1)
-        try write(0.3, mtime: t0.addingTimeInterval(10))
-        XCTAssertEqual(GraphifyLSPBridge.lookupFileInfo(sourceFile: "a.swift", projectRoot: root)?.pagerank, 0.3)
-    }
 }

@@ -341,7 +341,7 @@ One-line records; reasoning lives in each plan under `agent-memory/plans/`.
 
 ## Commit preparation
 
-CLI delivery entrypoints (`Scripts/commit-push-merge.sh`, `Scripts/full-cycle.sh`, `Scripts/bump-version.sh`) and the `make start` menu commit with plain `git commit` and run no Graphify refresh. Git panel commit actions reach `SurfaceRegistry.runGitCommandInDaemon`, which configures `GitCommitCommand`; that path still runs `graphify update .` and stages tracked graph outputs before it commits (pending Swift change).
+CLI delivery entrypoints (`Scripts/commit-push-merge.sh`, `Scripts/full-cycle.sh`, `Scripts/bump-version.sh`) and the `make start` menu commit with plain `git commit` and run no index refresh. Git panel commit actions reach `SurfaceRegistry.runGitCommandInDaemon`, which configures `GitCommitCommand`; it runs plain `git` with no preparation step.
 
 ## Markdown preview trust boundary
 

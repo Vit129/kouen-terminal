@@ -17,8 +17,6 @@ Pre-merge gate: once all tests confirm GREEN, run `/code-review` (or any review 
 
 **Release or deploy after this feature:** run the release gate in `rules/coding/release.md` first (security/pen test, performance, audit, version + changelog).
 
-**Knowledge graph sync:** If `graphify-out/` exists in the repository, run `graphify update .` before closing the task (AST-only, keeps the graph fresh for subsequent queries/tools).
-
 **Update `ai-sdlc-task-progress.md` now** — mark the final checkbox, feature Done (§
 Incremental Update Rule, `skills/ai-sdlc/references/ai-sdlc-progress-spec.md`; this IS the Done-gate (`rules/aodd.md`) — don't call it Done anywhere
 else first).
