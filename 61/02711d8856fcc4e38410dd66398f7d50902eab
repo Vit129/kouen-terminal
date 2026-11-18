@@ -1,0 +1,19 @@
+CHANGELOG.md
+  s_975d374818ab68::t_8a216715343be5 12-13
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.3",
+  "base_commit_sha": "6102711d8856fcc4e38410dd66398f7d50902eab",
+  "prompts": {},
+  "sessions": {
+    "s_975d374818ab68": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1ed8c-3d51-77b3-add8-88c3472dcba3",
+        "model": "unknown"
+      },
+      "human_author": "Vit129 <vitosk129@gmail.com>"
+    }
+  }
+}
