@@ -7,7 +7,7 @@ Per-project memory lives centrally in `~/Git/Personal/agent-memory-private/agent
 ## Session Start
 
 - Continuation → read `CONTEXT.md` → invoke `macos-swiftui` skill
-- Code navigation → `graphify-out/GRAPH_SUMMARY.md`
+- Code search: see `## Code search` below.
 - Bug/pattern → `python3 ~/.claude/scripts/recall.py "<keyword>"`
 
 ## Skills & Rules
@@ -26,44 +26,12 @@ Per-project memory lives centrally in `~/Git/Personal/agent-memory-private/agent
 - FileTree programmatic reveal: populate `node.children` before setting `node.isExpanded = true`, and guard `NodeRow.loadChildren` to prevent race conditions clobbering descendants.
 - BrowserPane WKWebView repaint: WKWebView with `drawsBackground = false` stays pitch black unless woken; override `viewDidMoveToWindow`, kick compositor on `didCommit`, and call `forceRepaint()` on structural rebuilds after layout.
 
-## Graphify
+## Code search
 
-```
-mcp__graphify__query_graph   # focused question
-mcp__graphify__shortest_path # dependency path A → B
-mcp__graphify__get_node      # explain concept/symbol
-```
-
-```bash
-graphify update .  # rebuild index + GRAPH_SUMMARY.md (CLI)
-```
-
-## graphify
-
-This project has a knowledge graph at graphify-out/ with god nodes, community structure, and cross-file relationships.
-
-Rules:
-- For codebase questions, first run `graphify query "<question>"` when graphify-out/graph.json exists. Use `graphify path "<A>" "<B>"` for relationships and `graphify explain "<ClassName/FileName>"` for a known symbol/file (name match, not free-form concept search - use `query` for that). These return a scoped subgraph, usually much smaller than GRAPH_REPORT.md or raw grep output.
-- If graphify-out/wiki/index.md exists, use it for broad navigation instead of raw source browsing.
-- Read graphify-out/GRAPH_REPORT.md only for broad architecture review or when query/path/explain do not surface enough context.
-- After modifying code, run `graphify update .` to keep the graph current (AST-only, no API cost).
-- After judging a query/path/explain result useful, a dead end, or wrong, run `graphify save-result --question "Q" --answer "A" --outcome useful|dead_end|corrected --nodes N1 N2` - this accumulates across sessions so the same dead end or vocabulary mismatch isn't re-derived every time. At the start of a session, check `graphify-out/reflections/LESSONS.md` if it exists (built via `graphify reflect`) for preferred sources, known dead ends, and past corrections.
-
-<!-- aodd:begin -->
-> Managed by aodd-aisdlc (install.sh --project). The rules/, skills/, hooks/, scripts/, agents/ and docs/ paths here live under this repo's .claude/ folder (~/.claude means the same).
-
-# AODD: the operating contract
-
-AODD = AI Orchestration Driven Development. The human is the CEO / judge; the main agent is the chief of
-staff / orchestrator; cheap models do the mechanics; an independent auditor, from another model family, checks
-every claim of Done. This file is the always-on contract. The full feature workflow lives in
-`rules/ai-sdlc-workflow.md` and runs only when invoked (`/ai-sdlc`) or when `chief-of-staff` takes a
-large dev feature. Coding principles live in `rules/coding.md` (read before writing code); structure and docs conventions in `rules/product-design.md`.
-
-Everything stateful lives under `AODD_HOME` (default `~/.aodd`): `$AODD_REPORTS` (default `pending-reports/`:
-audit reports, agent-ops reports, agy proposals; decided ones in `done/`), `$AODD_PLANS` (default `plans/`; a
-`{project}` in it is the repo folder name; `<feature>/` holds briefs, progress files, handoffs), `$AODD_STATE`
-(default `state/`: hook state). Resolve any of them with `python3 hooks/_aodd_paths.py reports|state|plans`.
+- Use `project_search` first. One call returns text matches and code-graph hits together.
+- `rg` plus `Read` is the primary method. Read the file before you edit it.
+- If `project_search` reports a stale index, treat its graph hits as hints and confirm them with `rg` and `Read`.
+- Code-index output is local. Never commit it.
 
 ## AODD triage: every request passes this gate (silently, no announcement)
 
@@ -120,7 +88,7 @@ Routing table: search with Haiku, check with Sonnet, escalate to the advisor.
 | Work | 1. Do it | 2. Check it | 3. Too hard |
 |---|---|---|---|
 | Search, lookup, research (web, docs, papers, past sessions), file/log/transcript sweeps and summaries | **Haiku** subagent(s), in parallel when independent; returns facts + sources/paths, no dumps | **Sonnet**: reads the cited files/sources itself before anything is built on it | `advisor` agent (Fable/Opus) |
-| Code lookup (graphify `query_graph`, `get_neighbors`, `blast_radius`, `search_text`, or grep) | **Haiku** subagent returns file paths + edges | **Sonnet** reads in full every file it will edit or judge; never edits from a Haiku summary | `advisor` |
+| Code lookup (`project_search`, or `rg`) | **Haiku** subagent returns file paths + edges | **Sonnet** reads in full every file it will edit or judge; never edits from a Haiku summary | `advisor` |
 | Run build / test / dev server / deploy already approved, verify a page or endpoint | **Haiku**, reports pass/fail + output excerpt | **Sonnet** re-checks the excerpt against the brief | n/a |
 | Write or change code, debug, plan, design, review a diff | **Sonnet** (the main session when it runs Sonnet, else a Sonnet subagent) | main session reviews every diff | `advisor` when two attempts failed, the choice is hard to reverse, or the trade-off is unclear |
 
@@ -139,7 +107,7 @@ Haiku (the cheap model) does the git and ops mechanics end to end:
 
 - `git fetch` / status / log / diff freely; always `git fetch` before reporting ahead/behind or "pushed".
 - Choose what to commit: read status + diff, stage only the files that belong to the task, by path (never `git add -A`); a file whose owner is unclear (another session's edit) → ask the big model.
-- Resolve merge conflicts. If the conflict needs understanding the code's intent, send the big model a short summary naming the files and hunks, and let it decide. Graphify (query / neighbors / blast_radius), when installed, guides the lookup.
+- Resolve merge conflicts. If the conflict needs understanding the code's intent, send the big model a short summary naming the files and hunks, and let it decide. `project_search`, when available, guides the lookup.
 - Rewrite history only on its own unmerged branch (rebase, squash, amend; push with `--force-with-lease` to that branch only), never on `main`/`master` or a merged branch.
 - Commit, push the branch, open the PR, post-merge cleanup (delete a branch only after the PR state is MERGED), run sync/install/backup scripts, status checks, summaries.
 - After the CEO approves in words ("merge", "deploy"): merge the PR, run the deploy, write to production data. Never before that approval.
@@ -206,7 +174,7 @@ the unit level.
 | **Requirement**: a new or changed capability, a rule users see, a new integration | Full | Phase 2 Dev subagent, Phase 4 | Phase 2 QA subagent (NFRs), Phase 3 scenarios RED, Phase 5 traceability + sign-off | Gates 1-3 | `PRODUCT.md`, `ARCHITECTURE.md`, `CONTEXT.md` (+ `DESIGN.md` with UI) |
 | Unclear which | Interview | Phase 1 resolves the kind, then the path above | | — | — |
 
-**Look before you pick.** Size is not known from the request; it comes from the code. Before choosing, check: the blast radius (graphify `blast_radius`/`affected`, or grep the token, component or function), how many screens or callers it reaches, and whether this was already "fixed" before (git log, past sessions). Then weigh it:
+**Look before you pick.** Size is not known from the request; it comes from the code. Before choosing, check: the blast radius (`project_search`, or grep the token, component or function), how many screens or callers it reaches, and whether this was already "fixed" before (git log, past sessions). Then weigh it:
 - one place, first attempt → the path as it is;
 - wide reach (a color token used on 30 screens, a shared helper with many callers) → list every affected place in a short plan; QA checks each one (a regression list, not a spot check), even on the Logic or UX/UI path;
 - already failed once, or many small symptoms on one screen (clipping, wrapping, spacing) → stop patching symptom by symptom: Phase 1 lists all the symptoms first (QA turns each into a check that fails now), find the shared cause, then fix and re-run every check together (UI: `rules/gui-fixes.md`, 2 rounds then options).
@@ -284,7 +252,7 @@ No mechanical hook enforces these — treat "the user hasn't objected" as differ
   contract QA automation depends on existing, not something to rediscover per task. Full
   dev→QA handoff conventions (testid map, test-env requirements, schema consistency,
   DB strategy) → `skills/ai-sdlc/references/dev-qa-handoff.md`.
-- Graph-before-edit (if graphify is installed) and surgical changes (no drive-by refactors) apply in every phase.
+- Search-before-edit (`project_search`, when available) and surgical changes (no drive-by refactors) apply in every phase.
 - **Skill visibility + Self-Update, every phase:** name every skill invoked in the response text — never call one silently. Every
   skill learns the same way: when a phase hit a correction, a gotcha, or a
   wrong/missing step in the invoked skill, and the fix was verified, patch that skill's

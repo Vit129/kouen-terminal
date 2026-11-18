@@ -341,7 +341,7 @@ One-line records; reasoning lives in each plan under `agent-memory/plans/`.
 
 ## Commit preparation
 
-The `make start` menu disables automatic Graphify refresh for every selected command and its descendants (`GRAPHIFY_AUTO_REFRESH=0`, `GRAPHIFY_SKIP_HOOK=1`), including nested release commits and Git hooks. Manual refresh remains available. Outside the menu, CLI delivery entrypoints share `Scripts/graphify-commit.sh`. Git panel commit actions reach `SurfaceRegistry.runGitCommandInDaemon`, which configures `GitCommitCommand` for commit requests. Both await Graphify with deterministic hashing, stage tracked graph outputs, then commit the prepared index with only the Graphify post-commit rebuild suppressed. Release metadata/changelog commits use the same contract; failure blocks the next commit/push.
+CLI delivery entrypoints (`Scripts/commit-push-merge.sh`, `Scripts/full-cycle.sh`, `Scripts/bump-version.sh`) and the `make start` menu commit with plain `git commit` and run no Graphify refresh. Git panel commit actions reach `SurfaceRegistry.runGitCommandInDaemon`, which configures `GitCommitCommand`; that path still runs `graphify update .` and stages tracked graph outputs before it commits (pending Swift change).
 
 ## Markdown preview trust boundary
 

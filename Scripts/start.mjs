@@ -27,12 +27,7 @@ const nextVersions = nextPatch ? ` (${nextPatch} / ${nextMinor} / ${nextMajor})`
 
 function runCommand(command, args) {
   return new Promise((resolve, reject) => {
-    const child = spawn(command, args, {
-      stdio: 'inherit',
-      // Every menu route, including nested release commits and Git hooks, stays
-      // independent of automatic knowledge-graph refreshes.
-      env: { ...process.env, GRAPHIFY_AUTO_REFRESH: '0', GRAPHIFY_SKIP_HOOK: '1' },
-    });
+    const child = spawn(command, args, { stdio: 'inherit' });
     child.on('close', (code) => {
       if (code === 0) {
         resolve();
