@@ -97,6 +97,7 @@ final class SidebarListModel {
 
     var collapsedGroups = Set<String>()
     var collapsedProjects = Set<String>()
+    private var isProjectSearchActive = false
     private var expandedWorktreeGroups = Set<String>()
     private(set) var projectWorktrees: [String: [SidebarWorktreeEntry]] = [:]
     var pinnedRepos: Set<String> = {
@@ -176,6 +177,12 @@ final class SidebarListModel {
         } else {
             collapsedProjects.insert(path)
         }
+        rebuildRows()
+    }
+
+    func setProjectSearchActive(_ active: Bool) {
+        guard isProjectSearchActive != active else { return }
+        isProjectSearchActive = active
         rebuildRows()
     }
 
@@ -298,7 +305,7 @@ final class SidebarListModel {
             // Grouped by user-defined categories (e.g. "Personal")
             for category in store.categories {
                 let catProjects = store.projects(inCategory: category.id)
-                let isCollapsed = collapsedGroups.contains(category.id)
+                let isCollapsed = collapsedGroups.contains(category.id) && !isProjectSearchActive
                 newRows.append(.groupHeader(
                     id: category.id,
                     name: category.name,
@@ -364,7 +371,7 @@ final class SidebarListModel {
         }
 
         let hasWorktrees = rawWorktrees.contains { !$0.isMain }
-        let isCollapsed = collapsedProjects.contains(project.path)
+        let isCollapsed = collapsedProjects.contains(project.path) && !isProjectSearchActive
         let headerItem = SidebarProjectHeaderItem(
             path: project.path,
             name: displayName,
@@ -440,7 +447,7 @@ final class SidebarListModel {
         }
 
         guard !extraWorktrees.isEmpty else { return }
-        let isExpanded = expandedWorktreeGroups.contains(project.path)
+        let isExpanded = expandedWorktreeGroups.contains(project.path) || isProjectSearchActive
         result.append(.worktreeDisclosure(projectPath: project.path, count: extraWorktrees.count, isExpanded: isExpanded))
         guard isExpanded else { return }
 

@@ -63,9 +63,11 @@ struct ProjectEntry: Codable, Equatable, Identifiable {
 final class ProjectStore {
     private static let categoriesKey = "ProjectCategories"
     private static let projectsKey = "ProjectEntries"
+    private static let pendingReconciliationsKey = "PendingProjectReconciliations"
 
     var categories: [ProjectCategory] = []
     var projects: [ProjectEntry] = []
+    var pendingReconciliationPaths: Set<String> = []
     private let userDefaults: UserDefaults
     private(set) var watcher: ProjectGroupWatcher?
 
@@ -93,9 +95,9 @@ final class ProjectStore {
             guard let folder = cat.sourceFolder, !folder.isEmpty else { return nil }
             return (id: cat.id, folder: folder)
         }
-        watcher.update(folders: validFolders) { [weak self] catID in
+        watcher.update(folders: validFolders) { [weak self] _ in
             Task { @MainActor [weak self] in
-                await self?.syncCategory(id: catID)
+                await self?.syncAllWatchedCategories()
             }
         }
     }
@@ -111,7 +113,8 @@ final class ProjectStore {
            let decoded = try? JSONDecoder().decode([ProjectEntry].self, from: data) {
             let home = FileManager.default.homeDirectoryForCurrentUser.path
             projects = decoded.filter {
-                !$0.path.hasSuffix("/.git") && ($0.path as NSString).lastPathComponent != ".git" && $0.path != home
+                !$0.path.hasSuffix("/.git") && ($0.path as NSString).lastPathComponent != ".git"
+                    && !$0.path.split(separator: "/").contains("testing-repo") && $0.path != home
             }
             if let rows = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]],
                rows.contains(where: { $0["stableID"] == nil }),
@@ -119,6 +122,7 @@ final class ProjectStore {
                 userDefaults.set(migrated, forKey: Self.projectsKey)
             }
         }
+        pendingReconciliationPaths = Set(userDefaults.stringArray(forKey: Self.pendingReconciliationsKey) ?? [])
     }
 
     func save() {
@@ -128,6 +132,7 @@ final class ProjectStore {
         if let data = try? JSONEncoder().encode(projects) {
             userDefaults.set(data, forKey: Self.projectsKey)
         }
+        userDefaults.set(Array(pendingReconciliationPaths), forKey: Self.pendingReconciliationsKey)
     }
 
     private func absorbLegacyRecents() {
@@ -153,6 +158,7 @@ final class ProjectStore {
         if let categoryID, let catIdx = categories.firstIndex(where: { $0.id == categoryID }) {
             categories[catIdx].excludedPaths.remove(path)
         }
+        pendingReconciliationPaths.remove(path)
         guard !projects.contains(where: { $0.path == path }) else {
             if let categoryID, let idx = projects.firstIndex(where: { $0.path == path }) {
                 projects[idx].categoryID = categoryID
@@ -182,6 +188,7 @@ final class ProjectStore {
             }
         }
         projects.removeAll { $0.path == path }
+        pendingReconciliationPaths.remove(path)
         save()
     }
 
@@ -207,18 +214,29 @@ final class ProjectStore {
         updateWatchedFolders()
     }
 
+    func excludeProjects(_ paths: Set<String>, from categoryID: String) {
+        guard let index = categories.firstIndex(where: { $0.id == categoryID }), !paths.isEmpty else { return }
+        categories[index].excludedPaths.formUnion(paths)
+        projects.removeAll { $0.categoryID == categoryID && paths.contains($0.path) }
+        save()
+    }
+
     func removeCategory(_ id: String) {
+        let paths = Set(projects.filter { $0.categoryID == id }.map(\.path))
         categories.removeAll { $0.id == id }
         for idx in projects.indices where projects[idx].categoryID == id {
             projects[idx].categoryID = nil
         }
+        pendingReconciliationPaths.subtract(paths)
         save()
         updateWatchedFolders()
     }
 
     func removeCategoryAndProjects(_ id: String) {
+        let paths = Set(projects.filter { $0.categoryID == id }.map(\.path))
         categories.removeAll { $0.id == id }
         projects.removeAll { $0.categoryID == id }
+        pendingReconciliationPaths.subtract(paths)
         save()
         updateWatchedFolders()
     }
@@ -231,66 +249,115 @@ final class ProjectStore {
 
     // MARK: - Auto-Sync (P54)
 
-    func syncCategory(id: String) async {
-        guard let catIdx = categories.firstIndex(where: { $0.id == id }) else { return }
-        let category = categories[catIdx]
-        guard let sourceFolder = category.sourceFolder, !sourceFolder.isEmpty else { return }
+    private struct CategoryScanSnapshot {
+        let category: ProjectCategory
+        let items: [DiscoveredRepoItem]
+    }
 
-        // Edge case: sourceFolder itself missing/unmounted -> do nothing, preserve entries
-        var isDir: ObjCBool = false
-        let folderExists = FileManager.default.fileExists(atPath: sourceFolder, isDirectory: &isDir) && isDir.boolValue
-        guard folderExists else { return }
+    private func scan(_ category: ProjectCategory) async -> CategoryScanSnapshot? {
+        guard let root = category.sourceFolder, !root.isEmpty else { return nil }
+        var isDirectory: ObjCBool = false
+        guard FileManager.default.fileExists(atPath: root, isDirectory: &isDirectory), isDirectory.boolValue else { return nil }
+        guard let items = await Task.detached(priority: .utility, operation: {
+            try? WorkspaceRepositoryScanner.scan(root: root).map { repo in
+                DiscoveredRepoItem(id: repo, name: (repo as NSString).lastPathComponent,
+                                   path: repo, isGitRepo: true, isEnvFolder: false)
+            }
+        }).value else { return nil }
+        return CategoryScanSnapshot(category: category, items: items)
+    }
 
-        let excluded = category.excludedPaths
+    private func isWithin(_ path: String, root: String) -> Bool {
+        let child = URL(fileURLWithPath: path).standardizedFileURL.path
+        let parent = URL(fileURLWithPath: root).standardizedFileURL.path
+        return child == parent || child.hasPrefix(parent.hasSuffix("/") ? parent : parent + "/")
+    }
 
-        // Perform scan off-main thread (P53 rule: no FS walk on main)
-        let discoveredItems = await Task.detached(priority: .utility) {
-            let scan = FolderScanner.inspect(path: sourceFolder)
-            return scan.items
-        }.value
+    private func applyScans(_ snapshots: [CategoryScanSnapshot], pruneConfirmedMissing: Bool) {
+        let validSnapshots = snapshots.filter { snapshot in
+            categories.first(where: { $0.id == snapshot.category.id }) == snapshot.category
+        }
+        guard !validSnapshots.isEmpty || pruneConfirmedMissing else { return }
 
-        // The category can change while the background scan is running.
-        guard let currentCategory = categories.first(where: { $0.id == id }),
-              currentCategory == category else { return }
-        var changed = false
-        var currentProjects = self.projects
-
-        // Keep possible moves unregistered until the user reviews them.
-        let missing = currentProjects.filter {
-            $0.categoryID == id && !FileManager.default.fileExists(atPath: $0.path)
+        let previousPendingPaths = pendingReconciliationPaths
+        let missingPaths = projects.filter {
+            $0.categoryID != nil && !FileManager.default.fileExists(atPath: $0.path)
         }.map(\.path)
-        let possibleMoves = Set(WorkspaceReconciliation.candidates(
-            missing: missing, discovered: discoveredItems.map(\.path)
-        ).map(\.newPath))
-        // 1. Add new items under sourceFolder that are not excluded
-        for item in discoveredItems {
-            if excluded.contains(item.path) || possibleMoves.contains(item.path) { continue }
-            if !currentProjects.contains(where: { $0.path == item.path }) {
-                currentProjects.append(ProjectEntry(path: item.path, categoryID: id))
-                changed = true
-            } else if let pIdx = currentProjects.firstIndex(where: { $0.path == item.path }),
-                      currentProjects[pIdx].categoryID == nil {
-                currentProjects[pIdx].categoryID = id
-                changed = true
+        let trackedPaths = Set(projects.map(\.path))
+        let eligibleDestinations = Set(validSnapshots.flatMap { snapshot in
+            snapshot.items
+                .filter { !trackedPaths.contains($0.path) }
+                .map(\.path)
+        })
+        let moveCandidates = WorkspaceReconciliation.candidates(
+            missing: missingPaths,
+            discovered: Array(eligibleDestinations)
+        )
+        let moveSources = Set(moveCandidates.map(\.oldPath))
+        let moveDestinations = Set(moveCandidates.map(\.newPath))
+        var updatedProjects = projects
+
+        for snapshot in validSnapshots {
+            for item in snapshot.items {
+                guard !snapshot.category.excludedPaths.contains(item.path),
+                      !moveDestinations.contains(item.path) else { continue }
+                if let index = updatedProjects.firstIndex(where: { $0.path == item.path }) {
+                    if updatedProjects[index].categoryID == nil {
+                        updatedProjects[index].categoryID = snapshot.category.id
+                    }
+                } else {
+                    updatedProjects.append(ProjectEntry(path: item.path, categoryID: snapshot.category.id))
+                }
             }
         }
 
-        if changed {
-            self.projects = currentProjects
+        if pruneConfirmedMissing {
+            let scannedRoots = Dictionary(uniqueKeysWithValues: validSnapshots.compactMap { snapshot in
+                snapshot.category.sourceFolder.map { (snapshot.category.id, $0) }
+            })
+            // Missing categorized paths may have moved outside the current root.
+            // Keep their records available for explicit Review or Remove.
+            updatedProjects.removeAll { project in
+                !FileManager.default.fileExists(atPath: project.path) && project.categoryID == nil
+            }
+            let confirmedMissing = projects.filter { project in
+                guard !FileManager.default.fileExists(atPath: project.path),
+                      let categoryID = project.categoryID,
+                      let root = scannedRoots[categoryID] else { return false }
+                return isWithin(project.path, root: root)
+            }
+            pendingReconciliationPaths.formUnion(confirmedMissing.map(\.path))
+            pendingReconciliationPaths.formUnion(moveSources)
+            pendingReconciliationPaths.subtract(updatedProjects.filter {
+                FileManager.default.fileExists(atPath: $0.path)
+            }.map(\.path))
+        }
+
+        if updatedProjects != projects || pendingReconciliationPaths != previousPendingPaths {
+            projects = updatedProjects
             save()
         }
     }
 
+    func syncCategory(id: String) async {
+        guard let category = categories.first(where: { $0.id == id }),
+              let snapshot = await scan(category) else { return }
+        applyScans([snapshot], pruneConfirmedMissing: false)
+    }
+
     func syncAllWatchedCategories() async {
-        for cat in categories where cat.sourceFolder != nil {
-            await syncCategory(id: cat.id)
+        let watchedCategories = categories.filter { $0.sourceFolder != nil }
+        var snapshots: [CategoryScanSnapshot] = []
+        for category in watchedCategories {
+            if let result = await scan(category) { snapshots.append(result) }
         }
+        applyScans(snapshots, pruneConfirmedMissing: true)
     }
 
     // MARK: - Queries
 
     func projects(inCategory categoryID: String?) -> [ProjectEntry] {
-        projects.filter { $0.categoryID == categoryID }
+        projects.filter { $0.categoryID == categoryID && !pendingReconciliationPaths.contains($0.path) }
     }
 }
 
@@ -375,181 +442,155 @@ struct AddToWorkspaceSheet: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            // Top Navigation Bar
-            HStack {
-                Button(action: onCancel) {
-                    HStack(spacing: 4) {
-                        Image(systemName: "chevron.left")
-                            .font(.system(size: 11, weight: .semibold))
-                        Text("Back")
-                            .font(.system(size: 12))
+        ProjectWorkspaceSheetFrame(
+            title: "Import repositories and folders",
+            subtitle: "Found \(items.count) item\(items.count == 1 ? "" : "s") in \(folderPath).",
+            onBack: onCancel,
+            onClose: onCancel
+        ) {
+            VStack(alignment: .leading, spacing: 14) {
+                // Checklist Box
+                VStack(spacing: 0) {
+                    // Header of checklist: Select/Deselect all + count
+                    HStack {
+                        Toggle(isOn: Binding(
+                            get: { allSelected },
+                            set: { toggleAll($0) }
+                        )) {
+                            Text(allSelected ? "Deselect all" : "Select all")
+                                .font(.system(size: 12, weight: .medium))
+                        }
+                        .toggleStyle(.checkbox)
+
+                        Spacer()
+
+                        Text("\(selectedCount) of \(items.count) selected")
+                            .font(.system(size: 11))
+                            .foregroundStyle(.secondary)
                     }
-                    .foregroundStyle(.secondary)
-                }
-                .buttonStyle(.plain)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
+                    .background(Color.primary.opacity(0.03))
 
-                Spacer()
+                    Divider()
 
-                Button(action: onCancel) {
-                    Image(systemName: "xmark")
-                        .font(.system(size: 11, weight: .medium))
-                        .foregroundStyle(.secondary)
-                }
-                .buttonStyle(.plain)
-            }
+                    // List of items
+                    ScrollView(.vertical) {
+                        LazyVStack(spacing: 0) {
+                            ForEach($items) { $item in
+                                HStack(spacing: 10) {
+                                    Toggle(isOn: $item.isSelected) {
+                                        EmptyView()
+                                    }
+                                    .toggleStyle(.checkbox)
+                                    .labelsHidden()
 
-            // Title & Subtitle
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Import repositories and folders")
-                    .font(.system(size: 16, weight: .bold))
-                    .foregroundStyle(.primary)
+                                    Image(systemName: item.isGitRepo ? "arrow.triangle.branch" : (item.isEnvFolder ? "gearshape" : "folder"))
+                                        .font(.system(size: 11))
+                                        .foregroundStyle(item.isGitRepo ? Color.accentColor : Color.secondary)
+                                        .frame(width: 14)
 
-                Text("Found \(items.count) item\(items.count == 1 ? "" : "s") in \(folderPath).")
-                    .font(.system(size: 12))
-                    .foregroundStyle(.secondary)
-            }
+                                    Text(item.name)
+                                        .font(.system(size: 12, weight: .semibold))
+                                        .foregroundStyle(.primary)
 
-            // Checklist Box
-            VStack(spacing: 0) {
-                // Header of checklist: Select/Deselect all + count
-                HStack {
-                    Toggle(isOn: Binding(
-                        get: { allSelected },
-                        set: { toggleAll($0) }
-                    )) {
-                        Text(allSelected ? "Deselect all" : "Select all")
-                            .font(.system(size: 12, weight: .medium))
+                                    Spacer()
+
+                                    if item.isEnvFolder {
+                                        Text("config")
+                                            .font(.system(size: 10))
+                                            .foregroundStyle(.tertiary)
+                                    } else if !item.isGitRepo {
+                                        Text("folder")
+                                            .font(.system(size: 10))
+                                            .foregroundStyle(.tertiary)
+                                    }
+                                }
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 7)
+                                .contentShape(Rectangle())
+                                .onTapGesture {
+                                    item.isSelected.toggle()
+                                }
+
+                                Divider()
+                                    .padding(.leading, 36)
+                            }
+                        }
                     }
-                    .toggleStyle(.checkbox)
+                    .frame(height: listHeight)
+                }
+                .background(RoundedRectangle(cornerRadius: 8, style: .continuous).fill(Color.primary.opacity(0.02)))
+                .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).stroke(Color.primary.opacity(0.08), lineWidth: 1))
 
-                    Spacer()
+                // Group these repositories?
+                VStack(alignment: .leading, spacing: 5) {
+                    Text("Group these repositories?")
+                        .font(.system(size: 13, weight: .bold))
 
-                    Text("\(selectedCount) of \(items.count) selected")
+                    Text("Choose this if these projects belong together — a monorepo, or just a set of related repos. Kouen will group them and let you work from the parent folder.")
                         .font(.system(size: 11))
                         .foregroundStyle(.secondary)
+                        .lineSpacing(2)
+
+                    Text("Group name")
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                        .padding(.top, 4)
+
+                    TextField("", text: $groupName)
+                        .textFieldStyle(.roundedBorder)
+                        .font(.system(size: 12))
                 }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 8)
-                .background(Color.primary.opacity(0.03))
 
-                Divider()
+                // Dual Action Buttons (Orca Style)
+                HStack(spacing: 10) {
+                    Spacer()
 
-                // List of items
-                ScrollView(.vertical) {
-                    LazyVStack(spacing: 0) {
-                        ForEach($items) { $item in
-                            HStack(spacing: 10) {
-                                Toggle(isOn: $item.isSelected) {
-                                    EmptyView()
-                                }
-                                .toggleStyle(.checkbox)
-                                .labelsHidden()
-
-                                Image(systemName: item.isGitRepo ? "arrow.triangle.branch" : (item.isEnvFolder ? "gearshape" : "folder"))
-                                    .font(.system(size: 11))
-                                    .foregroundStyle(item.isGitRepo ? Color.accentColor : Color.secondary)
-                                    .frame(width: 14)
-
-                                Text(item.name)
-                                    .font(.system(size: 12, weight: .semibold))
-                                    .foregroundStyle(.primary)
-
-                                Spacer()
-
-                                if item.isEnvFolder {
-                                    Text("config")
-                                        .font(.system(size: 10))
-                                        .foregroundStyle(.tertiary)
-                                } else if !item.isGitRepo {
-                                    Text("folder")
-                                        .font(.system(size: 10))
-                                        .foregroundStyle(.tertiary)
-                                }
-                            }
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 7)
-                            .contentShape(Rectangle())
-                            .onTapGesture {
-                                item.isSelected.toggle()
-                            }
-
-                            Divider()
-                                .padding(.leading, 36)
-                        }
+                    Button("No, import separately") {
+                        let selected = items.filter(\.isSelected).map(\.path)
+                        let chosen = selected
+                        onConfirm(chosen, nil) // nil = separate / uncategorized
                     }
-                }
-                .frame(height: listHeight)
-            }
-            .background(RoundedRectangle(cornerRadius: 8, style: .continuous).fill(Color.primary.opacity(0.02)))
-            .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).stroke(Color.primary.opacity(0.08), lineWidth: 1))
+                    .keyboardShortcut(.cancelAction)
+                    .buttonStyle(.bordered)
+                    .controlSize(.regular)
 
-            // Group these repositories?
-            VStack(alignment: .leading, spacing: 5) {
-                Text("Group these repositories?")
-                    .font(.system(size: 13, weight: .bold))
+                    Button("Yes, import as group") {
+                        let selected = items.filter(\.isSelected).map(\.path)
+                        let chosen = selected
 
-                Text("Choose this if these projects belong together — a monorepo, or just a set of related repos. Kouen will group them and let you work from the parent folder.")
-                    .font(.system(size: 11))
-                    .foregroundStyle(.secondary)
-                    .lineSpacing(2)
-
-                Text("Group name")
-                    .font(.system(size: 11))
-                    .foregroundStyle(.secondary)
-                    .padding(.top, 4)
-
-                TextField("", text: $groupName)
-                    .textFieldStyle(.roundedBorder)
-                    .font(.system(size: 12))
-            }
-
-            // Dual Action Buttons (Orca Style)
-            HStack(spacing: 10) {
-                Spacer()
-
-                Button("No, import separately") {
-                    let selected = items.filter(\.isSelected).map(\.path)
-                    let chosen = selected
-                    onConfirm(chosen, nil) // nil = separate / uncategorized
-                }
-                .keyboardShortcut(.cancelAction)
-                .buttonStyle(.bordered)
-                .controlSize(.regular)
-
-                Button("Yes, import as group") {
-                    let selected = items.filter(\.isSelected).map(\.path)
-                    let chosen = selected
-
-                    guard !chosen.isEmpty else { return }
-                    let trimmedGroup = groupName.trimmingCharacters(in: .whitespaces)
-                    var targetCatID: String? = nil
-                    if !trimmedGroup.isEmpty {
-                        if let existing = store.categories.first(where: { $0.name.lowercased() == trimmedGroup.lowercased() }) {
-                            targetCatID = existing.id
-                            if existing.sourceFolder == nil {
-                                store.setCategorySourceFolder(categoryID: existing.id, sourceFolder: folderPath)
+                        guard !chosen.isEmpty else { return }
+                        let trimmedGroup = groupName.trimmingCharacters(in: .whitespaces)
+                        var targetCatID: String? = nil
+                        if !trimmedGroup.isEmpty {
+                            if let existing = store.categories.first(where: { $0.name.lowercased() == trimmedGroup.lowercased() }) {
+                                targetCatID = existing.id
+                                if existing.sourceFolder == nil {
+                                    store.setCategorySourceFolder(categoryID: existing.id, sourceFolder: folderPath)
+                                }
+                            } else {
+                                let newCat = store.addCategory(name: trimmedGroup, sourceFolder: folderPath)
+                                targetCatID = newCat.id
                             }
-                        } else {
-                            let newCat = store.addCategory(name: trimmedGroup, sourceFolder: folderPath)
-                            targetCatID = newCat.id
                         }
+                        if let targetCatID {
+                            store.excludeProjects(Set(items.filter { !$0.isSelected }.map(\.path)), from: targetCatID)
+                        }
+                        onConfirm(chosen, targetCatID)
                     }
-                    onConfirm(chosen, targetCatID)
+                    .keyboardShortcut(.defaultAction)
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.regular)
                 }
-                .keyboardShortcut(.defaultAction)
-                .buttonStyle(.borderedProminent)
-                .controlSize(.regular)
+                .padding(.top, 4)
             }
-            .padding(.top, 4)
-        }
-        .padding(20)
-        .frame(width: 480)
-        .onAppear {
-            if items.isEmpty {
-                let scan = FolderScanner.inspect(path: folderPath)
-                self.items = scan.items
-                self.groupName = folderName
+            .onAppear {
+                if items.isEmpty {
+                    let scan = FolderScanner.inspect(path: folderPath)
+                    self.items = scan.items
+                    self.groupName = folderName
+                }
             }
         }
     }

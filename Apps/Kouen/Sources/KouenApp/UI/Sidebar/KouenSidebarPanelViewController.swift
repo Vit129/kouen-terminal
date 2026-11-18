@@ -525,6 +525,9 @@ final class KouenSidebarPanelViewController: NSViewController {
             onAddInGroup: { [weak self] name, catID in
                 self?.addProjectToGroup(name: name, categoryID: catID)
             },
+            onReviewGroupMoves: { [weak self] categoryID in
+                self?.presentMoveReviewSheet(categoryID: categoryID)
+            },
             onCloseSession: { [weak self] id in
                 guard let self, let session = self.sessions.first(where: { $0.id == id }) else { return }
                 SessionCoordinator.shared.closeSession(session)
@@ -532,7 +535,7 @@ final class KouenSidebarPanelViewController: NSViewController {
             onRemoveProject: { [weak self] path in
                 guard let self else { return }
                 self.projectStore.removeProject(path)
-                self.sidebarListModel.update(from: SessionCoordinator.shared.snapshot)
+                self.sidebarListModel.scheduleRebuild()
             },
             onPRClick: { urlString in
                 guard let url = URL(string: urlString) else { return }
@@ -637,18 +640,7 @@ final class KouenSidebarPanelViewController: NSViewController {
 
     private func setupSessionHistoryView() {
         sessionHistoryModel.warmUp()
-        let historyView = AgentSessionHistoryView(
-            model: sessionHistoryModel,
-            onResume: { [weak self] record in
-                self?.resumeAgentSession(record)
-            },
-            onHandoff: { [weak self] record, targetKind in
-                self?.handoffAgentSession(record, targetKind: targetKind)
-            },
-            onGoToTab: { [weak self] record in
-                self?.goToTabForAgentSession(record)
-            }
-        )
+        let historyView = makeSessionHistoryView()
         let hosting = NSHostingView(rootView: historyView)
         hosting.translatesAutoresizingMaskIntoConstraints = false
         hosting.isHidden = true
@@ -660,6 +652,25 @@ final class KouenSidebarPanelViewController: NSViewController {
             hosting.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             hosting.bottomAnchor.constraint(equalTo: footerHostingView.topAnchor),
         ])
+    }
+
+    func makeSessionHistoryPanelView() -> NSView {
+        NSHostingView(rootView: makeSessionHistoryView())
+    }
+
+    private func makeSessionHistoryView() -> AgentSessionHistoryView {
+        AgentSessionHistoryView(
+            model: sessionHistoryModel,
+            onResume: { [weak self] record in
+                self?.resumeAgentSession(record)
+            },
+            onHandoff: { [weak self] record, targetKind in
+                self?.handoffAgentSession(record, targetKind: targetKind)
+            },
+            onGoToTab: { [weak self] record in
+                self?.goToTabForAgentSession(record)
+            }
+        )
     }
 
 
@@ -1219,7 +1230,7 @@ final class KouenSidebarPanelViewController: NSViewController {
                     self.presentCategorySheet(for: url.path)
                 } else {
                     self.projectStore.addProject(url.path, categoryID: categoryID)
-                    self.sidebarListModel.update(from: SessionCoordinator.shared.snapshot)
+                    self.sidebarListModel.scheduleRebuild()
                 }
             }
         }
@@ -1462,7 +1473,28 @@ final class KouenSidebarPanelViewController: NSViewController {
                 window.endSheet(window.attachedSheet ?? window)
             }
         )
-        let controller = NSHostingController(rootView: sheet)
+        presentProjectSheet(sheet, in: window)
+    }
+
+    private func presentMoveReviewSheet(categoryID: String) {
+        guard let window = view.window else { return }
+        let sheet = ProjectMoveReviewView(
+            categoryID: categoryID,
+            store: projectStore,
+            onCancel: { [weak window] in
+                guard let window, let sheet = window.attachedSheet else { return }
+                window.endSheet(sheet)
+            },
+            onApplied: { [weak self] in self?.sidebarListModel.scheduleRebuild() }
+        )
+        presentProjectSheet(sheet, in: window)
+    }
+
+    private func presentProjectSheet<Content: View>(_ content: Content, in window: NSWindow) {
+        // Add and path review share one sheet presentation so they cannot stack as
+        // separate modal windows over the sidebar.
+        guard window.attachedSheet == nil else { return }
+        let controller = NSHostingController(rootView: content)
         let sheetWindow = NSWindow(contentViewController: controller)
         sheetWindow.styleMask = [.titled, .closable]
         window.beginSheet(sheetWindow) { _ in }
@@ -1476,7 +1508,7 @@ final class KouenSidebarPanelViewController: NSViewController {
                 SessionCoordinator.shared.addSession(to: id, cwd: p, name: (p as NSString).lastPathComponent)
             }
         }
-        sidebarListModel.update(from: SessionCoordinator.shared.snapshot)
+        sidebarListModel.scheduleRebuild()
     }
 
     private func addSessionInGroup(rootPath: String) {

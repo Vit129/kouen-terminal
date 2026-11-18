@@ -60,7 +60,7 @@ public struct AgentSessionHistoryView: View {
             .padding(.top, KouenDesign.Spacing.sm)
             .padding(.bottom, KouenDesign.Spacing.xs)
 
-            // Scope Selector (This repo / All repos)
+            // Scope selector follows the active workspace, project, or full history index.
             Picker("", selection: $model.selectedScope) {
                 ForEach(HistoryScope.allCases) { scope in
                     Text(scope.rawValue).tag(scope)

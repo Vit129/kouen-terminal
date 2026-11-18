@@ -16,12 +16,14 @@ struct SidebarSessionListView: View {
     var onSelectFleetItem: ((FleetSessionItem) -> Void)? = nil
     var onOpenProject: (String) -> Void
     var onAddInGroup: (String, String?) -> Void
+    var onReviewGroupMoves: (String) -> Void = { _ in }
     var onCloseSession: (SessionID) -> Void
     var onRemoveProject: (String) -> Void
     var onPRClick: (String) -> Void
     var onWorktreeActivate: (SidebarWorktreeEntry, WorkspaceID?) -> Void
 
     @State private var selectedFilter: ProjectTabFilter = .all
+    @State private var projectSearchQuery = ""
 
     var body: some View {
         VStack(spacing: 0) {
@@ -30,13 +32,24 @@ struct SidebarSessionListView: View {
                 .overlay(Color.primary.opacity(0.06))
 
             if selectedFilter == .all {
-                ScrollView(.vertical, showsIndicators: false) {
-                    LazyVStack(spacing: 0) {
-                        ForEach(model.rows) { row in
-                            rowContent(row)
-                        }
+                if !projectSearchQuery.isEmpty && filteredProjectRows.isEmpty {
+                    VStack {
+                        Spacer()
+                        Text("No projects or branches found")
+                            .font(.system(size: 11))
+                            .foregroundStyle(.secondary)
+                        Spacer()
                     }
-                    .padding(.vertical, 4)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else {
+                    ScrollView(.vertical, showsIndicators: false) {
+                        LazyVStack(spacing: 0) {
+                            ForEach(filteredProjectRows) { row in
+                                rowContent(row)
+                            }
+                        }
+                        .padding(.vertical, 4)
+                    }
                 }
             } else if let fleetModel {
                 let items = fleetModel.itemsFor(filter: selectedFilter)
@@ -69,42 +82,143 @@ struct SidebarSessionListView: View {
                 }
             }
         }
+        .onAppear {
+            model.setProjectSearchActive(selectedFilter == .all && !projectSearchQuery.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+        }
+        .onDisappear { model.setProjectSearchActive(false) }
+        .onChange(of: projectSearchQuery) { _, query in
+            model.setProjectSearchActive(selectedFilter == .all && !query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+        }
+        .onChange(of: selectedFilter) { _, filter in
+            model.setProjectSearchActive(filter == .all && !projectSearchQuery.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+        }
     }
 
     private var filterChipsHeader: some View {
-        HStack(spacing: 4) {
-            ForEach(ProjectTabFilter.allCases) { filter in
-                Button {
-                    selectedFilter = filter
-                } label: {
-                    HStack(spacing: 3) {
-                        Text(filter.rawValue)
-                            .font(.system(size: 10.5, weight: selectedFilter == filter ? .semibold : .regular))
-                        if filter == .waiting, let count = fleetModel?.waitingCount, count > 0 {
-                            Text("\(count)")
-                                .font(.system(size: 9, weight: .bold))
-                                .foregroundStyle(.white)
-                                .padding(.horizontal, 4)
-                                .padding(.vertical, 1)
-                                .background(Capsule().fill(Color.orange))
+        VStack(spacing: 4) {
+            if selectedFilter == .all {
+                HStack(spacing: 6) {
+                    Image(systemName: "magnifyingglass")
+                        .font(.system(size: 10))
+                        .foregroundStyle(.secondary)
+                    TextField("Find a project or branch", text: $projectSearchQuery)
+                        .textFieldStyle(.plain)
+                        .font(.system(size: 11))
+                        .accessibilityIdentifier("field_projectSearch_projectsSidebar")
+                    if !projectSearchQuery.isEmpty {
+                        Button {
+                            projectSearchQuery = ""
+                        } label: {
+                            Image(systemName: "xmark.circle.fill")
+                                .font(.system(size: 10))
+                                .foregroundStyle(.secondary)
                         }
+                        .buttonStyle(.plain)
                     }
-                    .padding(.horizontal, 7)
-                    .padding(.vertical, 2.5)
-                    .background(
-                        RoundedRectangle(cornerRadius: 5, style: .continuous)
-                            .fill(selectedFilter == filter
-                                  ? Color.primary.opacity(0.10)
-                                  : Color.clear)
-                    )
-                    .foregroundStyle(selectedFilter == filter ? Color.primary : Color.secondary)
                 }
-                .buttonStyle(.plain)
+                .padding(.horizontal, 7)
+                .frame(height: 24)
+                .background(Color.primary.opacity(0.06), in: RoundedRectangle(cornerRadius: 6))
+                .padding(.horizontal, KouenDesign.horizontalInset)
             }
-            Spacer()
+
+            HStack(spacing: 4) {
+                ForEach(ProjectTabFilter.allCases) { filter in
+                    Button {
+                        selectedFilter = filter
+                    } label: {
+                        HStack(spacing: 3) {
+                            Text(filter.rawValue)
+                                .font(.system(size: 10.5, weight: selectedFilter == filter ? .semibold : .regular))
+                            if filter == .waiting, let count = fleetModel?.waitingCount, count > 0 {
+                                Text("\(count)")
+                                    .font(.system(size: 9, weight: .bold))
+                                    .foregroundStyle(.white)
+                                    .padding(.horizontal, 4)
+                                    .padding(.vertical, 1)
+                                    .background(Capsule().fill(Color.orange))
+                            }
+                        }
+                        .padding(.horizontal, 7)
+                        .padding(.vertical, 2.5)
+                        .background(
+                            RoundedRectangle(cornerRadius: 5, style: .continuous)
+                                .fill(selectedFilter == filter
+                                      ? Color.primary.opacity(0.10)
+                                      : Color.clear)
+                        )
+                        .foregroundStyle(selectedFilter == filter ? Color.primary : Color.secondary)
+                    }
+                    .buttonStyle(.plain)
+                }
+                Spacer()
+            }
+            .padding(.horizontal, KouenDesign.horizontalInset)
         }
-        .padding(.horizontal, KouenDesign.horizontalInset)
-        .padding(.vertical, 4)
+        .padding(.vertical, 5)
+    }
+
+    private var filteredProjectRows: [SidebarSessionRow] {
+        let query = projectSearchQuery.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !query.isEmpty else { return model.rows }
+
+        var result: [SidebarSessionRow] = []
+        var currentGroup: SidebarSessionRow?
+        var groupWasAdded = false
+        var index = 0
+
+        while index < model.rows.count {
+            let row = model.rows[index]
+            switch row {
+            case .groupHeader(_, _, _, _, _, _):
+                currentGroup = row
+                groupWasAdded = false
+                index += 1
+            case .divider:
+                if let last = result.last, case .divider = last { }
+                else if !result.isEmpty { result.append(row) }
+                currentGroup = nil
+                groupWasAdded = false
+                index += 1
+            case let .projectHeader(item):
+                var end = index + 1
+                while end < model.rows.count {
+                    switch model.rows[end] {
+                    case .projectHeader(_), .groupHeader(_, _, _, _, _, _), .divider: break
+                    default: end += 1; continue
+                    }
+                    break
+                }
+                let block = Array(model.rows[index..<end])
+                let projectMatches = contains(item.name, query) || contains(item.path, query)
+                let childMatches = block.dropFirst().contains { row in
+                    switch row {
+                    case let .sessionItem(card):
+                        return contains(card.title, query) || contains(card.branch, query)
+                            || contains(card.subtitle ?? "", query) || contains(card.worktreePath ?? "", query)
+                    case let .worktreeDisclosure(path, _, _):
+                        return contains(path, query)
+                    default:
+                        return false
+                    }
+                }
+                if projectMatches || childMatches {
+                    if let currentGroup, !groupWasAdded {
+                        result.append(currentGroup)
+                        groupWasAdded = true
+                    }
+                    result.append(contentsOf: block)
+                }
+                index = end
+            default:
+                index += 1
+            }
+        }
+        return result
+    }
+
+    private func contains(_ value: String, _ query: String) -> Bool {
+        value.localizedCaseInsensitiveContains(query)
     }
 
     @ViewBuilder
@@ -120,7 +234,8 @@ struct SidebarSessionListView: View {
                 status: status,
                 model: model,
                 onToggleCollapse: { model.toggleCollapse(id: id) },
-                onAdd: { onAddInGroup(name, id) }
+                onAdd: { onAddInGroup(name, id) },
+                onReviewMoves: { onReviewGroupMoves(id) }
             )
             .frame(height: 28)
 
@@ -211,9 +326,9 @@ private struct SidebarGroupHeaderRow: View {
     var model: SidebarListModel
     var onToggleCollapse: () -> Void
     var onAdd: () -> Void
+    var onReviewMoves: () -> Void
 
     @State private var isHovered = false
-    @State private var reviewingMoves = false
 
     var body: some View {
         let c = KouenDesign.chrome
@@ -254,7 +369,7 @@ private struct SidebarGroupHeaderRow: View {
 
             Menu {
                 Button("Add Repository to \(name)...") { onAdd() }
-                Button("Review Moved Repositories…") { reviewingMoves = true }
+                Button("Review Moved Repositories…") { onReviewMoves() }
                     .accessibilityIdentifier("project-group-review-moves")
                 Divider()
                 Button("Delete Group", role: .destructive) {
@@ -286,13 +401,10 @@ private struct SidebarGroupHeaderRow: View {
         .contentShape(Rectangle())
         .onTapGesture { onToggleCollapse() }
         .onHover { isHovered = $0 }
-        .sheet(isPresented: $reviewingMoves) {
-            if let store = model.projectStore { ProjectMoveReviewView(categoryID: id, store: store) }
-        }
     }
 }
 
-// MARK: - Project Header row (Clean text, NO icon/logo in front!)
+// MARK: - Project Header row
 
 private struct SidebarProjectHeaderRow: View {
     let item: SidebarProjectHeaderItem
@@ -307,13 +419,17 @@ private struct SidebarProjectHeaderRow: View {
         let c = KouenDesign.chrome
         let indent: CGFloat = item.categoryID != nil ? 10 : 0
         HStack(spacing: 5) {
-            // Expand / collapse chevron (NO icon/logo in front!)
+            // Repository icon distinguishes the saved repo root from branch/session rows.
             Image(systemName: item.isCollapsed ? "chevron.right" : "chevron.down")
                 .font(.system(size: 8.5, weight: .semibold))
                 .foregroundStyle(isHovered ? Color(nsColor: c.textPrimary) : Color(nsColor: c.textTertiary))
                 .frame(width: 10, height: 10)
 
-            // Clean project name text
+            Image(systemName: "folder")
+                .font(.system(size: 11, weight: .regular))
+                .foregroundStyle(Color(nsColor: c.textSecondary))
+                .accessibilityHidden(true)
+
             Text(item.name)
                 .font(.system(size: 12.5, weight: .semibold))
                 .foregroundStyle(Color(nsColor: c.textPrimary))
@@ -379,6 +495,7 @@ private struct SidebarProjectHeaderRow: View {
         .padding(.trailing, KouenDesign.horizontalInset)
         .padding(.top, 4)
         .contentShape(Rectangle())
+        .help(item.path)
         .onTapGesture { onToggleCollapse() }
         .onHover { isHovered = $0 }
     }

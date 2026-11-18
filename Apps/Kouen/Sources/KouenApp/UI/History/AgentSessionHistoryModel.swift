@@ -2,6 +2,7 @@ import AppKit
 import Combine
 import KouenCore
 import KouenIPC
+import KouenGit
 import os.signpost
 import SwiftUI
 
@@ -38,8 +39,9 @@ final class RepoRootCache: @unchecked Sendable {
 }
 
 public enum HistoryScope: String, CaseIterable, Identifiable, Sendable {
-    case repo = "This repo"
-    case all = "All repos"
+    case workspace = "Workspace"
+    case repo = "Project"
+    case all = "All"
 
     public var id: String { rawValue }
 }
@@ -151,6 +153,8 @@ public final class AgentSessionHistoryModel: ObservableObject {
     public var repoRootResolver: @Sendable (String) -> String?
     /// Active CWD provider injected for testing or production.
     public var activeCWDProvider: @Sendable () -> String
+    /// Working directories represented by tabs in the active workspace.
+    public var workspaceCWDsProvider: @Sendable () -> [String]
 
     private let preferences: UserDefaults
 
@@ -159,6 +163,8 @@ public final class AgentSessionHistoryModel: ObservableObject {
 
     private var filterTask: Task<Void, Never>?
     private var updateCancellable: AnyCancellable?
+    private var snapshotCancellable: AnyCancellable?
+    private var lastFilterContextSignature = ""
 
     private let loadMoreBatchSize = 20
     private var minimumWindowStart: Date {
@@ -166,8 +172,9 @@ public final class AgentSessionHistoryModel: ObservableObject {
     }
 
     public init(
-        repoRootResolver: @escaping @Sendable (String) -> String? = { WorktreeManager().repoRoot(for: $0) },
+        repoRootResolver: @escaping @Sendable (String) -> String? = { GitService.shared.resolveRepoRoot(for: $0) },
         activeCWDProvider: (@Sendable () -> String)? = nil,
+        workspaceCWDsProvider: (@Sendable () -> [String])? = nil,
         userDefaults: UserDefaults = .standard
     ) {
         self.repoRootResolver = repoRootResolver
@@ -182,6 +189,33 @@ public final class AgentSessionHistoryModel: ObservableObject {
                 }
             }
         }
+        if let workspaceCWDsProvider {
+            self.workspaceCWDsProvider = workspaceCWDsProvider
+        } else {
+            self.workspaceCWDsProvider = {
+                MainActor.assumeIsolated {
+                    SessionCoordinator.shared.snapshot.activeWorkspace?.sessions
+                        .flatMap(\.tabs)
+                        .compactMap(\.cwd) ?? []
+                }
+            }
+        }
+        lastFilterContextSignature = filterContextSignature
+
+        self.snapshotCancellable = NotificationCenter.default
+            .publisher(for: NotificationBus.shared.snapshotChanged)
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                Task { @MainActor [weak self] in
+                    guard let self else { return }
+                    let signature = self.filterContextSignature
+                    guard signature != self.lastFilterContextSignature else { return }
+                    self.lastFilterContextSignature = signature
+                    if self.selectedScope != .all {
+                        self.scheduleFilter(debounceMs: 0)
+                    }
+                }
+            }
 
         self.updateCancellable = NotificationCenter.default
             .publisher(for: AgentHistoryScanner.didUpdateNotification)
@@ -433,6 +467,7 @@ public final class AgentSessionHistoryModel: ObservableObject {
             selectedAgents: selectedAgents,
             records: records,
             activeCWD: activeCWDProvider(),
+            workspaceCWDs: workspaceCWDsProvider(),
             resolver: repoRootResolver,
             initialCache: repoRootCache
         )
@@ -458,6 +493,7 @@ public final class AgentSessionHistoryModel: ObservableObject {
         let currentAgents = selectedAgents
         let currentRecords = records
         let activeCWD = activeCWDProvider()
+        let workspaceCWDs = workspaceCWDsProvider()
         let resolver = repoRootResolver
 
         let localCache = repoRootCache
@@ -475,6 +511,7 @@ public final class AgentSessionHistoryModel: ObservableObject {
                 selectedAgents: currentAgents,
                 records: currentRecords,
                 activeCWD: activeCWD,
+                workspaceCWDs: workspaceCWDs,
                 resolver: resolver,
                 initialCache: localCache
             )
@@ -497,12 +534,17 @@ public final class AgentSessionHistoryModel: ObservableObject {
         }
     }
 
+    private var filterContextSignature: String {
+        activeCWDProvider() + "\0" + workspaceCWDsProvider().sorted().joined(separator: "\n")
+    }
+
     nonisolated package static func computeFiltered(
         query: String,
         scope: HistoryScope,
         selectedAgents: Set<AgentKind> = [],
         records: [AgentSessionRecord],
         activeCWD: String,
+        workspaceCWDs: [String] = [],
         resolver: @Sendable (String) -> String?,
         initialCache: [String: String]
     ) -> (
@@ -535,13 +577,22 @@ public final class AgentSessionHistoryModel: ObservableObject {
             return root
         }
 
-        let activeRepoRoot = resolveRoot(for: activeCWD)
+        let activeRepoRoot = activeCWD.isEmpty ? "" : resolveRoot(for: activeCWD)
+        let workspaceRepoRoots = Set(workspaceCWDs.filter { !$0.isEmpty }.map(resolveRoot))
         let scopedRecords = baseRecords.filter { record in
-            guard scope == .repo, !activeRepoRoot.isEmpty else { return true }
-            if record.projectPath == activeRepoRoot || record.projectPath.hasPrefix(activeRepoRoot + "/") {
+            switch scope {
+            case .all:
                 return true
+            case .workspace:
+                guard !workspaceRepoRoots.isEmpty else { return false }
+                return workspaceRepoRoots.contains(resolveRoot(for: record.projectPath))
+            case .repo:
+                guard !activeRepoRoot.isEmpty else { return false }
+                if record.projectPath == activeRepoRoot || record.projectPath.hasPrefix(activeRepoRoot + "/") {
+                    return true
+                }
+                return resolveRoot(for: record.projectPath) == activeRepoRoot
             }
-            return resolveRoot(for: record.projectPath) == activeRepoRoot
         }
         let matcher = SearchMatcher(query: query)
 

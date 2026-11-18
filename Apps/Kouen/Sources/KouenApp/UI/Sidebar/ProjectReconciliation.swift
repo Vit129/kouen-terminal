@@ -44,6 +44,11 @@ extension ProjectStore {
             if let destination = mapping[entry.path] { updated.path = destination }
             return updated
         }
+        pendingReconciliationPaths.subtract(mapping.keys)
+        pendingReconciliationPaths.subtract(mapping.values)
+        for index in categories.indices {
+            categories[index].excludedPaths.subtract(mapping.values)
+        }
         save()
         return true
     }
