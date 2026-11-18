@@ -1,0 +1,33 @@
+.gemini/settings.json
+  s_57b54754110592::t_dec7e5de5eb67c 2-3
+.gitignore
+  s_57b54754110592::t_1099964e41d8cb 69-70
+AGENTS.md
+  s_57b54754110592::t_21665fc8046788 10,29,31-34,91,110,177,255
+ARCHITECTURE.md
+  s_57b54754110592::t_6a8b8cc229ff02 344
+Scripts/bump-version.sh
+  s_57b54754110592::t_cc05ded95de91f 47
+Scripts/commit-push-merge.sh
+  s_57b54754110592::t_1c2d1db366b545 78,93
+Scripts/full-cycle.sh
+  s_57b54754110592::t_b5556e24864d72 109,175,292
+Scripts/start.mjs
+  s_57b54754110592::t_9e3385b97af4b5 30
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.3",
+  "base_commit_sha": "5b4da9db88becfb7c26863eb089b1e5fd0c21e06",
+  "prompts": {},
+  "sessions": {
+    "s_57b54754110592": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7860b657-e5ae-49bd-92e1-c3eb70cfb06d",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Vit129 <vitosk129@gmail.com>"
+    }
+  }
+}
