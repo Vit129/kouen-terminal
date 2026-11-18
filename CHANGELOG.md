@@ -5,6 +5,18 @@ All notable changes to Kouen are documented here. The format is based on
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Each released version
 has a matching `vX.Y.Z` tag and a signed, notarized DMG on
 [GitHub Releases](https://github.com/Vit129/kouen-terminal/releases).
+## [Unreleased]
+
+### Added
+- Streamline project and history navigation
+
+## [4.23.2] - 2026-11-18
+
+### Added
+- Simplify project workspace navigation ([`9964ff2`](https://github.com/Vit129/kouen-terminal/commit/9964ff2c998c720be84439d67b5b7e3355e05d1a))
+- Streamline workspace and history navigation ([`cf0ff64`](https://github.com/Vit129/kouen-terminal/commit/cf0ff645d93fc2bf83d6faf359506cf0e58f52c4))
+
+
 ## [4.23.1] - 2026-11-17
 
 ### Added

@@ -292,9 +292,21 @@ if ! git diff --cached --quiet; then
   git commit -m "chore(release): update CHANGELOG for ${TAG}"
 fi
 
-git tag -f "$TAG" -m "$TAG"
+if git rev-parse -q --verify "refs/tags/$TAG" >/dev/null; then
+  echo "❌ Tag $TAG already exists locally; refusing to move it." >&2
+  exit 1
+fi
+remote_tag="$(git ls-remote --refs origin "refs/tags/$TAG")" || {
+  echo "❌ Could not check whether tag $TAG exists on origin." >&2
+  exit 1
+}
+if [[ -n "$remote_tag" ]]; then
+  echo "❌ Tag $TAG already exists on origin; refusing to move it." >&2
+  exit 1
+fi
+git tag "$TAG" -m "$TAG"
 git push origin main
-git push origin "refs/tags/$TAG" --force
+git push origin "refs/tags/$TAG"
 # Errors are NOT swallowed here (previously 2>/dev/null on both attempts hid every
 # failure — 20 releases went out with empty "Release vX.Y.Z" stub bodies over several
 # weeks before anyone noticed, because nothing ever printed why). A create/edit
