@@ -1,0 +1,69 @@
+.claude/hooks/dirty-branch-switch-guard.py
+  s_57b54754110592::t_060f976f511faf 60,100
+.claude/rules/ai-sdlc-workflow.md
+  s_57b54754110592::t_cd7de2aaf5fec1 53,131
+.claude/rules/aodd.md
+  s_57b54754110592::t_4f2f4558f62a9d 69,88
+.claude/rules/coding.md
+  s_57b54754110592::t_d6b85e3c3e5855 56,58,60,64-66,68,167
+.claude/rules/product-design.md
+  s_57b54754110592::t_5f3aace2238cc9 77
+.claude/scripts/skill_learning_report.py
+  s_57b54754110592::t_9700a6dd70822c 187
+.claude/skills/ai-sdlc/phases/phase2-existing-asset-scan.md
+  s_57b54754110592::t_625e7cfa0a6ffe 14
+.claude/skills/ai-sdlc/phases/phase2-reuse-retest.md
+  s_57b54754110592::t_46aeb7230cd81c 12
+.claude/skills/ai-sdlc/phases/phase2-reuse-table.md
+  s_57b54754110592::t_a3f1ab2b1fd08b 37
+.claude/skills/ai-sdlc/references/skill-routing.md
+  s_57b54754110592::t_71348cb4ed8969 29
+plans/completed-archive.md
+  s_57b54754110592::t_8735b5b497226f 109
+plans/p25-mobile-session-switcher-design.html
+  s_57b54754110592::t_030b4d2d5f990f 448-449
+plans/p37-phase-g-autocomplete/design.md
+  s_57b54754110592::t_7b50103e582d4d 12
+plans/p39-competitive-feature-gaps.md
+  s_57b54754110592::t_2a6b6217ca95d8 19
+plans/p40-mcp-surface-and-shader-presets/design.md
+  s_57b54754110592::t_1532abaa4f5e21 184-185
+ARCHITECTURE.md
+  s_57b54754110592::t_aea62fc77a89f8 344
+Apps/Kouen/Sources/KouenApp/Services/SessionCoordinatorTypes.swift
+  s_57b54754110592::t_fa48efb4f85b29 19
+Apps/Kouen/Sources/KouenApp/UI/CommandPalette/ContextInjectorController.swift
+  s_57b54754110592::t_ede1be29e83b62 8,115
+Apps/Kouen/Sources/KouenApp/UI/FileEditor/LSPFileSession.swift
+  s_57b54754110592::t_a73bacfafb007c 96
+Packages/KouenCore/Sources/KouenCore/Agents/AgentHistoryFTSIndex.swift
+  s_57b54754110592::t_1c866e11f6dafd 619
+Packages/KouenCore/Sources/KouenCore/Agents/AgentHistoryScanner.swift
+  s_57b54754110592::t_5d172393b5ec4a 854,1611,1913
+Packages/KouenCore/Sources/KouenCore/Platform/GitCommitCommand.swift
+  s_57b54754110592::t_231f6326a66167 3,8
+Packages/KouenCore/Sources/KouenCore/Platform/NotificationCenterProbe.swift
+  s_57b54754110592::t_c4bd6837df65e4 11
+Packages/KouenCore/Sources/KouenCore/Verification/VerificationRunner.swift
+  s_57b54754110592::t_5c76c3046300ae 8
+docs/COMMANDS.md
+  s_57b54754110592::t_c1446cd0185caa 358
+rules/concurrency.md
+  s_57b54754110592::t_6a1ffedb19f5f0 4
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.3",
+  "base_commit_sha": "65bddda383e4bd9ca3cb05deadff557e799bf794",
+  "prompts": {},
+  "sessions": {
+    "s_57b54754110592": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7860b657-e5ae-49bd-92e1-c3eb70cfb06d",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Vit129 <vitosk129@gmail.com>"
+    }
+  }
+}
