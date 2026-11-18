@@ -2,6 +2,205 @@
 
 Older releases. See [CHANGELOG.md](../CHANGELOG.md) for recent versions.
 
+## [4.21.12] - 2026-10-22
+
+### Added
+- Keep Mac awake while AI provider apps run alongside Kouen ([`bf06d3d`](https://github.com/Vit129/kouen-terminal/commit/bf06d3db07f97bab32ab202c5cd78a742c30d2d0))
+- Opt-in closed-lid keep-awake via pmset disablesleep helper ([`a909285`](https://github.com/Vit129/kouen-terminal/commit/a90928539cdbe904ffa253bd9f17470013b69746))
+
+## [4.21.11] - 2026-10-21
+
+### Added
+- Reuse existing browser pane with new tab instead of splitting ([`2587335`](https://github.com/Vit129/kouen-terminal/commit/2587335cfa92e15921d8b40ffba015824530def9))
+
+### Documentation
+- Relicense to Apache-2.0, keep the Harness MIT notice ([`6120233`](https://github.com/Vit129/kouen-terminal/commit/612023341b0765c78bc19630417a7a7152f31386))
+- Credit Claude as co-developer and contributor ([`5feea86`](https://github.com/Vit129/kouen-terminal/commit/5feea86610e98c2cea586a3ee477bb0442c744ac))
+- Add Installation section in README ([`395fe02`](https://github.com/Vit129/kouen-terminal/commit/395fe02049eef808d2632fdc83a13218320309f0))
+- Slim README and move reference material to docs/ ([`b4f5e4a`](https://github.com/Vit129/kouen-terminal/commit/b4f5e4a04ff0c04ef37e0a0b50f8d68be368e145))
+
+## [4.21.10] - 2026-10-18
+
+### Added
+- Open files and folders from other projects ([`9763748`](https://github.com/Vit129/kouen-terminal/commit/97637484085e4ff09da912fa4dd177b56751d709))
+- Open bare file names from agent output across projects ([`3b94742`](https://github.com/Vit129/kouen-terminal/commit/3b947421514eccbbca3c746de2fc8db8640ba523))
+- Pin the file tree on another folder; root picker in its header ([`8923e42`](https://github.com/Vit129/kouen-terminal/commit/8923e426978a54d3d35d2d40aac4e13cf11ec40a))
+
+### Changed
+- Route indexSession through indexSessionsBatch ([`fc6c869`](https://github.com/Vit129/kouen-terminal/commit/fc6c8690839e54c96736cd38775431046836b35a))
+- Write the FTS index in batches of 50 during a scan ([`e81ccda`](https://github.com/Vit129/kouen-terminal/commit/e81ccda245786d3f14b661400faa6e4542a37c38))
+- Spawn git only when a worktree or HEAD actually changed ([`962b06e`](https://github.com/Vit129/kouen-terminal/commit/962b06e4ac1f91f6d8a4cfd7dd34d5e079de79df))
+- Watch the transcript file instead of polling it every 1s ([`477ce70`](https://github.com/Vit129/kouen-terminal/commit/477ce70863722cb1fc7d3dfcee506d7619b3e8e2))
+
+### Documentation
+- Kouen-file-open covers folders, wrapped paths and other projects ([`8cc2267`](https://github.com/Vit129/kouen-terminal/commit/8cc226783bc1e388c16c90ad33aa55b010818509))
+- Document FileTree programmatic reveal race prevention ([`44c351a`](https://github.com/Vit129/kouen-terminal/commit/44c351ad243f56ac78ea31f5c461cc2306669edf))
+- Kouen-file-open: how to see click logs in KouenPreview ([`6af1d20`](https://github.com/Vit129/kouen-terminal/commit/6af1d20976b13505aae32fdf66d1854847a540d7))
+- Kouen-file-open: stale HTML after reload is usually page state ([`26eacd9`](https://github.com/Vit129/kouen-terminal/commit/26eacd9c5812271e788b2bb86fcd25f4ee902061))
+
+### Fixed
+- Restart the daemon for real at the end of make start ([`f4867e9`](https://github.com/Vit129/kouen-terminal/commit/f4867e9d36043fa872802c861234995e13b08715))
+- Fix header scroll overlap and cross-project reveal ancestor expansion ([`7c130cc`](https://github.com/Vit129/kouen-terminal/commit/7c130cca95245cc29d753929f512392987cebf0d))
+- Cancel overlapping reveal tasks and remove cascading revealEpoch bumps ([`66eea13`](https://github.com/Vit129/kouen-terminal/commit/66eea13fb5d9e30884651f604e3a7237d43345db))
+- Protect child nodes from parallel loadChildren races during reveal ([`abeedb1`](https://github.com/Vit129/kouen-terminal/commit/abeedb162c55611ee7a996bf1499c063a61fa271))
+- Loop over itemsToIndex in session_index_meta insert and add mixed batch test ([`4881b7d`](https://github.com/Vit129/kouen-terminal/commit/4881b7dff4494ed74503264ed37cd07fdba3d222))
+- Address P59 review findings (transcript meta, KeyTable precedence, semantic sort, locator head-tail) ([`dacbdf8`](https://github.com/Vit129/kouen-terminal/commit/dacbdf880f1a1a499dc1bc773462f44680e93aa7))
+- Cmd+R reloads the browser pane, Cmd+Shift+R ignores the cache ([`da1f9b7`](https://github.com/Vit129/kouen-terminal/commit/da1f9b70da914a17d07a2eea36835d5edc4e8440))
+- Cmd+R / Cmd+Shift+R reload the browser pane (release v4.21.10) ([`b07531c`](https://github.com/Vit129/kouen-terminal/commit/b07531c7c74c64ec74d903c61737911f152c6931))
+
+## [4.21.9] - 2026-10-17
+
+### Added
+- Black theme and the sidebar's real agent brand icons ([`dc547c2`](https://github.com/Vit129/kouen-terminal/commit/dc547c275df91138e960492768dfa6719d7fde7b))
+- Remove the "Isolate into worktree" banner ([`92c7ff7`](https://github.com/Vit129/kouen-terminal/commit/92c7ff7b26ac725d3521788905601567ba5fc2aa))
+
+### Fixed
+- Show agy CLI transcript and stop breaking Thai text on the phone ([`66ac20a`](https://github.com/Vit129/kouen-terminal/commit/66ac20ad380149a4877e1e4eb9ee291c9fc78423))
+- Print a loopback pairing URL for opening the page on the Mac itself ([`69cf0df`](https://github.com/Vit129/kouen-terminal/commit/69cf0dfab674c1ef00665b05c1edd39440cc1fd1))
+- Ping the socket so a dead iOS connection reconnects on return ([`de1f14d`](https://github.com/Vit129/kouen-terminal/commit/de1f14d4074581eb52fe54cee597f36eb664c14c))
+- Agy transcript, Thai text, black theme, brand icons, liveness ping; remove worktree banner (release v4.21.9) ([`c3fac3c`](https://github.com/Vit129/kouen-terminal/commit/c3fac3c28e53cd73935ca23a0c9ceb70e882c8df))
+
+## [4.21.8] - 2026-10-17
+
+### Added
+- Route file types via shared FileViewRouting; map .gs to JavaScript ([`2b340a7`](https://github.com/Vit129/kouen-terminal/commit/2b340a7317e891b74f6c11a6f3a519fe59a2891d))
+- Cmd+click and viewer cover Office/Apple docs, AI data files, Xcode files and more languages ([`c03ff75`](https://github.com/Vit129/kouen-terminal/commit/c03ff753ee05acc9e2caf5efbc88070153535003))
+- Multi-agent transcript and usage metrics across CLI, Web, and Desktop ([`a4f8fd1`](https://github.com/Vit129/kouen-terminal/commit/a4f8fd1382eaf943802d40b695fcb82a5d6ca9f2))
+- Support AI and non-interactive execution in make start ([`0bfa91b`](https://github.com/Vit129/kouen-terminal/commit/0bfa91b8e8f04c8ce4940859982f21f791017073))
+
+### Documentation
+- Kouen-file-open — three open paths and where each extension list lives ([`66e494f`](https://github.com/Vit129/kouen-terminal/commit/66e494fcc5b08d17ab483cf1e5e0cc310cc2d1ef))
+
+### Fixed
+- Re-check Tailscale every 2s for real and stop leaking late-bound listeners ([`2df5bb0`](https://github.com/Vit129/kouen-terminal/commit/2df5bb076391e745709887ddfbdde039f9764cd4))
+- Follow Tailscale IP/Serve changes and keep pairing URL and shell wrapper as designed ([`2319e38`](https://github.com/Vit129/kouen-terminal/commit/2319e38dc8edc95dd05d9f5de4a5f8a7824077cd))
+- Stop leaking pipe fds that froze the app on "Reconnecting" ([`d71cd5d`](https://github.com/Vit129/kouen-terminal/commit/d71cd5dcbec9adb98d4f20350abdab7feadbd9c9))
+- Close the port scanner's pipe explicitly too ([`1a82116`](https://github.com/Vit129/kouen-terminal/commit/1a82116f95ee563a5ebc4f5fc2192edecaff028d))
+- Map any LaunchAgent to its repo, not only .sh jobs ([`cc4b310`](https://github.com/Vit129/kouen-terminal/commit/cc4b310ad27e266e6ba297d69bd2808d274045fa))
+- Cmd+click opens bare .gs/xlsx/heic/RAW filenames — extension was missing from the link allowlist ([`46f9649`](https://github.com/Vit129/kouen-terminal/commit/46f96494e4ab1320750a2f7f56e7772aa5cd46b0))
+- Handle graphify refresh before rebase and auto-default build/commit in release ([`8964858`](https://github.com/Vit129/kouen-terminal/commit/8964858c9272311963a6ab0284271fdf115fe661))
+
+## [4.21.7] - 2026-10-14
+
+### Added
+- Ask before isolating a tab instead of moving the shared folder ([`0348ac1`](https://github.com/Vit129/kouen-terminal/commit/0348ac15fae39f6eb9aa9fb42276c2078a12b140))
+
+### Changed
+- Split MobileBridgeServer so connection, text wrap and per-agent model/effort are findable on their own ([`eb59871`](https://github.com/Vit129/kouen-terminal/commit/eb59871e8346293ffca58b35699c822143ec9879))
+
+### Fixed
+- Re-enable IPC worktreeCreate and run setupScript in each new worktree ([`e995e78`](https://github.com/Vit129/kouen-terminal/commit/e995e78c8863169089de8a50922b80ac3b985483))
+- Recompute isolation notices on snapshot apply, not only on the branch ping ([`2e2331b`](https://github.com/Vit129/kouen-terminal/commit/2e2331b086af5a65c395ecc8434de8a55a094b3a))
+- Separate connecting logic and dynamically discover tailscale ([`e513be3`](https://github.com/Vit129/kouen-terminal/commit/e513be39b6212b33b1b200f5cd54e8b190947b99))
+
+## [4.21.6] - 2026-10-13
+
+### Added
+- Companion chat UI — image chips, model/mode meta, agent commands from the phone ([`fccaa0b`](https://github.com/Vit129/kouen-terminal/commit/fccaa0b79f5e1baeebcd6bf6b28c3e4dbaa267dc))
+- Model/effort picker for agy and keep the Companion on the open session across reloads ([`02e4fdd`](https://github.com/Vit129/kouen-terminal/commit/02e4fddaacff752c43927795cde44439cf65621f))
+- Read agy's model list from `agy models` instead of a hand-copied one ([`fa6a1dd`](https://github.com/Vit129/kouen-terminal/commit/fa6a1dd8c6e8cbbaab0f0a7258a7656875970f1a))
+
+### Fixed
+- Give the preview daemon its own Companion port so it doesn't collide with installed Kouen ([`574bedd`](https://github.com/Vit129/kouen-terminal/commit/574bedd0f75a80175282601c1f3d8e9eeb6e8343))
+- Drop TUI spinner/border redraw frames from the Companion feed ([`8d1913e`](https://github.com/Vit129/kouen-terminal/commit/8d1913e49e4dc1550fbab5467b7fdf37216473aa))
+- Preview daemon picks Companion port 8081 itself, however it was started ([`bf2e2f9`](https://github.com/Vit129/kouen-terminal/commit/bf2e2f96bcdb8a1ceb07313cf8ff5dcf31c3ab09))
+- Key Companion credentials by host:port and drop rejected ones so the QR can pair ([`f1fab77`](https://github.com/Vit129/kouen-terminal/commit/f1fab77139e4f3010c1d9872aeb9212252a0083c))
+- Agy model switch when the detector misses the pane; keep Claude transcripts on in preview ([`f9d2233`](https://github.com/Vit129/kouen-terminal/commit/f9d22330c00187e8a7069f0992337482c6d1887a))
+- Fall back to the page's agent hint when the detector reports an unsupported kind ([`78211c1`](https://github.com/Vit129/kouen-terminal/commit/78211c1a6b91759897f1d723347b2769bdd9151d))
+- Drop Claude harness plumbing, show agy tool-only replies, survive agy db writes ([`8f96dd6`](https://github.com/Vit129/kouen-terminal/commit/8f96dd601a1610cdb41a67fc460f0c3f8a66b45f))
+
+## [4.21.5] - 2026-10-12
+
+### Added
+- Parse Claude transcript lines into typed items and tail them by offset ([`f9c70fe`](https://github.com/Vit129/kouen-terminal/commit/f9c70fe9b90f68f484166dc8b28d9787786e826c))
+- Push the attached agent's transcript to the Companion ([`19044ae`](https://github.com/Vit129/kouen-terminal/commit/19044ae7b20cd4cfa0c36a9a7b72b21516b7e1de))
+- Render the Companion session as user/agent bubbles and tool rows ([`43d78ce`](https://github.com/Vit129/kouen-terminal/commit/43d78cec37d5b75cc140ed095bfb8f740bf10120))
+
+## [4.21.4] - 2026-10-12
+
+### Added
+- Group Preview links by agent, each at its newest version ([`750721b`](https://github.com/Vit129/kouen-terminal/commit/750721b13a8b4e7a5dd3720481f4a014773af883))
+- Show Antigravity brain artifacts in Preview ([`264a6cc`](https://github.com/Vit129/kouen-terminal/commit/264a6cc22e425b75b51abdffcdee9e34120f675a))
+
+### Fixed
+- Report the idle→working edge so tabs stop showing idle mid-task ([`81eec43`](https://github.com/Vit129/kouen-terminal/commit/81eec43362011caaca686f8eeab82b08f23dc3bc))
+- Start the Companion at daemon boot when the setting is on ([`22d89d2`](https://github.com/Vit129/kouen-terminal/commit/22d89d286e5efb532b82cf09af7b44474783da84))
+- Strip private-parameter CSI so kitty-keyboard codes don't leak ([`06d353b`](https://github.com/Vit129/kouen-terminal/commit/06d353b64afbbc04e126ee0f234d8ca6eff22add))
+- Preview lists every artifact link at its newest version ([`f6b653b`](https://github.com/Vit129/kouen-terminal/commit/f6b653b91b02644e8623b803432f36ab57395923))
+- Limit Companion file reads to the session cwd and agy's brain dir ([`d90dc37`](https://github.com/Vit129/kouen-terminal/commit/d90dc378b1d2954a4ebd2187d50e3afc35424aeb))
+
+## [4.21.3] - 2026-10-12
+
+### Fixed
+- Keep hidden panel and toast hidden so the companion isn't blank ([`c976da5`](https://github.com/Vit129/kouen-terminal/commit/c976da50dae9e825eec851c287faff5f9580b3d8))
+
+## [4.21.2] - 2026-10-12
+
+### Added
+- P51 Kouen Companion PWA (plain text chat, diff/preview cards, draft PR, no terminal emulator) ([`57d1ad7`](https://github.com/Vit129/kouen-terminal/commit/57d1ad774e3079612ba763d0a80fad634eddb85f))
+- Replace mockup preview with real browser mirror ([`edab839`](https://github.com/Vit129/kouen-terminal/commit/edab839ac6c14c50f065429cff90a86c36fc9d47))
+- Setup tailscale serve HTTPS pairing and clean up assets and fonts ([`0973515`](https://github.com/Vit129/kouen-terminal/commit/0973515cf7aeddb415e9d01cec3258bc63e5f7c6))
+- P51 Kouen Companion PWA (waiting for claude review and testing) ([`9411fe9`](https://github.com/Vit129/kouen-terminal/commit/9411fe93e172302676e8991ef9a0f30ed66dfe3d))
+- Add kouen rc command to launch companion in Chrome (waiting for claude review and testing) ([`c080b89`](https://github.com/Vit129/kouen-terminal/commit/c080b894cc12fbcf44e73d6f20fa4536d9e4a222))
+- Auto-open kouen rc when launching claude, agy, or codex (waiting for claude review and testing) ([`4aa3a54`](https://github.com/Vit129/kouen-terminal/commit/4aa3a54a17673bc85f17ce9b81199bda030d9825))
+- Open the Kouen Companion when copilot starts in remote mode ([`ec26c62`](https://github.com/Vit129/kouen-terminal/commit/ec26c629320821eef6fb91b13c07171e09841def))
+
+### Changed
+- Split history model, extract graphify cache, and deduplicate jsonl reader ([`105d17c`](https://github.com/Vit129/kouen-terminal/commit/105d17c98b696ba80cf8c042287d61805076b299))
+- P52 history model separation and JSONL reader deduplication (waiting for claude review and testing) ([`e0680a8`](https://github.com/Vit129/kouen-terminal/commit/e0680a8685d8efcd2c9a7eaeae2e2d52c20e1b0a))
+
+### Documentation
+- Update agent-memory location to central agent-memory-private ([`6377c48`](https://github.com/Vit129/kouen-terminal/commit/6377c48f77e70026a35844e51fde910de496199e))
+
+### Fixed
+- Align client ack key handling with draftPRCreated and fileAttached responses ([`5242111`](https://github.com/Vit129/kouen-terminal/commit/5242111f6037bb6380524927ffc850cbf8b32e78))
+- Prevent XSS in PR cards and enforce session-scoped cwd ([`83a6052`](https://github.com/Vit129/kouen-terminal/commit/83a6052867fd42e4108457dbc07ede333dde08cd))
+- Prevent subprocess deadlocks and enforce timeouts on gh and git ([`efd9efa`](https://github.com/Vit129/kouen-terminal/commit/efd9efa495494c3b13eb9ecd86e40716e034a99a))
+- Send attached file path to agent and submit with carriage return ([`2eaade0`](https://github.com/Vit129/kouen-terminal/commit/2eaade092424cec19c7f2234886eabe78cf16c8b))
+- Make draft PR creation one-tap without confirmation sheet ([`755a59c`](https://github.com/Vit129/kouen-terminal/commit/755a59c525d51193d2dfb1390a7f7a442e02ef45))
+- Isolate release bump staging and guard dirty main in full-cycle (waiting for claude review and testing) ([`3066705`](https://github.com/Vit129/kouen-terminal/commit/3066705a80a70eb842364cd9dd26ab6a4c6480d9))
+- Parse space-separated microsecond timestamps for Antigravity ([`3e021e2`](https://github.com/Vit129/kouen-terminal/commit/3e021e2135c772f8169c8c10916c4d3fbd1eace2))
+- Stop kouen rc from enabling the mobile bridge and hardcoding port 7777 ([`bef4cd0`](https://github.com/Vit129/kouen-terminal/commit/bef4cd057a96798f736f1b034db7a07f21ee9a8c))
+- Review fixes for the P56 companion and history follow-ups ([`2c350f8`](https://github.com/Vit129/kouen-terminal/commit/2c350f887fe164e4c8557ab57afa1effef58d6e0))
+- Find tailscale on Apple Silicon, block symlink cwd escape, drop guessed preview port ([`f6c2390`](https://github.com/Vit129/kouen-terminal/commit/f6c2390eb74846da9e435d9dc8f70a97eb04141d))
+- Guard os.Logger so the Linux headless build compiles again ([`b676fe7`](https://github.com/Vit129/kouen-terminal/commit/b676fe7a0e10bbb9dd15b2cdb0062677df59c55e))
+- Write kouen rc errors via FileHandle so Linux strict concurrency compiles ([`8992805`](https://github.com/Vit129/kouen-terminal/commit/89928058f50b26d7b6256596129a290c9fd7eb5d))
+
+## [4.21.1] - 2026-10-09
+
+### Added
+- Full session coverage and surface tagging across Antigravity, Codex and Copilot (P55) ([`f51b761`](https://github.com/Vit129/kouen-terminal/commit/f51b7611d23175610fba37dadc2b71869335dc83))
+- Cross-repo task grouping, selected row detail expansion, and search highlighting (P52 Phase 2) ([`7f55a8f`](https://github.com/Vit129/kouen-terminal/commit/7f55a8f2605dd9c8ce8c07526a98470c8a4ea9ca))
+- Advanced search (position indicators, topic segments, semantic fallback, graphify enrichment) ([#85](https://github.com/Vit129/kouen-terminal/pull/85)) ([`cb63342`](https://github.com/Vit129/kouen-terminal/commit/cb63342b5e0999ceec82b7e8d12e970cb36369c6))
+
+### Fixed
+- Keep sessions visible after schema bumps and cross-repo grouping (P52-P55 review) ([`725072c`](https://github.com/Vit129/kouen-terminal/commit/725072c8f48e064d7e5452925a1d06b8eb69638d))
+
+## [4.21.0] - 2026-10-09
+
+### Added
+- Add multi-select AI filter chips to history tab ([`8a6df27`](https://github.com/Vit129/kouen-terminal/commit/8a6df274df09a8b8d220d3131457e01f4d012fef))
+- Project folder auto-sync, fold fleet into projects & auto-open chrome on rc (P54) ([`12a2f22`](https://github.com/Vit129/kouen-terminal/commit/12a2f22404ba9cd3e4e20e234005855ebf09cc29))
+
+### Changed
+- Optimize startup cold scan, keystroke search latency, and file matching ([`9956539`](https://github.com/Vit129/kouen-terminal/commit/9956539551c8a7afb856fd66a40a6af7f0331dac))
+- Eliminate tab-open lag and search keystroke render bottlenecks ([`f10cea1`](https://github.com/Vit129/kouen-terminal/commit/f10cea19e483a036d6fef44f6390d1c5183fb7a0))
+- Stop git and IPC work from stalling the daemon (P53 Tier 1/3/4) ([`a88bb30`](https://github.com/Vit129/kouen-terminal/commit/a88bb303d7ca27c783209d3ca81f479bf4b76320))
+- Cut per-chunk and per-keystroke work in the terminal (P53 Tier 2-4) ([`da1d10e`](https://github.com/Vit129/kouen-terminal/commit/da1d10e3a08451732a86e4ca106fbd3a93898808))
+- Move git and daemon round-trips off the main thread (P53 Tier 1/2/5) ([`0a946af`](https://github.com/Vit129/kouen-terminal/commit/0a946af3394fa089c66e78eb4565598298b41d51))
+
+### Fixed
+- Resolve code review defects in history scanner, search ranking, and session cache ([`b860203`](https://github.com/Vit129/kouen-terminal/commit/b8602038ed052c33b746b307f0c864bac1a66042))
+- Only prune sessions whose transcript is gone from disk ([`e1e6100`](https://github.com/Vit129/kouen-terminal/commit/e1e6100be3c918cba6dd4284ea0e06386f839a63))
+- Regenerate notes so they match the v4.20.16 CHANGELOG block ([`03fe632`](https://github.com/Vit129/kouen-terminal/commit/03fe6323bef9ee9b48000aaec5470384ba20f831))
+- Guard SQLite3 import and test with canImport(SQLite3) for Linux headless CI ([`4839c9e`](https://github.com/Vit129/kouen-terminal/commit/4839c9e1811f907c1da427c71696a8ff57c35ea0))
+- Use Sendable box for notification check on Linux & increase timeout in GitStatusProvider test ([`03a2019`](https://github.com/Vit129/kouen-terminal/commit/03a2019ea037cd85bfc9f615670457e6fa1ab289))
+- Stop new panes landing in .kouen-worktrees after a worktree is removed ([`ffaf464`](https://github.com/Vit129/kouen-terminal/commit/ffaf464d8967fb5f96696485e258b3ac0dfe8bbd))
+- Stop the git status timeout from crashing the app ([`b4af996`](https://github.com/Vit129/kouen-terminal/commit/b4af99697a81ef3e150fef75aeb64acaed2199d0))
+- Refresh installed wrapper scripts on launch ([`98273d5`](https://github.com/Vit129/kouen-terminal/commit/98273d5fdb96388e742e2cb9dc46304ad0617539))
+- Don't touch UNUserNotificationCenter from an unbundled binary ([`fb8c050`](https://github.com/Vit129/kouen-terminal/commit/fb8c05058b851e43f338a765dbfbf6ceaab7bb21))
+- Build the What's New block from real commits, not a placeholder ([`23cb4fd`](https://github.com/Vit129/kouen-terminal/commit/23cb4fde03d27afac5104a8fba233b4c18ebbe35))
+
 ## [4.20.16] - 2026-10-08
 
 ### Added
