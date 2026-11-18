@@ -8,6 +8,11 @@ final class ContentAreaViewController: NSViewController, TerminalTabBarDelegate 
     private let tabBar = TerminalTabBarView()
     private let terminalHost = NSView()
     private let tabBarDivider = KouenDesign.divider()
+    private var historyPanel: SessionHistoryPanelController!
+    var isHistoryPanelVisible: Bool { historyPanel?.isVisible ?? false }
+    var onHistoryPanelVisibilityChanged: ((Bool) -> Void)? {
+        didSet { historyPanel?.onVisibilityChanged = onHistoryPanelVisibilityChanged }
+    }
 
     private nonisolated(unsafe) var copySelectionMonitor: Any?
     private var pasteboardCountAtMouseDown: Int = NSPasteboard.general.changeCount
@@ -46,6 +51,7 @@ final class ContentAreaViewController: NSViewController, TerminalTabBarDelegate 
 
     func applyChrome() {
         KouenDesign.makeClear(view)
+        historyPanel?.applyChrome()
         refreshTerminalHostFill()
         filePreview.refreshEditorPanelFill()
         tabBar.applyChrome()
@@ -82,6 +88,9 @@ final class ContentAreaViewController: NSViewController, TerminalTabBarDelegate 
         view.addSubview(terminalHost)
         view.addSubview(tabBar)
         view.addSubview(tabBarDivider)
+        historyPanel = SessionHistoryPanelController()
+        historyPanel.onVisibilityChanged = onHistoryPanelVisibilityChanged
+        historyPanel.install(in: view, below: tabBarDivider.bottomAnchor)
 
         NSLayoutConstraint.activate([
             tabBar.topAnchor.constraint(equalTo: view.topAnchor),
@@ -93,7 +102,7 @@ final class ContentAreaViewController: NSViewController, TerminalTabBarDelegate 
             tabBarDivider.trailingAnchor.constraint(equalTo: view.trailingAnchor),
 
             terminalHost.topAnchor.constraint(equalTo: tabBarDivider.bottomAnchor),
-            terminalHost.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            terminalHost.trailingAnchor.constraint(equalTo: historyPanel.view.leadingAnchor),
             terminalHost.bottomAnchor.constraint(equalTo: view.bottomAnchor),
         ])
         updateTrafficLightClearance()
@@ -117,6 +126,18 @@ final class ContentAreaViewController: NSViewController, TerminalTabBarDelegate 
         filePreview.restoreEditorState()
     }
 
+    func installHistoryPanel(_ hostingView: NSView) {
+        historyPanel.install(hostingView: hostingView)
+    }
+
+    func toggleHistoryPanel() {
+        historyPanel.toggle()
+    }
+
+    func setHistoryPanelVisible(_ visible: Bool, notify: Bool = true) {
+        historyPanel.setVisible(visible, notify: notify)
+    }
+
     private func installCopySelectionToast() {
         copySelectionMonitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .leftMouseUp]) { [weak self] event in
             guard let self else { return event }
@@ -134,6 +155,7 @@ final class ContentAreaViewController: NSViewController, TerminalTabBarDelegate 
         }
     }
 
+
     private func eventIsInsideTerminalArea(_ event: NSEvent) -> Bool {
         guard let window = event.window, window === view.window else { return false }
         let pointInHost = terminalHost.convert(event.locationInWindow, from: nil)
@@ -142,6 +164,7 @@ final class ContentAreaViewController: NSViewController, TerminalTabBarDelegate 
 
     override func viewDidLayout() {
         super.viewDidLayout()
+        historyPanel?.constrainToAvailableWidth()
         guard paneLifecycle.paneContainer == nil || paneLifecycle.pendingReload != nil else { return }
         guard terminalHost.bounds.width > 1, terminalHost.bounds.height > 1 else { return }
         let force = paneLifecycle.pendingReload ?? true

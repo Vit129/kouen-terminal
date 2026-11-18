@@ -30,6 +30,7 @@ final class MainSplitViewController: NSViewController {
     private let headerGroup = NSView()
     private let appTitleLabel = NSTextField(labelWithString: Bundle.main.bundleIdentifier == "com.vit129.kouen.preview" ? "Kouen Preview" : "Kouen")
     private let sidebarToggle = SoftIconButton(frame: NSRect(x: 0, y: 0, width: 24, height: 24))
+    private let historyToggle = SoftIconButton(frame: NSRect(x: 0, y: 0, width: 24, height: 24))
     private let previousSessionButton = SoftIconButton(frame: NSRect(x: 0, y: 0, width: 24, height: 24))
     private let nextSessionButton = SoftIconButton(frame: NSRect(x: 0, y: 0, width: 24, height: 24))
     private var headerGroupLeadingConstraint: NSLayoutConstraint?
@@ -109,6 +110,10 @@ final class MainSplitViewController: NSViewController {
         }
         addChild(sidebar)
         addChild(content)
+        content.installHistoryPanel(sidebar.makeSessionHistoryPanelView())
+        content.onHistoryPanelVisibilityChanged = { [weak self] _ in
+            self?.updateHistoryPanelToggleIcon()
+        }
 
         split.translatesAutoresizingMaskIntoConstraints = false
         // Layer-back the split so the terminal's CAMetalLayer islands are contained within
@@ -593,11 +598,11 @@ final class MainSplitViewController: NSViewController {
     }
 
     private var collapsedTabBarInset: CGFloat {
-        // title label (measured: "Kouen Preview" is wider than "Kouen") + 6pt gap + 26pt sidebarToggle.
+        // title label + sidebar/history toggles + 6pt gaps.
         // +56 = previousSessionButton + nextSessionButton (26pt each + 2pt gap, ×2) — without
         // this, the collapsed-sidebar tab bar's leading inset stays too narrow and slides on top
         // of nextSessionButton, covering it and stealing its clicks.
-        effectiveHeaderLeading + ceil(appTitleLabel.intrinsicContentSize.width) + 6 + 26 + 56 + 12
+        effectiveHeaderLeading + ceil(appTitleLabel.intrinsicContentSize.width) + 6 + 26 + 28 + 56 + 12
     }
 
     /// Inset the tab bar by however much of the top-left header group the sidebar doesn't cover:
@@ -622,6 +627,7 @@ final class MainSplitViewController: NSViewController {
         sidebar.updateTrafficLightClearance()
         content.updateTrafficLightClearance()
         updateSidebarToggleIcon()
+        updateHistoryPanelToggleIcon()
     }
 
     /// Pops up the notifications dropdown. Works regardless of sidebar visibility.
@@ -647,6 +653,11 @@ final class MainSplitViewController: NSViewController {
         sidebarToggle.action = #selector(toggleSidebarButtonClicked)
         sidebarToggle.translatesAutoresizingMaskIntoConstraints = false
 
+        historyToggle.target = self
+        historyToggle.action = #selector(toggleHistoryPanelButtonClicked)
+        historyToggle.translatesAutoresizingMaskIntoConstraints = false
+        historyToggle.identifier = NSUserInterfaceItemIdentifier("btn_toggleSessionHistory")
+
         // Target is MenuTarget.shared, not self — same selector the "Previous/Next Session" menu
         // items (and ⌘⇧[ / ⌘⇧]) already use, so the < > buttons are the exact same list-order
         // cycle through open sessions, not a second implementation to keep in sync.
@@ -664,6 +675,7 @@ final class MainSplitViewController: NSViewController {
 
         headerGroup.addSubview(appTitleLabel)
         headerGroup.addSubview(sidebarToggle)
+        headerGroup.addSubview(historyToggle)
         headerGroup.addSubview(previousSessionButton)
         headerGroup.addSubview(nextSessionButton)
 
@@ -685,7 +697,12 @@ final class MainSplitViewController: NSViewController {
             sidebarToggle.widthAnchor.constraint(equalToConstant: 26),
             sidebarToggle.heightAnchor.constraint(equalToConstant: 26),
 
-            previousSessionButton.leadingAnchor.constraint(equalTo: sidebarToggle.trailingAnchor, constant: 2),
+            historyToggle.leadingAnchor.constraint(equalTo: sidebarToggle.trailingAnchor, constant: 2),
+            historyToggle.centerYAnchor.constraint(equalTo: headerGroup.centerYAnchor),
+            historyToggle.widthAnchor.constraint(equalToConstant: 26),
+            historyToggle.heightAnchor.constraint(equalToConstant: 26),
+
+            previousSessionButton.leadingAnchor.constraint(equalTo: historyToggle.trailingAnchor, constant: 2),
             previousSessionButton.centerYAnchor.constraint(equalTo: headerGroup.centerYAnchor),
             previousSessionButton.widthAnchor.constraint(equalToConstant: 26),
             previousSessionButton.heightAnchor.constraint(equalToConstant: 26),
@@ -705,6 +722,17 @@ final class MainSplitViewController: NSViewController {
         sidebarToggle.setSymbol(right ? "sidebar.right" : "sidebar.left", accessibilityDescription: visible ? "Hide sidebar" : "Show sidebar", pointSize: 12, weight: .medium)
         sidebarToggle.toolTip = visible ? "Hide sidebar (⌘\\)" : "Show sidebar (⌘\\)"
         updateSidebarToggleMenu()
+    }
+
+    private func updateHistoryPanelToggleIcon() {
+        let visible = content?.isHistoryPanelVisible ?? false
+        historyToggle.setSymbol(
+            "clock.arrow.circlepath",
+            accessibilityDescription: visible ? "Hide Session History" : "Show Session History",
+            pointSize: 12,
+            weight: .medium
+        )
+        historyToggle.toolTip = visible ? "Hide Session History" : "Show Session History"
     }
 
     private func updateSidebarToggleMenu() {
@@ -727,6 +755,10 @@ final class MainSplitViewController: NSViewController {
 
     @objc private func toggleSidebarButtonClicked() {
         toggleSidebar()
+    }
+
+    @objc private func toggleHistoryPanelButtonClicked() {
+        content.toggleHistoryPanel()
     }
 
     func toggleSidebar() {
