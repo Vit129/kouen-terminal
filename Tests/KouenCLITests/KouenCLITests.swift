@@ -86,10 +86,11 @@ final class KouenCLITests: XCTestCase {
     /// each `case` (the first label, excluding pure aliases like `--version`/`setw`). Whenever a
     /// `case` is added to or removed from the dispatch in `KouenCLI.swift`, update this set; the
     /// bidirectional drift guard below then fails until the catalog matches.
+    /// Includes public command groups routed by normalizeWorkspaceArguments before the switch.
     static let dispatchVerbs: Set<String> = [
         "color-check", "theme-preview", "view", "lsp", "remote", "daemon", "version",
         "list-workspaces", "list-surfaces", "list-sessions", "list-agents", "doctor",
-        "completions", "list-windows", "list-panes", "has-session", "list-commands",
+        "completions", "project", "workspace", "list-windows", "list-panes", "has-session", "list-commands",
         "get-snapshot", "board", "new-workspace", "new-session", "new-tab", "new-split",
         "select-workspace", "select-tab", "select-session", "close-tab", "close-session",
         "promote-session", "demote-session", "send", "notify", "install", "ping",

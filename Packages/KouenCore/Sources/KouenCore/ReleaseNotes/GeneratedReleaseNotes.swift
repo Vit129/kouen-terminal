@@ -6,11 +6,12 @@
 extension ReleaseNotes {
     public static let current = ReleaseNotes(
         version: "4.23.2",
-        changelogDigest: "3ccc874ea0f37797",
+        changelogDigest: "328c322e9aa9e258",
         sections: [
             Section(title: "Added", items: [
                 "Simplify project workspace navigation (9964ff2)",
-                "Streamline workspace and history navigation (cf0ff64)",
+                "Streamline workspace and history navigation (2f767e5)",
+                "Streamline project and history navigation (release v4.23.2) (9b8d21e)",
             ]),
         ]
     )
