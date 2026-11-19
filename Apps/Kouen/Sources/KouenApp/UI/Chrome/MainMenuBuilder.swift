@@ -187,8 +187,11 @@ enum MainMenuBuilder {
         view.submenu?.addItem(promptItem)
         let injectorItem = menuItem("Quick Context Injector", action: #selector(MenuTarget.contextInjector), binding: BannerShortcutRegistry.contextInjector)
         view.submenu?.addItem(injectorItem)
-        let diffReviewerItem = menuItem("Turn Diff Reviewer", action: #selector(MenuTarget.turnDiffReviewer), binding: BannerShortcutRegistry.turnDiffReviewer)
+        let diffReviewerItem = menuItem("Review Changes", action: #selector(MenuTarget.toggleReviewChanges), binding: BannerShortcutRegistry.reviewChanges)
         view.submenu?.addItem(diffReviewerItem)
+        let checkpointItem = NSMenuItem(title: "Review Last Checkpoint", action: #selector(MenuTarget.reviewLastCheckpoint), keyEquivalent: "")
+        checkpointItem.target = MenuTarget.shared
+        view.submenu?.addItem(checkpointItem)
         let queueItem = NSMenuItem(title: "Add Clipboard to Queue", action: #selector(MenuTarget.addToQueue), keyEquivalent: "\r")
         queueItem.keyEquivalentModifierMask = [.command, .shift]
         queueItem.target = MenuTarget.shared
@@ -203,6 +206,10 @@ enum MainMenuBuilder {
         view.submenu?.addItem(findItem)
         let sidebarItem = menuItem("Toggle Sidebar", action: #selector(MenuTarget.toggleSidebar), binding: BannerShortcutRegistry.toggleSidebar)
         view.submenu?.addItem(sidebarItem)
+        view.submenu?.addItem(menuItem(
+            "Show Session History", action: #selector(MenuTarget.showSessionHistory),
+            binding: BannerShortcutRegistry.showSessionHistory
+        ))
         let hintItem = menuItem("Hint Mode (Open Link by Key)", action: #selector(MenuTarget.hintMode), binding: BannerShortcutRegistry.hintMode)
         view.submenu?.addItem(hintItem)
         let composerItem = menuItem("Composer", action: #selector(MenuTarget.openComposer), binding: BannerShortcutRegistry.composer)
@@ -755,8 +762,18 @@ final class MenuTarget: NSObject, NSMenuItemValidation, NSMenuDelegate {
         ContextInjectorController.shared.present()
     }
 
-    @objc func turnDiffReviewer() {
+    @objc func reviewLastCheckpoint() {
         TurnDiffReviewerController.shared.present()
+    }
+
+    @objc func toggleReviewChanges() {
+        let windows = [NSApp.keyWindow, NSApp.mainWindow].compactMap { $0 } + NSApp.windows
+        for window in windows {
+            if let split = window.contentViewController as? MainSplitViewController {
+                split.contentVC.toggleReviewChanges()
+                return
+            }
+        }
     }
 
     @objc func searchCommandHistory() {
@@ -795,6 +812,13 @@ final class MenuTarget: NSObject, NSMenuItemValidation, NSMenuDelegate {
                 return
             }
         }
+    }
+
+    @objc func showSessionHistory() {
+        let activeWindow = NSApp.keyWindow ?? NSApp.mainWindow
+        let split = activeWindow?.contentViewController as? MainSplitViewController
+            ?? NSApp.windows.compactMap { $0.contentViewController as? MainSplitViewController }.first
+        split?.showSessionHistory()
     }
 
     @objc func toggleSidebarPosition() {

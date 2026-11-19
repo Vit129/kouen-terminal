@@ -9,6 +9,7 @@ public final class SurfaceRegistry: @unchecked Sendable {
     private var editor = SessionEditor()
     private let store = SessionStore()
     private let lock = NSLock()
+    private var reviewFeedbackAttempts = ReviewFeedbackAttempts()
     private let workspaceOpenLock = NSLock()
     private let bufferStore = PasteBufferStore()
     private let taskStore = TaskStore()
@@ -483,6 +484,9 @@ public final class SurfaceRegistry: @unchecked Sendable {
     public func handleOffLock(_ request: IPCRequest, completion: @escaping @Sendable (IPCResponse) -> Void) -> Bool {
         let queue = DispatchQueue.global(qos: .userInitiated)
         switch request {
+        case let .sendReviewFeedback(feedback):
+            queue.async { completion(self.sendReviewFeedback(feedback)) }
+            return true
         case let .closeSession(sessionID):
             acquireRegistryLock()
             let (response, cleanup) = closeSessionLocked(sessionID)
@@ -583,6 +587,7 @@ public final class SurfaceRegistry: @unchecked Sendable {
     }
 
     public func handle(_ request: IPCRequest) -> IPCResponse {
+        if case let .sendReviewFeedback(feedback) = request { return sendReviewFeedback(feedback) }
         acquireRegistryLock()
         defer { lock.unlock() }
         switch request {
@@ -892,6 +897,14 @@ public final class SurfaceRegistry: @unchecked Sendable {
             session.write(text)
             if clearWaitingStatusLocked(surfaceKey: surfaceID) { commit(immediate: false) }
             return .ok
+        case let .inspectReviewFeedbackTarget(surfaceID, agentPID):
+            guard let (pty, agent, idle) = reviewFeedbackAgentLocked(surfaceID),
+                  agent.pid == agentPID, idle, let target = pty.reviewTarget(for: agent) else {
+                return .reviewFeedbackDelivery(.targetChanged)
+            }
+            return .reviewFeedbackTarget(target)
+        case .sendReviewFeedback:
+            return .reviewFeedbackDelivery(.invalidPayload) // dispatched before taking the lock
         case let .sendData(surfaceID, data, origin):
             if let rejection = checkWriteOriginLocked(surfaceID: surfaceID, origin: origin) { return rejection }
             guard let session = sessions[surfaceID] else {
@@ -1719,6 +1732,58 @@ public final class SurfaceRegistry: @unchecked Sendable {
         monitorLock.unlock()
     }
 
+    private func reviewFeedbackAgentLocked(_ surfaceID: String) -> (RealPty, AgentSnapshot, Bool)? {
+        guard let pty = sessions[surfaceID], let match = editor.tab(forSurfaceKey: surfaceID),
+              let tab = editor.snapshot.workspaces.first(where: { $0.id == match.workspaceID })?
+                .sessions.flatMap(\.tabs).first(where: { $0.id == match.tabID }),
+              let agent = tab.paneAgents?[surfaceID] else { return nil }
+        return (pty, agent, agent.activity == .idle && tab.status != .waiting)
+    }
+
+    private func sendReviewFeedback(_ request: ReviewFeedbackRequest) -> IPCResponse {
+        let target = request.target
+        acquireRegistryLock()
+        if reviewFeedbackAttempts.contains(request.attemptID) {
+            lock.unlock()
+            return .reviewFeedbackDelivery(.pasted)
+        }
+        let initial = reviewFeedbackAgentLocked(target.surfaceID)
+        lock.unlock()
+
+        guard let data = ReviewFeedbackText.paste(request.text) else { return .reviewFeedbackDelivery(.invalidPayload) }
+        guard let (pty, agent, idle) = initial, pty.reviewTarget(for: agent) == target else {
+            return .reviewFeedbackDelivery(.targetChanged)
+        }
+        guard idle else { return .reviewFeedbackDelivery(.notIdle) }
+        guard let directory = pty.reviewAgentDirectory(agent.pid) else {
+            return .reviewFeedbackDelivery(.worktreeChanged)
+        }
+        let binding = ReviewWorktree.binding(at: directory)
+        let pasteSequence = pty.reviewPasteSequence()
+
+        acquireRegistryLock()
+        defer { lock.unlock() }
+        if reviewFeedbackAttempts.contains(request.attemptID) { return .reviewFeedbackDelivery(.pasted) }
+        guard !reviewFeedbackAttempts.isFull else { return .reviewFeedbackDelivery(.attemptLimit) }
+        guard let (live, liveAgent, liveIdle) = reviewFeedbackAgentLocked(target.surfaceID),
+              live === pty, live.reviewAgentDirectory(liveAgent.pid) == directory else {
+            return .reviewFeedbackDelivery(.targetChanged)
+        }
+        if let rejection = ReviewFeedbackAttempts.rejection(expected: request, actualTarget: live.reviewTarget(for: liveAgent),
+                                                            actualWorktree: binding, idle: liveIdle) {
+            return .reviewFeedbackDelivery(rejection)
+        }
+        guard let pasteSequence, live.reviewOutputSequence == pasteSequence else {
+            return .reviewFeedbackDelivery(.pasteModeUnavailable)
+        }
+        guard checkWriteOriginLocked(surfaceID: target.surfaceID, origin: .human) == nil else {
+            return .reviewFeedbackDelivery(.writeDenied)
+        }
+        live.enqueueWrite(data, reviewTarget: target, agentDirectory: directory, outputSequence: pasteSequence)
+        reviewFeedbackAttempts.acknowledge(request.attemptID)
+        return .reviewFeedbackDelivery(.pasted)
+    }
+
     /// Record a human write's timestamp, or reject an automation write that lands within
     /// `humanWriteLockWindow` of the surface's last one. Returns the rejection response to
     /// short-circuit `handle(_:)` with, or nil to proceed with the write. Caller holds `lock`.
@@ -2073,16 +2138,31 @@ public final class SurfaceRegistry: @unchecked Sendable {
         process.executableURL = URL(fileURLWithPath: "/bin/sh")
         process.arguments = ["-c", command]
         let pipe = captureToBuffer ? Pipe() : nil
-        if let pipe { process.standardOutput = pipe }
-        process.terminationHandler = { [weak self] _ in
-            guard captureToBuffer, let pipe, let self else { return }
-            let data = pipe.fileHandleForReading.readDataToEndOfFile()
-            if !data.isEmpty {
-                _ = self.handle(.setBuffer(name: nil, data: data))
-            }
+        let terminated = DispatchSemaphore(value: 0)
+        if let pipe {
+            process.standardOutput = pipe
+            process.terminationHandler = { _ in terminated.signal() }
         }
-        do { try process.run() } catch {
+        do {
+            try process.run()
+        } catch {
+            process.terminationHandler = nil
+            try? pipe?.fileHandleForReading.close()
+            try? pipe?.fileHandleForWriting.close()
             fputs("KouenDaemon: run-shell hook failed: \(error)\n", kouenStderr)
+            return
+        }
+
+        // Foundation reaps the fire-and-forget child even when there is no capture.
+        guard let pipe else { return }
+        try? pipe.fileHandleForWriting.close()
+        DispatchQueue.global().async { [weak self] in
+            var data = Data()
+            DaemonPipeReader.drain(pipe.fileHandleForReading, from: process) { data.append($0) }
+            terminated.wait()
+            if !data.isEmpty {
+                _ = self?.handle(.setBuffer(name: nil, data: data))
+            }
         }
     }
 
@@ -2471,8 +2551,11 @@ public final class SurfaceRegistry: @unchecked Sendable {
         // subscriber + map entry leak until the surface closes. Scoped by object identity + token
         // so it never wipes a replacement pipe or every subscriber. Runs off-lock on a background
         // queue, so it takes the registry lock itself.
-        process.terminationHandler = { [weak self] _ in
-            guard let self else { return }
+        process.terminationHandler = { [weak self, weak pipe, stdin = pipe.stdin] _ in
+            guard let self else {
+                try? stdin.close()
+                return
+            }
             self.lock.lock()
             if let existing = self.pipes[surfaceID], existing === pipe {
                 if let token = existing.token { self.sessions[surfaceID]?.cancelSubscription(token: token) }
@@ -2482,18 +2565,20 @@ public final class SurfaceRegistry: @unchecked Sendable {
             self.lock.unlock()
         }
         if (try? process.run()) == nil {
+            process.terminationHandler = nil
             // Never log the command itself — a pipe target can carry tokens/paths the user
             // would not want in daemon stderr. The surface id is enough to diagnose.
             fputs("KouenDaemon: pipe-pane failed to launch for surface \(surfaceID)\n", kouenStderr)
             stopPipe(surfaceID: surfaceID)
         }
+        try? stdinPipe.fileHandleForReading.close()
     }
 
     private func stopPipe(surfaceID: String) {
         guard let pipe = pipes.removeValue(forKey: surfaceID) else { return }
         if let token = pipe.token { sessions[surfaceID]?.cancelSubscription(token: token) }
         try? pipe.stdin.close()
-        if pipe.process.isRunning { pipe.process.terminate() }
+        ProcessRunner.terminateWithEscalation(pipe.process)
     }
 
     /// Whether OSC/program title auto-rename is enabled for the tab owning

@@ -6,6 +6,7 @@ import KouenCore
 private final class FileEditorTabBarModel {
     var tabs: [FileTabManager.FileTab] = []
     var activeID: FileTabID?
+    var reviewID: FileTabID?
     /// The tab currently showing unsaved edits, if any. Only the active tab's dirty state
     /// is ever knowable — the editor swaps a single shared buffer on tab switch, so a
     /// background tab's content isn't loaded and can't be diffed.
@@ -36,10 +37,11 @@ final class FileEditorTabBarView: NSView {
 
     @available(*, unavailable) required init?(coder: NSCoder) { fatalError() }
 
-    func reload(tabs: [FileTabManager.FileTab], activeID: FileTabID?, dirtyTabID: FileTabID? = nil) {
+    func reload(tabs: [FileTabManager.FileTab], activeID: FileTabID?, dirtyTabID: FileTabID? = nil, reviewID: FileTabID? = nil) {
         model.tabs = tabs
         model.activeID = activeID
         model.dirtyTabID = dirtyTabID
+        model.reviewID = reviewID
     }
 }
 
@@ -52,11 +54,18 @@ private struct FileEditorTabBarBody: View {
                 HStack(spacing: 1) {
                     ForEach(model.tabs, id: \.id) { tab in
                         FileTabPillView(
-                            tab: tab,
+                            id: tab.id,
+                            title: tab.title,
                             isActive: tab.id == model.activeID,
                             isDirty: tab.id == model.dirtyTabID,
                             onSelect: { model.onSelect?($0) },
                             onClose: { model.onClose?($0) }
+                        )
+                    }
+                    if let id = model.reviewID {
+                        FileTabPillView(
+                            id: id, title: "Review Changes", isActive: id == model.activeID, isDirty: false,
+                            onSelect: { model.onSelect?($0) }, onClose: { model.onClose?($0) }
                         )
                     }
                 }
@@ -69,7 +78,8 @@ private struct FileEditorTabBarBody: View {
 }
 
 private struct FileTabPillView: View {
-    let tab: FileTabManager.FileTab
+    let id: FileTabID
+    let title: String
     let isActive: Bool
     let isDirty: Bool
     let onSelect: (FileTabID) -> Void
@@ -79,18 +89,19 @@ private struct FileTabPillView: View {
     var body: some View {
         let c = KouenDesign.chrome
         HStack(spacing: 4) {
-            Text(isDirty ? "*\(tab.title)" : tab.title)
+            Text(isDirty ? "*\(title)" : title)
                 .font(.system(size: 12, weight: isActive ? .semibold : .medium))
                 .foregroundStyle(isActive ? Color(c.textPrimary) : Color(c.textSecondary))
                 .lineLimit(1)
                 .truncationMode(.middle)
-            Button { onClose(tab.id) } label: {
+            Button { onClose(id) } label: {
                 Image(systemName: "xmark")
                     .font(.system(size: 8, weight: .bold))
                     .foregroundStyle(Color(c.textSecondary))
                     .frame(width: 14, height: 14)
             }
             .buttonStyle(.plain)
+            .accessibilityLabel("Close \(title)")
         }
         .padding(.leading, 8)
         .padding(.trailing, 4)
@@ -111,6 +122,6 @@ private struct FileTabPillView: View {
         }
         .contentShape(Rectangle())
         .onHover { isHovered = $0 }
-        .onTapGesture { onSelect(tab.id) }
+        .onTapGesture { onSelect(id) }
     }
 }

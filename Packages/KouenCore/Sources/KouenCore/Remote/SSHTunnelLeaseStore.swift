@@ -7,13 +7,13 @@ import Glibc
 
 /// A PID alone is not ownership: persist its birth identity as well, so a later
 /// Kouen process never terminates an unrelated process that reused that PID.
-struct SSHTunnelProcessIdentity: Codable, Equatable {
+package struct SSHTunnelProcessIdentity: Codable, Equatable {
     let pid: Int32
-    let birth: String
+    package let birth: String
     let uid: UInt32
     let executable: String
 
-    static func read(_ pid: Int32) -> Self? {
+    package static func read(_ pid: Int32) -> Self? {
         guard pid > 1 else { return nil }
         #if canImport(Darwin)
         var info = proc_bsdinfo()

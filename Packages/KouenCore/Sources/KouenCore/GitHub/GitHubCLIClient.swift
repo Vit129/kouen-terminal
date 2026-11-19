@@ -3,7 +3,18 @@ import Foundation
 /// Lightweight wrapper around the `gh` CLI for PR and CI status queries.
 /// Requires `gh` to be installed and authenticated.
 public struct GitHubCLIClient: Sendable {
-    public init() {}
+    let feedbackRunner: @Sendable ([String], String) async -> ProcessResult
+
+    public init() {
+        feedbackRunner = { args, directory in
+            guard let path = Self.cachedGhPath else { return ProcessResult(exitCode: 127, stdout: "") }
+            return await ProcessRunner.runAsync(executable: path, arguments: args, in: directory, timeout: 12)
+        }
+    }
+
+    package init(feedbackRunner: @escaping @Sendable ([String], String) async -> ProcessResult) {
+        self.feedbackRunner = feedbackRunner
+    }
 
     // MARK: - Availability
 

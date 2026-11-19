@@ -1,10 +1,8 @@
 import AppKit
 import KouenCore
+import KouenGit
 
-/// Fast Turn Diff Reviewer (⌘⌥D) — P46 Phase 3's last item. A compact popup showing only what
-/// the agent changed in its most recent checkpoint (`CheckpointManager`, Phase 3's shadow-ref
-/// snapshots), with `y` to accept/dismiss or `r` to roll the working tree back to it
-/// (`kouen undo step`'s same `CheckpointManager.restore`).
+/// Shows the last agent checkpoint or the current tracked worktree changes.
 @MainActor
 final class TurnDiffReviewerController: NSObject {
     static let shared = TurnDiffReviewerController()
@@ -14,31 +12,55 @@ final class TurnDiffReviewerController: NSObject {
     private let hintLabel = NSTextField(labelWithString: "")
     private var cwd: String?
     private var session: String?
+    private var loadTask: Task<Void, Never>?
 
     private override init() { super.init() }
 
     func present() {
         let coord = SessionCoordinator.shared
-        guard let surfaceID = coord.activeSurfaceID else {
+        guard let tab = coord.snapshot.activeWorkspace?.activeTab else {
             DisplayMessage.show("turn diff: no active terminal")
             return
         }
-        let tabCwd = coord.snapshot.activeWorkspace?.activeTab?.cwd ?? FileManager.default.currentDirectoryPath
-        let mgr = CheckpointManager()
-        guard let last = mgr.list(cwd: tabCwd, session: surfaceID.uuidString).last else {
-            DisplayMessage.show("turn diff: no checkpoint yet for this tab")
-            return
-        }
-        cwd = tabCwd
-        session = surfaceID.uuidString
-
-        let diff = mgr.fullDiff(last, cwd: tabCwd)
-        textView.string = diff.isEmpty ? "(no textual diff — binary files only, or the change is empty)" : diff
-        hintLabel.stringValue = "Turn \(last.turn) · y accept · r revert to this checkpoint · esc close"
+        let tabCwd = tab.cwd
+        let activeLeaf = tab.rootPane.allLeaves().first { $0.id == tab.activePaneID }
+        let surfaceID = activeLeaf.map { $0.activeSurfaceID ?? $0.surfaceID }
 
         let panel = window ?? build()
         window = panel
-        guard let anchor = NSApp.mainWindow else { return }
+        guard let anchor = NSApp.mainWindow ?? NSApp.keyWindow else { return }
+        cwd = nil
+        session = nil
+        textView.string = ""
+        hintLabel.stringValue = "Loading diff… · esc close"
+        loadTask?.cancel()
+        loadTask = Task {
+            let result = await Task.detached(priority: .userInitiated) {
+                let mgr = CheckpointManager()
+                if let session = surfaceID?.uuidString,
+                   let last = mgr.list(cwd: tabCwd, session: session).last {
+                    return (
+                        diff: mgr.fullDiff(last, cwd: tabCwd),
+                        hint: "Turn \(last.turn) · y accept · r revert to this checkpoint · esc close",
+                        session: Optional(session)
+                    )
+                }
+                let git = GitRunner.shared.execute(
+                    ["diff", "--no-ext-diff", "--no-textconv", "HEAD", "--"],
+                    in: tabCwd, timeout: 5
+                )
+                return (
+                    diff: git.isSuccess ? git.stdout : git.stderr,
+                    hint: git.isSuccess ? "Working tree · esc close" : "Diff unavailable · esc close",
+                    session: nil
+                )
+            }.value
+            guard !Task.isCancelled else { return }
+            cwd = tabCwd
+            session = result.session
+            textView.string = result.diff.isEmpty ? "(no textual diff)" : result.diff
+            hintLabel.stringValue = result.hint
+        }
         let frame = anchor.frame
         let size = NSSize(width: min(760, frame.width - 80), height: min(480, frame.height - 160))
         panel.setFrame(
@@ -54,6 +76,7 @@ final class TurnDiffReviewerController: NSObject {
     }
 
     @objc func dismiss() {
+        loadTask?.cancel()
         guard let window else { return }
         KouenMotion.animate(KouenDesign.Motion.fast, timing: KouenDesign.Motion.exit) { _ in
             window.animator().alphaValue = 0
@@ -63,7 +86,10 @@ final class TurnDiffReviewerController: NSObject {
     }
 
     func revertAndDismiss() {
-        guard let cwd, let session else { dismiss(); return }
+        guard let cwd, let session else {
+            DisplayMessage.show("Revert is only available for a checkpoint")
+            return
+        }
         let reverted = CheckpointManager().restore(cwd: cwd, session: session)
         dismiss()
         DisplayMessage.show(reverted ? "Reverted to the last checkpoint." : "turn diff: nothing to revert to")

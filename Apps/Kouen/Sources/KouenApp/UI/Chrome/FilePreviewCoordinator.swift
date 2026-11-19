@@ -1,6 +1,7 @@
 import AppKit
 import KouenCore
 import KouenLSP
+import SwiftUI
 
 /// Manages the file editor split panel — tab bar, editor view, show/hide, vi commands,
 /// and persistence. Owned by ContentAreaViewController.
@@ -21,6 +22,9 @@ final class FilePreviewCoordinator {
     private var fileEditorView: FileEditorView?
     private var editorWidthConstraint: NSLayoutConstraint?
     private var editorDivider: EditorDividerView?
+    private var reviewView: NSHostingView<ReviewChangesView>?
+    private let reviewTabID = UUID()
+    private var reviewDrafts: [String: [String: ReviewDraft]] = [:]
 
     // Owned here; ContentAreaVC calls setupInitialLeadingConstraint() in viewDidLoad.
     var terminalHostLeading: NSLayoutConstraint?
@@ -46,6 +50,7 @@ final class FilePreviewCoordinator {
     // MARK: - File Tab API
 
     func openFileTab(path: String) {
+        showReviewView(false)
         fileTabManager.open(path: path)
         showFileEditorSplit()
         loadActiveFileTab()
@@ -57,6 +62,10 @@ final class FilePreviewCoordinator {
     }
 
     func closeFileTab(id: FileTabID) {
+        if id == reviewTabID {
+            closeReviewChanges()
+            return
+        }
         // Only the active tab's content is actually loaded (the editor swaps a single
         // shared buffer on tab switch — see FileEditorTabBarModel.dirtyTabID), so a
         // background tab's dirty state isn't knowable here and always closes immediately,
@@ -69,10 +78,67 @@ final class FilePreviewCoordinator {
         performCloseFileTab(id: id)
     }
 
+    func toggleReviewChanges(tabID: String, cwd: String) {
+        if let reviewView {
+            if reviewView.isHidden {
+                showReviewView(true)
+            } else {
+                closeReviewChanges()
+            }
+            return
+        }
+        if fileEditorPanel == nil { showFileEditorSplit() }
+        guard let panel = fileEditorPanel, let tabBar = fileEditorTabBar else { return }
+        let draft = reviewDraft(forTabID: tabID, cwd: cwd)
+        let host = NSHostingView(rootView: ReviewChangesView(cwd: cwd, draft: draft))
+        host.translatesAutoresizingMaskIntoConstraints = false
+        host.sizingOptions = []
+        panel.addSubview(host)
+        NSLayoutConstraint.activate([
+            host.topAnchor.constraint(equalTo: tabBar.bottomAnchor),
+            host.bottomAnchor.constraint(equalTo: panel.bottomAnchor),
+            host.leadingAnchor.constraint(equalTo: panel.leadingAnchor),
+            host.trailingAnchor.constraint(equalTo: panel.trailingAnchor),
+        ])
+        reviewView = host
+        showReviewView(true)
+        persistEditorState()
+    }
+
+    func reviewDraft(forTabID tabID: String, cwd: String) -> ReviewDraft {
+        let draft = reviewDrafts[tabID]?[cwd] ?? ReviewDraft()
+        reviewDrafts[tabID, default: [:]][cwd] = draft
+        return draft
+    }
+
+    private func showReviewView(_ visible: Bool) {
+        reviewView?.isHidden = !visible
+        fileEditorView?.isHidden = visible
+        refreshTabBarDirtyState()
+    }
+
+    private func removeReviewView() {
+        reviewView?.removeFromSuperview()
+        reviewView = nil
+        fileEditorView?.isHidden = false
+    }
+
+    private func closeReviewChanges() {
+        removeReviewView()
+        if fileTabManager.hasOpenTabs {
+            refreshTabBarDirtyState()
+            fileEditorView?.focusActiveView()
+        } else {
+            hideFileEditorSplit()
+        }
+    }
+
     private func performCloseFileTab(id: FileTabID) {
         fileTabManager.close(id: id)
         if fileTabManager.hasOpenTabs {
             loadActiveFileTab()
+        } else if reviewView != nil {
+            showReviewView(true)
         } else {
             hideFileEditorSplit()
         }
@@ -106,6 +172,16 @@ final class FilePreviewCoordinator {
     }
 
     func selectFileTab(id: FileTabID) {
+        if id == reviewTabID {
+            showReviewView(true)
+            return
+        }
+        let returningToCurrentFile = reviewView?.isHidden == false && id == fileTabManager.activeFileTabID
+        showReviewView(false)
+        if returningToCurrentFile {
+            fileEditorView?.focusActiveView()
+            return
+        }
         fileTabManager.activate(id: id)
         loadActiveFileTab()
         persistEditorState()
@@ -122,6 +198,7 @@ final class FilePreviewCoordinator {
     /// previews of its own never shows another tab's file.
     func switchToTab(tabID: String?) {
         guard tabID != currentTabID else { return }
+        removeReviewView()
         currentTabID = tabID
         guard let tabID else {
             fileTabManager = FileTabManager()
@@ -147,13 +224,14 @@ final class FilePreviewCoordinator {
     func pruneFileTabManagers(keepingTabIDs liveTabIDs: Set<String>) {
         let staleKeys = fileTabManagers.keys.filter { !liveTabIDs.contains($0) }
         for key in staleKeys { fileTabManagers.removeValue(forKey: key) }
+        reviewDrafts = reviewDrafts.filter { liveTabIDs.contains($0.key) }
     }
 
     private func loadActiveFileTab() {
         guard let tab = fileTabManager.activeTab() else { return }
         fileEditorView?.load(path: tab.path)
         refreshTabBarDirtyState()
-        if let fileEditorView {
+        if let fileEditorView, !fileEditorView.isHidden {
             fileEditorView.focusActiveView()
         }
     }
@@ -163,7 +241,13 @@ final class FilePreviewCoordinator {
     /// `FileEditorView.onDirtyChange`.
     private func refreshTabBarDirtyState() {
         let dirtyID = fileEditorView?.isDirty == true ? fileTabManager.activeFileTabID : nil
-        fileEditorTabBar?.reload(tabs: fileTabManager.openTabs, activeID: fileTabManager.activeFileTabID, dirtyTabID: dirtyID)
+        let reviewIsActive = reviewView?.isHidden == false
+        fileEditorTabBar?.reload(
+            tabs: fileTabManager.openTabs,
+            activeID: reviewIsActive ? reviewTabID : fileTabManager.activeFileTabID,
+            dirtyTabID: dirtyID,
+            reviewID: reviewView == nil ? nil : reviewTabID
+        )
     }
 
     // MARK: - Split Show/Hide
@@ -245,6 +329,7 @@ final class FilePreviewCoordinator {
 
     func hideFileEditorSplit() {
         guard let panel = fileEditorPanel else { return }
+        removeReviewView()
         fileEditorView?.teardown()
         panel.removeFromSuperview()
         editorDivider?.removeFromSuperview()
@@ -276,7 +361,7 @@ final class FilePreviewCoordinator {
     // MARK: - Persistence
 
     func persistEditorState() {
-        let visible = isFileEditorVisible
+        let visible = isFileEditorVisible && fileTabManager.hasOpenTabs
         let paths = fileTabManager.openTabs.map { $0.path }
         let activePath = fileTabManager.activeTab()?.path
         UserDefaults.standard.set(visible, forKey: "kouen.fileEditorVisible")

@@ -72,7 +72,8 @@ import Foundation
 /// Bumped 2026-09-27 (cross-agent handoff): added `agentKind`/`resumeSessionID` to
 /// `.ccRunStart` so the app can resume any adapter's session headlessly. Wire-shape change of
 /// an existing case — same rule as the M10 `effort` bump above.
-public let ipcProtocolVersion: Int = 14
+/// Version 15 adds the guarded PR feedback paste and target inspection handlers.
+public let ipcProtocolVersion: Int = 15
 
 /// Who initiated a write to a surface's PTY. Lets the daemon serialize concurrent writers
 /// instead of interleaving keystrokes into one broken command (P46 Pillar 6 gap 3) — a human
@@ -178,6 +179,8 @@ public enum IPCRequest: Codable, Sendable {
     case getVerificationOutput(surfaceID: String)
     case send(surfaceID: String, text: String, origin: WriteOrigin)
     case sendData(surfaceID: String, data: Data, origin: WriteOrigin)
+    case inspectReviewFeedbackTarget(surfaceID: String, agentPID: Int32)
+    case sendReviewFeedback(ReviewFeedbackRequest)
     case getSnapshot
     case createSurface(cwd: String?, shell: String?)
     case ensureSurface(surfaceID: String, cwd: String?, shell: String?, rows: UInt16, cols: UInt16, scrollbackBytes: Int?)
@@ -513,6 +516,8 @@ public enum DirectionalAxis: String, Codable, Sendable {
 
 public enum IPCResponse: Codable, Sendable {
     case ok
+    case reviewFeedbackTarget(ReviewFeedbackTarget)
+    case reviewFeedbackDelivery(ReviewFeedbackDelivery)
     case pong
     case workspaces([WorkspaceSummary])
     case surfaces([SurfaceSummary])
