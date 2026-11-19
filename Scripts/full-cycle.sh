@@ -86,7 +86,7 @@ done
 # before Step 3 merges to main, so a dirty checkout can't leave main merged but untagged.
 if [[ "$(git rev-parse --git-dir)" == *"worktrees"* ]]; then
   main_repo="$(cd "$(dirname "$(git rev-parse --git-common-dir)")" && pwd)"
-  # Preserve pre-existing graph edits too; never discard them to synchronize main.
+  # Refuse rather than discard any uncommitted edits in main, to synchronize main.
   if [[ -n "$(git -C "$main_repo" status --porcelain)" ]]; then
     echo "❌ Cannot release: main repo at $main_repo has uncommitted changes:" >&2
     git -C "$main_repo" status -s >&2
@@ -265,7 +265,7 @@ git-cliff --tag "$TAG" --output CHANGELOG.md
 
 # Generate release notes for this tag only (since previous tag).
 # Range the previous tag against HEAD, not "$TAG": the tag is only created further
-# down (git tag -f), so "${PREV_TAG}..${TAG}" resolves to a missing ref, git-cliff
+# down (git tag), so "${PREV_TAG}..${TAG}" resolves to a missing ref, git-cliff
 # exits non-zero, and every release shipped the "Release vX.Y.Z" stub body instead
 # of its real notes.
 PREV_TAG="$(git tag --sort=-v:refname | grep -v "^${TAG}$" | head -1)"
