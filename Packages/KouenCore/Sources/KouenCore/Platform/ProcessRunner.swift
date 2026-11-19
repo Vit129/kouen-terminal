@@ -432,10 +432,14 @@ public enum ProcessRunner {
         let group = DispatchGroup()
         for (pipe, buffer) in [(outPipe, outBuf), (errPipe, errBuf)] {
             group.enter()
-            DispatchQueue.global(qos: .userInitiated).async {
+            // A dedicated thread, not the global pool: under pool starvation a queued reader never
+            // starts, and the unbounded group.wait() below would hang forever.
+            let reader = Thread {
                 _ = drainOutput(pipe.fileHandleForReading, into: buffer, shouldStop: stop.shouldStop)
                 group.leave()
             }
+            reader.qualityOfService = .userInitiated
+            reader.start()
         }
 
         var timedOut = false
