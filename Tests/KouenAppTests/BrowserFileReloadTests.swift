@@ -30,8 +30,25 @@ final class BrowserFileReloadTests: XCTestCase {
     // Guard for the other half of the report: WebKit re-reads an edited file:// page and its
     // sibling script on a plain reload, so a stale page after reload is not a cache problem.
     private final class Nav: NSObject, WKNavigationDelegate {
-        var done: (() -> Void)?
-        func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) { done?(); done = nil }
+        var done: ((Error?) -> Void)?
+
+        func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+            complete()
+        }
+
+        func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
+            complete(error)
+        }
+
+        func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
+            complete(error)
+        }
+
+        private func complete(_ error: Error? = nil) {
+            let callback = done
+            done = nil
+            callback?(error)
+        }
     }
 
     func testReloadPicksUpEditedFileAndSiblingScript() async throws {
@@ -42,18 +59,36 @@ final class BrowserFileReloadTests: XCTestCase {
         try "<body>A<script src=\"app.js\"></script></body>".write(to: page, atomically: true, encoding: .utf8)
         try "document.body.append('1')".write(to: js, atomically: true, encoding: .utf8)
 
-        let web = WKWebView(frame: .init(x: 0, y: 0, width: 300, height: 200))
-        let nav = Nav(); web.navigationDelegate = nav
-        func load(_ action: () -> Void) async {
-            await withCheckedContinuation { (c: CheckedContinuation<Void, Never>) in nav.done = { c.resume() }; action() }
+        let frame = NSRect(x: 0, y: 0, width: 300, height: 200)
+        let configuration = WKWebViewConfiguration()
+        configuration.websiteDataStore = .nonPersistent()
+        let web = WKWebView(frame: frame, configuration: configuration)
+        let window = NSWindow(contentRect: frame, styleMask: [.titled], backing: .buffered, defer: false)
+        window.contentView = web
+        defer { window.contentView = nil }
+        let nav = Nav()
+        web.navigationDelegate = nav
+        func load(_ action: () -> Void) async throws {
+            let completed = XCTestExpectation(description: "WebKit navigation completes")
+            var navigationError: Error?
+            nav.done = { error in
+                navigationError = error
+                completed.fulfill()
+            }
+            defer { nav.done = nil }
+            action()
+            guard await XCTWaiter.fulfillment(of: [completed], timeout: 5) == .completed else {
+                throw URLError(.timedOut)
+            }
+            if let navigationError { throw navigationError }
         }
-        await load { web.loadFileURL(page, allowingReadAccessTo: dir) }
+        try await load { web.loadFileURL(page, allowingReadAccessTo: dir) }
         let before = try await web.evaluateJavaScript("document.body.innerText") as? String
         XCTAssertEqual(before, "A1")
 
         try "<body>B<script src=\"app.js\"></script></body>".write(to: page, atomically: true, encoding: .utf8)
         try "document.body.append('2')".write(to: js, atomically: true, encoding: .utf8)
-        await load { web.reload() }
+        try await load { web.reload() }
         let after = try await web.evaluateJavaScript("document.body.innerText") as? String
         XCTAssertEqual(after, "B2")
     }

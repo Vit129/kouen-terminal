@@ -64,7 +64,7 @@ public final class BrowserPaneView: NSView {
     private static let maxRetries = 10  // 10 × 3s = 30s then auto-close
     private var isDisposed = false
 
-    private var loadStates: [LoadCompletionState] = []
+    private var loadStates: [ObjectIdentifier: [LoadCompletionState]] = [:]
     internal let progressLine = BrowserProgressLine()
     private var progressObservation: NSKeyValueObservation?
     private var isLoadingObservation: NSKeyValueObservation?
@@ -182,24 +182,23 @@ public final class BrowserPaneView: NSView {
         UserDefaults.standard.removeObject(forKey: "browserPane.\(paneID.uuidString).url")
 
         cancelRetry()
-        compositorKicks.values.forEach { $0.restore.cancel() }
-        compositorKicks.removeAll()
         progressObservation = nil
         isLoadingObservation = nil
         titleObservation = nil
         designModePopover?.close()
         designModePopover = nil
         isDesignModeActive = false
-        completeLoading(error: CancellationError())
+        tabs.forEach { disposeWebView($0.webView) }
+        tabs.removeAll()
+    }
 
-        for tab in tabs {
-            tab.webView.stopLoading()
-            tab.webView.navigationDelegate = nil
-            tab.webView.uiDelegate = nil
-            // Detach from the view hierarchy so the remote layer/compositor is released and
-            // the pane's content process has nothing left to keep alive while it is closed.
-            tab.webView.removeFromSuperview()
-        }
+    private func disposeWebView(_ webView: WKWebView) {
+        compositorKicks.removeValue(forKey: ObjectIdentifier(webView))?.restore.cancel()
+        completeLoading(in: webView, error: CancellationError())
+        webView.navigationDelegate = nil
+        webView.uiDelegate = nil
+        webView.stopLoading()
+        webView.removeFromSuperview()
     }
 
     override public func viewDidMoveToSuperview() {
@@ -214,10 +213,16 @@ public final class BrowserPaneView: NSView {
         // When added to a window (initial creation or container reparenting),
         // kick compositor immediately and queue a follow-up once layout settles.
         if window != nil {
-            forceRepaint()
-            DispatchQueue.main.async { [weak self] in
-                self?.forceRepaint()
-            }
+            repaintAfterAttachment()
+        }
+    }
+
+    private func repaintAfterAttachment() {
+        forceRepaint()
+        // Reattachment can leave the same size, so layout() may skip its repaint.
+        DispatchQueue.main.async { [weak self, weak webView] in
+            guard let self, self.webView === webView else { return }
+            self.forceRepaint()
         }
     }
 
@@ -237,7 +242,7 @@ public final class BrowserPaneView: NSView {
     /// the Metal-rendered terminal path — WKWebView's remote layer can go stale/black
     /// across a superview reattach or an ancestor's `isHidden` toggle without this nudge.
     public func forceRepaint() {
-        guard superview != nil, window != nil else { return }
+        guard !isDisposed, superview != nil, window != nil else { return }
         webView.setNeedsDisplay(webView.bounds)
         // Nudge the web content process by evaluating a trivial script — this is the
         // most reliable way to wake WKWebView's compositor.
@@ -632,6 +637,8 @@ public final class BrowserPaneView: NSView {
         let newWeb = tabs[index].webView
 
         if oldWeb !== newWeb {
+            cancelRetry()
+            dismissErrorBanner()
             // Swap webView in the stack
             if let stackIndex = mainStack.arrangedSubviews.firstIndex(of: oldWeb) {
                 mainStack.removeArrangedSubview(oldWeb)
@@ -645,16 +652,9 @@ public final class BrowserPaneView: NSView {
             }
             webView = newWeb
             setupProgressObservation()
-            // Reattaching a previously-detached tab's WKWebView to the stack can leave its
-            // remote compositor layer stale/black, same as the reveal-from-cache case
-            // forceRepaint() already fixes elsewhere (see PaneLifecycleManager, dbc950c3).
-            forceRepaint()
-            // The swap's layout pass has not run yet and an unchanged size will not trigger
-            // layout()'s repaint, so repeat once it settles (as viewDidMoveToWindow does).
-            DispatchQueue.main.async { [weak self] in
-                guard let self, self.webView === newWeb else { return }
-                self.forceRepaint()
-            }
+            updateReloadStopButton(isLoading: newWeb.isLoading)
+            progressLine.setProgress(newWeb.estimatedProgress, isLoading: newWeb.isLoading)
+            repaintAfterAttachment()
         }
         urlTextField.stringValue = newWeb.url?.absoluteString ?? ""
         updateViewSourceButtonVisibility(for: newWeb.url)
@@ -662,18 +662,16 @@ public final class BrowserPaneView: NSView {
     }
 
     func closeTab(at index: Int) {
-        NSLog("BROWSER_DEBUG: closeTab(at: %d), tabs.count=%d", index, tabs.count)
+        guard tabs.indices.contains(index) else { return }
         guard tabs.count > 1 else {
-            // Last tab — close the entire browser pane
-            SessionCoordinator.shared.splitPaneCoordinator.closeBrowserPane(paneID: paneID)
+            closePaneClicked()
             return
         }
         let closedWebView = tabs.remove(at: index).webView
-        let newIndex = min(activeTabIndex, tabs.count - 1)
-        // selectTab finds the insertion slot from the active web view, so it must stay
-        // in the stack until the swap; detaching it first leaves the pane with no web view.
+        let newIndex = tabs.firstIndex { $0.webView === webView } ?? min(index, tabs.count - 1)
+        // Keep the outgoing view in the stack until selectTab has used its insertion slot.
         selectTab(at: newIndex)
-        closedWebView.removeFromSuperview()
+        disposeWebView(closedWebView)
     }
 
     private func setupConstraints() {
@@ -720,13 +718,15 @@ public final class BrowserPaneView: NSView {
     private func setupProgressObservation() {
         progressObservation = webView.observe(\.estimatedProgress, options: []) { [weak self] wv, _ in
             DispatchQueue.main.async {
-                self?.progressLine.setProgress(wv.estimatedProgress, isLoading: wv.isLoading)
+                guard let self, self.isActiveWebView(wv) else { return }
+                self.progressLine.setProgress(wv.estimatedProgress, isLoading: wv.isLoading)
             }
         }
         isLoadingObservation = webView.observe(\.isLoading, options: []) { [weak self] wv, _ in
             DispatchQueue.main.async {
-                self?.updateReloadStopButton(isLoading: wv.isLoading)
-                self?.progressLine.setProgress(wv.estimatedProgress, isLoading: wv.isLoading)
+                guard let self, self.isActiveWebView(wv) else { return }
+                self.updateReloadStopButton(isLoading: wv.isLoading)
+                self.progressLine.setProgress(wv.estimatedProgress, isLoading: wv.isLoading)
             }
         }
         titleObservation = webView.observe(\.title, options: [.new]) { [weak self] wv, _ in
@@ -855,7 +855,7 @@ public final class BrowserPaneView: NSView {
     // fires only when a nested frame exists and its content is laid out — not on a blind
     // timer. P35 investigation, 2026-07-06, see agent-memory/knowledge/ui/browser-pane.md.
     private func kickCompositorRelayout(for webView: WKWebView) {
-        guard webView.allowsMagnification else { return }
+        guard !isDisposed, webView.allowsMagnification else { return }
         let key = ObjectIdentifier(webView)
         let inFlight = compositorKicks[key]
         let base = inFlight?.base ?? webView.magnification
@@ -1315,6 +1315,7 @@ public final class BrowserPaneView: NSView {
     }
 
     private func attemptRetry() {
+        guard retryTimer != nil else { return }
         retryCount += 1
         if retryCount > Self.maxRetries {
             cancelRetry()
@@ -1449,26 +1450,30 @@ public final class BrowserPaneView: NSView {
     }
 
     public func waitForLoad(timeout: TimeInterval) async throws {
-        if !webView.isLoading {
-            return
-        }
+        guard !isDisposed else { throw CancellationError() }
+        guard webView.isLoading else { return }
+        let key = ObjectIdentifier(webView)
         try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
             let state = LoadCompletionState(continuation: continuation)
-            self.loadStates.append(state)
+            loadStates[key, default: []].append(state)
 
-            Task {
+            Task { [weak self] in
                 try? await Task.sleep(nanoseconds: Self.sleepNanoseconds(forTimeout: timeout))
+                if let self, var states = self.loadStates[key] {
+                    states.removeAll { $0 === state }
+                    self.loadStates[key] = states.isEmpty ? nil : states
+                }
                 state.complete(error: NSError(domain: "BrowserPaneView", code: 1, userInfo: [NSLocalizedDescriptionKey: "Loading timed out"]))
             }
         }
     }
 
-    private func completeLoading(error: Error? = nil) {
-        let current = loadStates
-        loadStates.removeAll()
-        for state in current {
-            state.complete(error: error)
-        }
+    private func completeLoading(in webView: WKWebView, error: Error? = nil) {
+        loadStates.removeValue(forKey: ObjectIdentifier(webView))?.forEach { $0.complete(error: error) }
+    }
+
+    private func isActiveWebView(_ webView: WKWebView) -> Bool {
+        !isDisposed && self.webView === webView
     }
 
     // MARK: - Key Equivalents
@@ -1483,9 +1488,9 @@ public final class BrowserPaneView: NSView {
             closePaneClicked()
             return true
         }
-        if cmd && characters == "l" {
-            self.window?.makeFirstResponder(urlTextField)
-            return true
+        if cmd && characters.lowercased() == "l" {
+            // Let the Review Changes menu shortcut pass through WKWebView.
+            return false
         }
         if cmd && characters.lowercased() == "r" {
             // WKWebView has no ⌘R of its own and Kouen's menu doesn't claim it, so without this
@@ -1516,24 +1521,29 @@ final class SelectAllOnClickTextField: NSTextField {
 
 extension BrowserPaneView: WKNavigationDelegate {
     public func webView(_ webView: WKWebView, didCommit navigation: WKNavigation!) {
-        if let url = webView.url {
+        updateTabTitle(for: webView)
+        // Flush the initial paint while subresources are still loading.
+        webView.setNeedsDisplay(webView.bounds)
+        kickCompositorRelayout(for: webView)
+        if isActiveWebView(webView), let url = webView.url {
             urlTextField.stringValue = url.absoluteString
             updateViewSourceButtonVisibility(for: url)
         }
-        updateTabTitle(for: webView)
-        // Flush initial paint to screen immediately when HTML commits, preventing
-        // the view from staying pitch black while remaining subresources load.
-        webView.setNeedsDisplay(webView.bounds)
-        kickCompositorRelayout(for: webView)
     }
 
     public func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) {
+        guard isActiveWebView(webView) else { return }
         updateReloadStopButton(isLoading: true)
         progressLine.setProgress(max(webView.estimatedProgress, 0.1), isLoading: true)
         dismissErrorBanner()
     }
 
     public func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+        updateTabTitle(for: webView)
+        // Commit the completed main frame even when a transparent WKWebView hasn't painted yet.
+        kickCompositorRelayout(for: webView)
+        completeLoading(in: webView)
+        guard isActiveWebView(webView) else { return }
         updateReloadStopButton(isLoading: false)
         progressLine.setProgress(1.0, isLoading: false)
         cancelRetry()
@@ -1542,40 +1552,30 @@ extension BrowserPaneView: WKNavigationDelegate {
             updateViewSourceButtonVisibility(for: url)
             UserDefaults.standard.set(url.absoluteString, forKey: "browserPane.\(paneID.uuidString).url")
         }
-        updateTabTitle(for: webView)
         applyWebDarkMode()
-        // The nested-iframe scroll fix (kickCompositorRelayout) is driven by the in-frame
-        // pointer-move signal, not from here — a blind post-load timer raced the iframe's
-        // async mount and mis-fired before its scrollable content existed. The main frame
-        // has no such async-mount race by the time didFinish fires, so it's safe to kick
-        // its own compositor commit unconditionally here — fixes an intermittent fully
-        // black content area where content finishes loading (URL bar updates correctly)
-        // but WebKit never flushes the paint to screen, leaving the transparent WKWebView
-        // showing the solid terminalBackground canvas behind it. Reload always "fixed" it
-        // because a fresh navigation forces a full compositor setup; this kick gives the
-        // same forced commit without requiring a manual reload.
-        kickCompositorRelayout(for: webView)
-        completeLoading()
     }
 
     public func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
-        updateReloadStopButton(isLoading: false)
-        progressLine.setProgress(1.0, isLoading: false)
-        showErrorBanner(message: error.localizedDescription)
-        startRetryIfConnectionError(error)
-        completeLoading(error: error)
+        navigationFailed(in: webView, error: error)
     }
 
     public func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
+        navigationFailed(in: webView, error: error)
+    }
+
+    private func navigationFailed(in webView: WKWebView, error: Error) {
+        completeLoading(in: webView, error: error)
+        guard isActiveWebView(webView) else { return }
         updateReloadStopButton(isLoading: false)
         progressLine.setProgress(1.0, isLoading: false)
         showErrorBanner(message: error.localizedDescription)
         startRetryIfConnectionError(error)
-        completeLoading(error: error)
     }
 
     public func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
-        showErrorBanner(message: "Page crashed, reloading…")
+        if isActiveWebView(webView) {
+            showErrorBanner(message: "Page crashed, reloading…")
+        }
         webView.reload()
     }
 }

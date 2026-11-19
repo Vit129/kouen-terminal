@@ -144,6 +144,40 @@ final class BrowserPaneViewTests: XCTestCase {
     // a new tab) must also get allowsMagnification=true, same as the pane's first tab —
     // otherwise kickCompositorRelayout()'s guard silently no-ops for it forever, and no
     // amount of reload can fix its stuck-black first paint.
+    func test_TS_2311_FE_UT_closingEarlierTabKeepsSelectionAndDisposesClosedWebView() {
+        let first = MockWebView(frame: .zero, configuration: WKWebViewConfiguration())
+        let url = URL(string: "about:blank")!
+        let pane = BrowserPaneView(url: url, paneID: UUID(), webView: first)
+        let selected = pane.createTab(url: url, skipLoad: true)
+        pane.createTab(url: url, skipLoad: true)
+        pane.selectTab(at: 1)
+
+        pane.closeTab(at: 0)
+
+        XCTAssertTrue(pane.webView === selected)
+        XCTAssertTrue(first.stopLoadingCalled)
+        XCTAssertNil(first.navigationDelegate)
+        XCTAssertNil(first.uiDelegate)
+        XCTAssertNil(first.superview)
+    }
+
+    func test_TS_2312_FE_UT_backgroundNavigationKeepsActiveToolbar() {
+        let first = MockWebView(frame: .zero, configuration: WKWebViewConfiguration())
+        let url = URL(string: "about:blank")!
+        let pane = BrowserPaneView(url: url, paneID: UUID(), webView: first)
+        pane.createTab(url: url, skipLoad: true)
+        pane.navigate(to: url)
+        first.mockURL = URL(string: "https://example.com/background")!
+
+        pane.webView(first, didCommit: nil)
+        XCTAssertEqual(pane.urlTextField.stringValue, url.absoluteString)
+        pane.webView(first, didFinish: nil)
+        XCTAssertEqual(pane.urlTextField.stringValue, url.absoluteString)
+        pane.webView(first, didFailProvisionalNavigation: nil,
+                     withError: URLError(.cannotConnectToHost))
+        XCTAssertTrue(pane.errorBanner.isHidden)
+    }
+
     func testCreateTabSetsAllowsMagnificationForCompositorKick() {
         let testURL = URL(string: "https://example.com/test")!
         let mockWebView = MockWebView(frame: .zero, configuration: WKWebViewConfiguration())
