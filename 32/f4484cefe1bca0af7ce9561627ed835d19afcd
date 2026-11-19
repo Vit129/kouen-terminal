@@ -1,0 +1,22 @@
+Packages/KouenTerminalEngine/Sources/KouenTerminalEngine/Emulator/TerminalEmulator.swift
+  s_60104bb1539db6::t_1233664f441420 88,603-608,617,628,835-837,973
+Tests/KouenTerminalEngineTests/CommandFinishedTests.swift
+  s_60104bb1539db6::t_a6bf83e5b8a684 16-18
+  s_60104bb1539db6::t_d8e2ea58fe5748 9-15,19-20
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.3",
+  "base_commit_sha": "32f4484cefe1bca0af7ce9561627ed835d19afcd",
+  "prompts": {},
+  "sessions": {
+    "s_60104bb1539db6": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1ef4f-632f-7563-a553-8892bfbaa1a7",
+        "model": "gpt-6.2-sol"
+      },
+      "human_author": "Vit129 <vitosk129@gmail.com>"
+    }
+  }
+}
