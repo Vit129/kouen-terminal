@@ -1,0 +1,36 @@
+Tests/KouenAppTests/BrowserFileReloadTests.swift
+  s_87640e2e23794e::t_9a21efb9302180 33-51,62-83,85,91
+Apps/Kouen/Sources/KouenApp/UI/Chrome/BrowserPaneView.swift
+  s_a50990c3b05301::t_7733b04b0d03d7 1491-1493
+  s_87640e2e23794e::t_f52664ea40e598 67,191-201,216-225,245,640-641,655-657,665,667,671-672,674,721-722,727-729,858,1318,1453-1455,1458,1460,1462-1465,1471-1476,1525,1528-1531,1535,1542-1546,1559,1563-1568,1576-1578
+Tests/KouenAppTests/DaemonSyncServiceBrowserPaneMergeTests.swift
+  s_87640e2e23794e::t_8a503333b581f2 33-55
+Apps/Kouen/Sources/KouenApp/Services/DaemonSyncService.swift
+  s_87640e2e23794e::t_a080256f2e1fbe 515-531
+Tests/KouenAppTests/BrowserPaneViewTests.swift
+  s_87640e2e23794e::t_0346dc00eea9df 147-180
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.3",
+  "base_commit_sha": "7b865692203b9970c8cd908e1b1f1881a039a7f4",
+  "prompts": {},
+  "sessions": {
+    "s_87640e2e23794e": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1f2c3-e021-7ca3-abaf-6d793810a347",
+        "model": "gpt-6.2-sol"
+      },
+      "human_author": "Vit129 <vitosk129@gmail.com>"
+    },
+    "s_a50990c3b05301": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1f20b-ce8b-75d2-9895-5dae2d5762a9",
+        "model": "gpt-6.2-sol"
+      },
+      "human_author": "Vit129 <vitosk129@gmail.com>"
+    }
+  }
+}
