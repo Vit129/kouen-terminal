@@ -65,18 +65,11 @@ public actor ClaudeCodeHarness {
 
     private struct Run {
         var summary: RunSummary
-        let process: Process
+        var process: Process?
         let agentKind: AgentKind
         var stdoutBuffer = Data()
-        /// `readabilityHandler` (stdout draining) and `terminationHandler` (process exit) are
-        /// two independently-scheduled GCD callbacks with no ordering guarantee relative to
-        /// each other — a real race found live (2026-09-14, Agent Swarm Core Codex testing):
-        /// the process's very last stdout chunk (often the one that matters most — a terminal
-        /// error line) could still be mid-flight in its own `consume()` Task when
-        /// `terminationHandler`'s `finish()` Task won the race and ran first, silently locking
-        /// in a stale/earlier `resultText`. `finish()` now only actually runs once BOTH the
-        /// process has exited AND the stdout pipe has reached EOF (`stdoutDrained`) — see
-        /// `markProcessExited`/`markStdoutDrained`/`maybeFinish` below.
+        /// Finish after both independent events: child exit and consumption of the last
+        /// stdout chunk. The final line can carry the result or a terminal error.
         var exitCode: Int32?
         var stdoutDrained = false
     }
@@ -161,41 +154,48 @@ public actor ClaudeCodeHarness {
 
         let stdoutPipe = Pipe()
         process.standardOutput = stdoutPipe
-        process.standardError = Pipe() // drained, not surfaced — stream-json on stdout carries everything needed
+        process.standardError = FileHandle.nullDevice
 
         let transcriptURL = transcriptsDirectory.appendingPathComponent("\(id.uuidString).jsonl")
         FileManager.default.createFile(atPath: transcriptURL.path, contents: nil)
         let transcriptHandle = try? FileHandle(forWritingTo: transcriptURL)
-
-        runs[id] = Run(summary: summary, process: process, agentKind: agentKind)
-
-        stdoutPipe.fileHandleForReading.readabilityHandler = { [weak self] handle in
-            let chunk = handle.availableData
-            if chunk.isEmpty {
-                // EOF: the pipe is now fully drained, so every real chunk has already been
-                // handed to `consume()` above (GCD delivers a readabilityHandler's own
-                // callbacks in order). Only now is it safe to let `finish()` run.
-                handle.readabilityHandler = nil
-                Task { await self?.markStdoutDrained(id: id) }
-                return
-            }
-            transcriptHandle?.write(chunk)
-            Task { await self?.consume(chunk, forRun: id) }
-        }
+        let reader = stdoutPipe.fileHandleForReading
+        let writer = stdoutPipe.fileHandleForWriting
 
         process.terminationHandler = { [weak self] proc in
-            try? transcriptHandle?.close()
-            Task { await self?.markProcessExited(id: id, exitCode: proc.terminationStatus) }
+            let status = proc.terminationStatus
+            Task { await self?.markProcessExited(id: id, exitCode: status) }
         }
 
         do {
             try process.run()
         } catch {
+            process.terminationHandler = nil
+            try? reader.close()
+            try? writer.close()
+            try? transcriptHandle?.close()
             var failed = summary
             failed.state = .failed
             failed.resultText = "failed to launch \(adapter.binaryName): \(error.localizedDescription)"
-            runs[id] = nil
             return failed
+        }
+
+        try? writer.close()
+        runs[id] = Run(summary: summary, process: process, agentKind: agentKind)
+        let (chunks, stream) = AsyncStream<Data>.makeStream()
+        DispatchQueue.global(qos: .userInitiated).async {
+            DaemonPipeReader.drain(reader, from: process) { chunk in
+                _ = try? transcriptHandle?.write(contentsOf: chunk)
+                stream.yield(chunk)
+            }
+            try? transcriptHandle?.close()
+            stream.finish()
+        }
+        Task { [weak self] in
+            for await chunk in chunks {
+                await self?.consume(chunk, forRun: id)
+            }
+            await self?.markStdoutDrained(id: id)
         }
 
         return summary
@@ -211,7 +211,8 @@ public actor ClaudeCodeHarness {
 
     public func cancel(id: UUID) -> Bool {
         guard let run = runs[id], run.summary.state == .running else { return false }
-        run.process.terminate()
+        guard let process = run.process, process.isRunning else { return false }
+        ProcessRunner.terminateWithEscalation(process)
         runs[id]?.summary.state = .cancelled
         return true
     }
@@ -252,6 +253,7 @@ public actor ClaudeCodeHarness {
 
     private func markProcessExited(id: UUID, exitCode: Int32) {
         guard runs[id] != nil else { return }
+        runs[id]!.process = nil
         runs[id]!.exitCode = exitCode
         maybeFinish(id: id)
     }
@@ -319,24 +321,12 @@ public actor ClaudeCodeHarness {
         return await runProbe(shellPath: shellPath, command: "echo $PATH")
     }
 
-    private func runProbe(shellPath: String, command: String) async -> String? {
-        await withCheckedContinuation { continuation in
-            let process = Process()
-            process.executableURL = URL(fileURLWithPath: shellPath)
-            process.arguments = ["-l", "-c", command]
-            let pipe = Pipe()
-            process.standardOutput = pipe
-            process.standardError = Pipe()
-            do {
-                try process.run()
-                process.waitUntilExit()
-                let data = pipe.fileHandleForReading.readDataToEndOfFile()
-                let output = String(data: data, encoding: .utf8)?
-                    .trimmingCharacters(in: .whitespacesAndNewlines)
-                continuation.resume(returning: (output?.isEmpty ?? true) ? nil : output)
-            } catch {
-                continuation.resume(returning: nil)
-            }
-        }
+    func runProbe(shellPath: String, command: String) async -> String? {
+        let result = await ProcessRunner.runAsync(
+            executable: shellPath, arguments: ["-l", "-c", command], timeout: 5
+        )
+        guard !result.isTimedOut, result.exitCode != -1 else { return nil }
+        let output = result.stdout.trimmingCharacters(in: .whitespacesAndNewlines)
+        return output.isEmpty ? nil : output
     }
 }

@@ -417,7 +417,7 @@ public actor AgentHistoryScanner {
     /// prior cached record and retry on the next metadata change instead of truncating history.
     static let maxJSONLRecordBytes = 16 * 1024 * 1024
 
-    enum JSONLReadError: Error { case oversizedRecord(Int) }
+    enum JSONLReadError: Error { case oversizedRecord(Int), invalidRecord }
 
     @discardableResult
     static func forEachJSONLLine(
@@ -743,7 +743,7 @@ public actor AgentHistoryScanner {
 
     private func parseClaudeTranscript(fileURL: URL, toIndex: inout [AgentHistoryFTSIndex.SessionIndexItem]) -> AgentSessionRecord? {
         let fileURL = URL(fileURLWithPath: fileURL.path)
-        guard let lines = AgentHistoryJSONLSequence(url: fileURL) else { return nil }
+        guard let lines = AgentHistoryJSONLSequence(url: fileURL, validateJSON: true) else { return nil }
         let dataSize = lines.fileSize
 
         let sessionID = fileURL.deletingPathExtension().lastPathComponent
@@ -1248,9 +1248,9 @@ public actor AgentHistoryScanner {
             var firstPrompt: String = preview.isEmpty ? title : preview
             var turns: [AgentHistoryTurn] = []
             #if canImport(CryptoKit)
-            let fullTranscript: String = ""
+            let transcriptSpool: AgentHistoryTranscriptSpool? = nil
             #else
-            var fullTranscript: String = ""
+            var transcriptSpool: AgentHistoryTranscriptSpool?
             #endif
             var transcriptPath: String = dbPath
             var fileSize: Int = 0
@@ -1259,7 +1259,8 @@ public actor AgentHistoryScanner {
             var detectedModel: String?
 
             let sessionDir = brainDir.appendingPathComponent(conversationID)
-            if let transcriptURL = findFile(named: "transcript.jsonl", under: sessionDir) {
+            let transcriptURL = findFile(named: "transcript.jsonl", under: sessionDir)
+            if let transcriptURL {
                 transcriptPath = transcriptURL.path
                 if let rv = try? transcriptURL.resourceValues(forKeys: [.fileSizeKey]), let size = rv.fileSize {
                     fileSize = size
@@ -1280,42 +1281,63 @@ public actor AgentHistoryScanner {
                 }
             }
 
-            if let transcriptURL = findFile(named: "transcript.jsonl", under: sessionDir) {
-                // Memory-mapped and split on newline bytes: no whole-file String copy.
-                if let content = try? Data(contentsOf: transcriptURL, options: .mappedIfSafe) {
-                    let lines = content.split(separator: UInt8(ascii: "\n"))
-                    if !lines.isEmpty {
-                        messageCount = max(messageCount, lines.count)
-                        var promptFound = false
-                        #if !canImport(CryptoKit)
-                        var parts: [String] = []
-                        #endif
-                        for line in lines {
-                            // One scan is a single long async job, so autoreleased JSON objects
-                            // would otherwise pile up until the whole scan returns.
-                            let turn = autoreleasepool { () -> (String, String)? in
-                                guard let json = try? JSONSerialization.jsonObject(with: Data(line)) as? [String: Any] else { return nil }
-                                return antigravityTurn(json)
-                            }
-                            if let (role, trimmed) = turn {
-                                #if !canImport(CryptoKit)
-                                parts.append(trimmed)
-                                #endif
-                                if role == "YOU" && !promptFound {
-                                    firstPrompt = trimmed
-                                    promptFound = true
-                                }
-                                appendTurn(&turns, role: role, text: trimmed)
-                            }
-                        }
-                        let agMeta = AntigravityTranscriptLine.meta(from: lines.map { Data($0) })
-                        latestUsage = agMeta.usage
-                        detectedModel = agMeta.model
-                        #if !canImport(CryptoKit)
-                        fullTranscript = parts.joined(separator: "\n")
-                        #endif
+            if let transcriptURL {
+                func preserveCachedRecord() {
+                    if let cached = fileCache[transcriptPath], cached.record.id == conversationID {
+                        records.append(cached.record)
                     }
                 }
+
+                guard let lines = AgentHistoryJSONLSequence(url: transcriptURL, validateJSON: true) else {
+                    preserveCachedRecord()
+                    continue
+                }
+                messageCount = max(messageCount, lines.count)
+                var promptFound = false
+                #if !canImport(CryptoKit)
+                guard let spool = try? AgentHistoryTranscriptSpool() else {
+                    preserveCachedRecord()
+                    continue
+                }
+                var hasTranscriptText = false
+                var spoolFailed = false
+                #endif
+
+                for line in lines {
+                    guard let json = historyJSONObject(line), let (role, trimmed) = antigravityTurn(json) else {
+                        continue
+                    }
+                    #if !canImport(CryptoKit)
+                    do {
+                        if hasTranscriptText { try spool.append("\n") }
+                        try spool.append(trimmed)
+                        hasTranscriptText = true
+                    } catch {
+                        spoolFailed = true
+                        break
+                    }
+                    #endif
+                    if role == "YOU" && !promptFound {
+                        firstPrompt = trimmed
+                        promptFound = true
+                    }
+                    appendTurn(&turns, role: role, text: trimmed)
+                }
+
+                #if !canImport(CryptoKit)
+                if spoolFailed {
+                    preserveCachedRecord()
+                    continue
+                }
+                if hasTranscriptText { transcriptSpool = spool }
+                #endif
+                let agMeta = AntigravityTranscriptLine.meta(from: lines)
+                guard lines.isValid else {
+                    preserveCachedRecord()
+                    continue
+                }
+                latestUsage = agMeta.usage
+                detectedModel = agMeta.model
             }
 
             let resolvedTitle: String
@@ -1336,7 +1358,8 @@ public actor AgentHistoryScanner {
                     fileSize: fileSize,
                     title: resolvedTitle,
                     firstPrompt: firstPrompt,
-                    fullTranscript: fullTranscript.isEmpty ? "\(resolvedTitle)\n\(firstPrompt)" : fullTranscript,
+                    fullTranscript: "\(resolvedTitle)\n\(firstPrompt)",
+                    transcriptSpool: transcriptSpool,
                     gitBranch: nil,
                     repoName: projectName,
                     agentName: AgentKind.antigravity.displayName,
@@ -1482,7 +1505,7 @@ public actor AgentHistoryScanner {
 
     func parseAntigravityTranscript(sessionID: String, fileURL: URL, toIndex: inout [AgentHistoryFTSIndex.SessionIndexItem]) -> AgentSessionRecord? {
         let fileURL = URL(fileURLWithPath: fileURL.path)
-        guard let lines = AgentHistoryJSONLSequence(url: fileURL) else { return nil }
+        guard let lines = AgentHistoryJSONLSequence(url: fileURL, validateJSON: true) else { return nil }
         let dataSize = lines.fileSize
 
         var firstPrompt: String?
@@ -1793,7 +1816,7 @@ public actor AgentHistoryScanner {
         toIndex: inout [AgentHistoryFTSIndex.SessionIndexItem]
     ) -> AgentSessionRecord? {
         let fileURL = URL(fileURLWithPath: fileURL.path)
-        guard let lines = AgentHistoryJSONLSequence(url: fileURL) else { return nil }
+        guard let lines = AgentHistoryJSONLSequence(url: fileURL, validateJSON: true) else { return nil }
         let dataSize = lines.fileSize
 
         var sessionID: String?

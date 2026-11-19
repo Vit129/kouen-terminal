@@ -157,6 +157,37 @@ final class AgentHistoryMultiAgentCoverageTests: XCTestCase {
     #endif
 
     #if canImport(SQLite3)
+    func test_TS_2310_BE_IT_AntigravitySummaryKeepsCachedTranscriptOnParseFailure() async throws {
+        let root = makeTempDir()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let dbPath = root.appendingPathComponent("summaries.sqlite").path
+        createMockAntigravityDB(at: dbPath)
+        let brain = root.appendingPathComponent("brain")
+        let session = brain.appendingPathComponent("cli-1")
+        try FileManager.default.createDirectory(at: session, withIntermediateDirectories: true)
+        let transcript = session.appendingPathComponent("transcript.jsonl")
+        let prompt = #"{"type":"USER_INPUT","content":"original prompt"}"#
+        let large = #"{"type":"GENERIC","content":""# + String(repeating: "x", count: 128 * 1024) + #""}"#
+        try (prompt + "\r\n\n" + large).write(to: transcript, atomically: true, encoding: .utf8)
+
+        let index = AgentHistoryFTSIndex(dbPath: root.appendingPathComponent("index.sqlite").path)
+        let scanner = AgentHistoryScanner(ftsIndex: index)
+        let initial = await scanner.scanAntigravity(dbPath: dbPath, brainDir: brain)
+        let original = try XCTUnwrap(initial.first { $0.id == "cli-1" })
+        XCTAssertEqual(original.firstPrompt, "original prompt")
+
+        for invalid in ["{broken", #"{"type":"GENERIC","content":""# + String(
+            repeating: "x", count: AgentHistoryScanner.maxJSONLRecordBytes
+        ) + #""}"#] {
+            try (#"{"type":"USER_INPUT","content":"replacement prompt"}"# + "\n" + invalid)
+                .write(to: transcript, atomically: true, encoding: .utf8)
+            let rescanned = await scanner.scanAntigravity(dbPath: dbPath, brainDir: brain)
+            XCTAssertEqual(rescanned.first { $0.id == "cli-1" }?.firstPrompt, original.firstPrompt)
+            XCTAssertEqual(index.loadCachedEntries().first { $0.record.id == "cli-1" }?.record.firstPrompt,
+                           original.firstPrompt)
+        }
+    }
+
     func testAntigravityFailedDatabaseReadKeepsCachedSessions() async throws {
         let tempDir = makeTempDir()
         defer { try? FileManager.default.removeItem(at: tempDir) }

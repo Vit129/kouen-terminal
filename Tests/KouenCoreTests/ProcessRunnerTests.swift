@@ -1,5 +1,5 @@
 import Foundation
-import KouenCore
+@testable import KouenCore
 import XCTest
 
 /// [BE-UT] Unit Tests for Layer 1 ProcessRunner
@@ -92,6 +92,88 @@ final class ProcessRunnerTests: XCTestCase {
         XCTAssertTrue(res.stdoutWasTruncated || res.stderrWasTruncated)
         XCTAssertEqual(res.stdout.trimmingCharacters(in: .whitespacesAndNewlines), "hi")
         XCTAssertTrue(elapsed < 5.0, "Expected return soon after sh exits, took \(elapsed)s")
+    }
+
+    func test_TS_2311_BE_IT_SyncDescendantEOFRespectsCallerTimeout() {
+        let start = DispatchTime.now()
+        let result = ProcessRunner.run(executable: "/bin/sh",
+            arguments: ["-c", "sleep 3 2>/dev/null & printf ready"], timeout: 0.2)
+        XCTAssertLessThan(Double(DispatchTime.now().uptimeNanoseconds - start.uptimeNanoseconds) / 1e9, 0.65)
+        XCTAssertTrue(result.isTimedOut)
+        XCTAssertFalse(result.isSuccess)
+        XCTAssertEqual(result.stdout, "ready")
+        XCTAssertTrue(result.stdoutWasTruncated)
+        XCTAssertFalse(result.stderrWasTruncated)
+    }
+
+    func test_TS_2312_BE_IT_AsyncTimeoutClosesDescendantPipesPromptly() async {
+        let start = DispatchTime.now()
+        let result = await ProcessRunner.runAsync(executable: "/bin/sh",
+            arguments: ["-c", "sleep 3 2>/dev/null & printf ready"], timeout: 0.2)
+        XCTAssertLessThan(Double(DispatchTime.now().uptimeNanoseconds - start.uptimeNanoseconds) / 1e9, 1)
+        XCTAssertTrue(result.isTimedOut)
+        XCTAssertFalse(result.isSuccess)
+        XCTAssertEqual(result.stdout, "ready")
+        XCTAssertTrue(result.stdoutWasTruncated)
+        XCTAssertFalse(result.stderrWasTruncated)
+    }
+
+    func test_TS_2313_BE_IT_CancelWhileDescendantHoldsPipeAfterChildExit() async throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let marker = directory.appendingPathComponent("child-pid")
+        let task = Task {
+            await ProcessRunner.runAsync(executable: "/bin/sh", arguments: [
+                "-c", #"sleep 4 2>/dev/null & printf ready; echo "$$" > "$1""#, "sh", marker.path,
+            ])
+        }
+
+        let deadline = DispatchTime.now() + 1
+        var childExited = false
+        while DispatchTime.now() < deadline {
+            if let text = try? String(contentsOf: marker, encoding: .utf8),
+               let pid = Int32(text.trimmingCharacters(in: .whitespacesAndNewlines)),
+               kill(pid, 0) == -1, errno == ESRCH {
+                childExited = true
+                break
+            }
+            await Task.yield()
+        }
+        XCTAssertTrue(childExited)
+        let cancelledAt = DispatchTime.now()
+        task.cancel()
+        let result = await task.value
+        XCTAssertLessThan(Double(DispatchTime.now().uptimeNanoseconds - cancelledAt.uptimeNanoseconds) / 1e9, 1)
+        XCTAssertFalse(result.isSuccess)
+        XCTAssertFalse(result.isTimedOut)
+        XCTAssertEqual(result.stdout, "ready")
+        XCTAssertTrue(result.stdoutWasTruncated)
+        XCTAssertFalse(result.stderrWasTruncated)
+        XCTAssertTrue(result.stderr.contains("Process cancelled"))
+    }
+
+    func test_TS_2314_BE_IT_AsyncTimeoutEscalatesWhenChildIgnoresTerminate() async {
+        let start = DispatchTime.now()
+        let result = await ProcessRunner.runAsync(executable: "/bin/sh", arguments: [
+            "-c", "trap '' TERM; printf ready; exec sleep 5",
+        ], timeout: 0.2)
+        XCTAssertLessThan(Double(DispatchTime.now().uptimeNanoseconds - start.uptimeNanoseconds) / 1e9, 1.25)
+        XCTAssertTrue(result.isTimedOut)
+        XCTAssertEqual(result.exitCode, SIGKILL)
+        XCTAssertEqual(result.stdout, "ready")
+    }
+
+    func test_TS_2316_BE_IT_SyncReturnsWithReadHandlesClosed() throws {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/bin/echo")
+        process.arguments = ["ready"]
+        let result = ProcessRunner.run(process: process, timeout: 1)
+        XCTAssertTrue(result.isSuccess)
+        for output in [process.standardOutput, process.standardError] {
+            let pipe = try XCTUnwrap(output as? Pipe)
+            XCTAssertThrowsError(try pipe.fileHandleForReading.read(upToCount: 1))
+        }
     }
 
     // MARK: - Merged Output & Stderr Retention
