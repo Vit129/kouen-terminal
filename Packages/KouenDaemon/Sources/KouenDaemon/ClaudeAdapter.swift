@@ -42,8 +42,8 @@ public struct ClaudeAdapter: HeadlessCLIAdapter {
         var args = ["-p", prompt, "--output-format", "stream-json", "--verbose"]
         if let resumeSessionID {
             // Resuming the user's own session: load user settings so its plugin skills exist
-            // (`--setting-sources ""` hides them — verified 2026-09-27 with
-            // `/mattpocock-skills:handoff`). Session files are lowercase UUIDs.
+            // (`--setting-sources ""` hides them — verified 2026-09-27).
+            // Session files are lowercase UUIDs.
             // ponytail: every resumed run (incl. swarm follow-ups) pays for user hooks/plugins,
             // ~$1.5 vs cents; upgrade path = an explicit `userSettings` flag on `harness.start`.
             args += ["--setting-sources", "user", "--resume", resumeSessionID.uuidString.lowercased()]

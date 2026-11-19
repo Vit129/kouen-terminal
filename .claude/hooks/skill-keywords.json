@@ -20,7 +20,7 @@
     "keywords": ["copilot", "delegate to copilot", "let copilot"]
   },
   {
-    "skill": ["mattpocock-skills:code-review", "9arm-skills:scrutinize"],
+    "skill": "9arm-skills:scrutinize",
     "keywords": ["review", "code review", "pr review", "review this diff", "review the changes"]
   }
 ]

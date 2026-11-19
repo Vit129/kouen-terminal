@@ -81,6 +81,7 @@ final class AgentHandoffBuilderTests: XCTestCase {
         XCTAssertTrue(brief.contains("`/x.jsonl`"), "transcript stays as the fallback reference")
         XCTAssertFalse(brief.contains("No handoff note could be generated"))
 XCTAssertNil(AgentHandoffBuilder.handoffSkillPrompt(for: .aider), "unverified agents fall back to the transcript-only brief")
+        XCTAssertNil(AgentHandoffBuilder.handoffSkillPrompt(for: .claudeCode), "no Claude handoff skill installed: transcript-only brief")
     }
 
     func testSanityGateRejectsNonDocumentOutput() {
