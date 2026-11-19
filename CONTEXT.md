@@ -70,6 +70,9 @@ _Avoid_: Notification inbox (⌘⌃I)
 A git repo root registered in the sidebar; auto-registered only from a real `.git` directory, shown as missing (Relocate/Remove) when its folder moves.
 _Avoid_: Workspace, Worktree
 
+**Review Changes**:
+The worktree diff and its draft comments, shown beside the terminal. Review feedback is sent to a selected agent pane in the same checkout.
+
 **Shader Preset**:
 A pre-built, Kouen-authored GPU visual effect (e.g. CRT/scanline/bloom) toggled on/off in Settings.
 _Avoid_: Custom shader, User shader script

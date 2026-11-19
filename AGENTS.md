@@ -16,10 +16,11 @@ Per-project memory lives centrally in `~/Git/Personal/unified-memory-vault/agent
 - **Project-local skills** (`.claude/skills/`, when this repo has any) — check first; these specialize/override the global ones for this repo's own conventions.
 - **Global rules** (`~/.claude/rules/`) — behavior/workflow/coding conventions that apply everywhere.
 - **Project-local rules** (`rules/` — `build-release.md`, `concurrency.md`, `ipc-protocol.md`) — check first; these specialize the global ones for this repo's own domain.
-- AppKit/SwiftUI/macOS → `macos-swiftui` | debugging → `9arm-skills:debug-mantra` | review → `mattpocock-skills:code-review` + `9arm-skills:scrutinize`
+- AppKit/SwiftUI/macOS → `macos-swiftui` | debugging → `9arm-skills:debug-mantra` | review → `9arm-skills:scrutinize`
 
 ## Rules (read when triggered)
 
+- Do not use Computer Use unless the user explicitly requests it. This includes desktop or browser control and screenshots for verification. Use build, test, and CLI evidence when available, and report any visual checks still pending.
 - `rules/build-release.md` — build/test/run commands, release flow, version sync, git hooks, worktree constraint
 - `rules/concurrency.md` — Swift 6 strict concurrency, `@unchecked Sendable` ownership, terminal replay
 - `rules/ipc-protocol.md` — IPC framing, daemon socket security, generated-file regeneration
