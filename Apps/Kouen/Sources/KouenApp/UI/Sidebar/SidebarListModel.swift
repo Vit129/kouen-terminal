@@ -68,6 +68,8 @@ struct SidebarSessionCardItem: Identifiable, Sendable {
     var detectedAgents: [AgentSnapshot] = []
     let subagentsCount: Int
     let localhostPort: Int?
+    var isPrimaryCheckout = false
+    var lastActivityAt: Date? = nil
 }
 
 struct SidebarWorktreeEntry: Sendable, Equatable, Hashable {
@@ -80,6 +82,7 @@ struct SidebarWorktreeEntry: Sendable, Equatable, Hashable {
     var aheadCount: Int? = nil
     var behindCount: Int? = nil
     var isMerged: Bool = false
+    var lastActivityAt: Date? = nil
 }
 
 // MARK: - Observable model
@@ -98,6 +101,8 @@ final class SidebarListModel {
     var collapsedGroups = Set<String>()
     var collapsedProjects = Set<String>()
     private var isProjectSearchActive = false
+    private(set) var projectReveal: (id: UUID, path: String)?
+    private var repositoryRootsByFolder: [String: String] = [:]
     private var expandedWorktreeGroups = Set<String>()
     private(set) var projectWorktrees: [String: [SidebarWorktreeEntry]] = [:]
     var pinnedRepos: Set<String> = {
@@ -180,6 +185,26 @@ final class SidebarListModel {
         rebuildRows()
     }
 
+    func revealProject(_ entry: ProjectEntry) {
+        if let categoryID = entry.categoryID {
+            collapsedGroups.remove(categoryID)
+        }
+        projectReveal = (UUID(), entry.path)
+        rebuildRows()
+    }
+
+    /// Returns the path to add, or reveals the existing row in its original category.
+    func projectPathForAdd(_ path: String) async -> String? {
+        let projectPath = await Task.detached(priority: .utility) {
+            ProjectStore.repositoryProjectPath(path)
+        }.value
+        if let entry = projectStore?.project(at: projectPath) {
+            revealProject(entry)
+            return nil
+        }
+        return projectPath
+    }
+
     func setProjectSearchActive(_ active: Bool) {
         guard isProjectSearchActive != active else { return }
         isProjectSearchActive = active
@@ -228,12 +253,11 @@ final class SidebarListModel {
     // MARK: - Worktrees
 
     func updateWorktrees(force: Bool = false) {
-        let rootPaths = Set(sessions.map { repoRootForSession($0) })
-            .union(projectStore?.projects.compactMap { project in
-                let metadataPath = project.path + "/.git/worktrees"
-                return projectWorktrees[project.path] != nil || FileManager.default.fileExists(atPath: metadataPath)
-                    ? project.path : nil
-            } ?? [])
+        let paths = Set(sessions.map { repoRootForSession($0) })
+            .union(projectStore?.projects.map(\.path) ?? [])
+        let rootPaths = paths.union(paths.compactMap { path in
+            repositoryRootsByFolder[path].map { projectStore?.project(at: $0)?.path ?? $0 }
+        })
         let now = Date()
         for rootPath in rootPaths {
             if !force, let lastFetch = lastWorktreeFetchTime[rootPath],
@@ -248,8 +272,15 @@ final class SidebarListModel {
             if !force, !hasMissingWorktree, let signature, signature == lastWorktreeSignature[rootPath] { continue }
             lastWorktreeSignature[rootPath] = signature
             Task {
-                let worktrees = await self.fetchWorktrees(for: rootPath)
-                if self.projectWorktrees[rootPath] != worktrees {
+                let (resolvedPath, worktrees) = await self.fetchWorktrees(for: rootPath)
+                let containingRoot = resolvedPath == rootPath ? nil : resolvedPath
+                let previousRoot = self.repositoryRootsByFolder[rootPath]
+                self.repositoryRootsByFolder[rootPath] = containingRoot
+                if previousRoot != containingRoot {
+                    self.updateWorktrees()
+                    self.scheduleRebuild()
+                }
+                if let worktrees, self.projectWorktrees[rootPath] != worktrees {
                     self.projectWorktrees[rootPath] = worktrees
                     self.scheduleRebuild()
                 }
@@ -302,9 +333,22 @@ final class SidebarListModel {
         var newRows: [SidebarSessionRow] = []
 
         if let store = projectStore, (!store.projects.isEmpty || !store.categories.isEmpty) {
+            // Explicit repo entries keep their category even when a stored subfolder comes first.
+            let catalog = store.projects.filter { repositoryRootsByFolder[$0.path] == nil }
+            var seen = Set(catalog.map { ProjectStore.directoryIdentity($0.path) })
+            let inferred = store.projects.compactMap { entry -> ProjectEntry? in
+                guard let root = repositoryRootsByFolder[entry.path],
+                      !store.pendingReconciliationPaths.contains(entry.path),
+                      seen.insert(ProjectStore.directoryIdentity(root)).inserted else { return nil }
+                var projected = entry
+                projected.path = root
+                return projected
+            }
             // Grouped by user-defined categories (e.g. "Personal")
             for category in store.categories {
-                let catProjects = store.projects(inCategory: category.id)
+                let catProjects = store.projects(inCategory: category.id, revealing: projectReveal?.path)
+                    .filter { repositoryRootsByFolder[$0.path] == nil }
+                    + inferred.filter { $0.categoryID == category.id }
                 let isCollapsed = collapsedGroups.contains(category.id) && !isProjectSearchActive
                 newRows.append(.groupHeader(
                     id: category.id,
@@ -322,7 +366,9 @@ final class SidebarListModel {
             }
 
             // Standalone / Uncategorized projects
-            let uncategorized = store.projects(inCategory: nil)
+            let uncategorized = store.projects(inCategory: nil, revealing: projectReveal?.path)
+                .filter { repositoryRootsByFolder[$0.path] == nil }
+                + inferred.filter { $0.categoryID == nil }
             if !store.categories.isEmpty && !uncategorized.isEmpty {
                 newRows.append(.divider)
             }
@@ -333,9 +379,10 @@ final class SidebarListModel {
             // Standalone repos without groups: render directly as project headers
             var seenProjects = Set<String>()
             for session in sessions {
-                let rootPath = repoRootForSession(session)
-                guard !rootPath.isEmpty, rootPath != "Other", !seenProjects.contains(rootPath) else { continue }
-                seenProjects.insert(rootPath)
+                let sessionPath = repoRootForSession(session)
+                let rootPath = repositoryRootsByFolder[sessionPath] ?? sessionPath
+                guard !rootPath.isEmpty, rootPath != "Other",
+                      seenProjects.insert(ProjectStore.directoryIdentity(rootPath)).inserted else { continue }
                 let entry = ProjectEntry(path: rootPath, categoryID: nil)
                 appendProjectAndSessions(entry, into: &newRows)
             }
@@ -345,8 +392,6 @@ final class SidebarListModel {
     }
 
     private func appendProjectAndSessions(_ project: ProjectEntry, into result: inout [SidebarSessionRow], preferredSession: SessionGroup? = nil) {
-        let folderName = (project.path as NSString).lastPathComponent
-        let displayName = folderName.isEmpty ? KouenDesign.pathDisplayName(project.path) : folderName
 
         // 1. Gather all active sessions belonging to this project
         let matchingSessions: [SessionGroup]
@@ -356,13 +401,15 @@ final class SidebarListModel {
             matchingSessions = sessions.filter { sess in
                 if repoRootForSession(sess) == project.path { return true }
                 return sess.tabs.contains { tab in
-                    tab.cwd == project.path || tab.parentRepoPath == project.path || tab.cwd.hasPrefix(project.path + "/")
+                    tab.cwd == project.path || tab.cwd.hasPrefix(project.path + "/")
+                        || tab.parentRepoPath == project.path
                 }
             }
         }
 
         // 2. Gather non-main worktrees for this project
-        let rawWorktrees = projectWorktrees[project.path] ?? []
+        let discoveredWorktrees = projectWorktrees[project.path]
+        let rawWorktrees = discoveredWorktrees ?? []
         let extraWorktrees = rawWorktrees.filter { wt in
             guard !wt.isMain else { return false }
             return !matchingSessions.contains { sess in
@@ -374,7 +421,7 @@ final class SidebarListModel {
         let isCollapsed = collapsedProjects.contains(project.path) && !isProjectSearchActive
         let headerItem = SidebarProjectHeaderItem(
             path: project.path,
-            name: displayName,
+            name: ProjectGroupResolver.pathDisplayName(project.path),
             categoryID: project.categoryID,
             hasWorktrees: hasWorktrees,
             sessionsCount: matchingSessions.count,
@@ -385,19 +432,66 @@ final class SidebarListModel {
 
         guard !isCollapsed else { return }
 
-        // 3. Append active sessions
-        for sess in matchingSessions {
+        let primary = rawWorktrees.first(where: \.isMain)
+        let primaryPath = primary?.path ?? project.path
+        let primarySessions = matchingSessions.filter { session in
+            guard let tab = session.activeTab else { return false }
+            if let worktreePath = tab.worktreePath { return worktreePath == primaryPath }
+            return (tab.cwd == primaryPath || tab.cwd.hasPrefix(primaryPath + "/"))
+                && !rawWorktrees.contains { worktree in
+                    !worktree.isMain && (tab.cwd == worktree.path || tab.cwd.hasPrefix(worktree.path + "/"))
+                }
+        }
+        // Wait for discovery before claiming this path is a primary checkout.
+        let showsPrimaryCheckout = discoveredWorktrees != nil || headerItem.isMissing
+        let primarySession = showsPrimaryCheckout
+            ? primarySessions.first { $0.id == activeSessionID } ?? primarySessions.first : nil
+        let primaryBranch = [primary?.branch, primarySession?.activeTab?.gitBranch, gitStatuses[project.path]?.branch]
+            .compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .first { !$0.isEmpty } ?? "main"
+
+        if primarySession == nil, showsPrimaryCheckout {
+            result.append(.sessionItem(SidebarSessionCardItem(
+                id: "idle-\(project.path)",
+                projectPath: project.path,
+                categoryID: project.categoryID,
+                title: primaryBranch,
+                branch: primaryBranch,
+                subtitle: nil,
+                isRunning: false,
+                isSelected: false,
+                isDirty: false,
+                sessionID: nil,
+                worktreePath: nil,
+                agentKind: nil,
+                subagentsCount: 0,
+                localhostPort: nil,
+                isPrimaryCheckout: true,
+                lastActivityAt: primary?.lastActivityAt
+            )))
+            if primary == nil, !headerItem.isMissing { fetchGitStatusForProject(project.path) }
+        }
+
+        // Put the primary checkout first and keep every other session selectable.
+        let orderedSessions = [primarySession].compactMap { $0 }
+            + matchingSessions.filter { $0.id != primarySession?.id }
+        for sess in orderedSessions {
             let tab = sess.activeTab ?? sess.tabs.first
-            let branch = tab?.gitBranch?.trimmingCharacters(in: .whitespacesAndNewlines) ?? "main"
-            let taskName = tab?.taskName
-            let title = taskName ?? (branch.isEmpty ? "main" : branch)
+            let isPrimary = sess.id == primarySession?.id
+            let tabBranch = tab?.gitBranch?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            let branch = isPrimary ? primaryBranch : (tabBranch.isEmpty ? "main" : tabBranch)
+            let title = isPrimary ? branch : (tab?.taskName ?? branch)
             let isDirty = gitStatuses[sess.id.uuidString]?.isDirty ?? false
             let port = tab?.listeningPorts.first ?? sess.tabs.compactMap({ $0.listeningPorts.min() }).min()
             let isSelected = sess.id == activeSessionID
 
+            var lastActivityAt = isPrimary ? primary?.lastActivityAt : nil
             var uniqueAgents: [AgentSnapshot] = []
             for t in sess.tabs {
                 for agent in t.allDetectedAgents {
+                    if isPrimary, agent.lastActivityAt > (lastActivityAt ?? .distantPast) {
+                        lastActivityAt = agent.lastActivityAt
+                    }
                     if !uniqueAgents.contains(where: { $0.kind == agent.kind }) {
                         uniqueAgents.append(agent)
                     }
@@ -409,7 +503,7 @@ final class SidebarListModel {
                 projectPath: project.path,
                 categoryID: project.categoryID,
                 title: title,
-                branch: branch.isEmpty ? "main" : branch,
+                branch: branch,
                 subtitle: tab?.cwd == nil ? nil : KouenDesign.shortenPath(tab!.cwd),
                 isRunning: true,
                 isSelected: isSelected,
@@ -419,31 +513,11 @@ final class SidebarListModel {
                 agentKind: tab?.effectiveAgentKind,
                 detectedAgents: uniqueAgents,
                 subagentsCount: tab?.subagents?.count ?? 0,
-                localhostPort: port
+                localhostPort: port,
+                isPrimaryCheckout: isPrimary,
+                lastActivityAt: lastActivityAt
             )
             result.append(.sessionItem(cardItem))
-        }
-
-        if matchingSessions.isEmpty {
-            let branch = gitStatuses[project.path]?.branch ?? "main"
-            let cardItem = SidebarSessionCardItem(
-                id: "idle-\(project.path)",
-                projectPath: project.path,
-                categoryID: project.categoryID,
-                title: branch.isEmpty ? "main" : branch,
-                branch: branch.isEmpty ? "main" : branch,
-                subtitle: nil,
-                isRunning: false,
-                isSelected: false,
-                isDirty: false,
-                sessionID: nil,
-                worktreePath: nil,
-                agentKind: nil,
-                subagentsCount: 0,
-                localhostPort: nil
-            )
-            result.append(.sessionItem(cardItem))
-            fetchGitStatusForProject(project.path)
         }
 
         guard !extraWorktrees.isEmpty else { return }
@@ -615,18 +689,24 @@ final class SidebarListModel {
             + names.map { mtime(worktreesDir.appendingPathComponent($0).appendingPathComponent("logs/HEAD")) }
     }
 
-    private func fetchWorktrees(for rootPath: String) async -> [SidebarWorktreeEntry] {
-        guard !rootPath.isEmpty, FileManager.default.fileExists(atPath: rootPath) else { return [] }
+    private func fetchWorktrees(for path: String) async -> (String, [SidebarWorktreeEntry]?) {
+        guard !path.isEmpty, FileManager.default.fileExists(atPath: path) else { return (path, []) }
         return await Task.detached(priority: .utility) {
+            let rootPath = ProjectStore.repositoryProjectPath(path)
+            guard rootPath == path else { return (rootPath, nil) }
             let infos = GitService.shared.listWorktrees(for: rootPath)
-            guard !infos.isEmpty else { return [] }
+            guard !infos.isEmpty else { return (rootPath, []) }
             let manager = WorktreeManager()
-            return infos.enumerated().compactMap { index, wt -> SidebarWorktreeEntry? in
+            let worktrees = infos.enumerated().compactMap { index, wt -> SidebarWorktreeEntry? in
                 var isDirectory: ObjCBool = false
                 guard FileManager.default.fileExists(atPath: wt.path, isDirectory: &isDirectory),
                       isDirectory.boolValue else { return nil }
                 let isMain = index == 0
                 let branch = wt.branch ?? "detached"
+                // HEAD's reflog records local activity including checkout, reset and commit.
+                let lastActivityAt = isMain ? ["logs/HEAD", "HEAD"].lazy.compactMap { relativePath in
+                    try? FileManager.default.attributesOfItem(atPath: wt.path + "/.git/" + relativePath)[.modificationDate] as? Date
+                }.first : nil
                 let base = isMain ? "main" : (manager.baseBranch(for: branch, in: rootPath) ?? "main")
                 let div = isMain ? nil : manager.divergence(repoPath: rootPath, branch: branch, base: base)
                 let isMerged = isMain ? false : manager.isMergedOrSquashed(repoPath: rootPath, branch: branch, base: base)
@@ -639,9 +719,11 @@ final class SidebarListModel {
                     baseBranch: base,
                     aheadCount: div?.ahead,
                     behindCount: div?.behind,
-                    isMerged: isMerged
+                    isMerged: isMerged,
+                    lastActivityAt: lastActivityAt
                 )
             }
+            return (rootPath, worktrees)
         }.value
     }
 }

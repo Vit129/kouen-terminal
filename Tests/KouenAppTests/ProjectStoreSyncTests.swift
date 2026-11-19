@@ -20,6 +20,90 @@ final class ProjectStoreSyncTests: XCTestCase {
         super.tearDown()
     }
 
+    @MainActor
+    func testTC6920_FE_BL_ExactDuplicateKeepsOriginalCategory() {
+        let store = ProjectStore(userDefaultsSuite: UUID().uuidString)
+        let personal = store.addCategory(name: "Personal")
+        let company = store.addCategory(name: "Company")
+        store.addProject(tempPath, categoryID: personal.id)
+        store.addProject(tempPath, categoryID: company.id)
+        XCTAssertEqual(store.projects.count, 1)
+        XCTAssertEqual(store.projects.first?.categoryID, personal.id)
+    }
+
+    @MainActor
+    func testTC6920_FE_BL_SymlinkDuplicateIsRejected() throws {
+        let repo = tempDirURL.appendingPathComponent("repo")
+        let alias = tempDirURL.appendingPathComponent("alias")
+        try FileManager.default.createDirectory(at: repo, withIntermediateDirectories: false)
+        try FileManager.default.createSymbolicLink(at: alias, withDestinationURL: repo)
+        let store = ProjectStore(userDefaultsSuite: UUID().uuidString)
+        store.addProject(repo.path)
+        store.addProject(alias.path)
+        XCTAssertEqual(store.projects.map(\.path), [repo.path])
+    }
+
+    @MainActor
+    func testTC6920_FE_BL_TrailingSlashDuplicateIsRejected() {
+        let store = ProjectStore(userDefaultsSuite: UUID().uuidString)
+        store.addProject(tempPath)
+        store.addProject(tempPath + "/")
+        XCTAssertEqual(store.projects.map(\.path), [tempPath])
+    }
+
+    @MainActor
+    func testTC6920_FE_BL_StoredAliasesRenderOnceAcrossCategories() throws {
+        let suite = UUID().uuidString
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let rows = [ProjectEntry(path: tempPath, categoryID: "personal"),
+                    ProjectEntry(path: tempPath + "/", categoryID: "company")]
+        let data = try JSONEncoder().encode(rows)
+        defaults.set(data, forKey: "ProjectEntries")
+        let store = ProjectStore(userDefaults: defaults)
+        XCTAssertEqual(store.projects(inCategory: "personal"), [rows[0]])
+        XCTAssertTrue(store.projects(inCategory: "company").isEmpty)
+        XCTAssertEqual(defaults.data(forKey: "ProjectEntries"), data)
+    }
+
+    @MainActor
+    func testTC6920_FE_BL_FolderScanKeepsExistingAliasInItsCategory() async throws {
+        let repo = tempDirURL.appendingPathComponent("repo")
+        try FileManager.default.createDirectory(at: repo.appendingPathComponent(".git"), withIntermediateDirectories: true)
+        let alias = tempDirURL.appendingPathComponent("alias")
+        try FileManager.default.createSymbolicLink(at: alias, withDestinationURL: repo)
+        let store = ProjectStore(userDefaultsSuite: UUID().uuidString)
+        let personal = store.addCategory(name: "Personal")
+        let company = store.addCategory(name: "Company", sourceFolder: tempPath)
+        store.addProject(alias.path, categoryID: personal.id)
+
+        await store.syncCategory(id: company.id)
+
+        XCTAssertEqual(store.projects.map(\.path), [alias.path])
+        XCTAssertEqual(store.projects.first?.categoryID, personal.id)
+        let missing = tempDirURL.appendingPathComponent("missing").path
+        store.addProject(missing)
+        XCTAssertNil(store.previewMoves([missing: repo.path]))
+    }
+
+    @MainActor
+    func testTC6920_FE_BL_SidebarListModelRevealsDuplicateInCollapsedCategory() throws {
+        let store = ProjectStore(userDefaultsSuite: UUID().uuidString)
+        let personal = store.addCategory(name: "Personal")
+        let entry = try XCTUnwrap(store.addProject(tempPath, categoryID: personal.id)?.entry)
+        let model = SidebarListModel()
+        model.projectStore = store
+        model.toggleCollapse(id: personal.id)
+        XCTAssertFalse(model.rows.contains { $0.id == "proj-\(entry.path)" })
+
+        let duplicate = try XCTUnwrap(store.addProject(tempPath + "/"))
+        XCTAssertFalse(duplicate.inserted)
+        model.revealProject(duplicate.entry)
+
+        XCTAssertEqual(model.projectReveal?.path, entry.path)
+        XCTAssertTrue(model.rows.contains { $0.id == "proj-\(entry.path)" })
+    }
+
     // MARK: - [TS-P54-001] [FE-UT] Legacy JSON Decoding
     func testProjectCategoryLegacyJSONDecoding() throws {
         let legacyJSON = """

@@ -238,7 +238,7 @@ final class SidebarSectionModel {
     var isRepoHeader: Bool = true
     var chromeEpoch: Int = 0
     var selectedTab: Int = 0
-    var onAddProject: (() -> Void)? = nil
+    var onAddProject: ((ProjectAddAction) -> Void)? = nil
     var onRefreshProjects: (() -> Void)? = nil
     var onAddJob: (() -> Void)? = nil
 }
@@ -322,15 +322,7 @@ struct SidebarSectionLabelView: View {
                 .help("Refresh projects and worktrees")
                 .accessibilityIdentifier("btn_refreshProjects_projectsSidebar")
 
-                Button {
-                    model.onAddProject?()
-                } label: {
-                    Image(systemName: "plus")
-                        .font(.system(size: 11, weight: .medium))
-                        .foregroundColor(Color(nsColor: c.textSecondary))
-                }
-                .buttonStyle(.plain)
-                .help("Add project or folder group")
+                ProjectAddMenu(scope: .projects) { model.onAddProject?($0) }
             } else if model.selectedTab == 2 {
                 Button {
                     model.onAddJob?()
@@ -379,7 +371,6 @@ struct SidebarFooterView: View {
             // `showSwarmFleet()` currently has no other entry point in the app.
             FooterIconButton(symbol: "key", tooltip: "Add API Key", chromeEpoch: epoch, action: onAddAPIKey)
             Spacer()
-            // RecentProjectsMenuButton replaced by persistent ProjectDirectoryTree (Phase 2.3)
             FooterIconButton(symbol: "command", tooltip: "Command palette (⌘K)", chromeEpoch: epoch, action: onPalette)
         }
         // Suppress unused warning — c is read via chromeEpoch-triggered body re-run in subviews
@@ -425,45 +416,6 @@ private struct FooterIconButton: View {
         .buttonStyle(.plain)
         .help(badgeCount > 0 ? "\(tooltip) — \(badgeCount) need attention" : tooltip)
         .onHover { isHovered = $0 }
-    }
-}
-
-private struct RecentProjectsMenuButton: View {
-    let chromeEpoch: Int
-    let provider: () -> [String]
-    let onSelect: (String) -> Void
-    @State private var isHovered = false
-
-    private var recents: [String] { provider() }
-
-    var body: some View {
-        let _ = chromeEpoch
-        let c = KouenDesign.chrome
-        Menu {
-            if recents.isEmpty {
-                Text("No recent projects").disabled(true)
-            } else {
-                ForEach(recents, id: \.self) { path in
-                    Button((path as NSString).lastPathComponent) { onSelect(path) }
-                        .help(path)
-                }
-            }
-        } label: {
-            Image(systemName: "clock.arrow.circlepath")
-                .font(.system(size: 12, weight: .medium))
-                .foregroundColor(Color(nsColor: isHovered ? c.textPrimary : c.textSecondary))
-                .frame(width: 24, height: 24)
-                .background(
-                    RoundedRectangle(cornerRadius: 6, style: .continuous)
-                        .fill(Color(nsColor: isHovered
-                            ? c.textPrimary.withAlphaComponent(c.isDark ? 0.10 : 0.09)
-                            : NSColor.clear))
-                )
-                .onHover { isHovered = $0 }
-        }
-        .menuIndicator(.hidden)
-        .fixedSize()
-        .help("Recent projects")
     }
 }
 

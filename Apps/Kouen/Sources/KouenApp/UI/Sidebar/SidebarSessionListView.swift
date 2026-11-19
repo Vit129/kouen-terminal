@@ -1,4 +1,5 @@
 import SwiftUI
+import KouenCommands
 import KouenCore
 import KouenIPC
 
@@ -15,7 +16,7 @@ struct SidebarSessionListView: View {
     var onSelect: (SessionID) -> Void
     var onSelectFleetItem: ((FleetSessionItem) -> Void)? = nil
     var onOpenProject: (String) -> Void
-    var onAddInGroup: (String, String?) -> Void
+    var onAddInGroup: (ProjectAddAction, ProjectAddScope) -> Void
     var onReviewGroupMoves: (String) -> Void = { _ in }
     var onCloseSession: (SessionID) -> Void
     var onRemoveProject: (String) -> Void
@@ -42,13 +43,43 @@ struct SidebarSessionListView: View {
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else {
-                    ScrollView(.vertical, showsIndicators: false) {
-                        LazyVStack(spacing: 0) {
-                            ForEach(filteredProjectRows) { row in
-                                rowContent(row)
+                    ScrollViewReader { proxy in
+                        ScrollView(.vertical, showsIndicators: false) {
+                            LazyVStack(spacing: 0, pinnedViews: [.sectionHeaders]) {
+                                let rows = filteredProjectRows
+                                let boundaries = rows.indices.filter { index in
+                                    switch rows[index] {
+                                    case .groupHeader, .divider: true
+                                    default: index == rows.startIndex
+                                    }
+                                }
+                                ForEach(boundaries.indices, id: \.self) { sectionIndex in
+                                    let start = boundaries[sectionIndex]
+                                    let next = sectionIndex + 1
+                                    let end = next < boundaries.endIndex ? boundaries[next] : rows.endIndex
+                                    if case .groupHeader = rows[start] {
+                                        Section {
+                                            ForEach(rows[(start + 1)..<end]) { row in
+                                                rowContent(row)
+                                            }
+                                        } header: {
+                                            rowContent(rows[start])
+                                                .background(Color(nsColor: KouenDesign.chrome.sidebarBackground))
+                                        }
+                                        .id(rows[start].id)
+                                    } else {
+                                        ForEach(rows[start..<end]) { row in
+                                            rowContent(row)
+                                        }
+                                    }
+                                }
                             }
+                            .padding(.vertical, 4)
                         }
-                        .padding(.vertical, 4)
+                        .task(id: projectSearchQuery.isEmpty ? model.projectReveal?.id : nil) {
+                            guard let reveal = model.projectReveal, projectSearchQuery.isEmpty else { return }
+                            proxy.scrollTo("proj-\(reveal.path)", anchor: .center)
+                        }
                     }
                 }
             } else if let fleetModel {
@@ -86,6 +117,10 @@ struct SidebarSessionListView: View {
             model.setProjectSearchActive(selectedFilter == .all && !projectSearchQuery.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
         }
         .onDisappear { model.setProjectSearchActive(false) }
+        .onChange(of: model.projectReveal?.id) { _, _ in
+            selectedFilter = .all
+            projectSearchQuery = ""
+        }
         .onChange(of: projectSearchQuery) { _, query in
             model.setProjectSearchActive(selectedFilter == .all && !query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
         }
@@ -234,7 +269,7 @@ struct SidebarSessionListView: View {
                 status: status,
                 model: model,
                 onToggleCollapse: { model.toggleCollapse(id: id) },
-                onAdd: { onAddInGroup(name, id) },
+                onAdd: { onAddInGroup($0, .group(name: name, id: id)) },
                 onReviewMoves: { onReviewGroupMoves(id) }
             )
             .frame(height: 28)
@@ -325,7 +360,7 @@ private struct SidebarGroupHeaderRow: View {
     let status: BoardColumnKind
     var model: SidebarListModel
     var onToggleCollapse: () -> Void
-    var onAdd: () -> Void
+    var onAdd: (ProjectAddAction) -> Void
     var onReviewMoves: () -> Void
 
     @State private var isHovered = false
@@ -356,19 +391,10 @@ private struct SidebarGroupHeaderRow: View {
 
             Spacer()
 
-            if isHovered {
-                Button(action: onAdd) {
-                    Image(systemName: "plus")
-                        .font(.system(size: 10, weight: .medium))
-                        .foregroundStyle(Color(nsColor: c.textSecondary))
-                }
-                .buttonStyle(.plain)
-                .frame(width: 20, height: 20)
-                .help("Add repository to \(name)")
-            }
+            ProjectAddMenu(scope: .group(name: name, id: id), onSelect: onAdd)
 
             Menu {
-                Button("Add Repository to \(name)...") { onAdd() }
+                Button("Browse folder…") { onAdd(.browse) }
                 Button("Review Moved Repositories…") { onReviewMoves() }
                     .accessibilityIdentifier("project-group-review-moves")
                 Divider()
@@ -611,8 +637,14 @@ private struct SidebarSessionCardRow: View {
                 )
 
             HStack(spacing: 6) {
-                // Leading: Agent icon(s) OR status dot OR branch symbol
-                if !card.detectedAgents.isEmpty {
+                if card.isPrimaryCheckout {
+                    Image(systemName: "house")
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundStyle(Color(nsColor: card.isRunning ? c.textSecondary : c.textTertiary))
+                        .frame(width: 12, height: 12)
+                        .padding(.leading, 8)
+                        .accessibilityLabel("Primary checkout")
+                } else if !card.detectedAgents.isEmpty {
                     HStack(spacing: 3) {
                         ForEach(card.detectedAgents.prefix(3)) { agent in
                             Image(nsImage: AgentIconRenderer.templateOrMonogramImage(for: agent.kind, size: 12))
@@ -650,7 +682,8 @@ private struct SidebarSessionCardRow: View {
                         .font(.system(size: 12, weight: isSelected ? .semibold : .medium))
                         .foregroundStyle(isSelected
                             ? Color(nsColor: c.textPrimary)
-                            : Color(nsColor: isHovered ? c.textPrimary : c.textSecondary))
+                            : Color(nsColor: card.isPrimaryCheckout && !card.isRunning
+                                ? c.textTertiary : (isHovered ? c.textPrimary : c.textSecondary)))
                         .lineLimit(1)
                         .truncationMode(.tail)
 
@@ -691,6 +724,13 @@ private struct SidebarSessionCardRow: View {
                     }
                     .buttonStyle(.plain)
                     .help("Open http://localhost:\(port) in browser pane")
+                }
+
+                if let lastActivityAt = card.lastActivityAt {
+                    Text(AgentListFormatter.age(from: lastActivityAt))
+                        .font(.system(size: 9.5, design: .monospaced))
+                        .foregroundStyle(Color(nsColor: c.textTertiary))
+                        .padding(.trailing, 6)
                 }
 
                 // Close button on hover
