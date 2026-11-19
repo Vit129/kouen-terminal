@@ -1,0 +1,25 @@
+.claude/hooks/skill-keywords.json
+  s_0d69914358c120::t_b198f2db0cfd83 23
+Packages/KouenCore/Sources/KouenCore/Agents/AgentHandoffBuilder.swift
+  s_0d69914358c120::t_1087ecc897ef60 60
+Packages/KouenDaemon/Sources/KouenDaemon/ClaudeAdapter.swift
+  s_0d69914358c120::t_1087ecc897ef60 45-46
+Tests/KouenCoreTests/AgentHandoffBuilderTests.swift
+  s_0d69914358c120::t_1087ecc897ef60 84
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.3",
+  "base_commit_sha": "50fb272742bfcd34d237e65422435b70cf3c23f4",
+  "prompts": {},
+  "sessions": {
+    "s_0d69914358c120": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "a20defe3-cb24-4fc5-a4ff-686dc3a70c52",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Vit129 <vitosk129@gmail.com>"
+    }
+  }
+}

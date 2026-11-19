@@ -1,0 +1,21 @@
+Packages/KouenCore/Sources/KouenCore/ReleaseNotes/GeneratedReleaseNotes.swift
+  s_403ba7fc9673bf::t_35a759605a51be 9,13-14
+Tests/KouenCLITests/KouenCLITests.swift
+  s_403ba7fc9673bf::t_35a759605a51be 89,93
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.3",
+  "base_commit_sha": "185818c3345479b10749f6fc5fa404b4700c2648",
+  "prompts": {},
+  "sessions": {
+    "s_403ba7fc9673bf": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1f2f8-b479-7333-90e1-68a37e8b4194",
+        "model": "gpt-6.2-sol"
+      },
+      "human_author": "Vit129 <vitosk129@gmail.com>"
+    }
+  }
+}

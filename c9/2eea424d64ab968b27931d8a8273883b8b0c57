@@ -1,0 +1,37 @@
+Apps/Kouen/Sources/KouenApp/UI/History/AgentSessionHistoryModel.swift
+  s_60104bb1539db6::t_87d1bdd9e8989a 403-413,415-416,432-434
+Apps/Kouen/Sources/KouenApp/UI/Chrome/MainSplitViewController.swift
+  s_34e9b5429ef1de::t_18c45dfc013928 688,732-736
+Apps/Kouen/Sources/KouenApp/UI/Chrome/ContentAreaViewController.swift
+  s_34e9b5429ef1de::t_18c45dfc013928 101
+  s_60104bb1539db6::t_28a0a645223d53 25-30
+Tests/KouenAppTests/AgentSessionHistoryModelTests.swift
+  s_60104bb1539db6::t_b3bb7ce721ce70 88-91
+  s_60104bb1539db6::t_2c33f55f291ddf 85-87
+  s_60104bb1539db6::t_20e513fae9c7c7 92-94
+  s_60104bb1539db6::t_09af3f40e806da 40-84,95
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.3",
+  "base_commit_sha": "c92eea424d64ab968b27931d8a8273883b8b0c57",
+  "prompts": {},
+  "sessions": {
+    "s_34e9b5429ef1de": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1f2a1-43e7-72d0-99f9-1f50a5a1cb58",
+        "model": "gpt-6.2-sol"
+      },
+      "human_author": "Vit129 <vitosk129@gmail.com>"
+    },
+    "s_60104bb1539db6": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1ef4f-632f-7563-a553-8892bfbaa1a7",
+        "model": "gpt-6.2-sol"
+      },
+      "human_author": "Vit129 <vitosk129@gmail.com>"
+    }
+  }
+}
