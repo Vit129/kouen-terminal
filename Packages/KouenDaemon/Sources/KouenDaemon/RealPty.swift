@@ -1361,7 +1361,10 @@ public final class RealPty: @unchecked Sendable {
     }
 
     private func watchForExit(pid: pid_t, generation gen: UInt64) {
-        DispatchQueue.global().async { [weak self] in
+        // A dedicated thread, not the global pool: this waitpid blocks for the child's whole
+        // lifetime, so one pool worker per live pane exhausted GCD's 64-thread limit and stalled
+        // every other global-queue job in the daemon.
+        let watcher = Thread { [weak self] in
             guard let self, pid > 0 else { return }
             var status: Int32 = 0
             let reaped = waitpid(pid, &status, 0)
@@ -1375,6 +1378,9 @@ public final class RealPty: @unchecked Sendable {
             self.lifecycleLock.unlock()
             self.childEnded(generation: gen, exitStatus: decoded)
         }
+        watcher.name = "kouen.pty.waitpid"
+        watcher.stackSize = 64 * 1024
+        watcher.start()
     }
 
     /// Mark `gen`'s child as reaped (its `waitpid` watcher returned), pruning to a bound. Caller
