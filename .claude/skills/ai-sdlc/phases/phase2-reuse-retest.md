@@ -9,13 +9,7 @@ but **it cannot run in Phase 2** — no code has changed yet. If the Existing As
 classified something `extend`, carry that flag into Phase 4 and execute there, right
 after this task's own change passes:
 
-1. Find dependents: use graphify (`mcp__graphify__get_neighbors`/`blast_radius` on the
-   changed symbol) as the default — it tracks real call/reference edges from a real AST,
-   more reliable than grep across every language (import-only languages like Swift/Go/Rust,
-   and Robot Framework's keyword calls, aren't visible via grep at all). Install the
-   project's graphify extractor if missing before falling back to grep.
-
-   **Grep fallback** (only when graphify isn't set up): target the actually-invoked token,
+1. Find dependents with grep: target the actually-invoked token,
    not the file/class name, scoped to real source+test dirs (never the bare repo root).
    Include any receiver/namespace prefix (`cy.mount`, not bare `mount`) to avoid collisions
    with common words. Start case-sensitive; only add `-i` if the language allows casing to

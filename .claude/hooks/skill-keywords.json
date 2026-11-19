@@ -20,10 +20,6 @@
     "keywords": ["copilot", "delegate to copilot", "let copilot"]
   },
   {
-    "skill": "graphify",
-    "keywords": ["graphify", "architecture", "codebase map", "graph", "structure", "dependencies", "where is", "which file"]
-  },
-  {
     "skill": ["mattpocock-skills:code-review", "9arm-skills:scrutinize"],
     "keywords": ["review", "code review", "pr review", "review this diff", "review the changes"]
   }

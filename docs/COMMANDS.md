@@ -355,7 +355,7 @@ Usage lines below are taken from the CLI source (`Tools/kouen/Sources/KouenCLI/`
 | `kouen-cli agent send <file> [--message <msg>] [--tab/--surface/--feature <id>]` | Send a file as context to an agent pane (a target is required when more than one agent is running). |
 | `kouen-cli context diff [--staged] [--all]` | Print the git diff, token-guarded and filtered. |
 | `kouen-cli context file <path>` / `pane <surfaceID> [--tail N]` / `last` / `error` | Print bounded file contents, a pane's tail, the active pane's recent output, or the latest compiler/runtime error. |
-| `kouen-cli context graph <query>` / `issue` | Graphify AST summary for a symbol or feature; the current SDLC feature and checklist. |
+| `kouen-cli context issue` | The current SDLC feature and checklist. |
 | `kouen-cli context inject "<template>"` | Resolve `@diff`, `@file:<path>`, `@last`, `@error` mentions in a template (same tokens as the ⌘K injector). |
 | `kouen-cli memo set <key> <val>` / `get <key>` / `list [--json]` / `delete <key>` / `clear` | Shared key-value scratchpad for agents. |
 | `kouen-cli cc run "<prompt>" [--cwd <path>] [--profile edit\|readonly] [--model <name>] [--effort <level>] [--no-wait]` | Run `claude` headlessly; `cc status <runId>`, `cc list`, `cc cancel <runId>` manage runs. |

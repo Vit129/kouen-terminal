@@ -250,7 +250,6 @@ final class AutomationsFleetModel {
             ("playwright-report/index.html", "Playwright Report (HTML)", .html),
             (".robot-output/report.html", "Robot Report (HTML)", .html),
             (".robot-output/log.html", "Robot Log (HTML)", .html),
-            ("graphify-out/graph.html", "Graphify Visualizer (HTML)", .html),
             ("coverage/index.html", "Coverage Report (HTML)", .html),
             ("out/index.html", "Web Build (HTML)", .html),
             ("plans/p25-mobile-session-switcher-design.html", "Mobile Switcher Design (HTML)", .html)

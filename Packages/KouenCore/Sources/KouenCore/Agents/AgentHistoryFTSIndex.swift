@@ -616,8 +616,7 @@ public final class AgentHistoryFTSIndex: @unchecked Sendable {
                 let previous = incrementalCursor(sessionID: item.sessionID, path: item.transcriptPath)
                 item.incremental = AgentHistoryIncrementalFTS.extract(url: URL(fileURLWithPath: item.transcriptPath), previous: previous, provider: provider)
                 if let update = item.incremental {
-                    let symbols = item.projectPath.map { GraphifyIndexCache.shared.enrich(files: update.files, projectPath: $0) } ?? []
-                    item.incrementalFiles = update.files.union(symbols).joined(separator: " ")
+                    item.incrementalFiles = update.files.joined(separator: " ")
                 }
             }
             return item

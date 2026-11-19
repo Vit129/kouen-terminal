@@ -16,7 +16,7 @@ struct NotificationEntry: Identifiable, Equatable {
 
 /// Presents notifications even while Kouen is the frontmost app — without a delegate,
 /// UNUserNotificationCenter suppresses foreground notifications by default (Step 3 of
-/// REVIEW-graphify-kouen-2026-07-03.md Part 3's fix plan). Stateless, so @unchecked Sendable
+/// the 2026-07-03 review's Part 3 fix plan). Stateless, so @unchecked Sendable
 /// is safe here (no mutable state to race on), matching this codebase's existing pattern for
 /// simple singleton delegates.
 final class NotificationPresenter: NSObject, UNUserNotificationCenterDelegate, @unchecked Sendable {

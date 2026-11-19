@@ -9,7 +9,7 @@
 
 **Bounded context: unchanged.** This extends the same "Mobile Bridge Client Ergonomics" surface
 D1-D3/E/F2 already live in — `MobileBridgeServer.swift`'s in-process daemon module (`community=60`
-per graphify) plus its embedded client (`embeddedPageHTML`). No new context, no new process, no
+per the code index) plus its embedded client (`embeddedPageHTML`). No new context, no new process, no
 new service boundary. Same reasoning Phase D's own doc entry already used: "everything below runs
 inside the daemon... no new bounded context, no new process."
 

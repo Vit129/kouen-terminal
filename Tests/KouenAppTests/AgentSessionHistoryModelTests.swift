@@ -590,47 +590,6 @@ final class AgentSessionHistoryModelTests: XCTestCase {
         }
     }
 
-    func testGraphifyIndexEnrichment() {
-        let cache = GraphifyIndexCache()
-        let currentFile = URL(fileURLWithPath: #filePath)
-        let repoRoot = currentFile
-            .deletingLastPathComponent() // Tests/KouenAppTests
-            .deletingLastPathComponent() // Tests
-            .deletingLastPathComponent() // repo root
-            .path
-
-        let labelsFile = URL(fileURLWithPath: repoRoot).appendingPathComponent("graphify-out/.graphify_labels.json")
-        let projectPath: String
-        var tempDir: URL? = nil
-
-        if FileManager.default.fileExists(atPath: labelsFile.path) {
-            projectPath = repoRoot
-        } else {
-            let tmp = FileManager.default.temporaryDirectory.appendingPathComponent("graphify-test-\(UUID().uuidString)")
-            let outDir = tmp.appendingPathComponent("graphify-out")
-            try? FileManager.default.createDirectory(at: outDir, withIntermediateDirectories: true)
-            let mockLabels = ["node1": "DaemonClient", "node2": "AgentSessionHistoryView"]
-            if let data = try? JSONSerialization.data(withJSONObject: mockLabels) {
-                try? data.write(to: outDir.appendingPathComponent(".graphify_labels.json"))
-            }
-            try? "1. `DaemonClient` - God node\n".write(to: outDir.appendingPathComponent("GRAPH_SUMMARY.md"), atomically: true, encoding: .utf8)
-            projectPath = tmp.path
-            tempDir = tmp
-        }
-        defer {
-            if let tempDir { try? FileManager.default.removeItem(at: tempDir) }
-        }
-
-        let touchedFiles = [
-            "Apps/Kouen/Sources/KouenApp/UI/History/AgentSessionHistoryView.swift",
-            "Packages/KouenCore/Sources/KouenCore/IPC/DaemonClient.swift"
-        ]
-
-        let enriched = cache.enrich(files: touchedFiles, projectPath: projectPath)
-        XCTAssertFalse(enriched.isEmpty, "Should extract symbols from .graphify_labels.json")
-        XCTAssertTrue(enriched.contains("DaemonClient") || enriched.contains(where: { $0.contains("Daemon") }))
-    }
-
     func testRecordPreservesUsageAndShortSummary() {
         var usage = AgentUsage()
         usage.inputTokens = 15000

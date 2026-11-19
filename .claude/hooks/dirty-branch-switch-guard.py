@@ -43,8 +43,6 @@ def unquoted(cmd: str) -> str:
     return re.sub(r"\"(?:\\.|[^\"\\])*\"|'[^']*'", '""', cmd)
 
 
-# a graphify refresh rewrites graphify-out/ after every session; in repos that track it that is never "unfinished work"
-GENERATED = ":(exclude,glob)**/graphify-out/**"
 
 
 def git(repo, *args):
@@ -59,7 +57,7 @@ def sibling_state(repo):
         if not line.startswith("worktree "):
             continue
         wt = line.split(" ", 1)[1]
-        if git(wt, "status", "--porcelain", "--untracked-files=no", "--", ".", GENERATED).strip():
+        if git(wt, "status", "--porcelain", "--untracked-files=no", "--", ".").strip():
             dirty.append(wt)
         branch = git(wt, "symbolic-ref", "--short", "-q", "HEAD").strip()
         if base and branch and branch != base and git(repo, "rev-list", "--count", f"{base}..{branch}").strip() not in ("", "0"):
@@ -99,7 +97,7 @@ def decide(data: dict):
     m = SWITCH.search(cmd)
     if not m or not switches_branch(m.group("rest")) or stashed_before(cmd, m.start()):
         return None, False, None
-    out = git(os.path.expanduser(m.group("c") or "."), "status", "--porcelain", "--untracked-files=no", "--", ".", GENERATED).strip()
+    out = git(os.path.expanduser(m.group("c") or "."), "status", "--porcelain", "--untracked-files=no", "--", ".").strip()
     if not out:
         return None, False, None
     files = "\n".join(out.splitlines()[:8])

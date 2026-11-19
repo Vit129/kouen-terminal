@@ -26,7 +26,7 @@ do the step directly.
 | Security concern (auth, permissions, user input, secrets) | `security` skill: secure-coding half in Phase 4, QA half in Phase 3 |
 | Hard technical decision, no clear answer | The `advisor` agent with a curated brief (decision, options, constraints) |
 | Bounded subtask: search files, read/summarize logs, classify, extract facts, run build/test/lint, git/ops mechanics | `Agent(model: "haiku")`, several in parallel; the big model plans and judges. See `rules/aodd.md` |
-| Read/map code ("where is X", "who calls Y") | graphify (companion) first, then a Haiku subagent for broad sweeps; the big model reads every file it will edit itself |
+| Read/map code ("where is X", "who calls Y") | `rg` first, then a Haiku subagent for broad sweeps; the big model reads every file it will edit itself |
 | Pre-merge review (standards + spec) | `/code-review` or any review skill; feed it the project's coding standards explicitly |
 | Session handoff to another agent/session | Write `$AODD_PLANS/[FEATURE]/handoff.md` (sibling of, not the same file as, `ai-sdlc-task-progress.md`; format in `references/ai-sdlc-progress-spec.md` § Resume protocol) |
 | Bug investigation | `9arm-skills:debug-mantra` (companion) |

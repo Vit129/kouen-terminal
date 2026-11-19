@@ -181,8 +181,8 @@ existing `.metal` source string or a new adjacent shader file — check
 single-file-vs-multi-file convention).
 
 **Settings**: new `Toggle`-style picker in whichever `SettingsXxxView.swift` currently
-holds theme/appearance settings (find via `graphify query "settings appearance theme
-view"` at implementation time — not yet located this session), backed by
+holds theme/appearance settings (find via `rg` for the settings appearance theme
+view at implementation time — not yet located this session), backed by
 `OptionStore` (existing pattern, one new key `shaderPreset: String`).
 
 **Explicitly out of scope** (per user's choice): no user-authored shader code, no

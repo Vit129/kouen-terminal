@@ -50,7 +50,7 @@ the unit level.
 | **Requirement**: a new or changed capability, a rule users see, a new integration | Full | Phase 2 Dev subagent, Phase 4 | Phase 2 QA subagent (NFRs), Phase 3 scenarios RED, Phase 5 traceability + sign-off | Gates 1-3 | `PRODUCT.md`, `ARCHITECTURE.md`, `CONTEXT.md` (+ `DESIGN.md` with UI) |
 | Unclear which | Interview | Phase 1 resolves the kind, then the path above | | — | — |
 
-**Look before you pick.** Size is not known from the request; it comes from the code. Before choosing, check: the blast radius (graphify `blast_radius`/`affected`, or grep the token, component or function), how many screens or callers it reaches, and whether this was already "fixed" before (git log, past sessions). Then weigh it:
+**Look before you pick.** Size is not known from the request; it comes from the code. Before choosing, check: the blast radius (grep the token, component or function), how many screens or callers it reaches, and whether this was already "fixed" before (git log, past sessions). Then weigh it:
 - one place, first attempt → the path as it is;
 - wide reach (a color token used on 30 screens, a shared helper with many callers) → list every affected place in a short plan; QA checks each one (a regression list, not a spot check), even on the Logic or UX/UI path;
 - already failed once, or many small symptoms on one screen (clipping, wrapping, spacing) → stop patching symptom by symptom: Phase 1 lists all the symptoms first (QA turns each into a check that fails now), find the shared cause, then fix and re-run every check together (UI: `rules/gui-fixes.md`, 2 rounds then options).
@@ -128,7 +128,7 @@ No mechanical hook enforces these — treat "the user hasn't objected" as differ
   contract QA automation depends on existing, not something to rediscover per task. Full
   dev→QA handoff conventions (testid map, test-env requirements, schema consistency,
   DB strategy) → `skills/ai-sdlc/references/dev-qa-handoff.md`.
-- Graph-before-edit (if graphify is installed) and surgical changes (no drive-by refactors) apply in every phase.
+- Search-before-edit and surgical changes (no drive-by refactors) apply in every phase.
 - **Skill visibility + Self-Update, every phase:** name every skill invoked in the response text — never call one silently. Every
   skill learns the same way: when a phase hit a correction, a gotcha, or a
   wrong/missing step in the invoked skill, and the fix was verified, patch that skill's

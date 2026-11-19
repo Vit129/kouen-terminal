@@ -1444,8 +1444,6 @@ final class GitPanelView: NSView {
             let file = String(line.dropFirst(3))
 
             let isUnstaged = workTreeStatus != " " || indexStatus == "?"
-            // Graph preparation stages tracked outputs; local query/cache files stay local.
-            if file.hasPrefix("graphify-out/") { continue }
             if isUnstaged && !manuallyUnstagedFiles.contains(file) {
                 filesToAutoStage.append(file)
             }
