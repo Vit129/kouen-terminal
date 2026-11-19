@@ -400,9 +400,20 @@ public final class AgentSessionHistoryModel: ObservableObject {
             rawWindowed = Array(list.prefix(visibleCount))
         }
 
+        var currentProjectRecords: [AgentSessionRecord] = []
+        var remainingRecords = rawWindowed
+        if searchQuery.isEmpty, selectedScope == .workspace,
+           let activeRoot = repoRootCache[activeCWDProvider()] {
+            remainingRecords.removeAll { record in
+                guard repoRootCache[record.projectPath] == activeRoot else { return false }
+                currentProjectRecords.append(record)
+                return true
+            }
+        }
+
         // Search results must remain individual: grouping can hide the actual matching session.
-        let windowed = searchQuery.isEmpty ? Self.groupCrossRepoTasks(rawWindowed) : rawWindowed
-        cachedWindowedRecords = windowed
+        let windowed = searchQuery.isEmpty ? Self.groupCrossRepoTasks(remainingRecords) : remainingRecords
+        cachedWindowedRecords = currentProjectRecords + windowed
 
         let grouped: [(title: String, records: [AgentSessionRecord])]
         if !searchQuery.isEmpty {
@@ -418,6 +429,9 @@ public final class AgentSessionHistoryModel: ObservableObject {
                 buckets[grp, default: []].append(record)
             }
             var result: [(title: String, records: [AgentSessionRecord])] = []
+            if !currentProjectRecords.isEmpty {
+                result.append((title: "Current Project", records: currentProjectRecords))
+            }
             for grp in AgentHistoryDateGroup.allCases {
                 if let items = buckets[grp], !items.isEmpty {
                     result.append((title: grp.rawValue, records: items))

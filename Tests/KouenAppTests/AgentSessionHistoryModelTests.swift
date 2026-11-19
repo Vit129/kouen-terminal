@@ -37,6 +37,62 @@ final class AgentSessionHistoryModelTests: XCTestCase {
     }
 
 
+    func testTC6901_FE_BL_WorkspaceHistoryPrioritizesActiveRepository() {
+        let now = Date()
+        let model = AgentSessionHistoryModel(
+            repoRootResolver: { $0 == "/worktree/one" ? "/repo/one" : $0 },
+            activeCWDProvider: { "/repo/one" },
+            workspaceCWDsProvider: { ["/repo/one", "/repo/two"] }
+        )
+        model.selectedScope = .workspace
+        model.records = [
+            makeRecord(id: "newer", title: "Newer", projectPath: "/repo/two", updatedAt: now),
+            makeRecord(id: "active", title: "Active", projectPath: "/worktree/one", updatedAt: now.addingTimeInterval(-86_400))
+        ]
+        model.applyFilterNow()
+        XCTAssertEqual(model.displayRecords.map(\.id), ["active", "newer"])
+
+        model.activeCWDProvider = { "/repo/two" }
+        model.applyFilterNow()
+        XCTAssertEqual(model.displayRecords.map(\.id), ["newer", "active"])
+    }
+
+    func testTC6902_FE_BL_WorkspaceAndProjectKeepTheirRepositoryBoundaries() {
+        let model = AgentSessionHistoryModel(
+            repoRootResolver: { $0 },
+            activeCWDProvider: { "/scope/one" },
+            workspaceCWDsProvider: { ["/scope/one", "/scope/two"] }
+        )
+        model.records = [
+            makeRecord(id: "one", title: "One", projectPath: "/scope/one"),
+            makeRecord(id: "two", title: "Two", projectPath: "/scope/two"),
+            makeRecord(id: "outside", title: "Outside", projectPath: "/scope/three")
+        ]
+        model.selectedScope = .workspace
+        model.applyFilterNow()
+        XCTAssertEqual(Set(model.displayRecords.map(\.id)), ["one", "two"])
+
+        model.selectedScope = .repo
+        model.applyFilterNow()
+        XCTAssertEqual(model.displayRecords.map(\.id), ["one"])
+    }
+
+    func testTC6903_FE_BL_WorkspaceSearchPreservesRelevanceOrder() {
+        let model = AgentSessionHistoryModel(
+            repoRootResolver: { $0 },
+            activeCWDProvider: { "/search/one" },
+            workspaceCWDsProvider: { ["/search/one", "/search/two"] }
+        )
+        model.selectedScope = .workspace
+        model.records = [
+            makeRecord(id: "active", title: "regression6903", projectPath: "/search/one", updatedAt: Date(timeIntervalSinceNow: -60)),
+            makeRecord(id: "match", title: "regression6903", projectPath: "/search/two")
+        ]
+        model.searchQuery = "regression6903"
+        model.applyFilterNow()
+        XCTAssertEqual(model.displayRecords.map(\.id), ["match", "active"])
+    }
+
     func testDateGrouping() {
         let calendar = Calendar.current
         let now = Date()
