@@ -6,6 +6,18 @@ import XCTest
 /// notification: the `C`/`B` mark starts the clock, `D` fires `onCommandFinished` with the elapsed
 /// time + exit code. An `A`→`D` sequence with no command in between must not fire.
 final class CommandFinishedTests: XCTestCase {
+    func testTC6915_BE_BL_InterruptedCommandReleasesAbandonedSyncAtNextPrompt() {
+        let term = TerminalEmulator(cols: 40, rows: 4)
+        term.feed("\u{1b}]133;C\u{07}\u{1b}[?2026h")
+        term.feed("\u{1b}]133;D;130\u{07}")
+        XCTAssertTrue(term.modes.synchronizedOutput)
+        term.feed("\u{1b}]133;A\u{07}kouen-terminal > ")
+        XCTAssertFalse(term.modes.synchronizedOutput)
+
+        term.feed("\u{1b}[?1049h\u{1b}[?2026h\u{1b}]133;D;130\u{07}\u{1b}]133;A\u{07}")
+        XCTAssertTrue(term.modes.synchronizedOutput, "An alternate-screen prompt can belong to a nested command")
+    }
+
     func testFiresAfterCommandRunsWithExitCode() {
         let term = TerminalEmulator(cols: 20, rows: 4)
         var fired: (duration: TimeInterval, exit: Int?)?
