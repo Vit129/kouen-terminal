@@ -1,0 +1,93 @@
+Packages/KouenDaemon/Sources/KouenDaemon/ClaudeCodeHarness.swift
+  s_0d69914358c120::t_2cdb9252a38adb 196-198
+  s_34e9b5429ef1de::t_d7319200a9339a 215
+  s_34e9b5429ef1de::t_ad64ed5edbf774 68,71-72,157,162-163,166-167,173-176,183-195,199-200,214,256,324-330
+Packages/KouenDaemon/Sources/KouenDaemon/DaemonPipeReader.swift
+  s_6db4c8a81ae33f::t_75176f6cf5c3a3 2-26
+  s_6db4c8a81ae33f::t_165473076d8b6c 1,27-32
+Packages/KouenCore/Sources/KouenCore/Agents/AgentHistoryTranscriptSpool.swift
+  s_1857b2a364d523::t_0264a930e81696 7-50,52-55,57-63,65-69,72-85,88-117,119-146,151-164,174-179,220,222-223
+  s_0d69914358c120::t_f93562426ee944 64,86-87,118
+Packages/KouenCore/Sources/KouenCore/Agents/AgentHistoryScanner.swift
+  s_e382f91da3ff4b::t_452077faec6608 420,746,1251,1253,1262-1263,1284-1287,1290-1340,1361-1362,1508,1819
+Tests/KouenCoreTests/ProcessRunnerTests.swift
+  s_e382f91da3ff4b::t_e3c075c311f1c3 2,165-176
+  s_e382f91da3ff4b::t_f55dcfce4f6e29 98,102-107,110,114-119,121-164,177-178
+  s_e382f91da3ff4b::t_2de4eaa9b8a567 97,99-101,108-109,111-113,120
+Tests/KouenCoreTests/AgentHistoryStreamingTests.swift
+  s_e382f91da3ff4b::t_25c7d2ba20df3c 59-60
+  s_e382f91da3ff4b::t_f55dcfce4f6e29 45-58,61-67
+Tests/KouenDaemonTests/DaemonProcessFDTests.swift
+  s_6db4c8a81ae33f::t_b27cf11ad92a4d 110-112,198
+  s_6db4c8a81ae33f::t_75176f6cf5c3a3 1,208
+  s_6db4c8a81ae33f::t_8312e607a92ecb 2-72,74,76-83,85-109,113-115,117,130,132,143,145,147,150-157,162,174,176,178,180-193,196,200-202,206-207
+  s_6db4c8a81ae33f::t_a563b6954b08de 84,175,177
+  s_0d69914358c120::t_2cdb9252a38adb 149,158-161,163-173,179
+  s_0d69914358c120::t_c93702dc1af928 73,75,116,118-129,131,133-142,144,146,148,194-195,197,199,203-205
+Packages/KouenCore/Sources/KouenCore/Agents/AgentHistoryJSONLSequence.swift
+  s_e382f91da3ff4b::t_452077faec6608 26,31-35,62
+Packages/KouenCore/Sources/KouenCore/Platform/ProcessRunner.swift
+  s_34e9b5429ef1de::t_d7319200a9339a 264-265,350-360
+  s_e382f91da3ff4b::t_73644e6860b3d6 53-60,64,66-67,82-85,88-89,125,127-128,150,158,164-165,169,174,176,183,203,213,231-232,239,242,244,248-252,254,258-261,296,417,420,424,428,447-454,457,459,462-463,473-474
+  s_34e9b5429ef1de::t_eb893ea6354738 50-52,271,280,286-287,304-305,487-515
+Packages/KouenCore/Sources/KouenCore/Agents/AgentHistoryFTSIndex.swift
+  s_0d69914358c120::t_50a0549fad2279 66-69,79,85-90,92,213-214,259-301,787
+Packages/KouenDaemon/Sources/KouenDaemon/AgentRemoteControlDaemonService.swift
+  s_0d69914358c120::t_f37c9b9d7bea09 29-32
+Packages/KouenDaemon/Sources/KouenDaemon/AgyModelCatalog.swift
+  s_0d69914358c120::t_57cf12a6c347f9 2,42,46-52
+Packages/KouenDaemon/Sources/KouenDaemon/MobileBridgeServer.swift
+  s_0d69914358c120::t_dfc842767c7ccf 1533-1544,1554-1555,1565,1572,1576-1579,1583-1591,1600,1603-1604
+Tests/KouenCoreTests/AgentHistoryMultiAgentCoverageTests.swift
+  s_0d69914358c120::t_f1eca5424da730 160-190
+Tests/KouenCoreTests/AgentHistoryStorageLimitsTests.swift
+  s_0d69914358c120::t_1cd33f6e5345c0 1-91
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.3",
+  "base_commit_sha": "4abcc7911de675dda036b0919a7056814505ff6f",
+  "prompts": {},
+  "sessions": {
+    "s_0d69914358c120": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "a20defe3-cb24-4fc5-a4ff-686dc3a70c52",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Vit129 <vitosk129@gmail.com>"
+    },
+    "s_1857b2a364d523": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1f295-54b0-7af1-8d2a-67336528e826",
+        "model": "gpt-6.2-sol"
+      },
+      "human_author": "Vit129 <vitosk129@gmail.com>"
+    },
+    "s_34e9b5429ef1de": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1f2a1-43e7-72d0-99f9-1f50a5a1cb58",
+        "model": "gpt-6.2-sol"
+      },
+      "human_author": "Vit129 <vitosk129@gmail.com>"
+    },
+    "s_6db4c8a81ae33f": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1f285-c52f-77e3-a43f-f5055ecd471d",
+        "model": "gpt-6.2-sol"
+      },
+      "human_author": "Vit129 <vitosk129@gmail.com>"
+    },
+    "s_e382f91da3ff4b": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1f27c-02a9-7f90-8495-0586aec45777",
+        "model": "gpt-6.2-sol"
+      },
+      "human_author": "Vit129 <vitosk129@gmail.com>"
+    }
+  }
+}
