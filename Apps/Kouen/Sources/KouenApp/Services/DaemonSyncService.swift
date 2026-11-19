@@ -512,8 +512,23 @@ final class DaemonSyncService {
         incomingTree: PaneNode,
         browserLeaves: [BrowserLeaf]
     ) -> PaneNode {
-        guard Set(localTerminalOnly.allPaneIDs()) != Set(incomingTree.allPaneIDs()) else {
-            return localTree
+        if Set(localTerminalOnly.allPaneIDs()) == Set(incomingTree.allPaneIDs()) {
+            // Keep the browser split layout, but take the daemon's current terminal surfaces.
+            let incomingLeaves = Dictionary(incomingTree.allLeaves().map { ($0.id, $0) },
+                                            uniquingKeysWith: { first, _ in first })
+            func updatingTerminalLeaves(in node: PaneNode) -> PaneNode {
+                switch node {
+                case .leaf(let leaf):
+                    return .leaf(incomingLeaves[leaf.id] ?? leaf)
+                case .browser:
+                    return node
+                case .branch(let direction, let ratio, let first, let second):
+                    return .branch(direction: direction, ratio: ratio,
+                                   first: updatingTerminalLeaves(in: first),
+                                   second: updatingTerminalLeaves(in: second))
+                }
+            }
+            return updatingTerminalLeaves(in: localTree)
         }
         var rebuilt = incomingTree
         for leaf in browserLeaves {

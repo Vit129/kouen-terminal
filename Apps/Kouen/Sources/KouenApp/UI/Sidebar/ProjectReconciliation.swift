@@ -16,13 +16,13 @@ struct ProjectMovePreview {
 
 extension ProjectStore {
     func previewMoves(_ mapping: [String: String]) -> ProjectMovePreview? {
-        guard !mapping.isEmpty, Set(mapping.values).count == mapping.count else { return nil }
+        guard !mapping.isEmpty, Set(mapping.values.map(Self.directoryIdentity)).count == mapping.count else { return nil }
         let fm = FileManager.default
         var moves: [ProjectMovePreview.Move] = []
         for (old, new) in mapping.sorted(by: { $0.key < $1.key }) {
             guard projects.contains(where: { $0.path == old }),
                   !fm.fileExists(atPath: old),
-                  !projects.contains(where: { $0.path == new }),
+                  project(at: new) == nil,
                   WorkspaceRepositoryScanner.isPrimaryRepository(new),
                   let attributes = try? fm.attributesOfItem(atPath: new),
                   attributes[.type] as? FileAttributeType == .typeDirectory,

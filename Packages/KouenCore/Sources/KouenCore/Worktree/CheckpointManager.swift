@@ -74,8 +74,7 @@ public struct CheckpointManager: Sendable {
         .sorted { $0.turn < $1.turn }
     }
 
-    /// Full unified diff a checkpoint captured (`commit^..commit`) — what `⌘⌥D`'s Turn Diff
-    /// Reviewer shows, as opposed to `CheckpointInfo.diffStat`'s one-line-per-file summary.
+    /// Full unified diff a checkpoint captured (`commit^..commit`), used by Review Last Checkpoint.
     public func fullDiff(_ checkpoint: CheckpointInfo, cwd: String) -> String {
         runGitOutput(["diff", "\(checkpoint.commit)^..\(checkpoint.commit)"], in: cwd) ?? ""
     }

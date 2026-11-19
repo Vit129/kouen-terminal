@@ -42,6 +42,29 @@ final class AgentHistoryStreamingTests: XCTestCase {
         XCTAssertEqual(codexRecord?.latestTurns.last?.content, "last Codex")
     }
 
+    func test_TS_2315_BE_IT_CodexParseFailureKeepsCachedRolloutAndRetries() throws {
+        let initial = #"{"type":"session_meta","payload":{"id":"fixture","cwd":"/tmp"}}"# + "\n"
+            + #"{"type":"message","role":"user","content":"original prompt"}"#
+        let (root, fixture) = try tempFile(Data(initial.utf8))
+        defer { try? FileManager.default.removeItem(at: root) }
+        let url = root.appendingPathComponent("rollout-fixture.jsonl")
+        try FileManager.default.moveItem(at: fixture, to: url)
+        var cache: [String: AgentHistoryScanner.FileCacheEntry] = [:]
+
+        let original = try XCTUnwrap(AgentHistoryScanner.readCodexRollouts(baseDir: root, fileCache: &cache).first)
+        XCTAssertEqual(original.firstPrompt, "original prompt")
+        try Data((initial + "\n{broken").utf8).write(to: url)
+        let recovered = AgentHistoryScanner.readCodexRollouts(baseDir: root, fileCache: &cache)
+        XCTAssertEqual(recovered.first?.firstPrompt, original.firstPrompt)
+        XCTAssertEqual(cache.count, 1)
+        XCTAssertEqual(cache.values.first?.size, initial.utf8.count)
+
+        let repaired = initial.replacingOccurrences(of: "original prompt", with: "repaired longer prompt")
+        try Data(repaired.utf8).write(to: url)
+        let rescanned = AgentHistoryScanner.readCodexRollouts(baseDir: root, fileCache: &cache)
+        XCTAssertEqual(rescanned.first?.firstPrompt, "repaired longer prompt")
+    }
+
     private func tempFile(_ data: Data) throws -> (URL, URL) {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)

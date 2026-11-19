@@ -30,17 +30,32 @@ Source: `KouenDesign.swift`
 
 ### Projects
 
-- Show running sessions and the idle repository row above a compact, collapsed-by-default disclosure for discovered worktrees. Show the count on the disclosure and include only worktrees whose directories still exist.
+- Keep the current group header at the top of the scrolling project list. The next group header pushes it out as it reaches the top.
+- Repository rows start expanded and can be collapsed by clicking their header. Group headers and discovered worktree lists collapse independently.
+
+- Show the primary checkout first with its branch name, house icon, and relative last-activity time. Dim the row when no session is open there. Show other running sessions above a compact, collapsed-by-default disclosure for discovered worktrees. Show the count on the disclosure and include only worktrees whose directories still exist.
+- The Projects and group header plus controls open the same three-item menu: Browse folder…, Clone from URL…, and Create new project…. A group import stays in that group and adds projects without opening a session. The repository-row plus opens a new session.
+- Clone and Create show the destination path and a Local Mac label. Add the checkout to Projects after Git succeeds. If registration fails, retry with the existing checkout.
 - Keep a refresh action next to Add in the Projects header; refresh rescans source folders and reloads linked worktrees so deleted checkout directories leave the sidebar.
 
 - Folder import and rescan show primary Git checkout candidates. Reconciliation presents the saved and proposed paths together, with an explicit action for uncertain matches.
 
 ### Session History
+
+- Open session history in the sidebar’s History tab. View → Show Session History (⌃⌘H) expands the sidebar and selects that tab.
+
+- Workspace history shows the active tab's repository first under Current Project, followed by the date-grouped history of other open repositories. Search results retain relevance order.
+
 - Keep history rows compact: one session title, a single metadata line, and search evidence only while searching. Show token usage and transcript content in selected-session details.
 - Keep repository scope and agent filters visible at narrow sidebar widths; agent shortcuts scroll horizontally while the trailing More menu remains fixed. The More menu holds other providers and shortcut management.
 - Shortcut management numbers the selected agents and lets users drag the handle to reorder them; selection changes append and removal closes the gaps.
 - Search counts distinguish matching sessions from searchable sessions under the active scope and agent filters. Empty results offer clear/reset actions.
 - Selected details label the first prompt and latest turns, identify speaker roles, and show worktree availability before resume actions.
+
+### Review Changes
+
+- Use the File Preview split beside the terminal. Review Changes has a close button in the tab bar and Refresh above the diff. ⌘L opens or closes the active review tab.
+- Show the file and change kind before the diff. Click a line or Shift-click within a hunk to select a range. Keep comments visible through refresh and expose Resolve and Reattach actions.
 
 ## Avoid
 - System accent blue in chrome

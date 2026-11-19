@@ -85,6 +85,7 @@ public final class TerminalEmulator: VTParserHandler {
     /// wall-clock step (NTP/DST/manual change) between C and D would make it negative (suppressing a
     /// long-command notification) or inflated (firing a spurious one).
     private var commandStartedAt: DispatchTime?
+    private var interruptedWithSynchronizedOutput = false
     /// Blocks (command + output, OSC 133 `C`→`D`), decoupled from scrollback so they survive
     /// `dropHistoryHead` eviction. See `commandText(atPromptLine:)`.
     private let blockStore = TerminalBlockStore()
@@ -599,6 +600,12 @@ public final class TerminalEmulator: VTParserHandler {
         guard let kind = parts.first?.first else { return }
         switch kind {
         case "A":
+            // SIGINT can leave the interrupted program's redraw batch open.
+            // Release it when the shell prompt arrives on the primary screen.
+            if interruptedWithSynchronizedOutput, !onAlternateScreen {
+                modes.synchronizedOutput = false
+            }
+            interruptedWithSynchronizedOutput = false
             current.markPromptStart()
             commandStartedAt = nil // new prompt: no command running yet
             pendingBlockPromptLine = current.historyCount + current.cursorRow
@@ -607,6 +614,7 @@ public final class TerminalEmulator: VTParserHandler {
             // time the user spent typing — B alone still covers integrations that never emit C.
             commandStartedAt = .now()
         case "C":
+            interruptedWithSynchronizedOutput = false
             commandStartedAt = .now()
             if let promptLine = pendingBlockPromptLine, parts.count >= 2,
                let command = Self.decodeBlockCommand(parts[1]) {
@@ -617,6 +625,7 @@ public final class TerminalEmulator: VTParserHandler {
             }
         case "D":
             let exitCode = parts.count >= 2 ? Int(parts[1]) : nil
+            interruptedWithSynchronizedOutput = exitCode == 130 && modes.synchronizedOutput
             current.markCommandFinished(exit: exitCode)
             modes.resetForShellPrompt()
             blockStore.finish(
@@ -823,7 +832,9 @@ public final class TerminalEmulator: VTParserHandler {
             case 1004: modes.focusReporting = set          // focus in/out reporting
             case 1007: modes.alternateScroll = set         // wheel → arrows on alt screen
             case 2004: modes.bracketedPaste = set          // bracketed paste
-            case 2026: modes.synchronizedOutput = set      // synchronized output (no tearing)
+            case 2026:
+                modes.synchronizedOutput = set
+                interruptedWithSynchronizedOutput = false
             case 1: modes.cursorKeysApplication = set      // DECCKM
             case 47, 1047: switchAlternate(set, clearOnEnter: true, saveCursor: false)
             case 1049: switchAlternate(set, clearOnEnter: true, saveCursor: true)
@@ -959,6 +970,7 @@ public final class TerminalEmulator: VTParserHandler {
         // A full reset abandons any in-flight command timing — otherwise a 133;D after
         // ESC c reports a spurious command-finished with a pre-reset start time.
         commandStartedAt = nil
+        interruptedWithSynchronizedOutput = false
         parser.reset()
     }
 }

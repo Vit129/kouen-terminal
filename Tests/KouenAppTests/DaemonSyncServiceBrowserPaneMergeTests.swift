@@ -30,6 +30,29 @@ final class DaemonSyncServiceBrowserPaneMergeTests: XCTestCase {
         XCTAssertEqual(merged.allBrowserLeaves().map(\.id), [browser.id])
     }
 
+    func test_TS_2313_FE_UT_adoptsDaemonSurfaceChangesWithoutResettingBrowserLayout() {
+        let terminal = PaneLeaf()
+        let browser = BrowserLeaf(id: PaneID(), url: URL(string: "about:blank")!)
+        let localTree = PaneNode.branch(
+            direction: .vertical, ratio: 0.4, first: .browser(browser), second: .leaf(terminal)
+        )
+        let newSurface = PaneSurface(id: SurfaceID())
+        var updatedTerminal = terminal
+        updatedTerminal.surfaces.append(newSurface)
+        updatedTerminal.activeSurfaceID = newSurface.id
+
+        let merged = DaemonSyncService.mergedRootPane(
+            localTree: localTree,
+            localTerminalOnly: .leaf(terminal),
+            incomingTree: .leaf(updatedTerminal),
+            browserLeaves: [browser]
+        )
+
+        XCTAssertEqual(merged, .branch(
+            direction: .vertical, ratio: 0.4, first: .browser(browser), second: .leaf(updatedTerminal)
+        ))
+    }
+
     func testAdoptsDaemonSplitInsteadOfDiscardingIt() {
         let originalTerminal = terminalLeaf()
         let browser = BrowserLeaf(id: PaneID(), url: URL(string: "https://example.com")!)

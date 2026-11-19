@@ -24,7 +24,8 @@ The maintainer (Vit129). Personal hard fork of `robzilla1738/harness-terminal`, 
 - Sidebar Git workflows, Recipes/Composer/zoxide picker, hint mode
 - Four experience modes: Plain Terminal, Persistent Terminal, Full Terminal, Agent Workspace
 - **Agent safety net** — automatic per-turn checkpoints (`kouen-cli undo`), two-tier build/test verification (`kouen-cli verify`, opt-in `verify-on-turn`), and write-origin guards refusing an automation write onto a protected branch, a dirty unisolated checkout, or a surface a human is actively typing in
-- **Turn review & context tools** — Turn Diff Reviewer (⌘⌥D) to accept/revert an agent's last turn against its checkpoint; Quick Context Injector (⌘K) to resolve `@diff`/`@file`/`@last`/`@error`/`@builderror` tokens straight into a prompt
+- **Review Changes (⌘L)** — review staged, unstaged, and new files next to the terminal, add line comments, and send them to a selected agent in the same worktree. LazyGit handles Git operations. Review Last Checkpoint remains available in View.
+- **Quick Context Injector (⌘K)** — resolves `@diff`/`@file`/`@last`/`@error`/`@builderror` tokens into a prompt.
 - **Fleet view** — one sidebar tab flattening every live session across every workspace, needs-attention-first, reached mainly via a notification's "jump to session" action
 - **`kouen-cli history`/`task pack-pr`** — cross-session agent transcript search/resume, and PR-description assembly from a tracked feature's diff/gates/checklist
 - **Orchestrator & Agent Swarm (P44)** — a CLI agent decomposes a goal into Tasks, spawns headless or interactive Workers, and drives them to merge-ready with a bounded auto-fix loop; inline task status on tabs and sidebar

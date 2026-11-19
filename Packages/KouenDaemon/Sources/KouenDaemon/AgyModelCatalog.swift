@@ -1,4 +1,5 @@
 import Foundation
+import KouenCore
 
 /// agy's `/model` choices, read from `agy models` instead of a hand-copied list so a model agy adds
 /// shows up on the phone without a Kouen release. Cached for a while: the call hits the network.
@@ -38,20 +39,15 @@ public enum AgyModelCatalog {
         lock.lock(); defer { lock.unlock() }
         if let cached, Date().timeIntervalSince(cached.at) < ttl { return cached.catalog }
         guard let bin = AgentRemoteControlDaemonService.resolveExecutable(named: "agy") else { return cached?.catalog }
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: bin)
-        process.arguments = ["models"]
-        let pipe = Pipe()
-        process.standardOutput = pipe
-        process.standardError = FileHandle.nullDevice
-        guard (try? process.run()) != nil else { return cached?.catalog }
-        // It fetches over the network; a hang must not wedge the bridge thread waiting on it.
-        DispatchQueue.global().asyncAfter(deadline: .now() + 15) { if process.isRunning { process.terminate() } }
-        let data = pipe.fileHandleForReading.readDataToEndOfFile()
-        process.waitUntilExit()
-        let catalog = parse(String(decoding: data, as: UTF8.self))
-        guard !catalog.models.isEmpty else { return cached?.catalog }
+        guard let catalog = load(executable: bin) else { return cached?.catalog }
         cached = (catalog, Date())
         return catalog
+    }
+
+    static func load(executable: String) -> Catalog? {
+        let result = ProcessRunner.run(executable: executable, arguments: ["models"], timeout: 15)
+        guard !result.isTimedOut, result.exitCode != -1 else { return nil }
+        let catalog = parse(result.stdout)
+        return catalog.models.isEmpty ? nil : catalog
     }
 }

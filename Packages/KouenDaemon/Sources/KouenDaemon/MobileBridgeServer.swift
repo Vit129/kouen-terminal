@@ -1527,15 +1527,21 @@ public final class MobileBridgeServer: @unchecked Sendable {
         init(_ text: String) { self.text = text }
     }
 
-    /// Lock-protected accumulator for a `Process` pipe's `readabilityHandler` (which Foundation
-    /// invokes on its own background dispatch queue) — Swift 6 strict concurrency rejects a
-    /// captured `var Data` mutated from that closure even behind a manually-paired `NSLock`, so
-    /// the lock has to live inside a class the compiler can see is safe to share.
     private final class PipeBuffer: @unchecked Sendable {
         private let lock = NSLock()
         private var data = Data()
-        func append(_ chunk: Data) { lock.lock(); data.append(chunk); lock.unlock() }
-        func snapshot() -> Data { lock.lock(); defer { lock.unlock() }; return data }
+
+        func append(_ chunk: Data) {
+            lock.lock()
+            defer { lock.unlock() }
+            data.append(chunk)
+        }
+
+        func snapshot() -> Data {
+            lock.lock()
+            defer { lock.unlock() }
+            return data
+        }
     }
 
     struct ProcessRunResult: Equatable, Sendable {
@@ -1545,8 +1551,8 @@ public final class MobileBridgeServer: @unchecked Sendable {
         var timedOut: Bool
     }
 
-    /// Unified process runner with concurrent pipe draining and hard timeout.
-    /// Drains both stdout and stderr concurrently via PipeBuffer to prevent pipe buffer deadlocks.
+    /// The mobile diff consumes the complete output, including patches larger than
+    /// ProcessRunner's capture limit. Drain both streams before returning.
     static func runProcess(
         executableURL: URL,
         arguments: [String],
@@ -1556,47 +1562,33 @@ public final class MobileBridgeServer: @unchecked Sendable {
         let process = Process()
         process.executableURL = executableURL
         process.arguments = arguments
-        if let cwd = cwd, !cwd.isEmpty {
-            process.currentDirectoryURL = URL(fileURLWithPath: cwd)
-        }
+        if let cwd, !cwd.isEmpty { process.currentDirectoryURL = URL(fileURLWithPath: cwd) }
         let outPipe = Pipe()
         let errPipe = Pipe()
         process.standardOutput = outPipe
         process.standardError = errPipe
-
-        let outBuffer = PipeBuffer()
-        let errBuffer = PipeBuffer()
         let terminated = DispatchSemaphore(value: 0)
         process.terminationHandler = { _ in terminated.signal() }
-        outPipe.fileHandleForReading.readabilityHandler = { handle in
-            let chunk = handle.availableData
-            if !chunk.isEmpty { outBuffer.append(chunk) }
-        }
-        errPipe.fileHandleForReading.readabilityHandler = { handle in
-            let chunk = handle.availableData
-            if !chunk.isEmpty { errBuffer.append(chunk) }
-        }
-        defer {
-            outPipe.fileHandleForReading.readabilityHandler = nil
-            errPipe.fileHandleForReading.readabilityHandler = nil
-            // Close explicitly: callers like `runPairingLoop` run inside one never-ending GCD
-            // block whose autorelease pool never drains, so waiting for dealloc leaked 2 fds
-            // per call until the daemon hit EMFILE.
-            try? outPipe.fileHandleForReading.close()
-            try? errPipe.fileHandleForReading.close()
-        }
-
+        defer { process.terminationHandler = nil }
         do {
             try process.run()
         } catch {
-            // `run()` failed, so Process never closed the parent's write ends either.
-            outPipe.fileHandleForReading.readabilityHandler = nil
-            errPipe.fileHandleForReading.readabilityHandler = nil
-            try? outPipe.fileHandleForWriting.close()
-            try? errPipe.fileHandleForWriting.close()
+            for pipe in [outPipe, errPipe] {
+                try? pipe.fileHandleForReading.close()
+                try? pipe.fileHandleForWriting.close()
+            }
             return ProcessRunResult(status: -1, stdout: "", stderr: error.localizedDescription, timedOut: false)
         }
 
+        let readers = DispatchGroup()
+        let outBuffer = PipeBuffer()
+        let errBuffer = PipeBuffer()
+        for (pipe, buffer) in [(outPipe, outBuffer), (errPipe, errBuffer)] {
+            try? pipe.fileHandleForWriting.close()
+            DispatchQueue.global(qos: .userInitiated).async(group: readers) {
+                DaemonPipeReader.drain(pipe.fileHandleForReading, from: process, consume: buffer.append)
+            }
+        }
         let timedOut = terminated.wait(timeout: .now() + timeoutSeconds) == .timedOut
         if timedOut && process.isRunning {
             process.terminate()
@@ -1605,20 +1597,11 @@ public final class MobileBridgeServer: @unchecked Sendable {
             }
         }
         process.waitUntilExit()
-        // The handlers can still be holding the final chunk (gh prints the PR URL last), so
-        // detach them and read whatever is left before snapshotting.
-        outPipe.fileHandleForReading.readabilityHandler = nil
-        errPipe.fileHandleForReading.readabilityHandler = nil
-        outBuffer.append(outPipe.fileHandleForReading.readDataToEndOfFile())
-        errBuffer.append(errPipe.fileHandleForReading.readDataToEndOfFile())
-
-        let outStr = String(data: outBuffer.snapshot(), encoding: .utf8) ?? ""
-        let errStr = String(data: errBuffer.snapshot(), encoding: .utf8) ?? ""
-
+        readers.wait()
         return ProcessRunResult(
             status: process.terminationStatus,
-            stdout: outStr,
-            stderr: errStr,
+            stdout: String(data: outBuffer.snapshot(), encoding: .utf8) ?? "",
+            stderr: String(data: errBuffer.snapshot(), encoding: .utf8) ?? "",
             timedOut: timedOut
         )
     }

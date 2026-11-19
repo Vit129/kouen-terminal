@@ -42,6 +42,19 @@ final class IPCCodecTests: XCTestCase {
         }
     }
 
+    func testReviewFeedbackProtocolVersionAndTypedPayload() throws {
+        XCTAssertEqual(ipcProtocolVersion, 15)
+        let target = ReviewFeedbackTarget(surfaceID: UUID().uuidString, ptyInstance: UUID(), generation: 2,
+            agentPID: 45, agentBirth: "123:456", agentKind: .codex)
+        let head = String(repeating: "a", count: 40)
+        let binding = ReviewWorktreeBinding(root: "/test", gitDirectory: "/test/.git", branch: "feature", head: head)
+        let request = ReviewFeedbackRequest(target: target, worktree: binding, headSHA: head, attemptID: UUID(), text: "Review")
+        var packet = try IPCCodec.encode(IPCEnvelope(request: .sendReviewFeedback(request)))
+        guard case let .sendReviewFeedback(decoded)? = try IPCCodec.decodeRequest(from: &packet)?.request
+        else { return XCTFail("Expected review feedback request") }
+        XCTAssertEqual(decoded, request)
+    }
+
     func testLegacyNewTabRequestsDecodeWithoutShell() throws {
         let workspaceID = UUID()
         let payload = #"{"request":{"newTab":{"workspaceID":"\#(workspaceID.uuidString)","cwd":"/tmp/project"}}}"#.data(using: .utf8)!
@@ -74,6 +87,8 @@ final class IPCCodecTests: XCTestCase {
     func testResponseRoundTripIsStable() throws {
         let responses: [IPCResponse] = [
             .ok,
+            .reviewFeedbackDelivery(.pasted),
+            .reviewFeedbackDelivery(.worktreeChanged),
             .pong,
             .tabID(UUID()),
             .paneID(UUID()),

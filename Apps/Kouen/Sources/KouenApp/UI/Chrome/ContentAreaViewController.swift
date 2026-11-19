@@ -8,12 +8,6 @@ final class ContentAreaViewController: NSViewController, TerminalTabBarDelegate 
     private let tabBar = TerminalTabBarView()
     private let terminalHost = NSView()
     private let tabBarDivider = KouenDesign.divider()
-    private var historyPanel: SessionHistoryPanelController!
-    var isHistoryPanelVisible: Bool { historyPanel?.isVisible ?? false }
-    var onHistoryPanelVisibilityChanged: ((Bool) -> Void)? {
-        didSet { historyPanel?.onVisibilityChanged = onHistoryPanelVisibilityChanged }
-    }
-
     private nonisolated(unsafe) var copySelectionMonitor: Any?
     private var pasteboardCountAtMouseDown: Int = NSPasteboard.general.changeCount
 
@@ -28,6 +22,12 @@ final class ContentAreaViewController: NSViewController, TerminalTabBarDelegate 
     var currentFilePath: String? { filePreview.currentFilePath }
 
     func openFileTab(path: String) { filePreview.openFileTab(path: path) }
+    func toggleReviewChanges() {
+        guard let tab = SessionCoordinator.shared.snapshot.activeWorkspace?.activeTab else { return }
+        let pane = tab.rootPane.allLeaves().first { $0.id == tab.activePaneID }
+        let cwd = pane?.surfaces.first { $0.id == pane?.activeSurfaceID }?.cwd ?? tab.cwd
+        filePreview.toggleReviewChanges(tabID: tab.id.uuidString, cwd: cwd)
+    }
     func resolveTerminalLinkPath(_ path: String) -> String? { filePreview.resolveTerminalLinkPath(path) }
     func closeFileTab(id: FileTabID) { filePreview.closeFileTab(id: id) }
     func selectFileTab(id: FileTabID) { filePreview.selectFileTab(id: id) }
@@ -51,7 +51,6 @@ final class ContentAreaViewController: NSViewController, TerminalTabBarDelegate 
 
     func applyChrome() {
         KouenDesign.makeClear(view)
-        historyPanel?.applyChrome()
         refreshTerminalHostFill()
         filePreview.refreshEditorPanelFill()
         tabBar.applyChrome()
@@ -88,9 +87,6 @@ final class ContentAreaViewController: NSViewController, TerminalTabBarDelegate 
         view.addSubview(terminalHost)
         view.addSubview(tabBar)
         view.addSubview(tabBarDivider)
-        historyPanel = SessionHistoryPanelController()
-        historyPanel.onVisibilityChanged = onHistoryPanelVisibilityChanged
-        historyPanel.install(in: view, below: tabBarDivider.bottomAnchor)
 
         NSLayoutConstraint.activate([
             tabBar.topAnchor.constraint(equalTo: view.topAnchor),
@@ -102,7 +98,7 @@ final class ContentAreaViewController: NSViewController, TerminalTabBarDelegate 
             tabBarDivider.trailingAnchor.constraint(equalTo: view.trailingAnchor),
 
             terminalHost.topAnchor.constraint(equalTo: tabBarDivider.bottomAnchor),
-            terminalHost.trailingAnchor.constraint(equalTo: historyPanel.view.leadingAnchor),
+            terminalHost.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             terminalHost.bottomAnchor.constraint(equalTo: view.bottomAnchor),
         ])
         updateTrafficLightClearance()
@@ -124,18 +120,6 @@ final class ContentAreaViewController: NSViewController, TerminalTabBarDelegate 
         reloadTabBar()
         filePreview.switchToTab(tabID: SessionCoordinator.shared.snapshot.activeWorkspace?.activeTab?.id.uuidString)
         filePreview.restoreEditorState()
-    }
-
-    func installHistoryPanel(_ hostingView: NSView) {
-        historyPanel.install(hostingView: hostingView)
-    }
-
-    func toggleHistoryPanel() {
-        historyPanel.toggle()
-    }
-
-    func setHistoryPanelVisible(_ visible: Bool, notify: Bool = true) {
-        historyPanel.setVisible(visible, notify: notify)
     }
 
     private func installCopySelectionToast() {
@@ -164,7 +148,6 @@ final class ContentAreaViewController: NSViewController, TerminalTabBarDelegate 
 
     override func viewDidLayout() {
         super.viewDidLayout()
-        historyPanel?.constrainToAvailableWidth()
         guard paneLifecycle.paneContainer == nil || paneLifecycle.pendingReload != nil else { return }
         guard terminalHost.bounds.width > 1, terminalHost.bounds.height > 1 else { return }
         let force = paneLifecycle.pendingReload ?? true

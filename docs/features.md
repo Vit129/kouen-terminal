@@ -89,14 +89,15 @@ surfaces as a desktop notification instead of silently compounding into the next
   since running a full suite after every turn is too expensive a default). Enable tier1
   automatically after every agent turn with `set-option -g verify-on-turn on`; a failing check
   flips the tab to an error state with a desktop notification you can act on directly (see
-  Turn Diff Reviewer below).
+  Review Last Checkpoint below).
 - **Write-origin guards** — every PTY write is tagged `human` or `automation`. An automation
   write is refused (not silently accepted) when: a human typed in that surface within the last
   1.5s (avoids stepping on a live human edit), the tab sits directly on a protected branch
   (`main`/`master`/`develop`) with no worktree isolation, or the tab's checkout already has
   uncommitted changes with no worktree isolation — each a guard against an agent clobbering work
   that isn't its own. Worktree-isolated tabs are exempt from the branch/dirty-tree checks by design.
-- **Turn Diff Reviewer (⌘⌥D)** — review the diff since the last checkpoint in a floating panel;
+- **Review Changes (⌘L)** — view working tree diffs and send review comments to an agent.
+- **Review Last Checkpoint** — open the checkpoint diff from the menu.
   `y` accepts, `r` reverts to the checkpoint, `esc` dismisses.
 - **Quick Context Injector (⌘K)** — a HUD that resolves `@`-mention tokens (`@diff`, `@file:<path>`,
   `@last`, `@error`, `@builderror` for the last failed `verify-on-turn` output, `@pane:<id>`,

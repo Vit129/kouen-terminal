@@ -65,6 +65,7 @@ public final class RealPty: @unchecked Sendable {
     /// `onExit` for — the child that replaced it. The previous code let the old
     /// exit-watcher's `close()` kill the freshly respawned shell.
     private var generation: UInt64 = 0
+    private let reviewInstance = UUID()
     /// Exit status the `waitpid` watcher reaped, tagged with its child's generation. The EOF
     /// path usually wins the `isClosed` race but cannot reap the zombie (the watcher's blocked
     /// `waitpid` claims it) — it reads this record to still deliver a real status to `onExit`.
@@ -163,6 +164,7 @@ public final class RealPty: @unchecked Sendable {
     private var scrollbackBytes: Int = 0
     private var maxScrollbackBytes: Int
     private var nextSequence: UInt64 = 1
+    private var reviewOutputStart: UInt64 = 1
     private let scrollbackLock = NSLock()
     /// Optional on-disk persistence of the scrollback (set when the surface is created with a
     /// `scrollbackURL`), so history survives a daemon restart/crash and reattach replays it.
@@ -332,6 +334,7 @@ public final class RealPty: @unchecked Sendable {
         }
         // Parent: the child holds its own copy-on-write view; free ours.
         freeChildStrings()
+        markReviewOutputStart()
         lifecycleLock.lock()
         generation &+= 1
         self.master = spawned.master
@@ -377,7 +380,57 @@ public final class RealPty: @unchecked Sendable {
         self.scrollbackFile = nil
     }
 
-    public func write(_ data: Data) {
+    func reviewTarget(for agent: AgentSnapshot) -> ReviewFeedbackTarget? {
+        lifecycleLock.lock()
+        defer { lifecycleLock.unlock() }
+        guard let birth = reviewAgentBirthLocked(agent.pid) else { return nil }
+        return ReviewFeedbackTarget(surfaceID: id, ptyInstance: reviewInstance, generation: generation,
+                                    agentPID: agent.pid, agentBirth: birth, agentKind: agent.kind)
+    }
+
+    func reviewAgentDirectory(_ pid: Int32) -> String? { Self.cwd(for: pid) }
+
+    private func reviewAgentBirthLocked(_ pid: Int32) -> String? {
+        guard !isClosed, master >= 0, pid > 1, pid != childPID else { return nil }
+        let group = getpgid(pid)
+        guard group > 0, group != childPID, tcgetpgrp(master) == group else { return nil }
+        return SSHTunnelProcessIdentity.read(pid)?.birth
+    }
+
+    var reviewOutputSequence: UInt64 {
+        scrollbackLock.lock()
+        defer { scrollbackLock.unlock() }
+        return nextSequence
+    }
+
+    private func markReviewOutputStart() {
+        scrollbackLock.lock()
+        reviewOutputStart = nextSequence
+        scrollbackLock.unlock()
+    }
+
+    /// A multiline paste sent to a client without bracketed paste could submit a command.
+    /// Observe its DEC mode from this PTY generation's output. Persisted history can contain
+    /// mode changes from an old process, so it cannot establish the current paste mode.
+    func reviewPasteSequence() -> UInt64? {
+        let (segments, start, sequence) = scrollbackLock.withLock {
+            let limit = UInt64(1024 * 1024)
+            let start = max(reviewOutputStart, nextSequence - min(nextSequence, limit))
+            let segments = scrollback[scrollbackHead...]
+                .filter { $0.sequence &+ UInt64($0.data.count) > start }
+                .map { ScrollbackReplaySegment(sequence: $0.sequence, data: $0.data) }
+            return (segments, start, nextSequence)
+        }
+        guard let terminal = KouenGridTerminal(cols: 80, rows: 24) else { return nil }
+        terminal.feed(Self.replayData(from: segments, fromSequence: start))
+        guard terminal.modes.bracketedPaste, sequence == reviewOutputSequence else { return nil }
+        return sequence
+    }
+
+    public func write(_ data: Data) { enqueueWrite(data) }
+
+    func enqueueWrite(_ data: Data, reviewTarget: ReviewFeedbackTarget? = nil,
+                      agentDirectory: String? = nil, outputSequence: UInt64? = nil) {
         guard !data.isEmpty else { return }
         // Off the caller's thread (see `writeQueue`): the daemon must never block on a full PTY.
         writeQueue.async { [weak self] in
@@ -390,6 +443,14 @@ public final class RealPty: @unchecked Sendable {
             // bytes there would corrupt it. The dup owns a distinct fd the OS won't recycle until we
             // close it and keeps the original PTY open, so the write can only ever reach this PTY.
             self.lifecycleLock.lock()
+            if let target = reviewTarget,
+               target.ptyInstance != self.reviewInstance || target.generation != self.generation
+                   || self.reviewAgentBirthLocked(target.agentPID) != target.agentBirth
+                   || self.reviewAgentDirectory(target.agentPID) != agentDirectory
+                   || self.reviewOutputSequence != outputSequence {
+                self.lifecycleLock.unlock()
+                return
+            }
             let fd = self.master
             let dupFd = fd >= 0 ? sysDup(fd) : -1
             self.lifecycleLock.unlock()
@@ -468,6 +529,7 @@ public final class RealPty: @unchecked Sendable {
             scrollbackHead = 0
             scrollbackBytes = 0
             nextSequence = 1
+            reviewOutputStart = 1
             scrollbackLock.unlock()
             scrollbackFile?.reset()
         }
@@ -497,6 +559,7 @@ public final class RealPty: @unchecked Sendable {
         scrollbackHead = 0
         scrollbackBytes = 0
         nextSequence = 1
+        reviewOutputStart = 1
         scrollbackLock.unlock()
         scrollbackFile?.reset()
     }
@@ -549,6 +612,7 @@ public final class RealPty: @unchecked Sendable {
             throw PtyError.launchFailed
         }
         freeChildStrings()
+        markReviewOutputStart()
         lifecycleLock.lock()
         generation &+= 1
         let gen = generation
@@ -1297,7 +1361,10 @@ public final class RealPty: @unchecked Sendable {
     }
 
     private func watchForExit(pid: pid_t, generation gen: UInt64) {
-        DispatchQueue.global().async { [weak self] in
+        // A dedicated thread, not the global pool: this waitpid blocks for the child's whole
+        // lifetime, so one pool worker per live pane exhausted GCD's 64-thread limit and stalled
+        // every other global-queue job in the daemon.
+        let watcher = Thread { [weak self] in
             guard let self, pid > 0 else { return }
             var status: Int32 = 0
             let reaped = waitpid(pid, &status, 0)
@@ -1311,6 +1378,9 @@ public final class RealPty: @unchecked Sendable {
             self.lifecycleLock.unlock()
             self.childEnded(generation: gen, exitStatus: decoded)
         }
+        watcher.name = "kouen.pty.waitpid"
+        watcher.stackSize = 64 * 1024
+        watcher.start()
     }
 
     /// Mark `gen`'s child as reaped (its `waitpid` watcher returned), pruning to a bound. Caller

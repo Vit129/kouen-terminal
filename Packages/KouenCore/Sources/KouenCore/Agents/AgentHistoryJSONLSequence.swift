@@ -23,12 +23,16 @@ final class AgentHistoryJSONLSequence: Sequence {
         return values.fileSize == fileSize && values.contentModificationDate == modifiedAt
     }
 
-    init?(url: URL) {
+    init?(url: URL, validateJSON: Bool = false) {
         self.url = URL(fileURLWithPath: url.path)
         guard let values = try? self.url.resourceValues(forKeys: [.contentModificationDateKey, .fileSizeKey]),
               let modifiedAt = values.contentModificationDate else { return nil }
         self.modifiedAt = modifiedAt
-        guard let result = try? AgentHistoryScanner.forEachJSONLLine(from: self.url, { _, _ in }), result.lineCount > 0 else { return nil }
+        guard let result = try? AgentHistoryScanner.forEachJSONLLine(from: self.url, { line, _ in
+            if validateJSON, historyJSONObject(line) == nil {
+                throw AgentHistoryScanner.JSONLReadError.invalidRecord
+            }
+        }), result.lineCount > 0 else { return nil }
         count = result.lineCount
         fileSize = result.fileSize
         guard values.fileSize == fileSize, isValid else { return nil }
@@ -55,6 +59,7 @@ final class AgentHistoryJSONLSequence: Sequence {
         deinit { try? handle?.close() }
 
         func next() -> Data? {
+            guard !owner.failed else { return nil }
             while true {
                 if position == chunk.count && !eof {
                     do {

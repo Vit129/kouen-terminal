@@ -165,13 +165,17 @@ public enum BannerShortcutRegistry {
         id: "contextInjector", title: "Quick Context Injector",
         modifiers: .command, keyChar: "k")
 
-    public static let turnDiffReviewer = Keybinding(
-        id: "turnDiffReviewer", title: "Turn Diff Reviewer",
-        modifiers: [.command, .option], keyChar: "d")
+    public static let reviewChanges = Keybinding(
+        id: "reviewChanges", title: "Review Changes",
+        modifiers: .command, keyChar: "l")
 
     public static let toggleSidebar = Keybinding(
         id: "toggleSidebar", title: "Toggle Sidebar",
         modifiers: .command, keyChar: "\\")
+
+    public static let showSessionHistory = Keybinding(
+        id: "showSessionHistory", title: "Show Session History",
+        modifiers: [.command, .control], keyChar: "h")
 
     public static let runScript = Keybinding(
         id: "runScript", title: "Run Script",
@@ -238,7 +242,7 @@ public enum BannerShortcutRegistry {
         .init(key: findInFiles.displayKey, description: "find in files"),
         .init(key: "\(commandPrompt.displayKey)", description: "command prompt · try: find, grep, cd"),
         .init(key: "\(contextInjector.displayKey)", description: "inject context (diff, file, last output) into the terminal"),
-        .init(key: "\(turnDiffReviewer.displayKey)", description: "review the agent's last turn"),
+        .init(key: "\(reviewChanges.displayKey)", description: "review worktree changes"),
         .init(key: "", description: "Shell", showInBanner: true),
         .init(key: "z <dir>", description: "smart cd — same list as ⌘⇧J"),
         .init(key: "fd <pattern>", description: "find files by name"),

@@ -26,24 +26,10 @@ public final class AgentRemoteControlDaemonService: @unchecked Sendable {
         if let found = candidates.first(where: { FileManager.default.isExecutableFile(atPath: $0) }) {
             return found
         }
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/which")
-        process.arguments = [name]
-        let pipe = Pipe()
-        process.standardOutput = pipe
-        process.standardError = FileHandle.nullDevice
-        do {
-            try process.run()
-            let data = pipe.fileHandleForReading.readDataToEndOfFile()
-            process.waitUntilExit()
-            guard process.terminationStatus == 0,
-                  let path = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines),
-                  !path.isEmpty, FileManager.default.isExecutableFile(atPath: path)
-            else { return nil }
-            return path
-        } catch {
-            return nil
-        }
+        let result = ProcessRunner.run(executable: "/usr/bin/which", arguments: [name], timeout: 5)
+        let path = result.stdout.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard result.isSuccess, !path.isEmpty, FileManager.default.isExecutableFile(atPath: path) else { return nil }
+        return path
     }
 
     /// Starts companion daemons for configured agents if their mode is `.remoteControl`

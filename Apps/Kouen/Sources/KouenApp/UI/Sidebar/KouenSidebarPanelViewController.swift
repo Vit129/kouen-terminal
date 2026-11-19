@@ -479,8 +479,8 @@ final class KouenSidebarPanelViewController: NSViewController {
     }
 
     private func setupSectionLabel() {
-        sidebarSectionModel.onAddProject = { [weak self] in
-            self?.addSession()
+        sidebarSectionModel.onAddProject = { [weak self] action in
+            self?.handleProjectAdd(action, scope: .projects)
         }
         sidebarSectionModel.onRefreshProjects = { [weak self] in
             guard let self else { return }
@@ -522,8 +522,8 @@ final class KouenSidebarPanelViewController: NSViewController {
             onOpenProject: { [weak self] path in
                 self?.openRecentPath(path)
             },
-            onAddInGroup: { [weak self] name, catID in
-                self?.addProjectToGroup(name: name, categoryID: catID)
+            onAddInGroup: { [weak self] action, scope in
+                self?.handleProjectAdd(action, scope: scope)
             },
             onReviewGroupMoves: { [weak self] categoryID in
                 self?.presentMoveReviewSheet(categoryID: categoryID)
@@ -652,10 +652,6 @@ final class KouenSidebarPanelViewController: NSViewController {
             hosting.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             hosting.bottomAnchor.constraint(equalTo: footerHostingView.topAnchor),
         ])
-    }
-
-    func makeSessionHistoryPanelView() -> NSView {
-        NSHostingView(rootView: makeSessionHistoryView())
     }
 
     private func makeSessionHistoryView() -> AgentSessionHistoryView {
@@ -1040,6 +1036,11 @@ final class KouenSidebarPanelViewController: NSViewController {
         previewFile(path: expanded)
     }
 
+    func selectHistoryTab() {
+        sidebarSectionModel.selectedTab = 3
+        selectSidebarTab(index: 3)
+    }
+
     private func selectSidebarTab(index: Int) {
         sessionHostingView?.isHidden = index != 0
         if index != 1 {
@@ -1196,13 +1197,7 @@ final class KouenSidebarPanelViewController: NSViewController {
         dropTarget.translatesAutoresizingMaskIntoConstraints = false
         dropTarget.layer?.zPosition = 1   // behind all interactive subviews
         dropTarget.onDrop = { [weak self] path in
-            guard let self else { return }
-            let scan = FolderScanner.inspect(path: path)
-            if scan.isMultiRepo {
-                self.presentCategorySheet(for: path)
-            } else {
-                self.finalizeAddProject(paths: [path], categoryID: nil)
-            }
+            self?.presentCategorySheet(for: path)
         }
         projectDropTarget = dropTarget
         view.addSubview(dropTarget, positioned: .below, relativeTo: nil)
@@ -1212,28 +1207,6 @@ final class KouenSidebarPanelViewController: NSViewController {
             dropTarget.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             dropTarget.bottomAnchor.constraint(equalTo: view.bottomAnchor),
         ])
-    }
-
-    private func addProjectToGroup(name: String, categoryID: String?) {
-        let panel = NSOpenPanel()
-        panel.canChooseDirectories = true
-        panel.canChooseFiles = false
-        panel.allowsMultipleSelection = false
-        panel.prompt = "Add to \(name)"
-        panel.message = "Choose a project folder to add to \(name)"
-        panel.begin { [weak self] response in
-            guard response == .OK, let url = panel.url else { return }
-            DispatchQueue.main.async {
-                guard let self else { return }
-                let scan = FolderScanner.inspect(path: url.path)
-                if scan.isMultiRepo {
-                    self.presentCategorySheet(for: url.path)
-                } else {
-                    self.projectStore.addProject(url.path, categoryID: categoryID)
-                    self.sidebarListModel.scheduleRebuild()
-                }
-            }
-        }
     }
 
     private func openRecentPath(_ path: String) {
@@ -1429,51 +1402,8 @@ final class KouenSidebarPanelViewController: NSViewController {
         }
     }
 
-    @objc private func addSession() {
-        let panel = NSOpenPanel()
-        panel.canChooseDirectories = true
-        panel.canChooseFiles = false
-        panel.allowsMultipleSelection = false
-        panel.prompt = "Open"
-        panel.message = "Choose a project folder"
-        panel.begin { [weak self] response in
-            guard response == .OK, let url = panel.url else { return }
-            DispatchQueue.main.async {
-                guard let self else { return }
-                let scan = FolderScanner.inspect(path: url.path)
-                if scan.isMultiRepo {
-                    self.presentCategorySheet(for: url.path)
-                } else {
-                    self.finalizeAddProject(paths: scan.items.map(\.path), categoryID: nil)
-                }
-            }
-        }
-    }
-
-    /// Shows the unified AddToWorkspaceSheet (auto-detecting group folder vs single project)
-    /// and adds all chosen projects to the tree and active workspace.
-    func presentCategorySheet(for path: String) {
-        let scan = FolderScanner.inspect(path: path)
-        guard scan.isMultiRepo else {
-            finalizeAddProject(paths: scan.items.map(\.path), categoryID: nil)
-            return
-        }
-        guard let window = view.window else {
-            finalizeAddProject(paths: scan.items.map(\.path), categoryID: nil)
-            return
-        }
-        let sheet = AddToWorkspaceSheet(
-            folderPath: path,
-            store: projectStore,
-            onConfirm: { [weak self] chosenPaths, categoryID in
-                window.endSheet(window.attachedSheet ?? window)
-                self?.finalizeAddProject(paths: chosenPaths, categoryID: categoryID)
-            },
-            onCancel: {
-                window.endSheet(window.attachedSheet ?? window)
-            }
-        )
-        presentProjectSheet(sheet, in: window)
+    private func addSession() {
+        handleProjectAdd(.browse, scope: .projects)
     }
 
     private func presentMoveReviewSheet(categoryID: String) {
@@ -1490,25 +1420,14 @@ final class KouenSidebarPanelViewController: NSViewController {
         presentProjectSheet(sheet, in: window)
     }
 
-    private func presentProjectSheet<Content: View>(_ content: Content, in window: NSWindow) {
+    func presentProjectSheet<Content: View>(_ content: Content, in window: NSWindow, closable: Bool = true) {
         // Add and path review share one sheet presentation so they cannot stack as
         // separate modal windows over the sidebar.
         guard window.attachedSheet == nil else { return }
         let controller = NSHostingController(rootView: content)
         let sheetWindow = NSWindow(contentViewController: controller)
-        sheetWindow.styleMask = [.titled, .closable]
+        sheetWindow.styleMask = closable ? [.titled, .closable] : [.titled]
         window.beginSheet(sheetWindow) { _ in }
-    }
-
-    private func finalizeAddProject(paths: [String], categoryID: String?) {
-        guard let id = activeWorkspaceID else { return }
-        for (index, p) in paths.enumerated() {
-            projectStore.addProject(p, categoryID: categoryID)
-            if index == 0 && sessions.isEmpty {
-                SessionCoordinator.shared.addSession(to: id, cwd: p, name: (p as NSString).lastPathComponent)
-            }
-        }
-        sidebarListModel.scheduleRebuild()
     }
 
     private func addSessionInGroup(rootPath: String) {

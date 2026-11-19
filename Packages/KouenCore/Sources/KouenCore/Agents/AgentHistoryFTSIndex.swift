@@ -63,7 +63,10 @@ public struct CachedSessionEntry: Sendable {
 /// SQLite FTS5 full-text search index for agent sessions.
 /// Manages indexing session metadata, transcripts, edited files, and tool names.
 public final class AgentHistoryFTSIndex: @unchecked Sendable {
-    public static let shared = AgentHistoryFTSIndex()
+    public static let shared: AgentHistoryFTSIndex = {
+        AgentHistoryTranscriptSpool.sweepAtStartup()
+        return AgentHistoryFTSIndex()
+    }()
     #if canImport(os)
     private static let logger = Logger(subsystem: "com.vit129.kouen", category: "history")
     #endif
@@ -73,13 +76,20 @@ public final class AgentHistoryFTSIndex: @unchecked Sendable {
     public static let schemaVersion: Int32 = 4
 
     private let dbPath: String
+    private let maximumIndexBytes: Int
     #if canImport(SQLite3)
     private var db: OpaquePointer?
     #endif
     private let lock = NSLock()
 
-    public init(dbPath: String = KouenPaths.applicationSupport.appendingPathComponent("agent_history_fts.sqlite").path) {
+    public convenience init(dbPath: String = KouenPaths.applicationSupport.appendingPathComponent("agent_history_fts.sqlite").path) {
+        self.init(dbPath: dbPath, maximumIndexBytes: 512 * 1024 * 1024)
+    }
+
+    init(dbPath: String, maximumIndexBytes: Int) {
+        precondition(maximumIndexBytes > 0)
         self.dbPath = dbPath
+        self.maximumIndexBytes = maximumIndexBytes
         #if canImport(SQLite3)
         openDatabase()
         #endif
@@ -200,6 +210,8 @@ public final class AgentHistoryFTSIndex: @unchecked Sendable {
         );
         """
         exec(createMetaSQL, context: "create session_index_meta")
+        exec("CREATE INDEX IF NOT EXISTS idx_session_index_mtime ON session_index_meta(mtime, session_id);",
+             context: "index session_index_meta mtime")
         exec("CREATE TABLE IF NOT EXISTS session_fts_cursor (session_id TEXT PRIMARY KEY, transcript_path TEXT NOT NULL, byte_offset INTEGER NOT NULL, digest TEXT NOT NULL);", context: "create session_fts_cursor")
 
         let createRecordsSQL = """
@@ -244,6 +256,49 @@ public final class AgentHistoryFTSIndex: @unchecked Sendable {
         );
         """
         exec(createFtsSQL, context: "create session_fts")
+        enforceIndexBudgetLocked()
+    }
+
+    /// Use occupied SQLite pages to decide how much to evict, then reclaim the free pages
+    /// on disk. Keep session_records so an evicted transcript still appears in History.
+    private func enforceIndexBudgetLocked() {
+        let sizeSQL = """
+        SELECT page_count * page_size, (page_count - freelist_count) * page_size
+        FROM pragma_page_count, pragma_freelist_count, pragma_page_size;
+        """
+        func databaseBytes() -> (allocated: Int64, occupied: Int64)? {
+            var stmt: OpaquePointer?
+            guard sqlite3_prepare_v2(db, sizeSQL, -1, &stmt, nil) == SQLITE_OK else { return nil }
+            defer { sqlite3_finalize(stmt) }
+            guard sqlite3_step(stmt) == SQLITE_ROW else { return nil }
+            return (sqlite3_column_int64(stmt, 0), sqlite3_column_int64(stmt, 1))
+        }
+
+        guard let size = databaseBytes(), size.allocated > maximumIndexBytes else { return }
+        let oldestSQL = "SELECT session_id FROM session_index_meta ORDER BY mtime ASC, session_id ASC LIMIT 1;"
+        func oldestSessionID() -> String? {
+            var stmt: OpaquePointer?
+            guard sqlite3_prepare_v2(db, oldestSQL, -1, &stmt, nil) == SQLITE_OK else { return nil }
+            defer { sqlite3_finalize(stmt) }
+            guard sqlite3_step(stmt) == SQLITE_ROW, let id = sqlite3_column_text(stmt, 0) else { return nil }
+            return String(cString: id)
+        }
+
+        if size.occupied > maximumIndexBytes {
+            inTransaction("enforce FTS budget") {
+                while let size = databaseBytes(), size.occupied > maximumIndexBytes,
+                      let id = oldestSessionID() {
+                    try deleteRows([id], from: ["session_fts", "session_index_meta", "session_fts_cursor"],
+                                   context: "evict oldest FTS session")
+                }
+            }
+        }
+
+        if dbPath != ":memory:", let size = databaseBytes(), size.allocated > size.occupied {
+            exec("VACUUM;", context: "reclaim evicted FTS pages")
+        }
+        let result = sqlite3_wal_checkpoint_v2(db, nil, SQLITE_CHECKPOINT_TRUNCATE, nil, nil)
+        if result != SQLITE_OK { logStepFailure(result, context: "truncate FTS WAL") }
     }
 
     func incrementalCursor(sessionID: String, path: String) -> AgentHistoryIncrementalFTS.Cursor? {
@@ -729,6 +784,7 @@ public final class AgentHistoryFTSIndex: @unchecked Sendable {
                 }
             }
         }
+        enforceIndexBudgetLocked()
     }
 
     private static func forEachFTSChunk(_ text: String, _ body: (String) throws -> Void) throws {

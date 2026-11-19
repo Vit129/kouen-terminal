@@ -5,6 +5,26 @@ All notable changes to Kouen are documented here. The format is based on
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Each released version
 has a matching `vX.Y.Z` tag and a signed, notarized DMG on
 [GitHub Releases](https://github.com/Vit129/kouen-terminal/releases).
+## [4.24.0] - 2026-11-19
+
+### Added
+- Consolidate sidebar projects and add clone and create actions ([`6d1a715`](https://github.com/Vit129/kouen-terminal/commit/6d1a715dc94da46f21aea764786730b1e6777721))
+- Consolidate session history in the sidebar ([`dc47c60`](https://github.com/Vit129/kouen-terminal/commit/dc47c60b6b04ed643a1afc68e06b8d3d9522a142))
+- Add Review Changes and PR feedback with IPC 15 ([`fd16f5d`](https://github.com/Vit129/kouen-terminal/commit/fd16f5dcde1ba5a584d70d50a15304dcb7deb329))
+
+### Documentation
+- Archive older changelog entries ([`5b2bd1f`](https://github.com/Vit129/kouen-terminal/commit/5b2bd1f9907eb4ab162a8913dd50499bc3bd80fd))
+- Point agent memory path to unified-memory-vault ([#154](https://github.com/Vit129/kouen-terminal/pull/154)) ([`e675adc`](https://github.com/Vit129/kouen-terminal/commit/e675adc4b4757ff1b5b61a4fe3ecf1593691668a))
+- Update project behavior and shortcut references ([`82a78ad`](https://github.com/Vit129/kouen-terminal/commit/82a78adbb4dc3d843c20ca38afce01f2899f13db))
+
+### Fixed
+- Bound history storage and close subprocess pipes ([`4abcc79`](https://github.com/Vit129/kouen-terminal/commit/4abcc7911de675dda036b0919a7056814505ff6f))
+- Stabilize browser pane navigation and lifecycle ([`7b86569`](https://github.com/Vit129/kouen-terminal/commit/7b865692203b9970c8cd908e1b1f1881a039a7f4))
+- Clear synchronized terminal output after SIGINT ([`32f4484`](https://github.com/Vit129/kouen-terminal/commit/32f4484cefe1bca0af7ce9561627ed835d19afcd))
+- Run ProcessRunner pipe readers on dedicated threads ([`6591580`](https://github.com/Vit129/kouen-terminal/commit/6591580de4aa04b55ced4e5bc60b7318176263c9))
+- Reap PTY children on dedicated threads instead of the GCD pool ([`509bfd7`](https://github.com/Vit129/kouen-terminal/commit/509bfd7873baba8fc84ddfa802add0e709aab73d))
+
+
 ## [4.23.2] - 2026-11-18
 
 ### Added

@@ -44,6 +44,17 @@ final class DaemonRoundTripTests: XCTestCase {
         XCTFail("daemon did not become ready")
     }
 
+    func testReviewFeedbackProtocolRejectsPriorClientVersion() throws {
+        let client = DaemonClient()
+        guard case .protocolRejected = try client.request(.identifyClient(label: "prior", protocolVersion: ipcProtocolVersion - 1))
+        else { return XCTFail("Expected prior IPC version to be rejected") }
+        guard case .clientID = try client.request(.identifyClient(label: "current", protocolVersion: ipcProtocolVersion))
+        else { return XCTFail("Expected current IPC version to connect") }
+        guard case .reviewFeedbackDelivery(.targetChanged) =
+            try client.request(.inspectReviewFeedbackTarget(surfaceID: UUID().uuidString, agentPID: 300))
+        else { return XCTFail("Expected the new daemon handler to reject an absent surface") }
+    }
+
     func testControlSocketIsOwnerOnly() throws {
         // The control socket drives PTY spawning and hook shell commands — it must be
         // 0o600 so no other local user can connect, even before the peer-cred check.

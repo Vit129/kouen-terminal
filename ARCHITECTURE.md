@@ -318,7 +318,7 @@ One-line records; reasoning lives in each plan under `agent-memory/plans/`.
 
 - **P44 Autonomous Orchestrator (v4.14.0):** a CLI agent session decomposes a goal into Tasks, spawns Worker sessions via `kouenSpawnWorker`, and drives each toward merge-ready with a bounded auto-fix loop; task status shows inline on session tabs/sidebar instead of a clickable board. **Agent Swarm Core** (v4.16.0) adds headless fleet orchestration; headless workers accept follow-up turns via session resume (v4.20.0).
 - **P41 Automations / Jobs view (v4.17.0):** scheduled agent launches, addressable through `kouen-mcp` (`kouenAutomation*`), shown in a Jobs fleet view.
-- **P45 Worktree lineage & History:** worktrees are first-class sessions with base/drift tracking; `AgentHistoryScanner` indexes Claude Code, Codex, Antigravity, Copilot and VS Code Copilot Chat, with resume and cross-agent handoff (v4.20.0).
+- **P45 Worktree lineage & History:** the sidebar History tab hosts the session history view. View → Show Session History opens the sidebar and selects History. Worktrees are first-class sessions with base/drift tracking; `AgentHistoryScanner` indexes Claude Code, Codex, Antigravity, Copilot and VS Code Copilot Chat, with resume and cross-agent handoff (v4.20.0).
 - **P46 Agentic dev env:** checkpoints, `kouen undo`/`verify`, write-origin guards, Fleet tab, Turn Diff Reviewer, Quick Context Injector (see the 2026-09-21 entries above).
 - **P47 Primary-tree fix:** auto-isolate no longer leaves the primary checkout squatting on a feature branch.
 - **P48 Session navigation buttons (v4.18.2):** started as an MRU switch-history stack (`SessionHistoryNavigator`), replaced in `93362f0f` by the existing `selectAdjacentSession` — ◀ ▶ buttons, Session menu, palette and ⌘⇧[ / ⌘⇧] share one implementation. Order is list order, not visit order.
@@ -357,3 +357,7 @@ Offline Marked/Highlight/Mermaid/DOMPurify bundles are injected as WKUserScripts
 ## Menu-bar icon visibility
 
 `KouenSettings.showMenuBarIcon` defaults to true, including decoding older settings files. The Appearance toggle writes through `SettingsModel.update`; the existing settings/snapshot notification refreshes `MenuBarController` visibility synchronously on the main actor. The same status item/menu is retained while hidden, and startup reads the persisted value.
+
+## Worktree review
+
+`FilePreviewCoordinator` hosts Review Changes in its editor split and owns its in-memory drafts per terminal tab and working directory. `ReviewDiff` reads Git patches independently of the UI. The review view verifies the selected terminal surface and worktree before sending feedback through the daemon.

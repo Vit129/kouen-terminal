@@ -57,13 +57,12 @@ public enum AgentHandoffBuilder: Sendable {
 
     // MARK: - Source-agent handoff note
 
-    /// Prompt that runs the mattpocock `handoff` skill in `kind`'s own CLI (each agent has it
+    /// Prompt that runs the `handoff` skill in `kind`'s own CLI (each agent has it
     /// installed; the doc is also requested as the final reply since a headless run can't answer
     /// a Write permission prompt). `nil` = no verified headless resume → transcript-only brief.
     public static func handoffSkillPrompt(for kind: AgentKind) -> String? {
         let tail = "Output the full document as your final reply as well."
         switch kind {
-        case .claudeCode: return "/mattpocock-skills:handoff \(tail)"
         case .antigravity: return "/handoff \(tail)"   // ~/.agents/skills/handoff
         case .codex: return "$handoff \(tail)"          // Codex skill mention, ~/.codex/skills/handoff
         default: return nil

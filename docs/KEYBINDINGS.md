@@ -92,7 +92,8 @@ These are fixed `NSMenuItem` bindings defined in `MainMenuBuilder` — not prefi
 | **Recipes** | **`⌘⇧R`** — run or send a saved command to Composer |
 | Command prompt | `⌘;` |
 | Quick Context Injector (`@diff`/`@file`/`@last`/`@error`/`@builderror`) | `⌘K` |
-| Turn Diff Reviewer (`y` accept · `r` revert to checkpoint · `esc` dismiss) | `⌘⌥D` |
+| Review Changes | `⌘L` |
+| Review Last Checkpoint (`y` accept · `r` revert to checkpoint · `esc` dismiss) | Menu only |
 | Search command history | `⌃R` |
 | Toggle sidebar | `⌘\` |
 | Open Lazygit on right / bottom | `⌘G` / `⌘⇧G` |
