@@ -75,13 +75,28 @@ final class FuzzyPathResolverTests: XCTestCase {
     }
 
     func testScannerFindsAgentMemoryFoldersAndSkipsWorktrees() throws {
-        let base = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        let tmp = try XCTUnwrap(realpath(FileManager.default.temporaryDirectory.path, nil))
+        defer { free(tmp) }
+        let base = URL(fileURLWithPath: String(cString: tmp)).appendingPathComponent(UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: base) }
-        let notes = base.appendingPathComponent("Personal/notes-private/agent-memory")
+        let notes = base.appendingPathComponent("Personal/unified-memory-vault/memory-vault")
         try FileManager.default.createDirectory(at: notes.appendingPathComponent("kouen/plans"), withIntermediateDirectories: true)
         try FileManager.default.createDirectory(at: base.appendingPathComponent("Personal/app/.kouen-worktrees/x/agent-memory"), withIntermediateDirectories: true)
+        let legacy = base.appendingPathComponent("Company/other/agent-memory")
+        try FileManager.default.createDirectory(at: legacy, withIntermediateDirectories: true)
+        try FileManager.default.createSymbolicLink(at: notes.deletingLastPathComponent().appendingPathComponent("agent-memory"),
+                                                    withDestinationURL: notes)
+        let note = notes.appendingPathComponent("kouen/plans/vault-smoke.md")
+        try Data().write(to: note)
         let found = FileSearchRootScanner.scan(base: base).map { ($0 as NSString).resolvingSymlinksInPath }
-        XCTAssertEqual(found, [(notes.path as NSString).resolvingSymlinksInPath])
+        XCTAssertEqual(found, [legacy.path, notes.path].map { ($0 as NSString).resolvingSymlinksInPath }.sorted())
+        let checkout = base.appendingPathComponent("Personal/app")
+        guard case .unique(let match) = FuzzyPathResolver.resolve(
+            query: "vault-smoke.md", root: checkout.path, otherRoots: found
+        ) else { return XCTFail("Expected a unique file in the shared vault") }
+        let matchedFile = try URL(fileURLWithPath: match).resourceValues(forKeys: [.fileResourceIdentifierKey])
+        let expectedFile = try note.resourceValues(forKeys: [.fileResourceIdentifierKey])
+        XCTAssertEqual(matchedFile.fileResourceIdentifier as? NSObject, expectedFile.fileResourceIdentifier as? NSObject)
     }
 
     func testResolveReturnsNoneForNoMatches() {
