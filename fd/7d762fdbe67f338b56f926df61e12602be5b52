@@ -1,0 +1,46 @@
+Apps/Kouen/Sources/KouenApp/UI/Sidebar/SidebarListModel.swift
+  s_7b387bd9064705::t_3a7baa19af523d 334,384-385
+  s_7b387bd9064705::t_622f584437f4ba 66,78,220,290-291,298,311,324,326,335-338,379,512
+  s_7b387bd9064705::t_cdd418981814b8 55-65,67-77,79-81,94,121-123,217-219,221-222,376-378,380,386-389,391-393,396-405,447-449,454-455,551-554,568,622-628
+Tests/KouenAppTests/ProjectStoreSyncTests.swift
+  s_7b387bd9064705::t_3a7baa19af523d 159-185
+Apps/Kouen/Sources/KouenApp/UI/Sidebar/SidebarWorkspaceViews.swift
+  s_7b387bd9064705::t_622f584437f4ba 242,285-287,318-325,327-337,340,342-343,345-355
+Tests/KouenAppTests/ProjectAddTests.swift
+  s_7b387bd9064705::t_4614c5c14f4653 64-68,76,85,90,96,98,100-133,135-139,153,155,164,171-172
+  s_7b387bd9064705::t_ca316950327a57 161-162,165,168-169
+  s_7b387bd9064705::t_652a07cdb7ae58 77-79
+  s_7b387bd9064705::t_a9286492432270 63,69-75,80-84,86-89,91-95,97,99,134,140-152,154,156-160,163,166-167,170,173
+Apps/Kouen/Sources/KouenApp/UI/Sidebar/SidebarSessionListView.swift
+  s_7b387bd9064705::t_622f584437f4ba 699-700,713-727,730-731,808
+  s_7b387bd9064705::t_3a7baa19af523d 45-46,166-180
+  s_7b387bd9064705::t_afa78e21447b15 23-44,47-54,73,107-131,687-694
+Apps/Kouen/Sources/KouenApp/UI/Sidebar/KouenSidebarPanelViewController.swift
+  s_7b387bd9064705::t_622f584437f4ba 486
+Apps/Kouen/Sources/KouenApp/UI/Sidebar/ProjectDirectoryTree.swift
+  s_7b387bd9064705::t_3a7baa19af523d 71,355-373,403-404
+DESIGN.md
+  s_7b387bd9064705::t_3a7baa19af523d 41
+  s_7b387bd9064705::t_622f584437f4ba 35
+  s_7b387bd9064705::t_7347d9f1717fec 28,38
+Apps/Kouen/Sources/KouenApp/UI/Chrome/ContentAreaViewController.swift
+  s_7b387bd9064705::t_1ebe7078664469 220,241-243
+Apps/Kouen/Sources/KouenApp/UI/Chrome/MainSplitViewController.swift
+  s_7b387bd9064705::t_d36214e8d7c796 462,483,508,580
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.3",
+  "base_commit_sha": "fd7d762fdbe67f338b56f926df61e12602be5b52",
+  "prompts": {},
+  "sessions": {
+    "s_7b387bd9064705": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1f715-27f1-7c10-90f6-84ae99f0b149",
+        "model": "gpt-6.2-sol"
+      },
+      "human_author": "Vit129 <vitosk129@gmail.com>"
+    }
+  }
+}
