@@ -19,7 +19,7 @@ final class DaemonOffLockWorktreeTests: XCTestCase {
         try KouenPaths.ensureDirectories()
         repoPath = root.appendingPathComponent("repo").path
         try FileManager.default.createDirectory(atPath: repoPath, withIntermediateDirectories: true)
-        shell("git init && git commit --allow-empty -m init", in: repoPath)
+        shell("git init && git config user.name 'Kouen Tests' && git config user.email kouen-tests@example.invalid && git commit --allow-empty -m init", in: repoPath)
     }
 
     override func tearDownWithError() throws {

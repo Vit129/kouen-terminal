@@ -67,8 +67,9 @@ final class SSHTunnelLeaseStore: @unchecked Sendable {
 
     func record(process: Process, socket: URL) {
         lock.lock(); defer { lock.unlock() }
+        // Linux Foundation can encode the same directory URL with or without a trailing slash.
         guard isPrivateDirectory,
-              socket.deletingLastPathComponent().resolvingSymlinksInPath().standardizedFileURL == directory,
+              socket.deletingLastPathComponent().resolvingSymlinksInPath().standardizedFileURL.path == directory.path,
               let owner = snapshot(Int32(getpid())),
               let child = snapshot(process.processIdentifier), child.uid == UInt32(getuid()),
               child.executable == "/usr/bin/ssh", process.arguments?.contains("-N") == true,

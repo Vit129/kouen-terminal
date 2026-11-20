@@ -65,14 +65,20 @@ private func drainOutput(_ handle: FileHandle, into buffer: OutputBuffer, should
     let fd = handle.fileDescriptor
     var reachedEOF = false
     var bytes = [UInt8](repeating: 0, count: 64 * 1024)
-    while !shouldStop() {
+    while true {
+        let stopping = shouldStop()
         var descriptor = pollfd(fd: fd, events: Int16(POLLIN | POLLHUP), revents: 0)
-        let ready = poll(&descriptor, 1, 100)
+        // Check for an already-closed stream once more at cancellation. A companion
+        // stream can still be held open even if this one reached EOF before the reader ran.
+        let ready = poll(&descriptor, 1, stopping ? 0 : 100)
         if ready < 0 {
             if errno == EINTR { continue }
             break
         }
-        guard ready > 0 else { continue }
+        guard ready > 0 else {
+            if stopping { break }
+            continue
+        }
         #if canImport(Darwin)
         let count = Darwin.read(fd, &bytes, bytes.count)
         #else
@@ -84,6 +90,7 @@ private func drainOutput(_ handle: FileHandle, into buffer: OutputBuffer, should
             break
         }
         buffer.append(Data(bytes.prefix(count)))
+        if stopping { break }
     }
     if !reachedEOF { buffer.markIncomplete() }
     return OutputCapture(data: buffer.toData(), truncated: buffer.isTruncated(), reachedEOF: reachedEOF)
@@ -115,6 +122,9 @@ public struct ProcessResult: Sendable, Equatable {
 private final class AsyncRunCoordinator: @unchecked Sendable {
     private let lock = NSLock()
     private let process: Process
+    #if os(Linux)
+    private let nativeChild = LinuxChildProcess()
+    #endif
     private let outPipe: Pipe
     private let errPipe: Pipe
     private let timeout: TimeInterval?
@@ -148,9 +158,11 @@ private final class AsyncRunCoordinator: @unchecked Sendable {
 
     func start() {
         let deadline = timeout.flatMap { $0 > 0 ? DispatchTime.now() + $0 : nil }
+        #if !os(Linux)
         process.terminationHandler = { [self] proc in
             self.handleProcessTerminated(status: proc.terminationStatus)
         }
+        #endif
 
         lock.lock()
         guard !didCancel else {
@@ -160,7 +172,11 @@ private final class AsyncRunCoordinator: @unchecked Sendable {
             return
         }
         do {
+            #if os(Linux)
+            try nativeChild.start(process) { [self] in handleProcessTerminated(status: $0) }
+            #else
             try process.run()
+            #endif
             launched = true
             closePipes([outPipe, errPipe], includingReaders: false)
             lock.unlock()
@@ -258,11 +274,18 @@ private final class AsyncRunCoordinator: @unchecked Sendable {
         didCancel = cancelled
         didTimeout = !cancelled
         stopReaders = true
-        let running = launched && terminationStatus == nil && process.isRunning
+        let running = launched && terminationStatus == nil
         lock.unlock()
 
         if running {
+            #if os(Linux)
+            nativeChild.signal(SIGTERM)
+            DispatchQueue.global(qos: .userInitiated).asyncAfter(deadline: .now() + terminationGrace) { [nativeChild] in
+                nativeChild.signal(SIGKILL)
+            }
+            #else
             ProcessRunner.terminateWithEscalation(process)
+            #endif
         }
     }
 
@@ -416,10 +439,18 @@ public enum ProcessRunner {
 
         let deadline = timeout.flatMap { $0 > 0 ? DispatchTime.now() + $0 : nil }
         let exited = DispatchSemaphore(value: 0)
+        #if os(Linux)
+        let nativeChild = LinuxChildProcess()
+        #else
         process.terminationHandler = { _ in exited.signal() }
         defer { process.terminationHandler = nil }
+        #endif
         do {
+            #if os(Linux)
+            try nativeChild.start(process) { _ in exited.signal() }
+            #else
             try process.run()
+            #endif
         } catch {
             closePipes([outPipe, errPipe], includingReaders: true)
             return ProcessResult(exitCode: -1, stdout: "", stderr: error.localizedDescription)
@@ -456,6 +487,13 @@ public enum ProcessRunner {
             timedOut = timedOut || deadline == drainDeadline
             stop.stop()
         }
+        #if os(Linux)
+        if timedOut, nativeChild.signal(SIGTERM) {
+            if exited.wait(timeout: .now() + terminationGrace) == .timedOut {
+                nativeChild.signal(SIGKILL)
+            }
+        }
+        #else
         if timedOut, process.isRunning {
             process.terminate()
             if exited.wait(timeout: .now() + terminationGrace) == .timedOut, process.isRunning {
@@ -463,6 +501,7 @@ public enum ProcessRunner {
                 _ = exited.wait(timeout: .now() + terminationGrace)
             }
         }
+        #endif
         // The reader owns the descriptor and closes it before leaving the group.
         group.wait()
         let stdout = String(decoding: outBuf.toData(), as: UTF8.self)
@@ -471,7 +510,11 @@ public enum ProcessRunner {
             let note = "Process timed out after \(timeout ?? 0)s"
             stderr = stderr.isEmpty ? note : "\(stderr)\n\(note)"
         }
+        #if os(Linux)
+        let status = nativeChild.wait()
+        #else
         let status: Int32 = process.isRunning ? -1 : process.terminationStatus
+        #endif
         return ProcessResult(exitCode: (timedOut || incomplete) && status == 0 ? -1 : status,
                              stdout: stdout, stderr: stderr, isTimedOut: timedOut,
                              stdoutWasTruncated: outBuf.isTruncated(),

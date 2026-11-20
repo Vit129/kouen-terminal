@@ -23,7 +23,7 @@ final class WorktreeIsolationDaemonTests: XCTestCase {
         // Create a real git repo for worktree tests
         repoPath = dir.appendingPathComponent("repo").path
         try FileManager.default.createDirectory(atPath: repoPath, withIntermediateDirectories: true)
-        shell("git init && git commit --allow-empty -m init", in: repoPath)
+        shell("git init && git config user.name 'Kouen Tests' && git config user.email kouen-tests@example.invalid && git commit --allow-empty -m init", in: repoPath)
     }
 
     override func tearDownWithError() throws {
@@ -324,6 +324,7 @@ final class WorktreeIsolationDaemonTests: XCTestCase {
         process.standardError = FileHandle.nullDevice
         try? process.run()
         process.waitUntilExit()
+        XCTAssertEqual(process.terminationStatus, 0, "Fixture command failed: \(command)")
         return String(data: pipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8)
     }
 }

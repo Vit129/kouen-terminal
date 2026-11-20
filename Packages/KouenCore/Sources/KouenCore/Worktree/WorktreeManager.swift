@@ -185,6 +185,26 @@ public struct WorktreeManager: Sendable {
         }
         process.standardOutput = FileHandle.nullDevice
         process.standardError = FileHandle.nullDevice
+        #if os(Linux)
+        let child = LinuxChildProcess()
+        do {
+            try child.start(process) { _ in }
+        } catch {
+            return false
+        }
+        let timer = DispatchSource.makeTimerSource(queue: .global())
+        timer.schedule(deadline: .now() + timeout)
+        timer.setEventHandler {
+            child.signal(SIGTERM)
+            DispatchQueue.global().asyncAfter(deadline: .now() + killGrace) {
+                child.signal(SIGKILL)
+            }
+        }
+        timer.resume()
+        let status = child.wait()
+        timer.cancel()
+        return status == 0
+        #else
         do {
             try process.run()
         } catch {
@@ -205,6 +225,7 @@ public struct WorktreeManager: Sendable {
         process.waitUntilExit()
         timer.cancel()
         return process.terminationStatus == 0
+        #endif
     }
 
     // MARK: - List

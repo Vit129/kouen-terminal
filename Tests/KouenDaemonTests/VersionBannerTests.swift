@@ -122,27 +122,25 @@ final class VersionBannerTests: XCTestCase {
         return Set(list.map(\.surfaceID))
     }
 
-    func testFreshInstallInjectsWelcomeIntoSeededSurfaceOnce() throws {
+    func testFreshInstallInjectsWelcomeIntoSeededAndNewSurfaces() throws {
         try skipUnlessLiveDaemonTests()
         // No layout.json, no version state → registry seeds the default tab AND welcomes there.
         let registry = SurfaceRegistry(enableVersionBanner: true)
         guard let first = surfaceIDs(registry).first else { return XCTFail("expected a seeded surface") }
         XCTAssertTrue(
-            waitForCapture(registry, surfaceID: first, contains: "Try this"),
+            waitForCapture(registry, surfaceID: first, contains: "Welcome to Kouen"),
             "welcome banner missing from the seeded first surface"
         )
-        // Consumed + persisted immediately — one-shot across restarts too.
-        XCTAssertEqual(VersionBannerStore().loadLastSeenBuild(), KouenVersion.build)
+        XCTAssertNil(VersionBannerStore().loadLastSeenBuild(), "welcome does not acknowledge a release update")
 
-        // The next tab is banner-free.
+        // Welcome is a MOTD on each new surface.
         guard let workspaceID = registry.snapshot.workspaces.first?.id else { return XCTFail("no workspace") }
         let before = surfaceIDs(registry)
         _ = registry.handle(.newTab(workspaceID: workspaceID, cwd: nil, shell: nil))
         guard let second = surfaceIDs(registry).subtracting(before).first else {
             return XCTFail("newTab spawned no surface")
         }
-        usleep(500_000) // give a hypothetical (buggy) second injection time to land
-        XCTAssertFalse(capture(registry, second).contains("Try this"))
+        XCTAssertTrue(waitForCapture(registry, surfaceID: second, contains: "Welcome to Kouen"))
     }
 
     func testUpdateBannersFirstNewTabAndSparesRestoredPanes() throws {
@@ -216,25 +214,31 @@ final class VersionBannerTests: XCTestCase {
 
     func testFailedAckRetriesWithoutReplayingBanner() throws {
         try skipUnlessLiveDaemonTests()
+        try SessionStore().saveImmediately(SessionSnapshot())
         // Block the ack: a DIRECTORY at version-state.json makes the atomic write fail.
         try FileManager.default.createDirectory(
             at: KouenPaths.versionStateURL, withIntermediateDirectories: true
         )
-        let registry = SurfaceRegistry(enableVersionBanner: true) // fresh install → welcome
-        guard let first = surfaceIDs(registry).first else { return XCTFail("expected a seeded surface") }
-        XCTAssertTrue(waitForCapture(registry, surfaceID: first, contains: "Try this"))
+        let registry = SurfaceRegistry(enableVersionBanner: true)
+        guard let workspaceID = registry.snapshot.workspaces.first?.id else { return XCTFail("no workspace") }
+        let restored = surfaceIDs(registry)
+        _ = registry.handle(.newTab(workspaceID: workspaceID, cwd: nil, shell: nil))
+        guard let first = surfaceIDs(registry).subtracting(restored).first else {
+            return XCTFail("newTab spawned no surface")
+        }
+        XCTAssertTrue(waitForCapture(registry, surfaceID: first, contains: "Kouen updated"))
         XCTAssertNil(VersionBannerStore().loadLastSeenBuild(), "ack could not have landed")
 
         // Unblock and create another surface: the ack retries; the banner must NOT re-render.
         try FileManager.default.removeItem(at: KouenPaths.versionStateURL)
-        guard let workspaceID = registry.snapshot.workspaces.first?.id else { return XCTFail("no workspace") }
         let before = surfaceIDs(registry)
         _ = registry.handle(.newTab(workspaceID: workspaceID, cwd: nil, shell: nil))
         guard let second = surfaceIDs(registry).subtracting(before).first else {
             return XCTFail("newTab spawned no surface")
         }
         usleep(500_000)
-        XCTAssertFalse(capture(registry, second).contains("Try this"), "banner renders at most once per run")
+        XCTAssertTrue(waitForCapture(registry, surfaceID: second, contains: "Welcome to Kouen"))
+        XCTAssertFalse(capture(registry, second).contains("Kouen updated"), "update banner renders at most once per run")
         XCTAssertEqual(
             VersionBannerStore().loadLastSeenBuild(), KouenVersion.build,
             "failed ack must be retried on the next surface"
@@ -246,7 +250,7 @@ final class VersionBannerTests: XCTestCase {
         let registry = SurfaceRegistry() // default: banner disabled (every embedded/test registry)
         guard let first = surfaceIDs(registry).first else { return XCTFail("expected a seeded surface") }
         usleep(500_000)
-        XCTAssertFalse(capture(registry, first).contains("Try this"))
+        XCTAssertFalse(capture(registry, first).contains("Welcome to Kouen"))
         XCTAssertNil(VersionBannerStore().loadLastSeenBuild())
     }
 }

@@ -21,14 +21,24 @@ final class GitRunnerTests: XCTestCase {
     }
 
     // MARK: - [BE-IT] GitService Repository Discovery
-    func testGitServiceHasRemoteInCurrentRepo() {
-        let repoRoot = URL(fileURLWithPath: #filePath)
-            .deletingLastPathComponent() // Tests/KouenGitTests
-            .deletingLastPathComponent() // Tests
-            .deletingLastPathComponent() // repo root
-            .path
+    func testGitServiceDiscoversRepositoryAndRemote() throws {
+        let fileManager = FileManager.default
+        let repo = fileManager.temporaryDirectory
+            .appendingPathComponent("kouen-git-discovery-\(UUID().uuidString)", isDirectory: true)
+        try fileManager.createDirectory(at: repo, withIntermediateDirectories: true)
+        defer { try? fileManager.removeItem(at: repo) }
+
         let service = GitService()
-        XCTAssertTrue(service.hasRemote(for: repoRoot))
-        XCTAssertNotNil(service.resolveRepoRoot(for: repoRoot))
+        let initialize = service.run(["init", "--template="], in: repo.path)
+        XCTAssertTrue(initialize.isSuccess, initialize.stderr)
+        XCTAssertNotNil(service.resolveRepoRoot(for: repo.path))
+        XCTAssertFalse(service.hasRemote(for: repo.path))
+
+        let addRemote = service.run(
+            ["remote", "add", "origin", "https://example.invalid/kouen.git"],
+            in: repo.path
+        )
+        XCTAssertTrue(addRemote.isSuccess, addRemote.stderr)
+        XCTAssertTrue(service.hasRemote(for: repo.path))
     }
 }

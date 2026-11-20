@@ -184,4 +184,6 @@ jobs:
       - name: Run benchmark suite
         env:
           KOUEN_BENCHMARKS: "1"
-        run: swift test -c release --filter KouenBenchmarks
+        # KouenBenchmarks uses XCTest. The release Swift Testing runner can
+        # resolve the CLI entry point and exit after the XCTest suite passes.
+        run: swift test -c release --disable-swift-testing --filter KouenBenchmarks

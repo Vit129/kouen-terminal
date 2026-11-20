@@ -123,9 +123,17 @@ final class ProcessRunnerTests: XCTestCase {
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: directory) }
         let marker = directory.appendingPathComponent("child-pid")
+        let redirected = directory.appendingPathComponent("stderr-redirected")
         let task = Task {
             await ProcessRunner.runAsync(executable: "/bin/sh", arguments: [
-                "-c", #"sleep 4 2>/dev/null & printf ready; echo "$$" > "$1""#, "sh", marker.path,
+                "-c",
+                #"""
+                (touch "$2"; exec sleep 4) 2>/dev/null &
+                while [ ! -f "$2" ]; do sleep 0.01; done
+                printf ready
+                echo "$$" > "$1"
+                """#,
+                "sh", marker.path, redirected.path,
             ])
         }
 
