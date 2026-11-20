@@ -1086,65 +1086,15 @@ struct ToolRegistry: Sendable {
     static let maxShellOutputBytes = 4 * 1024 * 1024
     static let shellTimeoutSeconds: TimeInterval = 120
 
-    /// Drains one pipe to EOF off-main via GCD (not `Task.detached`, which shares Swift's
-    /// fixed cooperative pool and can starve under bursty concurrent calls) — same pattern
-    /// as `GitStatusProvider.status(rootPath:)`. Keeps at most `limit` bytes but always reads to
-    /// EOF, so a chatty child can neither fill the pipe and deadlock nor grow this process.
-    private func drainPipe(_ pipe: Pipe, limit: Int = ToolRegistry.maxShellOutputBytes) async -> (Data, Bool) {
-        await withCheckedContinuation { (continuation: CheckedContinuation<(Data, Bool), Never>) in
-            DispatchQueue.global(qos: .userInitiated).async {
-                var kept = Data()
-                var truncated = false
-                let handle = pipe.fileHandleForReading
-                while true {
-                    let chunk = handle.availableData
-                    if chunk.isEmpty { break }
-                    let room = limit - kept.count
-                    if chunk.count > room { truncated = true }
-                    if room > 0 { kept.append(chunk.prefix(room)) }
-                }
-                continuation.resume(returning: (kept, truncated))
-            }
-        }
-    }
-
     func shell(_ command: String, cwd: String?, timeout: TimeInterval = ToolRegistry.shellTimeoutSeconds) async -> (String, String, Int32) {
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/bin/sh")
-        process.arguments = ["-c", command]
-        if let cwd { process.currentDirectoryURL = URL(fileURLWithPath: cwd) }
-        let outPipe = Pipe(); let errPipe = Pipe()
-        process.standardOutput = outPipe; process.standardError = errPipe
-        do {
-            try process.run()
-        } catch {
-            return ("", error.localizedDescription, -1)
-        }
-        // A hung command must not wedge the (sequential) MCP stdio loop forever: SIGTERM at the
-        // deadline, SIGKILL if it ignores that.
-        let killer = ShellKiller(process: process)
-        let timer = DispatchSource.makeTimerSource(queue: .global())
-        timer.schedule(deadline: .now() + timeout)
-        timer.setEventHandler { killer.fire() }
-        timer.resume()
-        defer { timer.cancel() }
-        // Drain both pipes CONCURRENTLY, before waitUntilExit(): this helper runs arbitrary
-        // shell commands for MCP tools (git log, builds, etc.) whose output can exceed the
-        // pipe buffer on either stream — reading sequentially (or after waitUntilExit())
-        // deadlocks deterministically once it does. See
-        // agent-memory/knowledge/patterns/process-pipe-deadlock.md.
-        async let outDataTask = drainPipe(outPipe)
-        async let errDataTask = drainPipe(errPipe)
-        let ((outData, outCut), (errData, errCut)) = await (outDataTask, errDataTask)
-        process.waitUntilExit()
-        var out = String(data: outData, encoding: .utf8)?
-            .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-        var err = String(data: errData, encoding: .utf8)?
-            .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-        if outCut { out += "\n[stdout truncated at \(Self.maxShellOutputBytes) bytes]" }
-        if errCut { err += "\n[stderr truncated at \(Self.maxShellOutputBytes) bytes]" }
-        if killer.didFire { err += "\n[timed out after \(Int(timeout))s and was terminated]" }
-        return (out, err, process.terminationStatus)
+        let result = await ProcessRunner.runAsync(
+            executable: "/bin/sh", arguments: ["-c", command], in: cwd, timeout: max(0.001, timeout)
+        )
+        var out = result.stdout.trimmingCharacters(in: .whitespacesAndNewlines)
+        var err = result.stderr.trimmingCharacters(in: .whitespacesAndNewlines)
+        if result.stdoutWasTruncated { out += "\n[stdout truncated at \(Self.maxShellOutputBytes) bytes]" }
+        if result.stderrWasTruncated { err += "\n[stderr truncated at \(Self.maxShellOutputBytes) bytes]" }
+        return (out, err, result.exitCode)
     }
 
     private func toolResult(_ text: String) -> AnyCodable {
@@ -1208,26 +1158,5 @@ struct ToolRegistry: Sendable {
     private func intArg(_ value: AnyCodable?, default defaultValue: Int) -> Int {
         guard case let .int(i)? = value else { return defaultValue }
         return i
-    }
-}
-
-/// SIGTERMs a process at its deadline and SIGKILLs it two seconds later if it is still running.
-private final class ShellKiller: @unchecked Sendable {
-    private let process: Process
-    private let lock = NSLock()
-    private var fired = false
-
-    init(process: Process) { self.process = process }
-
-    var didFire: Bool { lock.lock(); defer { lock.unlock() }; return fired }
-
-    func fire() {
-        guard process.isRunning else { return }
-        lock.lock(); fired = true; lock.unlock()
-        process.terminate()
-        let pid = process.processIdentifier
-        DispatchQueue.global().asyncAfter(deadline: .now() + 2) { [process] in
-            if process.isRunning { kill(pid, SIGKILL) }
-        }
     }
 }

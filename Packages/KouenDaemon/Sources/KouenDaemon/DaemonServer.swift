@@ -13,7 +13,7 @@ public final class DaemonServer: @unchecked Sendable {
     /// M10: drives `claude -p --output-format stream-json` as a subprocess for headless/
     /// automation runs. Dispatched directly (see `.ccRunStart` etc. in `handle`), off the
     /// `registry` lock — same reasoning as `handleWaitFor`, its work is genuinely async.
-    public let claudeCodeHarness = ClaudeCodeHarness()
+    public let claudeCodeHarness: ClaudeCodeHarness
     /// Agent Swarm Core: shared fleet DAG both worker lanes report into.
     public let swarmDAGStore = SwarmDAGStore()
     /// Agent Swarm Core: fleet spawn/send/terminate, dispatched via `.swarm*` (see `handle`).
@@ -109,7 +109,12 @@ public final class DaemonServer: @unchecked Sendable {
     /// `enableVersionBanner` is passed by the real daemon entry point only (`main.swift`):
     /// the first-run / what's-new banner is daemon policy, not something every embedded or
     /// test registry should emit into freshly spawned PTYs.
-    public init(enableVersionBanner: Bool = false) {
+    public convenience init(enableVersionBanner: Bool = false) {
+        self.init(enableVersionBanner: enableVersionBanner, claudeCodeHarness: ClaudeCodeHarness())
+    }
+
+    init(enableVersionBanner: Bool, claudeCodeHarness: ClaudeCodeHarness) {
+        self.claudeCodeHarness = claudeCodeHarness
         registry = SurfaceRegistry(enableVersionBanner: enableVersionBanner)
 
         // Built before `registry.onSnapshotCommitted` below: that closure captures `self`
