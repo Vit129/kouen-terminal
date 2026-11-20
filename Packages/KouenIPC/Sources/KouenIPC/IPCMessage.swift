@@ -73,7 +73,8 @@ import Foundation
 /// `.ccRunStart` so the app can resume any adapter's session headlessly. Wire-shape change of
 /// an existing case — same rule as the M10 `effort` bump above.
 /// Version 15 adds the guarded PR feedback paste and target inspection handlers.
-public let ipcProtocolVersion: Int = 15
+/// Version 16 removes the embedded Feature request and response cases.
+public let ipcProtocolVersion: Int = 16
 
 /// Who initiated a write to a surface's PTY. Lets the daemon serialize concurrent writers
 /// instead of interleaving keystrokes into one broken command (P46 Pillar 6 gap 3) — a human
@@ -390,16 +391,6 @@ public enum IPCRequest: Codable, Sendable {
     case swarmTerminate(taskID: UUID)
     case swarmList
 
-    // Features / AI-SDLC (P46): Embedded workflow engine & worktree discipline.
-    case featureList(repoPath: String?)
-    case featureGet(slug: String)
-    case featureCreate(slug: String, repoPath: String, branch: String?, baseBranch: String?, worktreePath: String?, phase: String?)
-    case featureUpdatePhase(slug: String, phase: String)
-    case featureApproveGate(slug: String, gate: Int, approver: String, notes: String?)
-    case featureSetWorktree(slug: String, worktreePath: String?)
-    case featureSupersede(slug: String, supersededBy: String)
-    case featureDelete(slug: String)
-    case featureSweepMerged(repoPath: String?)
 
     /// Forces an immediate, synchronous `layout.json` write (bypasses the normal 0.5s
     /// debounce). `install-graceful.sh`'s protocol-changed restart path sends this and waits
@@ -601,9 +592,6 @@ public enum IPCResponse: Codable, Sendable {
     /// (see `SwarmWorkerManager.send`/`.terminate`'s doc comments for what `false` means).
     case swarmActionResult(Bool)
 
-    // Features / AI-SDLC (P46)
-    case featureInfo(FeatureSummary?)
-    case features([FeatureSummary])
 }
 
 public struct OptionEntry: Codable, Sendable, Equatable {

@@ -49,7 +49,7 @@ final class ContextResolutionEngineTests: XCTestCase {
         XCTAssertTrue(result.contains("hello world from test"))
     }
 
-    func testContextResolutionEngineResolvesTemplate() async {
+    func test_TS_0005_FE_UT_FileTokenResolvesWithoutFeatureContext() async {
         let engine = ContextResolutionEngine()
         let tempDir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         try? FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
@@ -58,10 +58,11 @@ final class ContextResolutionEngineTests: XCTestCase {
         let sampleFile = tempDir.appendingPathComponent("main.swift")
         try? "print(42)".write(to: sampleFile, atomically: true, encoding: .utf8)
 
-        let template = "Explain this code: @file:main.swift please"
+        let template = "Explain this code: @file:main.swift for @issue"
         let resolved = await engine.resolveTemplate(template, cwd: tempDir.path)
         XCTAssertTrue(resolved.contains("Explain this code:"))
         XCTAssertTrue(resolved.contains("### File: main.swift"))
         XCTAssertTrue(resolved.contains("print(42)"))
+        XCTAssertTrue(resolved.hasSuffix(" for @issue"))
     }
 }

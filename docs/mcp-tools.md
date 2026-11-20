@@ -42,7 +42,7 @@ AI agents (Claude Code, Codex, Kiro) can see and interact with the embedded brow
 | Code navigation | `kouenFind`, `kouenGrep`, `kouenRecent`, `kouenErrors` |
 | Agents and swarm | `kouenSpawnAgent`, `kouenSpawnWorker`, `kouenSwarmList`, `kouenSwarmInput`, `kouenSwarmTerminate` |
 | Tasks | `kouenTaskList`, `kouenTaskGet`, `kouenTaskCreate`, `kouenTaskUpdate`, `kouenTaskDelete` |
-| Features (AI-SDLC) | `kouenFeatureCreate`, `kouenFeatureGet`, `kouenFeatureList`, `kouenFeatureApproveGate`, `kouenFeatureUpdatePhase`, `kouenContextResolve`, `kouenFeaturePreview` |
+| Context | `kouenContextResolve` |
 | Worktrees, hosts, projects | `kouenWorktreeList`, `kouenWorktreeCreate`, `kouenWorktreeRemove`, `kouenHostList`, `kouenProjectsList` |
 | Automations | `kouenAutomationList`, `kouenAutomationGet`, `kouenAutomationCreate`, `kouenAutomationUpdate`, `kouenAutomationDelete`, `kouenAutomationPause`, `kouenAutomationResume`, `kouenAutomationRunNow` |
 | Agent routing rules | `kouenRoutingRuleList`, `kouenRoutingRuleCreate`, `kouenRoutingRuleUpdate`, `kouenRoutingRuleDelete`, `kouenRoutingRuleReorder` |

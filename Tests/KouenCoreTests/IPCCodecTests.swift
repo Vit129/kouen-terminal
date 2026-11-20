@@ -42,8 +42,16 @@ final class IPCCodecTests: XCTestCase {
         }
     }
 
-    func testReviewFeedbackProtocolVersionAndTypedPayload() throws {
-        XCTAssertEqual(ipcProtocolVersion, 15)
+    func test_TS_0003_BE_IT_LegacyFeaturePayloadsAreRejected() throws {
+        XCTAssertEqual(ipcProtocolVersion, 16)
+        let decoder = JSONDecoder()
+        let request = Data(#"{"request":{"featureList":{}}}"#.utf8)
+        let response = Data(#"{"response":{"features":{"_0":[]}}}"#.utf8)
+        XCTAssertThrowsError(try decoder.decode(IPCEnvelope.self, from: request))
+        XCTAssertThrowsError(try decoder.decode(IPCReply.self, from: response))
+    }
+
+    func testReviewFeedbackTypedPayload() throws {
         let target = ReviewFeedbackTarget(surfaceID: UUID().uuidString, ptyInstance: UUID(), generation: 2,
             agentPID: 45, agentBirth: "123:456", agentKind: .codex)
         let head = String(repeating: "a", count: 40)

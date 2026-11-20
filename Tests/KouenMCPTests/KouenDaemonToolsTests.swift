@@ -13,6 +13,23 @@ final class KouenDaemonToolsTests: XCTestCase {
         try super.tearDownWithError()
     }
 
+    func test_TS_0002_BE_IT_FeatureToolsAreAbsentAndGenericToolsRemain() async {
+        let registry = ToolRegistry()
+        guard case let .object(root) = registry.listTools(), case let .array(tools) = root["tools"] else {
+            return XCTFail("Expected tool list")
+        }
+        let names = tools.compactMap { tool -> String? in
+            guard case let .object(item) = tool, case let .string(name) = item["name"] else { return nil }
+            return name
+        }
+        XCTAssertFalse(names.contains { $0.hasPrefix("kouenFeature") })
+        for name in ["kouenTaskList", "kouenWorktreeList", "kouenList", "kouenSpawnAgent", "readFile"] {
+            XCTAssertTrue(names.contains(name), name)
+        }
+        let (_, error) = await registry.callTool(params: .object(["name": .string("kouenFeatureList"), "arguments": .object([:])]))
+        XCTAssertNotNil(error)
+    }
+
     func testControlGateRequiresExactOne() {
         XCTAssertFalse(KouenDaemonTools.isControlEnabled(environment: [:]))
         XCTAssertFalse(KouenDaemonTools.isControlEnabled(environment: ["KOUEN_MCP_ALLOW_CONTROL": "true"]))

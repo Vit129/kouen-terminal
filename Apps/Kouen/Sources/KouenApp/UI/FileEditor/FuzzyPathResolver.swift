@@ -148,31 +148,21 @@ enum FuzzyPathResolver {
 }
 
 /// Finds folders worth adding to Settings › Files › search folders: notes repos that agents write
-/// plans and memory to outside the project, including the shared Unified Memory Vault.
+/// plans and memory to outside the project.
 enum FileSearchRootScanner {
     static func scan(base: URL = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Git"),
                      maxDepth: Int = 4, fileManager: FileManager = .default) -> [String] {
         let base = base.resolvingSymlinksInPath().standardizedFileURL
-        let vault = base.appendingPathComponent("Personal").appendingPathComponent("unified-memory-vault")
-        let sharedRoot = vault.appendingPathComponent("memory-vault", isDirectory: true)
-        let canonicalVault = vault.resolvingSymlinksInPath().path
         var found: [String] = []
-        var isDirectory: ObjCBool = false
-        if fileManager.fileExists(atPath: sharedRoot.path, isDirectory: &isDirectory), isDirectory.boolValue {
-            found.append(sharedRoot.resolvingSymlinksInPath().path)
-        }
         guard let walker = fileManager.enumerator(at: base, includingPropertiesForKeys: [.isDirectoryKey],
-                                                  options: [.skipsHiddenFiles, .skipsPackageDescendants]) else { return found }
+                                                  options: [.skipsHiddenFiles, .skipsPackageDescendants]) else { return [] }
         for case let url as URL in walker {
             guard (try? url.resourceValues(forKeys: [.isDirectoryKey]))?.isDirectory == true else { continue }
             let name = url.lastPathComponent
             if walker.level > maxDepth || ["node_modules", ".build", "DerivedData", "dist", ".kouen-worktrees"].contains(name) {
                 walker.skipDescendants(); continue
             }
-            if name == vault.lastPathComponent, !found.isEmpty,
-               url.resolvingSymlinksInPath().path == canonicalVault {
-                walker.skipDescendants()
-            } else if name == "agent-memory" {
+            if name == "agent-memory" {
                 found.append(url.resolvingSymlinksInPath().path)
                 walker.skipDescendants()
             }

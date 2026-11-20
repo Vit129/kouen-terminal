@@ -27,7 +27,7 @@ The maintainer (Vit129). Personal hard fork of `robzilla1738/harness-terminal`, 
 - **Review Changes (⌘L)** — review staged, unstaged, and new files next to the terminal, add line comments, and send them to a selected agent in the same worktree. LazyGit handles Git operations. Review Last Checkpoint remains available in View.
 - **Quick Context Injector (⌘K)** — resolves `@diff`/`@file`/`@last`/`@error`/`@builderror` tokens into a prompt.
 - **Fleet view** — one sidebar tab flattening every live session across every workspace, needs-attention-first, reached mainly via a notification's "jump to session" action
-- **`kouen-cli history`/`task pack-pr`** — cross-session agent transcript search/resume, and PR-description assembly from a tracked feature's diff/gates/checklist
+- **`kouen-cli history`** — cross-session agent transcript search and resume
 - **Orchestrator & Agent Swarm (P44)** — a CLI agent decomposes a goal into Tasks, spawns headless or interactive Workers, and drives them to merge-ready with a bounded auto-fix loop; inline task status on tabs and sidebar
 - **Automations & Jobs view** — scheduled agent launches (`kouenAutomation*` MCP tools) with a Jobs fleet view and result viewer
 - **Workspace navigation** — import and refresh primary Git checkouts, review moved repositories in one batch, clear deleted worktree checkouts from the sidebar, and open a project branch from the CLI. Creating a branch and worktree requires an explicit flag.

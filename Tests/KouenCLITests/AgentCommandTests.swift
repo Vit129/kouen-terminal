@@ -76,20 +76,4 @@ final class AgentCommandTests: XCTestCase {
         XCTAssertEqual(KouenCLI.resolveAgentTab(in: snap, target: nil)?.id, agentA.id)
     }
 
-    /// P46 Pillar 6 gap 4 follow-up: `--feature <slug>` targeting resolves to the tab bound to
-    /// that feature's worktree — matching either `cwd` (the common case: a shell opened directly
-    /// in the worktree) or the explicit `worktreePath` tag (set via `.newSession`'s
-    /// `worktreePath:` — a linked/grouped tab whose own `cwd` may differ).
-    func testMatchTabForWorktreePathMatchesCwdOrExplicitTag() {
-        let byCwd = Tab(title: "by-cwd", cwd: "/repo/.kouen-worktrees/feat-a")
-        let byTag = Tab(title: "by-tag", cwd: "/somewhere/else", worktreePath: "/repo/.kouen-worktrees/feat-b")
-        let unrelated = Tab(title: "unrelated", cwd: "/repo")
-        let session = SessionGroup(id: UUID(), name: "s", tabs: [byCwd, byTag, unrelated], activeTabID: byCwd.id, sortOrder: 0)
-        let ws = Workspace(id: UUID(), name: "W", sessions: [session], activeSessionID: session.id)
-        let snap = SessionSnapshot(workspaces: [ws], activeWorkspaceID: ws.id)
-
-        XCTAssertEqual(KouenCLI.matchTab(forWorktreePath: "/repo/.kouen-worktrees/feat-a", in: snap)?.id, byCwd.id)
-        XCTAssertEqual(KouenCLI.matchTab(forWorktreePath: "/repo/.kouen-worktrees/feat-b", in: snap)?.id, byTag.id)
-        XCTAssertNil(KouenCLI.matchTab(forWorktreePath: "/repo/.kouen-worktrees/no-such-feature", in: snap))
-    }
 }

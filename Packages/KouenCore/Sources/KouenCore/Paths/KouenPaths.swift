@@ -262,10 +262,6 @@ public enum KouenPaths {
         applicationSupport.appendingPathComponent("automations.json")
     }
 
-    public static var featuresURL: URL {
-        applicationSupport.appendingPathComponent("features.json")
-    }
-
     public static var memoURL: URL {
         applicationSupport.appendingPathComponent("memo.json")
     }
