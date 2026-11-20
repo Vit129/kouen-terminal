@@ -459,6 +459,7 @@ final class MainSplitViewController: NSViewController {
     /// sidebar to an unusable sliver — but a programmatic collapse must reach 0).
     private func applySidebarVisibility(_ visible: Bool, animated: Bool) {
         sidebarAnimToken &+= 1
+        if !visible { sidebar.sidebarListModel.isSidebarVisible = false }
         // Clamp to the same floor `SplitChromeDelegate` enforces on user drags — a
         // persisted width below it (e.g. `sidebarWidth: 0` from a stuck-collapse write,
         // see cmd-backslash-sidebar-zero-width) makes `target == 0` for both directions,
@@ -479,6 +480,7 @@ final class MainSplitViewController: NSViewController {
             hosts.values.forEach { $0.setPresentsWithTransaction(false) }
             panel?.isHidden = !visible
             if visible { panel?.layoutSubtreeIfNeeded() }
+            sidebar.sidebarListModel.isSidebarVisible = visible
             splitDelegate.allowFullCollapse = false
             edgeDivider.isHidden = !visible
             updateContentLeadingInset()
@@ -503,6 +505,7 @@ final class MainSplitViewController: NSViewController {
             sidebarLog.debug("applySidebarVisibility zero-delta guard fired start=\(start) target=\(target) — no animation, jumping directly")
             setSidebarWidth(target)
             if !visible { panel.isHidden = true }
+            sidebar.sidebarListModel.isSidebarVisible = visible
             splitDelegate.allowFullCollapse = false
             updateContentLeadingInset()
             return
@@ -574,6 +577,7 @@ final class MainSplitViewController: NSViewController {
                 // valid layout pass — force one once the panel is at its final open geometry.
                 panel.layoutSubtreeIfNeeded()
             }
+            sidebar.sidebarListModel.isSidebarVisible = visible
             splitDelegate.allowFullCollapse = false   // restore the 200pt drag floor
             split.needsDisplay = true
             updateContentLeadingInset()

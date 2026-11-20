@@ -60,6 +60,117 @@ final class ProjectAddTests: XCTestCase {
         XCTAssertEqual(store.projects.map(\.categoryID), [group.id])
     }
 
+    func testTC0006_FE_IT_ActiveProjectFollowsSessionAndRevealsCollapsedGroup() throws {
+        let (root, cleanUp) = try fixture()
+        defer { cleanUp() }
+        let store = ProjectStore(userDefaultsSuite: UUID().uuidString)
+        let sidebar = SidebarListModel()
+        sidebar.projectStore = store
+        let group = store.addCategory(name: "Projects")
+        let paths = try ["alpha", "zulu"].map { name in
+            let repo = root.appendingPathComponent(name)
+            try FileManager.default.createDirectory(
+                at: repo.appendingPathComponent(".git"), withIntermediateDirectories: true
+            )
+            return try XCTUnwrap(store.addProject(repo.path, categoryID: group.id)).entry.path
+        }
+        let blank = try XCTUnwrap(URL(string: "about:blank"))
+        let alpha = Tab(cwd: paths[0], rootPane: .browser(BrowserLeaf(url: blank)))
+        let zulu = Tab(cwd: paths[1] + "/nested", rootPane: .browser(BrowserLeaf(url: blank)))
+        let first = SessionGroup(tabs: [alpha], activeTabID: alpha.id)
+        let second = SessionGroup(tabs: [zulu], activeTabID: zulu.id)
+        var workspace = Workspace(name: "Test", sessions: [first, second], activeSessionID: first.id)
+        sidebar.collapsedGroups.insert(group.id)
+
+        sidebar.update(from: SessionSnapshot(workspaces: [workspace], activeWorkspaceID: workspace.id))
+        XCTAssertEqual(sidebar.activeProjectPath, paths[0])
+        XCTAssertFalse(sidebar.rows.contains { $0.id == "proj-\(paths[0])" })
+
+        workspace.activeSessionID = second.id
+        sidebar.update(from: SessionSnapshot(workspaces: [workspace], activeWorkspaceID: workspace.id))
+        XCTAssertEqual(sidebar.activeProjectPath, paths[1])
+        sidebar.expandActiveProjectGroup()
+        XCTAssertTrue(sidebar.rows.contains { $0.id == "proj-\(paths[1])" })
+
+        workspace.activeSessionID = first.id
+        sidebar.update(from: SessionSnapshot(workspaces: [workspace], activeWorkspaceID: workspace.id))
+        XCTAssertEqual(sidebar.activeProjectPath, paths[0])
+    }
+
+    func testTC0007_FE_IT_RefreshLoadsCheckoutAndSelectionKeepsSessionOrder() async throws {
+        let (root, cleanUp) = try fixture()
+        defer { cleanUp() }
+        let checkout = try await ProjectAcquisitionService.acquire(
+            .init(mode: .create, input: "Shared", parent: root)
+        )
+        let store = ProjectStore(userDefaultsSuite: UUID().uuidString)
+        let sidebar = SidebarListModel()
+        sidebar.projectStore = store
+        let path = try XCTUnwrap(store.addProject(checkout.path)).entry.path
+        let blank = try XCTUnwrap(URL(string: "about:blank"))
+        let sessions = (0..<4).map { _ in
+            let tab = Tab(cwd: path, rootPane: .browser(BrowserLeaf(url: blank)))
+            return SessionGroup(tabs: [tab], activeTabID: tab.id)
+        }
+        var workspace = Workspace(name: "Test", sessions: sessions, activeSessionID: sessions[0].id)
+        func cards() -> [SidebarSessionCardItem] {
+            sidebar.rows.compactMap {
+                guard case let .sessionItem(card) = $0 else { return nil }
+                return card
+            }
+        }
+
+        sidebar.update(from: SessionSnapshot(workspaces: [workspace], activeWorkspaceID: workspace.id))
+        await sidebar.refreshProjects()
+        XCTAssertEqual(cards().first?.isPrimaryCheckout, true)
+
+        workspace.activeSessionID = sessions[2].id
+        sidebar.update(from: SessionSnapshot(workspaces: [workspace], activeWorkspaceID: workspace.id))
+        XCTAssertEqual(cards().compactMap(\.sessionID), sessions.map(\.id))
+        XCTAssertEqual(cards().filter(\.isSelected).compactMap(\.sessionID), [sessions[2].id])
+        XCTAssertEqual(cards().first?.isPrimaryCheckout, true)
+    }
+
+    func testTC0009_FE_IT_SessionActivityIncludesWorkingPaneOfSameAgentKind() throws {
+        let (root, cleanUp) = try fixture()
+        defer { cleanUp() }
+        let store = ProjectStore(userDefaultsSuite: UUID().uuidString)
+        let sidebar = SidebarListModel()
+        sidebar.projectStore = store
+        let path = try XCTUnwrap(store.addProject(root.path)).entry.path
+        let idle = AgentSnapshot(kind: .codex, executable: "codex", pid: 1)
+        var otherPane = AgentSnapshot(kind: .codex, executable: "codex", pid: 2, activity: .working)
+        var tab = Tab(cwd: path, agent: idle, paneAgents: ["second": otherPane])
+        var session = SessionGroup(tabs: [tab], activeTabID: tab.id)
+        var workspace = Workspace(name: "Test", sessions: [session], activeSessionID: session.id)
+
+        func displayedActivity() -> TabStatus? {
+            sidebar.update(from: SessionSnapshot(workspaces: [workspace], activeWorkspaceID: workspace.id))
+            for row in sidebar.rows {
+                if case let .sessionItem(card) = row, card.sessionID == session.id {
+                    return card.status
+                }
+            }
+            return nil
+        }
+
+        XCTAssertEqual(displayedActivity(), .running)
+        for (activity, expected): (AgentActivity, TabStatus) in [(.awaiting, .waiting), (.idle, .idle)] {
+            otherPane.activity = activity
+            tab.paneAgents = ["second": otherPane]
+            session.tabs = [tab]
+            workspace.sessions = [session]
+            XCTAssertEqual(displayedActivity(), expected)
+        }
+
+        for status: TabStatus in [.done, .running] {
+            tab.status = status
+            session.tabs = [tab]
+            workspace.sessions = [session]
+            XCTAssertEqual(displayedActivity(), status)
+        }
+    }
+
     func testTC0003_BE_IT_CloneRegistersOnlyAfterGitSucceeds() async throws {
         let (root, cleanUp) = try fixture()
         defer { cleanUp() }

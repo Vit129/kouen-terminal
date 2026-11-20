@@ -68,6 +68,7 @@ final class ProjectStore {
     var categories: [ProjectCategory] = []
     var projects: [ProjectEntry] = []
     var pendingReconciliationPaths: Set<String> = []
+    private(set) var missingProjectPaths: Set<String> = []
     private let userDefaults: UserDefaults
     private(set) var watcher: ProjectGroupWatcher?
 
@@ -317,11 +318,6 @@ final class ProjectStore {
             let scannedRoots = Dictionary(uniqueKeysWithValues: validSnapshots.compactMap { snapshot in
                 snapshot.category.sourceFolder.map { (snapshot.category.id, $0) }
             })
-            // Missing categorized paths may have moved outside the current root.
-            // Keep their records available for explicit Review or Remove.
-            updatedProjects.removeAll { project in
-                !FileManager.default.fileExists(atPath: project.path) && project.categoryID == nil
-            }
             let confirmedMissing = projects.filter { project in
                 guard !FileManager.default.fileExists(atPath: project.path),
                       let categoryID = project.categoryID,
@@ -356,6 +352,25 @@ final class ProjectStore {
         applyScans(snapshots, pruneConfirmedMissing: true)
     }
 
+    /// A readable parent distinguishes a removed entry from an unavailable volume or denied path.
+    func refreshProjectAvailability() async {
+        let paths = Set(projects.map(\.path))
+        let previouslyMissing = missingProjectPaths
+        let missing = await Task.detached(priority: .utility) {
+            let fileManager = FileManager.default
+            return paths.filter { path in
+                guard !fileManager.fileExists(atPath: path) else { return false }
+                let url = URL(fileURLWithPath: path).standardizedFileURL
+                guard let entries = try? fileManager.contentsOfDirectory(
+                    atPath: url.deletingLastPathComponent().path
+                ) else { return previouslyMissing.contains(path) }
+                return !entries.contains(url.lastPathComponent)
+            }
+        }.value
+        guard !Task.isCancelled, paths == Set(projects.map(\.path)) else { return }
+        if missing != missingProjectPaths { missingProjectPaths = missing }
+    }
+
     // MARK: - Queries
 
     nonisolated static func directoryIdentity(_ path: String) -> String {
@@ -385,7 +400,8 @@ final class ProjectStore {
 
     func projects(inCategory categoryID: String?, revealing path: String? = nil) -> [ProjectEntry] {
         visibleProjects.filter {
-            $0.categoryID == categoryID && ($0.path == path || !pendingReconciliationPaths.contains($0.path))
+            $0.categoryID == categoryID && !missingProjectPaths.contains($0.path)
+                && ($0.path == path || !pendingReconciliationPaths.contains($0.path))
         }
     }
 }

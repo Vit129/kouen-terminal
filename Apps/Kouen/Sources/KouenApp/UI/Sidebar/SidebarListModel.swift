@@ -52,6 +52,33 @@ struct SidebarProjectHeaderItem: Identifiable, Sendable {
     var id: String { path }
 }
 
+extension SessionGroup {
+    var chromeStatus: TabStatus {
+        var statuses = Set<TabStatus>()
+        for tab in tabs {
+            statuses.insert(tab.status)
+            for agent in tab.paneAgents?.values ?? [:].values {
+                statuses.insert(agent.activity.chromeStatus)
+            }
+            if let agent = tab.agent {
+                statuses.insert(agent.activity.chromeStatus)
+            }
+        }
+        return [.running, .waiting, .error, .done].first { statuses.contains($0) } ?? .idle
+    }
+}
+
+private extension AgentActivity {
+    var chromeStatus: TabStatus {
+        switch self {
+        case .working: .running
+        case .awaiting: .waiting
+        case .errored: .error
+        case .idle: .idle
+        }
+    }
+}
+
 struct SidebarSessionCardItem: Identifiable, Sendable {
     let id: String
     let projectPath: String
@@ -64,8 +91,7 @@ struct SidebarSessionCardItem: Identifiable, Sendable {
     let isDirty: Bool
     let sessionID: SessionID?
     let worktreePath: String?
-    let agentKind: AgentKind?
-    var detectedAgents: [AgentSnapshot] = []
+    var status: TabStatus = .idle
     let subagentsCount: Int
     let localhostPort: Int?
     var isPrimaryCheckout = false
@@ -92,6 +118,9 @@ final class SidebarListModel {
     var rows: [SidebarSessionRow] = []
     var activeSessionID: SessionID?
     var activeWorkspaceID: WorkspaceID?
+    private(set) var activeProjectPath: String?
+    var isSidebarVisible = false
+    private var activeProjectCategoryID: String?
     private(set) var sessions: [SessionGroup] = []
     private var isRebuilding = false
 
@@ -185,6 +214,12 @@ final class SidebarListModel {
         rebuildRows()
     }
 
+    func expandActiveProjectGroup() {
+        guard let activeProjectCategoryID,
+              collapsedGroups.remove(activeProjectCategoryID) != nil else { return }
+        rebuildRows()
+    }
+
     func revealProject(_ entry: ProjectEntry) {
         if let categoryID = entry.categoryID {
             collapsedGroups.remove(categoryID)
@@ -252,13 +287,15 @@ final class SidebarListModel {
 
     // MARK: - Worktrees
 
-    func updateWorktrees(force: Bool = false) {
+    @discardableResult
+    func updateWorktrees(force: Bool = false) -> [Task<Void, Never>] {
         let paths = Set(sessions.map { repoRootForSession($0) })
             .union(projectStore?.projects.map(\.path) ?? [])
         let rootPaths = paths.union(paths.compactMap { path in
             repositoryRootsByFolder[path].map { projectStore?.project(at: $0)?.path ?? $0 }
         })
         let now = Date()
+        var scans: [Task<Void, Never>] = []
         for rootPath in rootPaths {
             if !force, let lastFetch = lastWorktreeFetchTime[rootPath],
                now.timeIntervalSince(lastFetch) < 3.0 { continue }
@@ -271,7 +308,7 @@ final class SidebarListModel {
             } ?? false
             if !force, !hasMissingWorktree, let signature, signature == lastWorktreeSignature[rootPath] { continue }
             lastWorktreeSignature[rootPath] = signature
-            Task {
+            scans.append(Task {
                 let (resolvedPath, worktrees) = await self.fetchWorktrees(for: rootPath)
                 let containingRoot = resolvedPath == rootPath ? nil : resolvedPath
                 let previousRoot = self.repositoryRootsByFolder[rootPath]
@@ -284,8 +321,9 @@ final class SidebarListModel {
                     self.projectWorktrees[rootPath] = worktrees
                     self.scheduleRebuild()
                 }
-            }
+            })
         }
+        return scans
     }
 
     /// Refreshes the visible project catalog and forces Git to re-read linked worktrees.
@@ -293,8 +331,12 @@ final class SidebarListModel {
     /// projects remain in the catalog so moved repositories can still be reconciled.
     func refreshProjects() async {
         await projectStore?.syncAllWatchedCategories()
+        await projectStore?.refreshProjectAvailability()
         rebuildRows()
-        updateWorktrees(force: true)
+        for scan in updateWorktrees(force: true) {
+            await scan.value
+        }
+        rebuildRows()
     }
 
     // MARK: - Row rebuild
@@ -331,18 +373,36 @@ final class SidebarListModel {
         registerSessionProjects()
 
         var newRows: [SidebarSessionRow] = []
+        let activeSession = sessions.first { $0.id == activeSessionID }
+        let activeRoot = activeSession.map { repoRootForSession($0) }.flatMap {
+            $0 == "Other" ? nil : (repositoryRootsByFolder[$0] ?? $0)
+        }
+        var activeProject: ProjectEntry?
 
         if let store = projectStore, (!store.projects.isEmpty || !store.categories.isEmpty) {
             // Explicit repo entries keep their category even when a stored subfolder comes first.
-            let catalog = store.projects.filter { repositoryRootsByFolder[$0.path] == nil }
-            var seen = Set(catalog.map { ProjectStore.directoryIdentity($0.path) })
-            let inferred = store.projects.compactMap { entry -> ProjectEntry? in
+            let availableProjects = store.projects.filter { !store.missingProjectPaths.contains($0.path) }
+            let catalog = availableProjects.filter { repositoryRootsByFolder[$0.path] == nil }
+            // The same resolved identity serves deduplication and active-project matching.
+            let catalogRoots = catalog.map { (project: $0, path: ProjectStore.directoryIdentity($0.path)) }
+            var seen = Set(catalogRoots.map(\.path))
+            let inferredRoots = availableProjects.compactMap { entry -> (project: ProjectEntry, path: String)? in
                 guard let root = repositoryRootsByFolder[entry.path],
-                      !store.pendingReconciliationPaths.contains(entry.path),
-                      seen.insert(ProjectStore.directoryIdentity(root)).inserted else { return nil }
+                      !store.pendingReconciliationPaths.contains(entry.path) else { return nil }
+                let path = ProjectStore.directoryIdentity(root)
+                guard seen.insert(path).inserted else { return nil }
                 var projected = entry
                 projected.path = root
-                return projected
+                return (projected, path)
+            }
+            let inferred = inferredRoots.map(\.project)
+            if let activeRoot {
+                let root = ProjectStore.directoryIdentity(activeRoot)
+                activeProject = (catalogRoots.filter {
+                    !store.pendingReconciliationPaths.contains($0.project.path) || $0.project.path == projectReveal?.path
+                } + inferredRoots)
+                .filter { root == $0.path || root.hasPrefix($0.path + "/") }
+                .max { $0.path.count < $1.path.count }?.project
             }
             // Grouped by user-defined categories (e.g. "Personal")
             for category in store.categories {
@@ -384,10 +444,15 @@ final class SidebarListModel {
                 guard !rootPath.isEmpty, rootPath != "Other",
                       seenProjects.insert(ProjectStore.directoryIdentity(rootPath)).inserted else { continue }
                 let entry = ProjectEntry(path: rootPath, categoryID: nil)
+                if let activeRoot, ProjectStore.directoryIdentity(activeRoot) == ProjectStore.directoryIdentity(rootPath) {
+                    activeProject = entry
+                }
                 appendProjectAndSessions(entry, into: &newRows)
             }
         }
 
+        activeProjectPath = activeProject?.path
+        activeProjectCategoryID = activeProject?.categoryID
         rows = newRows
     }
 
@@ -444,8 +509,7 @@ final class SidebarListModel {
         }
         // Wait for discovery before claiming this path is a primary checkout.
         let showsPrimaryCheckout = discoveredWorktrees != nil || headerItem.isMissing
-        let primarySession = showsPrimaryCheckout
-            ? primarySessions.first { $0.id == activeSessionID } ?? primarySessions.first : nil
+        let primarySession = showsPrimaryCheckout ? primarySessions.first : nil
         let primaryBranch = [primary?.branch, primarySession?.activeTab?.gitBranch, gitStatuses[project.path]?.branch]
             .compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }
             .first { !$0.isEmpty } ?? "main"
@@ -463,7 +527,6 @@ final class SidebarListModel {
                 isDirty: false,
                 sessionID: nil,
                 worktreePath: nil,
-                agentKind: nil,
                 subagentsCount: 0,
                 localhostPort: nil,
                 isPrimaryCheckout: true,
@@ -485,18 +548,10 @@ final class SidebarListModel {
             let port = tab?.listeningPorts.first ?? sess.tabs.compactMap({ $0.listeningPorts.min() }).min()
             let isSelected = sess.id == activeSessionID
 
-            var lastActivityAt = isPrimary ? primary?.lastActivityAt : nil
-            var uniqueAgents: [AgentSnapshot] = []
-            for t in sess.tabs {
-                for agent in t.allDetectedAgents {
-                    if isPrimary, agent.lastActivityAt > (lastActivityAt ?? .distantPast) {
-                        lastActivityAt = agent.lastActivityAt
-                    }
-                    if !uniqueAgents.contains(where: { $0.kind == agent.kind }) {
-                        uniqueAgents.append(agent)
-                    }
-                }
-            }
+            let lastActivityAt = isPrimary
+                ? ([primary?.lastActivityAt].compactMap { $0 }
+                    + sess.tabs.flatMap { Self.agentSnapshots(in: $0).map(\.lastActivityAt) }).max()
+                : nil
 
             let cardItem = SidebarSessionCardItem(
                 id: sess.id.uuidString,
@@ -510,8 +565,7 @@ final class SidebarListModel {
                 isDirty: isDirty,
                 sessionID: sess.id,
                 worktreePath: nil,
-                agentKind: tab?.effectiveAgentKind,
-                detectedAgents: uniqueAgents,
+                status: sess.chromeStatus,
                 subagentsCount: tab?.subagents?.count ?? 0,
                 localhostPort: port,
                 isPrimaryCheckout: isPrimary,
@@ -538,7 +592,6 @@ final class SidebarListModel {
                 isDirty: false,
                 sessionID: nil,
                 worktreePath: wt.path,
-                agentKind: nil,
                 subagentsCount: 0,
                 localhostPort: nil
             )
@@ -564,6 +617,13 @@ final class SidebarListModel {
                 }
             }
         }
+    }
+
+    private static func agentSnapshots(in tab: Tab) -> [AgentSnapshot] {
+        // Multiple panes can run the same agent kind with different activity.
+        var snapshots = tab.paneAgents.map { Array($0.values) } ?? []
+        if let agent = tab.agent { snapshots.append(agent) }
+        return snapshots
     }
 
     // MARK: - Helpers

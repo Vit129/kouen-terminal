@@ -239,7 +239,7 @@ final class SidebarSectionModel {
     var chromeEpoch: Int = 0
     var selectedTab: Int = 0
     var onAddProject: ((ProjectAddAction) -> Void)? = nil
-    var onRefreshProjects: (() -> Void)? = nil
+    var onRefreshProjects: (() async -> Void)? = nil
     var onAddJob: (() -> Void)? = nil
 }
 
@@ -282,6 +282,9 @@ struct SidebarTabBarView: View {
 struct SidebarSectionLabelView: View {
     let model: SidebarSectionModel
 
+    @State private var isRefreshingProjects = false
+    @State private var projectsRefreshed = false
+
     var body: some View {
         let _ = model.chromeEpoch
         let c = KouenDesign.chrome
@@ -312,15 +315,44 @@ struct SidebarSectionLabelView: View {
 
             if model.selectedTab == 0 {
                 Button {
-                    model.onRefreshProjects?()
+                    guard !isRefreshingProjects, let refresh = model.onRefreshProjects else { return }
+                    projectsRefreshed = false
+                    isRefreshingProjects = true
+                    Task {
+                        await refresh()
+                        projectsRefreshed = true
+                        isRefreshingProjects = false
+                    }
                 } label: {
-                    Image(systemName: "arrow.clockwise")
-                        .font(.system(size: 11, weight: .medium))
-                        .foregroundColor(Color(nsColor: c.textSecondary))
+                    Group {
+                        if isRefreshingProjects {
+                            ProgressView()
+                                .controlSize(.mini)
+                        } else {
+                            Image(systemName: projectsRefreshed ? "checkmark" : "arrow.clockwise")
+                                .font(.system(size: 11, weight: .medium))
+                                .foregroundStyle(Color(nsColor: c.textSecondary))
+                        }
+                    }
+                    .frame(width: 14, height: 14)
                 }
                 .buttonStyle(.plain)
+                .disabled(isRefreshingProjects)
                 .help("Refresh projects and worktrees")
+                .accessibilityLabel("Refresh projects and worktrees")
+                .accessibilityValue(isRefreshingProjects ? "Refreshing" : (projectsRefreshed ? "Refreshed" : ""))
                 .accessibilityIdentifier("btn_refreshProjects_projectsSidebar")
+                .task(id: projectsRefreshed) {
+                    guard projectsRefreshed else { return }
+                    do {
+                        try await Task.sleep(for: .seconds(2))
+                        projectsRefreshed = false
+                    } catch is CancellationError {
+                        return
+                    } catch {
+                        projectsRefreshed = false
+                    }
+                }
 
                 ProjectAddMenu(scope: .projects) { model.onAddProject?($0) }
             } else if model.selectedTab == 2 {

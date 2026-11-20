@@ -25,18 +25,20 @@ Source: `KouenDesign.swift`
 - Materials: `NSVisualEffectView` (`.sidebar`/`.underWindowBackground`) as fallback; `NSGlassEffectView` ("Liquid Glass") preferred on macOS 26+ via runtime reflection
 - Agent status: "breathing halo" pulse animation for actively-working agents
 - Chrome metrics: `KouenDesign.tabBarHeight` 38, `tabPillHeight` 26; the sidebar header uses `tabBarHeight`
+- The terminal tab bar shows blue for running sessions, green for confirmed completion, and gray for idle sessions.
 - Draggable chrome (title strip, sidebar header, tab bar) all zoom the window on double-click via one helper, `NSView.zoomWindowIfDoubleClick(_:)`
 - Surfaces added since the original audit, all built from the same tokens: Agent Notch HUD (`UI/Notch/`, off by default, hidden while Vorssaint's notch is running), Attention Beacon dot, Agent Inbox panel, Automations/Jobs fleet view, session History view, Issue Tracker panel
 
 ### Projects
 
 - Keep the current group header at the top of the scrolling project list. The next group header pushes it out as it reaches the top.
+- Use the theme accent to outline the selected session row. Keep session rows in the same order when selection changes. Bring its header into view when switching sessions or reopening the Projects sidebar. Expand its group if needed and respect the active search or filter.
 - Repository rows start expanded and can be collapsed by clicking their header. Group headers and discovered worktree lists collapse independently.
 
-- Show the primary checkout first with its branch name, house icon, and relative last-activity time. Dim the row when no session is open there. Show other running sessions above a compact, collapsed-by-default disclosure for discovered worktrees. Show the count on the disclosure and include only worktrees whose directories still exist.
+- Show the primary checkout first with its branch name and relative last-activity time. Dim the row when no session is open there. Show blue when any agent in a session is working, green on confirmed completion, yellow when awaiting input, red on error, and a gray house when idle. Show other running sessions above a compact, collapsed-by-default disclosure for discovered worktrees. Show the count on the disclosure and include only worktrees whose directories still exist.
 - The Projects and group header plus controls open the same three-item menu: Browse folder…, Clone from URL…, and Create new project…. A group import stays in that group and adds projects without opening a session. The repository-row plus opens a new session.
 - Clone and Create show the destination path and a Local Mac label. Add the checkout to Projects after Git succeeds. If registration fails, retry with the existing checkout.
-- Keep a refresh action next to Add in the Projects header; refresh rescans source folders and reloads linked worktrees so deleted checkout directories leave the sidebar.
+- Keep a refresh action next to Add in the Projects header; refresh rescans source folders and reloads linked worktrees so deleted checkout directories leave the sidebar. Show refresh progress and a brief checkmark when the scan finishes. Hide confirmed missing saved projects from Projects automatically. Keep their registrations available for restoration or move review.
 
 - Folder import and rescan show primary Git checkout candidates. Reconciliation presents the saved and proposed paths together, with an explicit action for uncertain matches.
 

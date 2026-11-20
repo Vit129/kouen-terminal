@@ -3,11 +3,6 @@ import KouenCommands
 import KouenCore
 import KouenIPC
 
-@MainActor
-fileprivate func agentColor(for kind: AgentKind) -> Color {
-    Color(nsColor: NSColor.fromHex(SessionCoordinator.shared.settings.agentColorHex(for: kind)) ?? KouenDesign.chrome.textSecondary)
-}
-
 // MARK: - Main container
 
 struct SidebarSessionListView: View {
@@ -25,6 +20,38 @@ struct SidebarSessionListView: View {
 
     @State private var selectedFilter: ProjectTabFilter = .all
     @State private var projectSearchQuery = ""
+    @State private var handledProjectRevealID: UUID?
+    @State private var lastScrolledProject: ProjectScrollRequest?
+
+    private struct ProjectScrollRequest: Equatable {
+        let explicitRevealID: UUID?
+        let activeSessionID: SessionID?
+        let activeProjectPath: String?
+        let activeProjectIsListed: Bool
+        let explicitProjectIsListed: Bool
+    }
+
+    private var projectScrollRequest: ProjectScrollRequest? {
+        guard projectSearchQuery.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return nil }
+        let reveal = model.projectReveal
+        let pendingReveal = reveal?.id == handledProjectRevealID ? nil : reveal
+        guard pendingReveal != nil || model.isSidebarVisible else { return nil }
+        let path = model.activeProjectPath
+        func isListed(_ path: String?) -> Bool {
+            guard let path else { return false }
+            return model.rows.contains {
+                guard case let .projectHeader(item) = $0 else { return false }
+                return item.path == path
+            }
+        }
+        return ProjectScrollRequest(
+            explicitRevealID: reveal?.id,
+            activeSessionID: model.activeSessionID,
+            activeProjectPath: model.activeProjectPath,
+            activeProjectIsListed: isListed(path),
+            explicitProjectIsListed: isListed(reveal?.path)
+        )
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -43,6 +70,7 @@ struct SidebarSessionListView: View {
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else {
+                    let scrollRequest = projectScrollRequest
                     ScrollViewReader { proxy in
                         ScrollView(.vertical, showsIndicators: false) {
                             LazyVStack(spacing: 0, pinnedViews: [.sectionHeaders]) {
@@ -76,9 +104,31 @@ struct SidebarSessionListView: View {
                             }
                             .padding(.vertical, 4)
                         }
-                        .task(id: projectSearchQuery.isEmpty ? model.projectReveal?.id : nil) {
-                            guard let reveal = model.projectReveal, projectSearchQuery.isEmpty else { return }
-                            proxy.scrollTo("proj-\(reveal.path)", anchor: .center)
+                        .onDisappear { lastScrolledProject = nil }
+                        .task(id: scrollRequest) {
+                            guard !Task.isCancelled else { return }
+                            guard let request = scrollRequest else {
+                                lastScrolledProject = nil
+                                return
+                            }
+                            if let reveal = model.projectReveal, reveal.id != handledProjectRevealID {
+                                guard request.explicitProjectIsListed else { return }
+                                proxy.scrollTo("proj-\(reveal.path)", anchor: .center)
+                                handledProjectRevealID = reveal.id
+                            } else {
+                                guard let path = request.activeProjectPath else {
+                                    lastScrolledProject = nil
+                                    return
+                                }
+                                guard lastScrolledProject?.activeProjectPath != path
+                                    || lastScrolledProject?.activeSessionID != request.activeSessionID else { return }
+                                if request.activeProjectIsListed {
+                                    lastScrolledProject = request
+                                    proxy.scrollTo("proj-\(path)")
+                                } else {
+                                    model.expandActiveProjectGroup()
+                                }
+                            }
                         }
                     }
                 }
@@ -113,6 +163,21 @@ struct SidebarSessionListView: View {
                 }
             }
         }
+        .task(id: model.isSidebarVisible && selectedFilter == .all) {
+            guard model.isSidebarVisible, selectedFilter == .all, let store = model.projectStore else { return }
+            while !Task.isCancelled {
+                do {
+                    try await Task.sleep(for: .seconds(3))
+                } catch {
+                    return
+                }
+                guard !Task.isCancelled else { return }
+                await store.refreshProjectAvailability()
+            }
+        }
+        .onChange(of: model.projectStore?.missingProjectPaths) { _, _ in model.scheduleRebuild() }
+        .onChange(of: model.projectStore?.pendingReconciliationPaths) { _, _ in model.scheduleRebuild() }
+        .onChange(of: model.projectStore?.projects) { _, _ in model.scheduleRebuild() }
         .onAppear {
             model.setProjectSearchActive(selectedFilter == .all && !projectSearchQuery.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
         }
@@ -619,12 +684,20 @@ private struct SidebarSessionCardRow: View {
 
     @State private var isHovered = false
 
+    private func activityDot(_ color: Color, label: String) -> some View {
+        Circle()
+            .fill(color)
+            .frame(width: 6, height: 6)
+            .accessibilityLabel(label)
+            .help(label)
+    }
+
     var body: some View {
         let c = KouenDesign.chrome
         let isSelected = card.isSelected
 
-        let selectedFill = Color(nsColor: c.accent).opacity(c.isDark ? 0.14 : 0.10)
-        let selectedBorder = Color(nsColor: c.focusRing).opacity(c.isDark ? 0.48 : 0.52)
+        let selectedFill = Color(nsColor: c.accent).opacity(c.isDark ? 0.24 : 0.18)
+        let selectedBorder = Color(nsColor: c.accent).opacity(0.85)
         let fillColor = isSelected ? selectedFill : (isHovered ? Color(nsColor: c.rowHoverFill) : Color.clear)
         let borderColor = isSelected ? selectedBorder : Color.clear
 
@@ -637,44 +710,25 @@ private struct SidebarSessionCardRow: View {
                 )
 
             HStack(spacing: 6) {
-                if card.isPrimaryCheckout {
-                    Image(systemName: "house")
-                        .font(.system(size: 10, weight: .semibold))
-                        .foregroundStyle(Color(nsColor: card.isRunning ? c.textSecondary : c.textTertiary))
-                        .frame(width: 12, height: 12)
-                        .padding(.leading, 8)
-                        .accessibilityLabel("Primary checkout")
-                } else if !card.detectedAgents.isEmpty {
-                    HStack(spacing: 3) {
-                        ForEach(card.detectedAgents.prefix(3)) { agent in
-                            Image(nsImage: AgentIconRenderer.templateOrMonogramImage(for: agent.kind, size: 12))
-                                .resizable()
-                                .renderingMode(.template)
-                                .foregroundStyle(agentColor(for: agent.kind))
-                                .frame(width: 12, height: 12)
-                                .help(agent.kind.rawValue)
-                        }
+                Group {
+                    switch card.status {
+                    case .running:
+                        activityDot(.blue, label: "Agent working")
+                    case .done:
+                        activityDot(.green, label: "Agent finished")
+                    case .waiting:
+                        activityDot(.yellow, label: "Agent waiting for input")
+                    case .error:
+                        activityDot(.red, label: "Agent errored")
+                    case .idle:
+                        Image(systemName: card.worktreePath == nil ? "house" : "arrow.triangle.branch")
+                            .font(.system(size: 10, weight: .semibold))
+                            .foregroundStyle(Color(nsColor: card.isRunning ? c.textSecondary : c.textTertiary))
+                            .accessibilityLabel(card.worktreePath == nil ? "Idle" : "Discovered worktree")
                     }
-                    .padding(.leading, 8)
-                } else if let kind = card.agentKind {
-                    Image(nsImage: AgentIconRenderer.templateOrMonogramImage(for: kind, size: 12))
-                        .resizable()
-                        .renderingMode(.template)
-                        .foregroundStyle(agentColor(for: kind))
-                        .frame(width: 12, height: 12)
-                        .padding(.leading, 8)
-                } else if card.worktreePath != nil {
-                    Image(systemName: "arrow.triangle.branch")
-                        .font(.system(size: 10, weight: .semibold))
-                        .foregroundStyle(Color(nsColor: c.textTertiary))
-                        .frame(width: 12, height: 12)
-                        .padding(.leading, 8)
-                } else {
-                    Circle()
-                        .fill(card.isRunning ? (card.isDirty ? Color.orange : Color.green) : Color.secondary.opacity(0.35))
-                        .frame(width: 6, height: 6)
-                        .padding(.leading, 8)
                 }
+                .frame(width: 12, height: 12)
+                .padding(.leading, 8)
 
                 // Title + Subtitle
                 VStack(alignment: .leading, spacing: 1) {
@@ -751,6 +805,7 @@ private struct SidebarSessionCardRow: View {
         .padding(.trailing, KouenDesign.horizontalInset)
         .padding(.vertical, 1)
         .contentShape(Rectangle())
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
         .onTapGesture { onSelect() }
         .onHover { isHovered = $0 }
     }

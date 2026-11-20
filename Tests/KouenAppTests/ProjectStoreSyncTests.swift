@@ -156,6 +156,33 @@ final class ProjectStoreSyncTests: XCTestCase {
         XCTAssertTrue(store.projects.contains { $0.path == repoA.path }, "Missing entries must be preserved")
     }
 
+    @MainActor
+    func testTC0008_FE_IT_ConfirmedMissingProjectsAreHiddenAndRestored() async throws {
+        let store = ProjectStore(userDefaultsSuite: UUID().uuidString)
+        let group = store.addCategory(name: "Manual")
+        let manual = tempDirURL.appendingPathComponent("manual")
+        let standalone = tempDirURL.appendingPathComponent("standalone")
+        let offline = tempDirURL.appendingPathComponent("unavailable/repo")
+        for url in [manual, standalone] {
+            try FileManager.default.createDirectory(at: url, withIntermediateDirectories: false)
+        }
+        store.addProject(manual.path, categoryID: group.id)
+        store.addProject(standalone.path)
+        store.addProject(offline.path, categoryID: group.id)
+        try FileManager.default.removeItem(at: manual)
+        try FileManager.default.removeItem(at: standalone)
+
+        await store.syncAllWatchedCategories()
+        await store.refreshProjectAvailability()
+        XCTAssertEqual(store.projects.count, 3)
+        XCTAssertEqual(store.projects(inCategory: group.id, revealing: manual.path).map(\.path), [offline.path])
+        XCTAssertTrue(store.projects(inCategory: nil).isEmpty)
+
+        try FileManager.default.createDirectory(at: manual, withIntermediateDirectories: false)
+        await store.refreshProjectAvailability()
+        XCTAssertTrue(store.projects(inCategory: group.id).contains { $0.path == manual.path })
+    }
+
     // MARK: - [TS-P54-004] [FE-UT] Manual Removal Adds to ExcludedPaths
     @MainActor
     func testManualRemovalAddsToExcludedPathsAndPreventsResync() async throws {

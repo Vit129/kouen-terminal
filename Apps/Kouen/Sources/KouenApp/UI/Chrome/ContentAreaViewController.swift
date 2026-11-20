@@ -217,14 +217,7 @@ final class ContentAreaViewController: NSViewController, TerminalTabBarDelegate 
         guard let workspace = snap.activeWorkspace else { return }
         let sessionTabs = workspace.sessions.compactMap { session -> Tab? in
             guard var tab = session.activeTab ?? session.tabs.first else { return nil }
-            let kind = BoardModel.columnKind(for: tab)
-            switch kind {
-            case .needsAttention: tab.status = .waiting
-            case .running:        tab.status = .running
-            case .done:           tab.status = .done
-            case .error:          tab.status = .error
-            case .idle:           tab.status = .idle
-            }
+            tab.status = session.chromeStatus
             return tab
         }
         let activeTabID = workspace.activeSession?.activeTab?.id ?? workspace.activeSession?.tabs.first?.id
@@ -245,7 +238,9 @@ final class ContentAreaViewController: NSViewController, TerminalTabBarDelegate 
         let snap = SessionCoordinator.shared.snapshot
         guard let workspace = snap.activeWorkspace else { return }
         let sessionTabs = workspace.sessions.compactMap { session -> Tab? in
-            session.activeTab ?? session.tabs.first
+            guard var tab = session.activeTab ?? session.tabs.first else { return nil }
+            tab.status = session.chromeStatus
+            return tab
         }
         let activeTabID = workspace.activeSession?.activeTab?.id ?? workspace.activeSession?.tabs.first?.id
         tabBar.refreshMetadata(tabs: sessionTabs, activeTabID: activeTabID)

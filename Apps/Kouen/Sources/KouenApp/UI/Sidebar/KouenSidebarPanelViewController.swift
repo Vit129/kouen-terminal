@@ -483,10 +483,7 @@ final class KouenSidebarPanelViewController: NSViewController {
             self?.handleProjectAdd(action, scope: .projects)
         }
         sidebarSectionModel.onRefreshProjects = { [weak self] in
-            guard let self else { return }
-            Task { @MainActor [weak self] in
-                await self?.sidebarListModel.refreshProjects()
-            }
+            await self?.sidebarListModel.refreshProjects()
         }
         sidebarSectionModel.onAddJob = { [weak self] in
             self?.promptNewAutomation()
