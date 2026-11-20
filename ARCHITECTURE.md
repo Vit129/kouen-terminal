@@ -2,6 +2,8 @@
 
 > Status: **active**, synced with code through v4.20.11 (P50 + Happy mode). Companion to `PRODUCT.md` (vision/features), `DESIGN.md` (visual system & tokens), and `CONTEXT.md` (domain terms).
 
+Kouen leaves workflow orchestration and feature plans to external agent environments; generic session tasks, worktrees, file search and Markdown preview remain independent.
+
 ## Constraints & System Invariants
 
 - **Swift 6 Strict Concurrency:** Tools version 6.0 with strict concurrency enforcement everywhere. `KouenCore` and `KouenTerminalEngine` have `-warnings-as-errors` enabled; any concurrency or deprecation warnings cause immediate build failure.
@@ -73,7 +75,7 @@ no breakpoints, no Run button.
 │ - attach/send    │ │ (KouenMCP)        │ │ - Agent stdin pipe│
 │ - capture-pane   │ │ - stdio + HTTP/SSE│ │ - LSP-style frame │
 │ - undo/verify/cc │ │ - browser, tasks, │ └───────────────────┘
-│   history/task   │ │   swarm, features │
+│   history        │ │   swarm, context  │
 └──────────────────┘ └───────────────────┘
 ```
 
@@ -92,7 +94,7 @@ no breakpoints, no Run button.
 | `CKouenSys` | `Packages/CKouenSys/` | C shim for variadic `ioctl` and POSIX PTY helpers. | Darwin / Glibc |
 | `KouenDaemonCore` | `Packages/KouenDaemon/` | Daemon library: socket server, PTY registry, checkpoints/verify, automations, agent adapters, headless workers. Also hosts `MobileBridgeServer` (Kouen Companion PWA; see Communication Protocols). | All |
 | `KouenCLI` | `Tools/kouen/Sources/KouenCLI/` | Command-line client (`attach`, `send-keys`, `capture-pane`, `undo`, `verify`, `cc`, `history`, `task`). | All |
-| `KouenMCP` | `Tools/kouen-mcp/Sources/KouenMCP/` | MCP server (`kouen-mcp`): stdio and remote HTTP/SSE transports; browser, task, worktree, host, automation, feature, swarm and worker tools. | All |
+| `KouenMCP` | `Tools/kouen-mcp/Sources/KouenMCP/` | MCP server (`kouen-mcp`): stdio and remote HTTP/SSE transports; browser, task, worktree, host, automation, swarm and worker tools. | All |
 | `KouenLSP` | `Packages/KouenLSP/` | LSP client, server registry, transport (21 languages). | All |
 | `KouenSyntaxResources` | `Packages/KouenSyntaxResources/` | Tree-sitter grammar and markdown/mermaid preview bundles. | macOS |
 | `KouenOnboarding` | `Packages/KouenOnboarding/` | First-run onboarding flow. | macOS |

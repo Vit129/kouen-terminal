@@ -1,7 +1,7 @@
 import Foundation
 import KouenIPC
 
-/// Engine that resolves semantic `@`-mentions (`@diff`, `@file`, `@pane`, `@error`, `@graph`, `@issue`)
+/// Engine that resolves semantic `@`-mentions (`@diff`, `@file`, `@pane`, `@error`, `@graph`)
 /// into clean, token-guarded context blocks suitable for AI agent CLI prompts.
 public struct ContextResolutionEngine: Sendable {
     public init() {}
@@ -57,12 +57,6 @@ public struct ContextResolutionEngine: Sendable {
         if resolved.contains("@last") {
             let lastContent = await resolveLast(daemonClient: daemonClient, activeSurfaceID: activeSurfaceID)
             resolved = resolved.replacingOccurrences(of: "@last", with: lastContent)
-        }
-
-        // 7. @issue
-        if resolved.contains("@issue") {
-            let issueContent = resolveIssue(cwd: cwd)
-            resolved = resolved.replacingOccurrences(of: "@issue", with: issueContent)
         }
 
         // 8. @builderror — Tier 1 verification's full failure output (P46 Phase 4 follow-up),
@@ -185,24 +179,6 @@ public struct ContextResolutionEngine: Sendable {
         }
 
         return "### Captured Error / Stacktrace:\n```text\n\(errorLines.joined(separator: "\n"))\n```"
-    }
-
-    /// Resolves active issue/feature task from FeatureStore.
-    public func resolveIssue(cwd: String) -> String {
-        let store = FeatureStore.shared
-        let features = store.list(repoPath: cwd)
-        if let feature = features.first(where: { $0.supersededBy == nil }) ?? features.first {
-            var desc = "### Active Feature: \(feature.slug) [Phase: \(feature.phase.rawValue)]\n"
-            desc += "Branch: \(feature.branch ?? "unknown") | Base: \(feature.baseBranch ?? "main")\n"
-            if !feature.tasks.isEmpty {
-                desc += "Tasks:\n"
-                for task in feature.tasks {
-                    desc += "- [\(task.done ? "x" : " ")] \(task.label)\n"
-                }
-            }
-            return desc
-        }
-        return "[No active feature tracked for \(cwd)]"
     }
 
     /// Resolves the active surface's last Tier 1 verification failure — the full captured output

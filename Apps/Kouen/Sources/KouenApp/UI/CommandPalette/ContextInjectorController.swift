@@ -5,7 +5,7 @@ import KouenIPC
 /// Quick Context Injector (⌘K) — P46 Phase 2's last item. A single-line HUD anchored above the
 /// terminal window, same `NSPanel` shape as `CommandPromptController`'s `:` prompt, but instead
 /// of dispatching an ex-command it resolves `@`-mention tokens (`@diff`, `@file:<path>`, `@last`,
-/// `@error`, `@pane:<id>`, `@issue` — `ContextResolutionEngine`, already built
+/// `@error`, `@pane:<id>` — `ContextResolutionEngine`, already built
 /// in Phase 2 for `kouen context inject`/`kouenContextResolve`) and types the resolved text
 /// straight into the active terminal, as if the human had pasted it themselves.
 @MainActor
@@ -112,7 +112,7 @@ final class ContextInjectorController: NSObject, NSTextFieldDelegate {
         prompt.font = KouenDesign.Typography.kbd
         prompt.textColor = KouenChrome.current.accent
 
-        field.placeholderString = "@diff, @file:<path>, @last, @error, @pane:<id>, @issue…"
+        field.placeholderString = "@diff, @file:<path>, @last, @error, @pane:<id>…"
         field.font = .monospacedSystemFont(ofSize: 13, weight: .regular)
         field.textColor = KouenChrome.current.textPrimary
         field.bezelStyle = .roundedBezel

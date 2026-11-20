@@ -74,7 +74,7 @@ final class FuzzyPathResolverTests: XCTestCase {
         XCTAssertEqual(FuzzyPathResolver.newestModified([old.path, new.path]), new.path)
     }
 
-    func testScannerFindsAgentMemoryFoldersAndSkipsWorktrees() throws {
+    func test_TS_0005_FE_UT_ScannerDoesNotAddVaultAndConfiguredRootsStillWork() throws {
         let tmp = try XCTUnwrap(realpath(FileManager.default.temporaryDirectory.path, nil))
         defer { free(tmp) }
         let base = URL(fileURLWithPath: String(cString: tmp)).appendingPathComponent(UUID().uuidString)
@@ -84,15 +84,13 @@ final class FuzzyPathResolverTests: XCTestCase {
         try FileManager.default.createDirectory(at: base.appendingPathComponent("Personal/app/.kouen-worktrees/x/agent-memory"), withIntermediateDirectories: true)
         let legacy = base.appendingPathComponent("Company/other/agent-memory")
         try FileManager.default.createDirectory(at: legacy, withIntermediateDirectories: true)
-        try FileManager.default.createSymbolicLink(at: notes.deletingLastPathComponent().appendingPathComponent("agent-memory"),
-                                                    withDestinationURL: notes)
         let note = notes.appendingPathComponent("kouen/plans/vault-smoke.md")
         try Data().write(to: note)
         let found = FileSearchRootScanner.scan(base: base).map { ($0 as NSString).resolvingSymlinksInPath }
-        XCTAssertEqual(found, [legacy.path, notes.path].map { ($0 as NSString).resolvingSymlinksInPath }.sorted())
+        XCTAssertEqual(found, [legacy.path].map { ($0 as NSString).resolvingSymlinksInPath }.sorted())
         let checkout = base.appendingPathComponent("Personal/app")
         guard case .unique(let match) = FuzzyPathResolver.resolve(
-            query: "vault-smoke.md", root: checkout.path, otherRoots: found
+            query: "vault-smoke.md", root: checkout.path, otherRoots: [notes.path]
         ) else { return XCTFail("Expected a unique file in the shared vault") }
         let matchedFile = try URL(fileURLWithPath: match).resourceValues(forKeys: [.fileResourceIdentifierKey])
         let expectedFile = try note.resourceValues(forKeys: [.fileResourceIdentifierKey])

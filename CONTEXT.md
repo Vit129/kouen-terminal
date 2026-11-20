@@ -121,6 +121,8 @@ _Avoid_: Terminal autocomplete, AI prompt popup
 ### Menu-bar icon
 The K status item in the macOS menu bar, separate from the Agent Notch HUD. It can be hidden in Settings → Appearance and restored through the app’s Settings command (⌘,).
 
+Workflow plans and agent-specific state are external to Kouen.
+
 ## Relationships
 
 - A **Task** belongs to exactly one session; deleting the session's underlying data does not orphan Tasks silently.

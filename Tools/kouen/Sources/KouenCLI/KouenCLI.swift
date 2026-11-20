@@ -15,6 +15,10 @@ struct KouenCLI {
             printUsage()
             exit(1)
         }
+        if ["agent", "undo", "verify"].contains(command), args.contains("--feature") {
+            fputs("kouen-cli: --feature is no longer supported; select a tab or surface\n", kouenStderr)
+            exit(1)
+        }
         do {
             switch command {
             case "workspace-project-list":
@@ -138,8 +142,6 @@ struct KouenCLI {
                 try Self.handleAgent(Array(args.dropFirst()), client: client)
             case "memo":
                 try Self.handleMemo(Array(args.dropFirst()), client: client)
-            case "task":
-                try await Self.handleTask(Array(args.dropFirst()), client: client)
             case "context":
                 try await Self.handleContext(Array(args.dropFirst()), client: client)
             case "history":

@@ -44,9 +44,9 @@ final class DaemonRoundTripTests: XCTestCase {
         XCTFail("daemon did not become ready")
     }
 
-    func testReviewFeedbackProtocolRejectsPriorClientVersion() throws {
+    func test_TS_0003_BE_IT_ProtocolRejectsPriorClientVersion() throws {
         let client = DaemonClient()
-        guard case .protocolRejected = try client.request(.identifyClient(label: "prior", protocolVersion: ipcProtocolVersion - 1))
+        guard case .protocolRejected = try client.request(.identifyClient(label: "prior", protocolVersion: 15))
         else { return XCTFail("Expected prior IPC version to be rejected") }
         guard case .clientID = try client.request(.identifyClient(label: "current", protocolVersion: ipcProtocolVersion))
         else { return XCTFail("Expected current IPC version to connect") }

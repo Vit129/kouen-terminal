@@ -33,29 +33,12 @@ extension KouenCLI {
 
         Commands:
           list [--status <status>] [--json]                        List active agents and their attention state
-          wait <tab-or-surface-id> | --feature <slug> [--timeout <sec>]
+          wait <tab-or-surface-id> [--timeout <sec>]
                                                                      Wait until agent finishes or requests attention
-          send <file> [--message <msg>] [--tab/--surface/--feature <id>]
+          send <file> [--message <msg>] [--tab/--surface <id>]
                                                                      Send file context to an agent pane
                                                                      (target required when more than one agent is running)
         """)
-    }
-
-    /// The tab bound to `worktreePath` — same match `GitPanelView.agentInfo(forWorktreePath:tabs:)`
-    /// uses. Pure (no daemon round trip) so `AgentCommandTests` can exercise it directly; `internal`
-    /// (not `private`) for exactly that reason.
-    static func matchTab(forWorktreePath worktreePath: String, in snap: SessionSnapshot) -> Tab? {
-        let allTabs = snap.workspaces.flatMap { $0.sessions.flatMap(\.tabs) }
-        return allTabs.first { $0.cwd == worktreePath || $0.worktreePath == worktreePath }
-    }
-
-    /// Resolve `--feature <slug>` to the tab bound to that feature's worktree. `nil` when the
-    /// feature doesn't exist, has no bound worktree, or nothing is currently running there.
-    static func resolveTabForFeature(slug: String, in snap: SessionSnapshot, client: DaemonClient) throws -> Tab? {
-        guard case let .featureInfo(summary) = try checkedRequest(client, .featureGet(slug: slug)),
-              let feat = summary, let worktreePath = feat.worktreePath
-        else { return nil }
-        return matchTab(forWorktreePath: worktreePath, in: snap)
     }
 
     /// A tab's surface, tolerating a split root pane (no single `surfaceID`) by falling back to
@@ -160,37 +143,25 @@ extension KouenCLI {
     }
 
     private static func handleAgentWait(_ args: [String], client: DaemonClient) throws {
-        // A leading flag (e.g. `--feature`) means no positional target — the flag's own value
-        // token isn't itself `--`-prefixed, so this only inspects `args.first`, never the value.
-        let positionalTarget = args.first?.hasPrefix("--") == false ? args.first : nil
-        let featureSlug = flagValue(args, flag: "--feature")
-        guard positionalTarget != nil || featureSlug != nil else {
-            fputs("Usage: kouen agent wait <tab-or-surface-id> [--timeout <sec>]\n       kouen agent wait --feature <slug> [--timeout <sec>]\n", kouenStderr)
+        guard let positionalTarget = args.first, !positionalTarget.hasPrefix("--") else {
+            fputs("Usage: kouen agent wait <tab-or-surface-id> [--timeout <sec>]\n", kouenStderr)
             return
         }
-        let describeTarget = featureSlug.map { "feature '\($0)'" } ?? "'\(positionalTarget!)'"
-
+        let describeTarget = "'\(positionalTarget)'"
         let timeoutSec = Double(flagValue(args, flag: "--timeout") ?? "600") ?? 600
         let deadline = Date().addingTimeInterval(timeoutSec)
-        let targetLower = positionalTarget?.lowercased()
+        let targetLower = positionalTarget.lowercased()
 
         // `resolveAgentTab` filters to agent-only tabs, which `wait` doesn't want (the target may
         // not have a detected agent yet) — match against every tab instead.
         func resolveTargetTab() throws -> Tab {
             let snap = try snapshot(client)
-            if let featureSlug {
-                guard let tab = try resolveTabForFeature(slug: featureSlug, in: snap, client: client) else {
-                    fputs("agent: no tab bound to feature '\(featureSlug)' (no worktree, or nothing running there)\n", kouenStderr)
-                    exit(1)
-                }
-                return tab
-            }
             let allTabs = snap.workspaces.flatMap { $0.sessions.flatMap(\.tabs) }
             guard let tab = allTabs.first(where: {
-                $0.id.uuidString.lowercased().hasPrefix(targetLower!)
-                    || ($0.rootPane.surfaceID?.uuidString.lowercased().hasPrefix(targetLower!) ?? false)
+                $0.id.uuidString.lowercased().hasPrefix(targetLower)
+                    || ($0.rootPane.surfaceID?.uuidString.lowercased().hasPrefix(targetLower) ?? false)
             }) else {
-                fputs("agent: tab/surface '\(positionalTarget!)' not found\n", kouenStderr)
+                fputs("agent: tab/surface '\(positionalTarget)' not found\n", kouenStderr)
                 exit(1)
             }
             return tab
@@ -242,12 +213,11 @@ extension KouenCLI {
 
     private static func handleAgentSend(_ args: [String], client: DaemonClient) throws {
         guard let file = args.first else {
-            fputs("Usage: kouen agent send <file> [--message <msg>] [--tab/--surface/--feature <id>]\n", kouenStderr)
+            fputs("Usage: kouen agent send <file> [--message <msg>] [--tab/--surface <id>]\n", kouenStderr)
             return
         }
         let message = flagValue(args, flag: "--message") ?? "review this file"
         let target = flagValue(args, flag: "--tab") ?? flagValue(args, flag: "--surface")
-        let featureSlug = flagValue(args, flag: "--feature")
 
         guard let data = FileManager.default.contents(atPath: file),
               let content = String(data: data, encoding: .utf8) else {
@@ -256,27 +226,18 @@ extension KouenCLI {
         }
 
         let snap = try snapshot(client)
-        let matched: Tab
-        if let featureSlug {
-            guard let tab = try resolveTabForFeature(slug: featureSlug, in: snap, client: client) else {
-                fputs("agent: no tab bound to feature '\(featureSlug)' (no worktree, or nothing running there)\n", kouenStderr)
-                exit(1)
+        let agentTabCount = snap.workspaces.flatMap { $0.sessions.flatMap(\.tabs) }.filter { $0.agent != nil }.count
+        guard let tab = resolveAgentTab(in: snap, target: target) else {
+            if target == nil, agentTabCount > 1 {
+                fputs("agent: \(agentTabCount) agent panes running — pass --tab/--surface to pick one (see `kouen agent list`)\n", kouenStderr)
+            } else if let target {
+                fputs("agent: no agent tab matching '\(target)'\n", kouenStderr)
+            } else {
+                fputs("agent: no agent pane found\n", kouenStderr)
             }
-            matched = tab
-        } else {
-            let agentTabCount = snap.workspaces.flatMap { $0.sessions.flatMap(\.tabs) }.filter { $0.agent != nil }.count
-            guard let tab = resolveAgentTab(in: snap, target: target) else {
-                if target == nil, agentTabCount > 1 {
-                    fputs("agent: \(agentTabCount) agent panes running — pass --tab/--surface/--feature to pick one (see `kouen agent list`)\n", kouenStderr)
-                } else if let target {
-                    fputs("agent: no agent tab matching '\(target)'\n", kouenStderr)
-                } else {
-                    fputs("agent: no agent pane found\n", kouenStderr)
-                }
-                exit(1)
-            }
-            matched = tab
+            exit(1)
         }
+        let matched = tab
         guard let surfaceID = firstSurfaceID(of: matched) else {
             fputs("agent: no agent pane found\n", kouenStderr)
             return

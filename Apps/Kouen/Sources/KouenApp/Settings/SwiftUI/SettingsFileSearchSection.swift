@@ -27,7 +27,7 @@ struct SettingsFileSearchSection: View {
         } header: {
             Text("File search")
         } footer: {
-            Text("When a file name you click or open isn't in the current project, Kouen also looks in these folders, then in recent projects. Scan finds the Unified Memory Vault and local agent-memory folders under ~/Git.")
+            Text("When a file name you click or open isn't in the current project, Kouen also looks in these folders, then in recent projects. Scan finds local agent-memory folders under ~/Git.")
         }
     }
 

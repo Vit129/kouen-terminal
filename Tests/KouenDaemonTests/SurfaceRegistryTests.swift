@@ -36,18 +36,55 @@ final class SurfaceRegistryTests: XCTestCase {
         if let root { try? FileManager.default.removeItem(at: root) }
     }
 
-    func test_TC0101_BE_UT_FeatureSweepReturnsWithoutRecursiveLock() {
-        let registry = SurfaceRegistry()
-        let returned = expectation(description: "[TC-0101][BE-UT] feature sweep returns")
-        DispatchQueue.global().async {
-            guard case .ok = registry.handle(.featureSweepMerged(repoPath: nil)) else {
-                XCTFail("expected ok")
-                returned.fulfill()
-                return
-            }
-            returned.fulfill()
+    func test_TS_0004_BE_IT_TickPreservesLegacyFeatureStateAndWorktree() throws {
+        let legacy = KouenPaths.applicationSupport.appendingPathComponent("features.json")
+        let repo = try XCTUnwrap(root).appendingPathComponent("repo")
+        try FileManager.default.createDirectory(at: repo, withIntermediateDirectories: true)
+        for arguments in [
+            ["init", "-q", "-b", "main"],
+            ["-c", "user.name=Test Runner", "-c", "user.email=test@example.com",
+             "commit", "--allow-empty", "-qm", "initial"],
+        ] {
+            let git = Process()
+            git.executableURL = URL(fileURLWithPath: "/usr/bin/env")
+            git.arguments = ["git"] + arguments
+            git.currentDirectoryURL = repo
+            try git.run()
+            git.waitUntilExit()
+            XCTAssertEqual(git.terminationStatus, 0, arguments.joined(separator: " "))
         }
-        wait(for: [returned], timeout: 2)
+        let manager = WorktreeManager()
+        let worktree = try XCTUnwrap(manager.create(
+            repoPath: repo.path, sessionID: "legacy", branch: "feature", baseRef: "main"
+        ))
+        XCTAssertTrue(manager.isMergedOrSquashed(repoPath: repo.path, branch: "feature", base: "main"))
+        XCTAssertFalse(manager.isDirty(worktreePath: worktree))
+        let record: [[String: Any]] = [[
+            "id": UUID().uuidString, "slug": "legacy", "repoPath": repo.path,
+            "phase": "dev", "gates": [], "tasks": [], "worktreePath": worktree,
+            "branch": "feature", "baseBranch": "main", "createdAt": "2026-01-01T00:00:00Z",
+            "updatedAt": "2026-01-01T00:00:00Z"
+        ]]
+        let contents = try JSONSerialization.data(withJSONObject: record)
+        let registry = SurfaceRegistry()
+        defer { registry.stopMonitoring() }
+        registry.tickAutomations()
+        XCTAssertFalse(FileManager.default.fileExists(atPath: legacy.path))
+
+        try contents.write(to: legacy)
+        let restarted = SurfaceRegistry()
+        defer { restarted.stopMonitoring() }
+        restarted.tickAutomations()
+        guard case let .worktrees(worktrees) = restarted.handle(.worktreeList(repoPath: repo.path)) else {
+            return XCTFail("Expected worktree list")
+        }
+        XCTAssertTrue(worktrees.contains { $0.branch == "feature" })
+        XCTAssertEqual(try Data(contentsOf: legacy), contents)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: worktree))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: repo.appendingPathComponent("agent-memory").path))
+        XCTAssertFalse(FileManager.default.fileExists(
+            atPath: URL(fileURLWithPath: worktree).appendingPathComponent("agent-memory").path
+        ))
     }
 
     func testPingReturnsPong() {

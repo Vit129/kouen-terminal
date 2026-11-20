@@ -66,10 +66,6 @@ extension KouenCLI {
             let output = await engine.resolveError(cwd: cwd, daemonClient: client, activeSurfaceID: activeSurface)
             print(output)
 
-        case "issue":
-            let output = engine.resolveIssue(cwd: cwd)
-            print(output)
-
         case "inject":
             let prompt = args.dropFirst().joined(separator: " ")
             guard !prompt.isEmpty else {
@@ -111,7 +107,6 @@ extension KouenCLI {
           pane <surfaceID> [--tail N] Capture tail output of a specific pane
           last                        Capture recent output from active pane
           error                       Extract latest compiler or runtime error stacktrace
-          issue                       Output current SDLC feature and checklist
           inject "<template>"         Resolve all @-mentions (@diff, @file:x, @last, @error)
 
         Examples:

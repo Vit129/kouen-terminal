@@ -82,8 +82,7 @@ surfaces as a desktop notification instead of silently compounding into the next
   working tree (tracked + untracked) into a `refs/kouen/checkpoints/<session>/<turn>` git ref via
   a temporary index, never touching your real staging area or `git stash`.
 - **`kouen undo`** — revert the working tree in a tab's `cwd` to its last checkpoint, or list
-  checkpoints with their diffstat: `kouen undo`, `kouen undo list`, `kouen undo --tab <id>`,
-  `kouen undo --feature <slug>`.
+  checkpoints with their diffstat: `kouen undo`, `kouen undo list`, `kouen undo --tab <id>`.
 - **`kouen verify`** — run a two-tier check against a tab's project: `tier1` (fast syntax/build
   check, auto-detected per toolchain) or `tier2` (the project's own full test command, manual-only
   since running a full suite after every turn is too expensive a default). Enable tier1
@@ -101,13 +100,10 @@ surfaces as a desktop notification instead of silently compounding into the next
   `y` accepts, `r` reverts to the checkpoint, `esc` dismisses.
 - **Quick Context Injector (⌘K)** — a HUD that resolves `@`-mention tokens (`@diff`, `@file:<path>`,
   `@last`, `@error`, `@builderror` for the last failed `verify-on-turn` output, `@pane:<id>`,
-  `@graph:<symbol>`, `@issue`) and sends the expanded text straight into the active surface.
+  `@graph:<symbol>`) and sends the expanded text straight into the active surface.
 - **`kouen history`** — list, search, show, or resume past agent sessions (Claude Code, Codex,
   Antigravity) across every workspace from the shell (Copilot and VS Code Copilot Chat sessions also appear in the app's History view): `kouen history`, `kouen history search
   <keyword>`, `kouen history show <id>`, `kouen history resume <id>`.
-- **`kouen task pack-pr [<slug>] [--out <file>]`** — assembles a PR description (diff stat, gate
-  approvals, task checklist) from a feature's tracked state, for `gh pr create --body "$(kouen
-  task pack-pr <slug>)"`.
 - **Fleet tab** — one sidebar view flattening every live tab across every workspace, sorted
   needs-attention-first, with a filter box; the more useful entry point in day-to-day use is
   still a notification's own "jump to this session" action — the tab itself is for scanning many

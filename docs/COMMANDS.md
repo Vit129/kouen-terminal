@@ -319,8 +319,7 @@ See `docs/KEYBINDINGS.md` for the default key tables and `Packages/KouenCore/Sou
 Shell-only commands (no `:` prompt / keybinding form) backing the checkpoint/verification/undo
 safety net — see [README.md § Agent Safety Net](../README.md#agent-safety-net-checkpoints-verification-write-guards)
 for the concepts. Every subcommand also accepts `--tab <id>` / `--surface <id>` (prefix-matched)
-to target a tab other than the active one, or `--feature <slug>` to resolve the tab bound to a
-`kouen task` feature's worktree.
+to target a tab other than the active one.
 
 | Command | Effect |
 |---|---|
@@ -328,12 +327,10 @@ to target a tab other than the active one, or `--feature <slug>` to resolve the 
 | `kouen-cli history search <keyword> [--limit N]` | Search prompts/output across all scanned transcripts. |
 | `kouen-cli history show <id>` | Show one session's full detail (agent, project, branch, model, transcript path, recent turns) — `<id>` is prefix-matched. |
 | `kouen-cli history resume <id>` | Open a new tab at that session's project path and replay the agent's own resume command into it. |
-| `kouen-cli undo [step] [--tab/--surface/--feature <id>]` | Revert the working tree in that tab's `cwd` to its last automatic checkpoint (a shadow git ref, not `git stash` — the real index is never touched). |
-| `kouen-cli undo list [--tab/--surface/--feature <id>]` | List that tab's checkpoints, oldest first, each with its diffstat summary line. |
-| `kouen-cli verify [tier1] [--tab/--surface/--feature <id>]` | Fast syntax/build check for the tab's project, auto-detecting the toolchain (same check `verify-on-turn` runs automatically). |
-| `kouen-cli verify tier2 [--tab/--surface/--feature <id>]` | The project's own full test command — deliberately manual-only, since running a full suite after every agent turn is too expensive a default. |
-| `kouen-cli task <new\|status\|list\|gate\|phase\|supersede\|delete\|merge\|sweep\|preview>` | Feature/task tracking subcommands (`Tools/kouen/Sources/KouenCLI/KouenCLI+Task.swift`). |
-| `kouen-cli task pack-pr [<slug>] [--out <file>]` | Assemble a PR description (diff stat, gate approvals, task checklist) from a `kouen task` feature's tracked state; defaults to the current directory's feature when `<slug>` is omitted. |
+| `kouen-cli undo [step] [--tab/--surface <id>]` | Revert the working tree in that tab's `cwd` to its last automatic checkpoint (a shadow git ref, not `git stash` — the real index is never touched). |
+| `kouen-cli undo list [--tab/--surface <id>]` | List that tab's checkpoints, oldest first, each with its diffstat summary line. |
+| `kouen-cli verify [tier1] [--tab/--surface <id>]` | Fast syntax/build check for the tab's project, auto-detecting the toolchain (same check `verify-on-turn` runs automatically). |
+| `kouen-cli verify tier2 [--tab/--surface <id>]` | The project's own full test command — deliberately manual-only, since running a full suite after every agent turn is too expensive a default. |
 
 Checkpoints are created automatically on every agent Stop hook (no command needed); `tier1`
 verification runs automatically after every turn only when enabled via `set-option -g
@@ -351,11 +348,10 @@ Usage lines below are taken from the CLI source (`Tools/kouen/Sources/KouenCLI/`
 |---|---|
 | `kouen-cli wake <org/repo\|path> --workspace <name\|uuid> [--issue N] [--agent claude] [--branch name] [--prompt text]` | One-shot: resolve or clone the repo, create an isolated worktree, spawn a session, launch the agent, and type the initial prompt (from `--prompt` or the GitHub issue). |
 | `kouen-cli agent list [--status <status>] [--json]` | List active agents and their attention state. |
-| `kouen-cli agent wait <tab-or-surface-id> [--timeout <sec>]` / `agent wait --feature <slug> [--timeout <sec>]` | Block until the agent finishes or asks for attention. |
-| `kouen-cli agent send <file> [--message <msg>] [--tab/--surface/--feature <id>]` | Send a file as context to an agent pane (a target is required when more than one agent is running). |
+| `kouen-cli agent wait <tab-or-surface-id> [--timeout <sec>]` | Block until the agent finishes or asks for attention. |
+| `kouen-cli agent send <file> [--message <msg>] [--tab/--surface <id>]` | Send a file as context to an agent pane (a target is required when more than one agent is running). |
 | `kouen-cli context diff [--staged] [--all]` | Print the git diff, token-guarded and filtered. |
 | `kouen-cli context file <path>` / `pane <surfaceID> [--tail N]` / `last` / `error` | Print bounded file contents, a pane's tail, the active pane's recent output, or the latest compiler/runtime error. |
-| `kouen-cli context issue` | The current SDLC feature and checklist. |
 | `kouen-cli context inject "<template>"` | Resolve `@diff`, `@file:<path>`, `@last`, `@error` mentions in a template (same tokens as the ⌘K injector). |
 | `kouen-cli memo set <key> <val>` / `get <key>` / `list [--json]` / `delete <key>` / `clear` | Shared key-value scratchpad for agents. |
 | `kouen-cli cc run "<prompt>" [--cwd <path>] [--profile edit\|readonly] [--model <name>] [--effort <level>] [--no-wait]` | Run `claude` headlessly; `cc status <runId>`, `cc list`, `cc cancel <runId>` manage runs. |
