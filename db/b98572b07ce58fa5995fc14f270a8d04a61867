@@ -1,0 +1,43 @@
+Tests/KouenGitTests/GitRunnerTests.swift
+  s_5d16c3b5fbfeaa::t_c22afc3373b97b 34
+  s_5d16c3b5fbfeaa::t_e28e78e90d2926 24-30,32-33,35-42
+Tests/KouenDaemonTests/DaemonOffLockWorktreeTests.swift
+  s_5d16c3b5fbfeaa::t_c5305f4018976e 22
+Packages/KouenCore/Sources/KouenCore/Platform/LinuxChildProcess.swift
+  s_5d16c3b5fbfeaa::t_f0025418c9f855 1-49,53-73,76-77,80-93
+  s_5d16c3b5fbfeaa::t_d0e60acdea57f4 50-52,74-75,78-79
+Tests/KouenDaemonTests/WorktreeIsolationDaemonTests.swift
+  s_5d16c3b5fbfeaa::t_c5305f4018976e 26,327
+Packages/KouenCore/Sources/KouenCore/Platform/ProcessRunner.swift
+  s_5d16c3b5fbfeaa::t_d0e60acdea57f4 118-120,154,158,168-170,172,270,274-279,281,435-437,440,442-444,446,483-489,497,506-508,510
+Packages/KouenCore/Sources/KouenCore/Worktree/WorktreeManager.swift
+  s_5d16c3b5fbfeaa::t_2c977dac58fdeb 188-207,228
+Packages/KouenDaemon/Sources/KouenDaemon/DaemonServer.swift
+  s_5d16c3b5fbfeaa::t_7a6e627d9331d7 16,112-117
+.github/workflows/ci.yml
+  s_5d16c3b5fbfeaa::t_d09585e70bc895 187-189
+Tests/KouenDaemonTests/ClaudeCodeHarnessIPCTests.swift
+  s_5d16c3b5fbfeaa::t_7a6e627d9331d7 13,29-33,77-78,105-106,125-144
+  s_5d16c3b5fbfeaa::t_d7e628f1b5e290 145
+Tests/KouenDaemonTests/VersionBannerTests.swift
+  s_5d16c3b5fbfeaa::t_d20a6159f83105 125,131,134,136,143,217,222-229,240-241,253
+Packages/KouenCore/Sources/KouenCore/Remote/SSHTunnelLeaseStore.swift
+  s_5d16c3b5fbfeaa::t_705cd7e411e163 72
+  s_5d16c3b5fbfeaa::t_66b6b7391f1169 70
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.3",
+  "base_commit_sha": "dbb98572b07ce58fa5995fc14f270a8d04a61867",
+  "prompts": {},
+  "sessions": {
+    "s_5d16c3b5fbfeaa": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1f6bd-c53e-7cf1-b178-6731f47033a2",
+        "model": "gpt-6.2-sol"
+      },
+      "human_author": "Vit129 <vitosk129@gmail.com>"
+    }
+  }
+}
