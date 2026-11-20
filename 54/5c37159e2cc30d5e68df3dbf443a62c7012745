@@ -1,0 +1,83 @@
+Tests/KouenCoreTests/ContextResolutionEngineTests.swift
+  s_85b10d5d7b6b98::t_a9c8c3aee7ade7 52,61,66
+Tests/KouenDaemonTests/DaemonRoundTripTests.swift
+  s_85b10d5d7b6b98::t_95520e3f74efb4 49
+  s_b702f4efbdd257::t_4825acc297a58e 47
+Tests/KouenMCPTests/KouenDaemonToolsTests.swift
+  s_b702f4efbdd257::t_4825acc297a58e 16-32
+Apps/Kouen/Sources/KouenApp/Settings/SwiftUI/SettingsFileSearchSection.swift
+  s_85b10d5d7b6b98::t_95520e3f74efb4 30
+Tools/kouen/Sources/KouenCLI/KouenCLI.swift
+  s_b702f4efbdd257::t_53115aaa149a1f 18-21
+Apps/Kouen/Sources/KouenApp/UI/FileEditor/FuzzyPathResolver.swift
+  s_b702f4efbdd257::t_95d562d3481a72 151,158,165
+ARCHITECTURE.md
+  s_b702f4efbdd257::t_b22470e8f3327f 5-6,78,97
+docs/features.md
+  s_b702f4efbdd257::t_b22470e8f3327f 85,103
+Packages/KouenIPC/Sources/KouenIPC/IPCMessage.swift
+  s_b702f4efbdd257::t_95d562d3481a72 77
+  s_b702f4efbdd257::t_51b960a336a3c0 76
+Tools/kouen/Sources/KouenCLI/KouenCLI+Agent.swift
+  s_b702f4efbdd257::t_53115aaa149a1f 230-236,238
+  s_b702f4efbdd257::t_247b23a1766f71 36,38,146-147,150,153,161-162,164,216,229,240
+Tools/kouen/Sources/KouenCLI/KouenCLI+Undo.swift
+  s_b702f4efbdd257::t_247b23a1766f71 6,18,20,23
+docs/COMMANDS.md
+  s_b702f4efbdd257::t_b22470e8f3327f 322,330-333,351-352
+Tests/robot/embedded_ai_sdlc_removal.robot
+  s_85b10d5d7b6b98::t_68bf5ee98be5e7 1-43
+Tools/kouen-mcp/Sources/KouenMCP/ToolRegistry.swift
+  s_b702f4efbdd257::t_95d562d3481a72 233,235
+docs/mcp-tools.md
+  s_b702f4efbdd257::t_b22470e8f3327f 45
+Packages/KouenCore/Sources/KouenCore/ReleaseNotes/GeneratedReleaseNotes.swift
+  s_b702f4efbdd257::t_93c32dfb280220 9,12-14,19,22-26
+Apps/Kouen/Sources/KouenApp/UI/CommandPalette/ContextInjectorController.swift
+  s_b702f4efbdd257::t_a19d34e7fb7a8e 8,115
+CONTEXT.md
+  s_b702f4efbdd257::t_b22470e8f3327f 124-125
+Tools/kouen/Sources/KouenCLI/KouenCLI+Verify.swift
+  s_b702f4efbdd257::t_247b23a1766f71 6,21,32
+PRODUCT.md
+  s_b702f4efbdd257::t_b22470e8f3327f 30
+Tests/KouenCoreTests/IPCCodecTests.swift
+  s_85b10d5d7b6b98::t_95520e3f74efb4 45-50,52-54
+  s_85b10d5d7b6b98::t_68bf5ee98be5e7 51
+Tests/KouenAppTests/FuzzyPathResolverTests.swift
+  s_b702f4efbdd257::t_a19d34e7fb7a8e 77,90,93
+Tools/kouen-mcp/Sources/KouenMCP/KouenDaemonTools.swift
+  s_b702f4efbdd257::t_51b960a336a3c0 1269
+Packages/KouenCore/Sources/KouenCore/Context/ContextResolutionEngine.swift
+  s_b702f4efbdd257::t_95d562d3481a72 4
+Tests/KouenDaemonTests/SurfaceRegistryTests.swift
+  s_b702f4efbdd257::t_4825acc297a58e 39-40,71,82
+  s_85b10d5d7b6b98::t_95520e3f74efb4 41-61,63-64,70,72-79,81,83-87
+  s_b702f4efbdd257::t_157275d0397cd3 62,65-68
+AGENTS.md
+  s_b702f4efbdd257::t_9a0b918c4d64a0 126,128
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.3",
+  "base_commit_sha": "545c37159e2cc30d5e68df3dbf443a62c7012745",
+  "prompts": {},
+  "sessions": {
+    "s_85b10d5d7b6b98": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1f514-88d8-72b3-8abe-a131424ad32a",
+        "model": "gpt-6.2-sol"
+      },
+      "human_author": "Vit129 <vitosk129@gmail.com>"
+    },
+    "s_b702f4efbdd257": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1f401-10a8-78d2-a9de-17309418fb2f",
+        "model": "gpt-6.2-sol"
+      },
+      "human_author": "Vit129 <vitosk129@gmail.com>"
+    }
+  }
+}
