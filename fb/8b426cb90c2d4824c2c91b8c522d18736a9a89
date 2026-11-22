@@ -1,0 +1,21 @@
+Apps/Kouen/Sources/KouenApp/UI/Sidebar/SidebarListModel.swift
+  s_37027ba26c2da8::t_8b7fae2929a6bf 138,255
+Packages/KouenCore/Sources/KouenCore/Persistence/SidebarPinnedReposPersistence.swift
+  s_37027ba26c2da8::t_8b7fae2929a6bf 1-11
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.7",
+  "base_commit_sha": "fb8b426cb90c2d4824c2c91b8c522d18736a9a89",
+  "prompts": {},
+  "sessions": {
+    "s_37027ba26c2da8": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a20188-ef16-7770-a712-9e1c6af8ade1",
+        "model": "gpt-6.1-terra"
+      },
+      "human_author": "Vit129 <vitosk129@gmail.com>"
+    }
+  }
+}
