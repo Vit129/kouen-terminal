@@ -1,0 +1,21 @@
+Apps/Kouen/Sources/KouenApp/UI/Shared/FloatingPaneController.swift
+  s_7dd6bb10f79da7::t_647ddc32896613 72,100
+Packages/KouenCore/Sources/KouenCore/Persistence/FloatingPanePreferences.swift
+  s_7dd6bb10f79da7::t_647ddc32896613 1-8
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.7",
+  "base_commit_sha": "5801f3cf54ec1f1486640b4fb2f2ce14b0b45141",
+  "prompts": {},
+  "sessions": {
+    "s_7dd6bb10f79da7": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a20182-0f78-7020-8e60-f46c7df7b5aa",
+        "model": "gpt-6.1-terra"
+      },
+      "human_author": "Vit129 <vitosk129@gmail.com>"
+    }
+  }
+}
