@@ -1,5 +1,5 @@
 import Foundation
-import KouenIPC
+import KouenCore
 
 /// Access is confined to the registry lock. At capacity, refuse new attempts so an
 /// acknowledged ID can never become eligible again during this daemon lifetime.

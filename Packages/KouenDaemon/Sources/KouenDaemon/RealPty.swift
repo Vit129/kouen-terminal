@@ -6,7 +6,6 @@ import Glibc
 import CKouenSys
 import Foundation
 import KouenCore
-import KouenIPC
 import KouenTerminalEngine
 
 public enum PtyError: Error {

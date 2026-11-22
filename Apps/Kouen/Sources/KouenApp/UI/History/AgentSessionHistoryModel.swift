@@ -274,7 +274,7 @@ public final class AgentSessionHistoryModel: ObservableObject {
         let normalized = Array(kinds.filter { seen.insert($0).inserted }.prefix(5))
         guard normalized != agentShortcutKinds else { return }
         agentShortcutKinds = normalized
-        preferences.set(normalized.map(\.rawValue), forKey: Self.agentShortcutKindsDefaultsKey)
+        ProjectDirectoryPersistence.set(preferences, normalized.map(\.rawValue), forKey: Self.agentShortcutKindsDefaultsKey)
     }
 
     /// Moves a selected shortcut into the destination shortcut's current slot.
@@ -309,7 +309,7 @@ public final class AgentSessionHistoryModel: ObservableObject {
         let normalized = Array(savedValues.compactMap(AgentKind.init(rawValue:)).filter { seen.insert($0).inserted }.prefix(5))
         let normalizedValues = normalized.map(\.rawValue)
         if savedValues != normalizedValues {
-            preferences.set(normalizedValues, forKey: agentShortcutKindsDefaultsKey)
+            ProjectDirectoryPersistence.set(preferences, normalizedValues, forKey: agentShortcutKindsDefaultsKey)
         }
         return normalized
     }

@@ -1,6 +1,5 @@
 import Foundation
 import KouenCore
-import KouenIPC
 import KouenSettings
 
 /// Manages background remote-control companion daemons (e.g. `codex remote-control start`,

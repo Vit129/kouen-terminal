@@ -1,6 +1,6 @@
 #if canImport(Network) // MobileBridgeServer is Apple-only; not built on Linux
 import Foundation
-import KouenIPC
+import KouenCore
 import KouenTheme
 
 // Brand marks for the Companion page, built from the same `AgentIconArt` geometry and
