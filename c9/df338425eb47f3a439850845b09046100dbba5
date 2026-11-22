@@ -1,0 +1,21 @@
+Apps/Kouen/Sources/KouenApp/Settings/SwiftUI/ModelKeyStore.swift
+  s_7dd6bb10f79da7::t_4c6a3c1959ded0 16,20,25,32,36,41,48,57
+Packages/KouenCore/Sources/KouenCore/Persistence/ModelPersistence.swift
+  s_7dd6bb10f79da7::t_4c6a3c1959ded0 1-54
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.7",
+  "base_commit_sha": "c9df338425eb47f3a439850845b09046100dbba5",
+  "prompts": {},
+  "sessions": {
+    "s_7dd6bb10f79da7": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a20182-0f78-7020-8e60-f46c7df7b5aa",
+        "model": "gpt-6.1-terra"
+      },
+      "human_author": "Vit129 <vitosk129@gmail.com>"
+    }
+  }
+}
