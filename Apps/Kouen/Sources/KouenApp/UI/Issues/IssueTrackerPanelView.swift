@@ -42,9 +42,9 @@ public struct IssueTrackerPanelView: View {
                 if !selectedTracker.usesGhCLI {
                     Button(action: {
                         patInput = IssueKeychainStore.loadToken(for: selectedTracker) ?? ""
-                        jiraDomainInput = UserDefaults.standard.string(forKey: "kouen.jira.domain") ?? ""
-                        jiraEmailInput = UserDefaults.standard.string(forKey: "kouen.jira.email") ?? ""
-                        azureOrgInput = UserDefaults.standard.string(forKey: "kouen.azure.organization") ?? ""
+                        jiraDomainInput = IssueTrackerPreferences.jiraDomain
+                        jiraEmailInput = IssueTrackerPreferences.jiraEmail
+                        azureOrgInput = IssueTrackerPreferences.azureOrganization
                         showSettingsSheet = true
                     }) {
                         Image(systemName: "key")
@@ -281,10 +281,10 @@ public struct IssueTrackerPanelView: View {
                     }
                     switch selectedTracker {
                     case .jira:
-                        UserDefaults.standard.set(jiraDomainInput.trimmingCharacters(in: .whitespacesAndNewlines), forKey: "kouen.jira.domain")
-                        UserDefaults.standard.set(jiraEmailInput.trimmingCharacters(in: .whitespacesAndNewlines), forKey: "kouen.jira.email")
+                        IssueTrackerPreferences.jiraDomain = jiraDomainInput.trimmingCharacters(in: .whitespacesAndNewlines)
+                        IssueTrackerPreferences.jiraEmail = jiraEmailInput.trimmingCharacters(in: .whitespacesAndNewlines)
                     case .azureDevOps:
-                        UserDefaults.standard.set(azureOrgInput.trimmingCharacters(in: .whitespacesAndNewlines), forKey: "kouen.azure.organization")
+                        IssueTrackerPreferences.azureOrganization = azureOrgInput.trimmingCharacters(in: .whitespacesAndNewlines)
                     case .linear, .github:
                         break
                     }
