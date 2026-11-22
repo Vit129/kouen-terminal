@@ -1,0 +1,23 @@
+Tests/KouenCoreTests/RecentProjectsStoreTests.swift
+  s_ca4f12a4d9c766::t_50b869b6f8d213 1-17
+Apps/Kouen/Sources/KouenApp/UI/Sidebar/KouenSidebarPanelViewController+RecentProjects.swift
+  s_ca4f12a4d9c766::t_3e44a9df7957a0 8,15
+Packages/KouenCore/Sources/KouenCore/Persistence/RecentProjectsStore.swift
+  s_ca4f12a4d9c766::t_3e44a9df7957a0 1-18
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.7",
+  "base_commit_sha": "368c6d5534ac8faa26d2dc6244b9dfd5fdf79338",
+  "prompts": {},
+  "sessions": {
+    "s_ca4f12a4d9c766": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a2015f-e052-7c51-bbc9-a4109de0251f",
+        "model": "gpt-6.1-terra"
+      },
+      "human_author": "Vit129 <vitosk129@gmail.com>"
+    }
+  }
+}
