@@ -133,7 +133,7 @@ final class WorkspaceFileTreeView: NSView {
         for url in urls {
             let dest = Self.uniqueDestination(base: context.rootPath, name: url.lastPathComponent)
             do {
-                try FileManager.default.copyItem(at: url, to: URL(fileURLWithPath: dest))
+                try FileTreePersistence.copyItem(at: url, to: URL(fileURLWithPath: dest))
                 copiedAny = true
             } catch {
                 NSSound.beep()
