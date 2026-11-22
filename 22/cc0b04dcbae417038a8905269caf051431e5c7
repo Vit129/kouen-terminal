@@ -1,0 +1,21 @@
+Apps/Kouen/Sources/KouenApp/UI/FileTree/WorkspaceFileTreeView.swift
+  s_a1a25b06bcafdc::t_edac16881d08c5 136
+Packages/KouenCore/Sources/KouenCore/Persistence/FileTreePersistence.swift
+  s_a1a25b06bcafdc::t_edac16881d08c5 1-7
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.7",
+  "base_commit_sha": "22cc0b04dcbae417038a8905269caf051431e5c7",
+  "prompts": {},
+  "sessions": {
+    "s_a1a25b06bcafdc": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a2017f-4a95-7682-bb7c-71644a6586a8",
+        "model": "gpt-6.1-terra"
+      },
+      "human_author": "Vit129 <vitosk129@gmail.com>"
+    }
+  }
+}
