@@ -364,19 +364,11 @@ final class FilePreviewCoordinator {
         let visible = isFileEditorVisible && fileTabManager.hasOpenTabs
         let paths = fileTabManager.openTabs.map { $0.path }
         let activePath = fileTabManager.activeTab()?.path
-        UserDefaults.standard.set(visible, forKey: "kouen.fileEditorVisible")
-        UserDefaults.standard.set(paths, forKey: "kouen.fileEditorPaths")
-        if let activePath {
-            UserDefaults.standard.set(activePath, forKey: "kouen.fileEditorActivePath")
-        } else {
-            UserDefaults.standard.removeObject(forKey: "kouen.fileEditorActivePath")
-        }
+        FileEditorPersistence.saveState(visible: visible, paths: paths, activePath: activePath)
     }
 
     func restoreEditorState() {
-        let visible = UserDefaults.standard.bool(forKey: "kouen.fileEditorVisible")
-        let paths = UserDefaults.standard.stringArray(forKey: "kouen.fileEditorPaths") ?? []
-        let activePath = UserDefaults.standard.string(forKey: "kouen.fileEditorActivePath")
+        let (visible, paths, activePath) = FileEditorPersistence.loadState()
         for path in paths { fileTabManager.open(path: path) }
         if let activePath { fileTabManager.open(path: activePath) }
         if visible && fileTabManager.hasOpenTabs {
