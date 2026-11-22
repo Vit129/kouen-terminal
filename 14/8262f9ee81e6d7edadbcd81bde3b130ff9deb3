@@ -1,0 +1,21 @@
+Apps/Kouen/Sources/KouenApp/UI/Sidebar/KouenSidebarPanelViewController.swift
+  s_37027ba26c2da8::t_8b7fae2929a6bf 853
+Packages/KouenCore/Sources/KouenCore/Persistence/HandoffNotePersistence.swift
+  s_37027ba26c2da8::t_8b7fae2929a6bf 1-7
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.7",
+  "base_commit_sha": "148262f9ee81e6d7edadbcd81bde3b130ff9deb3",
+  "prompts": {},
+  "sessions": {
+    "s_37027ba26c2da8": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a20188-ef16-7770-a712-9e1c6af8ade1",
+        "model": "gpt-6.1-terra"
+      },
+      "human_author": "Vit129 <vitosk129@gmail.com>"
+    }
+  }
+}
