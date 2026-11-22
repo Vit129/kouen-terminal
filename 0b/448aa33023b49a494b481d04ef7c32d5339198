@@ -1,0 +1,29 @@
+Apps/Kouen/Sources/KouenApp/UI/Shared/AgentApprovalBar.swift
+  s_891e4629dd2fe1::t_fdf9a093234576 73
+Apps/Kouen/Sources/KouenApp/UI/History/AgentSessionHistoryModel.swift
+  s_891e4629dd2fe1::t_fdf9a093234576 277,312
+Packages/KouenDaemon/Sources/KouenDaemon/ReviewFeedbackAttempts.swift
+  s_891e4629dd2fe1::t_fdf9a093234576 2
+Apps/Kouen/Sources/KouenApp/UI/Shared/KouenDesign.swift
+  s_891e4629dd2fe1::t_fdf9a093234576 168-171
+Packages/KouenDaemon/Sources/KouenDaemon/MobileBridgeAgentIcons.swift
+  s_891e4629dd2fe1::t_fdf9a093234576 3
+Apps/Kouen/Sources/KouenApp/UI/Shared/ComposerPanel.swift
+  s_891e4629dd2fe1::t_fdf9a093234576 56-57,65,75,117,139
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.7",
+  "base_commit_sha": "0b448aa33023b49a494b481d04ef7c32d5339198",
+  "prompts": {},
+  "sessions": {
+    "s_891e4629dd2fe1": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a201cf-5243-7ff2-a398-e6bed2a317dc",
+        "model": "gpt-6-luna"
+      },
+      "human_author": "Vit129 <vitosk129@gmail.com>"
+    }
+  }
+}
