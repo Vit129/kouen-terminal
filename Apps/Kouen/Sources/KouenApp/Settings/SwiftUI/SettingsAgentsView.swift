@@ -148,11 +148,7 @@ struct SettingsAgentsView: View {
 
                 Button("Edit agent-catalog.json…") {
                     let url = KouenPaths.applicationSupport.appendingPathComponent("agent-catalog.json")
-                    if !FileManager.default.fileExists(atPath: url.path) {
-                        // Create a starter file from current defaults so user has something to edit
-                        let starter = AgentCatalog.exportDefaultsJSON()
-                        try? starter.write(to: url, atomically: true, encoding: .utf8)
-                    }
+                    AgentCatalogPersistence.createStarterIfNeeded(at: url, contents: AgentCatalog.exportDefaultsJSON())
                     NSWorkspace.shared.open(url)
                 }
                 .buttonStyle(.bordered)
