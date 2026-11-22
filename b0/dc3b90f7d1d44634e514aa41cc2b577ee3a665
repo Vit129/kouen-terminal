@@ -1,0 +1,21 @@
+Apps/Kouen/Sources/KouenApp/UI/Sidebar/ProjectDirectoryTree.swift
+  s_f0c0eaf835ee3d::t_8d882924500b50 83,109,113,123,126,131,134,136,142,684-685,693
+Packages/KouenCore/Sources/KouenCore/Persistence/ProjectDirectoryPersistence.swift
+  s_f0c0eaf835ee3d::t_8d882924500b50 1-28
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.7",
+  "base_commit_sha": "b0dc3b90f7d1d44634e514aa41cc2b577ee3a665",
+  "prompts": {},
+  "sessions": {
+    "s_f0c0eaf835ee3d": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a20185-4a0b-7283-a917-c9dfda7f1639",
+        "model": "gpt-6.1-terra"
+      },
+      "human_author": "Vit129 <vitosk129@gmail.com>"
+    }
+  }
+}
