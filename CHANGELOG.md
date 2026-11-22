@@ -5,14 +5,13 @@ All notable changes to Kouen are documented here. The format is based on
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Each released version
 has a matching `vX.Y.Z` tag and a signed, notarized DMG on
 [GitHub Releases](https://github.com/Vit129/kouen-terminal/releases).
-## [4.24.1] - 2026-11-20
+## [4.24.2] - 2026-11-22
 
 ### Changed
 - Remove embedded AI-SDLC from Kouen ([`545c371`](https://github.com/Vit129/kouen-terminal/commit/545c37159e2cc30d5e68df3dbf443a62c7012745))
 
 ### Fixed
 - Discover the shared memory vault in file search ([`89ca0f4`](https://github.com/Vit129/kouen-terminal/commit/89ca0f46ff1cde7ba2a3417e22161d02f4133619))
-
 
 ## [4.24.0] - 2026-11-19
 
