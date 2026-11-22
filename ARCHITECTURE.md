@@ -116,6 +116,37 @@ no breakpoints, no Run button.
 4. **Mobile bridge (Kouen Companion PWA, opt-in):**
    - `MobileBridgeServer` (P51) ships in `KouenDaemonCore`, gated by `mobileBridgeEnabled` (default `false`) and the `setMobileBridgeEnabled`/`mobile*` IPC messages. Un-deprecated and redesigned in 2026-10-09 (P51) as a zero-install Mobile PWA (Tailscale/LAN + QR pairing). Terminal emulation (xterm.js) was completely replaced with a native mobile-first chat feed (ANSI stripped to readable text), inline interactive diff/preview/draft-PR cards, slide-up review panels, and one-tap approvals.
 
+## Layers and Dependency Direction
+
+The package dependencies below are the direct edges declared in `Package.swift`. A layer may use only its listed dependencies; dependencies must not point back toward a higher layer. The headless foundation stays free of AppKit, SwiftUI, and Metal. The macOS targets are conditional on the host platform.
+
+| Layer | Folder / target | May import |
+|---|---|---|
+| Contracts and models | `Packages/KouenIPC/Sources/KouenIPC` (`KouenIPC`) | Foundation and system libraries only |
+| Settings and commands | `Packages/KouenSettings/Sources/KouenSettings` (`KouenSettings`), `Packages/KouenCommands/Sources/KouenCommands` (`KouenCommands`) | Both may import `KouenIPC` |
+| Core services | `Packages/KouenCore/Sources/KouenCore` (`KouenCore`) | `KouenIPC`, `KouenSettings`, `KouenCommands`; `Packages/KouenGit/Sources/KouenGit` (`KouenGit`) may import `KouenCore` |
+| Headless domain and rendering model | `Packages/KouenTerminalEngine/Sources/KouenTerminalEngine` (`KouenTerminalEngine`), `Packages/KouenCopyMode/Sources/KouenCopyMode` (`KouenCopyMode`), `Packages/KouenCompositor/Sources/KouenCompositor` (`KouenCompositor`), `Packages/KouenTheme/Sources/KouenTheme` (`KouenTheme`), `Packages/KouenLSP/Sources/KouenLSP` (`KouenLSP`) | `KouenTerminalEngine` and `KouenTheme` have no package dependencies; `KouenCopyMode` may import `KouenCore` and `KouenTerminalEngine`; `KouenCompositor` may import `KouenCore`, `KouenTerminalEngine`, `KouenCopyMode`, and `KouenCommands`; `KouenLSP` may import `KouenCore`, `KouenIPC`, `KouenSettings`, and `KouenCommands` |
+| macOS terminal presentation | `Packages/KouenTerminalRenderer/Sources/KouenTerminalRenderer` (`KouenTerminalRenderer`), `Packages/KouenTerminalKit/Sources/KouenTerminalKit` (`KouenTerminalKit`) | Renderer may import `KouenCore`, `KouenTerminalEngine`, `KouenTheme`; Kit may import `KouenCore`, `KouenTerminalEngine`, `KouenCopyMode`, `KouenTerminalRenderer`, `KouenTheme`, `KouenCompositor` |
+| Application and onboarding UI | `Apps/Kouen/Sources/KouenApp` (`KouenApp`), `Packages/KouenOnboarding/Sources/KouenOnboarding` (`KouenOnboarding`) | `KouenApp` may import `KouenCore`, `KouenGit`, `KouenIPC`, `KouenSettings`, `KouenCommands`, `KouenTerminalEngine`, `KouenTerminalKit`, `KouenTheme`, `KouenLSP`, `KouenSyntaxResources`, `KouenOnboarding`, and Sparkle. `KouenOnboarding` may import `KouenCore`, `KouenIPC`, `KouenSettings`, `KouenCommands`, `KouenTerminalEngine`, `KouenTerminalRenderer`, `KouenTheme`, and `KouenCompositor`. |
+
+`KouenDaemonCore` (`Packages/KouenDaemon/Sources/KouenDaemon`) may import `KouenCore`, `KouenTerminalEngine`, `CKouenSys`, `KouenSettings`, and `KouenTheme`; the `KouenDaemon` executable (`Packages/KouenDaemon/Sources/KouenDaemonMain`) depends on `KouenDaemonCore`. `KouenCLI` and `KouenMCP` are clients of the shared packages and do not import `KouenDaemonCore`. These edges are defined in `Package.swift`.
+
+### Persistence and UI literals
+
+- UI and Settings code route persisted state changes through `KouenCore`: `KouenSettings.load()` / `KouenSettings.save()` in `Packages/KouenCore/Sources/KouenCore/Settings/KouenSettingsIO.swift`; `SessionStore.load()` / `save(_:)` / `saveImmediately(_:)` for daemon snapshots; and focused persistence APIs such as `FileTreePersistence`, `FileEditorPersistence`, `BrowserPanePersistence`, `SidebarPinnedReposPersistence`, `ProjectDirectoryPersistence`, and `RecentProjectsStore` under `Packages/KouenCore/Sources/KouenCore/Persistence/`. Do not add direct `UserDefaults` writes or filesystem writes in UI or Settings views/controllers; route them through a Core service. Filesystem reads needed to display or inspect user files remain in the UI where appropriate.
+- User-facing copy belongs to the view or controller that owns the interaction under `Apps/Kouen/Sources/KouenApp/UI/` or `Apps/Kouen/Sources/KouenApp/Settings/`; there is no shared string catalog in the current source.
+- Shared chrome font sizes and typography belong in `Apps/Kouen/Sources/KouenApp/UI/Shared/KouenDesign.swift` (`KouenDesign.FontSize` and `KouenDesign.Typography`, including `Typography.SUI`). Use these tokens instead of adding another shared size literal.
+- Shared chrome colors belong in `KouenDesign.Colors` or the active `KouenChromePalette` (`KouenChrome.current`); theme palette colors and serialization belong to `Packages/KouenTheme/Sources/KouenTheme/`. Feature-specific colors should use these sources rather than introduce duplicate shared values.
+
+Check dependency direction against the table and `Package.swift`; inspect direct persistence writes and shared design literals with:
+
+```sh
+rg -n 'UserDefaults\.standard\.(set|removeObject)|\.write\(to:|write\(.*atomically|createDirectory\(|moveItem\(|copyItem\(' Apps/Kouen/Sources/KouenApp/UI Apps/Kouen/Sources/KouenApp/Settings --glob '*.swift'
+rg -n 'systemFont\(ofSize|\.font\(\.system\(size:|NSColor\(|Color\(' Apps/Kouen/Sources/KouenApp/UI --glob '*.swift'
+```
+
+Review each match in context: state writes go through Core services, and shared design literals use their named owner above.
+
 ## Dev & QA Verification Invariants
 
 | Component / Invariant | Requirement / Verification Rule |
@@ -123,7 +154,7 @@ no breakpoints, no Run button.
 | **Version Quad-Sync** | Release version must be atomic across `Info.plist`, `KouenVersion.swift`, `GeneratedReleaseNotes.swift`, and `CHANGELOG.md` via `prepare-release.sh`. |
 | **Theme Catalog Sync** | Editing `themes.json` requires regenerating `BundledThemesData.swift` via `EXPORT_THEMES=1 swift test --filter ThemeCatalogEmbedTests`. |
 | **Character Width Sync** | Changing Unicode width definitions requires re-running `Scripts/generate-width-table.swift` to regenerate `CharacterWidthTable.swift`. |
-| **Regression Guard** | `Tests/robot/run.sh` and `swift test` must pass before any prod release build. |
+| **Release validation** | Run `Tests/robot/run.sh` and `swift test` before a production release build. |
 | **Release Artifact Order** | Build order must follow `make release` ➔ `make sign` ➔ `make dmg` ➔ `make finalize` (creating DMG before signing breaks the signature). |
 
 ## Architecture Decisions (dated log)
