@@ -1,0 +1,21 @@
+Packages/KouenCore/Sources/KouenCore/Persistence/FileEditorPersistence.swift
+  s_f0c0eaf835ee3d::t_8d882924500b50 1-11
+Apps/Kouen/Sources/KouenApp/UI/FileEditor/FileEditorView.swift
+  s_f0c0eaf835ee3d::t_8d882924500b50 107,128,240
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.7",
+  "base_commit_sha": "e2417981d812c975c6232848e4c13dda1329f1a8",
+  "prompts": {},
+  "sessions": {
+    "s_f0c0eaf835ee3d": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a20185-4a0b-7283-a917-c9dfda7f1639",
+        "model": "gpt-6.1-terra"
+      },
+      "human_author": "Vit129 <vitosk129@gmail.com>"
+    }
+  }
+}
