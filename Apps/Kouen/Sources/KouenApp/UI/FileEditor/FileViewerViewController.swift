@@ -77,7 +77,7 @@ final class FileViewerViewController: NSViewController {
             showMessage("File too large to preview (\(ByteCountFormatter.string(fromByteCount: Int64(size), countStyle: .file))).")
             return
         }
-        guard let data = try? Data(contentsOf: url), let contents = String(data: data, encoding: .utf8) else {
+        guard let data = FileEditorPersistence.load(from: url), let contents = String(data: data, encoding: .utf8) else {
             showMessage("Unable to preview this file (binary or unsupported encoding).")
             return
         }
@@ -158,7 +158,7 @@ final class FileViewerViewController: NSViewController {
         syntaxView.onSave = { [weak self] text in
             guard let path = self?.pathLabel.toolTip, !path.isEmpty else { return }
             let expanded = (path as NSString).expandingTildeInPath
-            try? text.write(toFile: expanded, atomically: true, encoding: .utf8)
+            FileEditorPersistence.save(text, to: expanded)
             self?.currentMarkdownRaw = text
             self?.markdownPreviewView.update(markdown: text)
             DisplayMessage.show("Saved \((path as NSString).lastPathComponent)")
@@ -416,7 +416,7 @@ final class FileViewerViewController: NSViewController {
 
     private static func loadQuickLookExtensions() -> Set<String> {
         let file = KouenPaths.applicationSupport.appendingPathComponent("quicklook-extensions.json")
-        if let data = try? Data(contentsOf: file),
+        if let data = FileEditorPersistence.load(from: file),
            let list = try? JSONDecoder().decode([String].self, from: data),
            !list.isEmpty { return Set(list) }
         return []
