@@ -4,22 +4,15 @@ import KouenCore
 extension KouenSidebarPanelViewController {
     // MARK: - Recent Projects
 
-    private static let recentProjectsKey = "RecentProjectPaths"
-    private static let maxRecents = 10
-
     private static func recentProjects() -> [String] {
-        UserDefaults.standard.stringArray(forKey: recentProjectsKey) ?? []
+        RecentProjectsStore.load()
     }
 
     /// Public alias used by `SidebarFooterView` closure to load recents without a VC reference.
     static func recentProjectsList() -> [String] { recentProjects() }
 
     static func recordRecentProject(_ path: String) {
-        var recents = recentProjects()
-        recents.removeAll { $0 == path }
-        recents.insert(path, at: 0)
-        if recents.count > maxRecents { recents = Array(recents.prefix(maxRecents)) }
-        UserDefaults.standard.set(recents, forKey: recentProjectsKey)
+        RecentProjectsStore.record(path)
     }
 
     @objc func showRecentProjects(_ sender: NSView) {
