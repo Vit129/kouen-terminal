@@ -1,0 +1,21 @@
+Apps/Kouen/Sources/KouenApp/UI/FileEditor/FuzzyPathResolver.swift
+  s_e0f712f5f3444e::t_402d5ab498bbde 2,108
+Apps/Kouen/Sources/KouenApp/UI/FileTree/FileTreeSwiftUIView.swift
+  s_e0f712f5f3444e::t_402d5ab498bbde 180
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.7",
+  "base_commit_sha": "0d9c07fe1b6d365b527b03c16ff15244113f0250",
+  "prompts": {},
+  "sessions": {
+    "s_e0f712f5f3444e": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a20179-0aa3-7a31-b31b-677f6706dfa7",
+        "model": "gpt-6.1-terra"
+      },
+      "human_author": "Vit129 <vitosk129@gmail.com>"
+    }
+  }
+}
