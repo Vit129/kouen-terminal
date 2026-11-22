@@ -1,0 +1,22 @@
+ARCHITECTURE.md
+  s_ee54c05dc5f9fb::t_4b3411c4b424b2 119-125,127-131,133-149,157
+  s_ee54c05dc5f9fb::t_185312e0f47838 126,132
+README.md
+  s_ee54c05dc5f9fb::t_4b3411c4b424b2 3,5,7,9-11,14,16-18,21,23-27,29
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.7",
+  "base_commit_sha": "f85b3209080ad0d55a1b0a48b20926d291e0cbb3",
+  "prompts": {},
+  "sessions": {
+    "s_ee54c05dc5f9fb": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a201a7-5089-78d1-8105-63e2e0e01b16",
+        "model": "gpt-6-luna"
+      },
+      "human_author": "Vit129 <vitosk129@gmail.com>"
+    }
+  }
+}
