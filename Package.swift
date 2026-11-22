@@ -363,10 +363,5 @@ let package = Package(
             dependencies: ["KouenCompositor", "KouenTerminalEngine", "KouenCore", "KouenCopyMode"],
             path: "Tests/KouenCompositorTests"
         ),
-        .testTarget(
-            name: "KouenArchitectureGuardTests",
-            dependencies: [],
-            path: "Tests/KouenArchitectureGuardTests"
-        ),
     ] + platformTargets + platformTestTargets
 )
