@@ -1,0 +1,21 @@
+Packages/KouenCore/Sources/KouenCore/AgentCatalogPersistence.swift
+  s_67b136f8aaf69b::t_a9353394589905 1-9
+Apps/Kouen/Sources/KouenApp/Settings/SwiftUI/SettingsAgentsView.swift
+  s_67b136f8aaf69b::t_a9353394589905 151
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.7",
+  "base_commit_sha": "16638ddcd3589c7074d807a21be2792d3231de59",
+  "prompts": {},
+  "sessions": {
+    "s_67b136f8aaf69b": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a2017c-8416-7eb1-8f3c-1ba78383a0d5",
+        "model": "gpt-6.1-terra"
+      },
+      "human_author": "Vit129 <vitosk129@gmail.com>"
+    }
+  }
+}
