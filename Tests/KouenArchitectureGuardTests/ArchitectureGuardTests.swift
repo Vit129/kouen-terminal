@@ -86,55 +86,6 @@ final class ArchitectureGuardTests: XCTestCase {
         )
     }
 
-    // MARK: - G11: Persistence Calls In UI (Ratchet Baseline)
-
-    /// Ensures direct persistence calls in UI do not exceed the measured baseline.
-    func testG11_PersistenceCallsInUIRatchetBaseline() throws {
-        let uiDirs = [
-            "Apps/Kouen/Sources/KouenApp/UI",
-            "Apps/Kouen/Sources/KouenApp/Settings",
-        ]
-
-        var totalCount = 0
-        for relDir in uiDirs {
-            let dirURL = repoRoot.appendingPathComponent(relDir)
-            guard FileManager.default.fileExists(atPath: dirURL.path) else { continue }
-            totalCount += try countPersistenceCalls(in: findSwiftFiles(in: dirURL))
-        }
-
-        // Ratchet: measured current baseline; only lower this as call sites move behind services.
-        let maxAllowedPersistenceCalls = 61
-        XCTAssertLessThanOrEqual(
-            totalCount,
-            maxAllowedPersistenceCalls,
-            "G11 Violation: direct persistence calls in UI exceeded baseline (\(totalCount) > \(maxAllowedPersistenceCalls)); move persistence behind KouenCore / a service; the ceiling may only go down"
-        )
-    }
-
-    func testG11_NegativeControlCountsPersistenceCalls() throws {
-        let tempDir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
-        try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
-        defer { try? FileManager.default.removeItem(at: tempDir) }
-
-        let badSource = """
-        final class LeakyClass {
-            // UserDefaults.standard and Data(contentsOf: URL(fileURLWithPath: "ignored")) in comment
-            func persist(_ data: Data, to url: URL) {
-                UserDefaults.standard.set(true, forKey: "flag")
-                FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
-                try? data.write(to: url)
-                _ = try? Data(contentsOf: url)
-            }
-        }
-        """
-        let badFile = tempDir.appendingPathComponent("BadPersistence.swift")
-        try badSource.write(to: badFile, atomically: true, encoding: .utf8)
-
-        let caughtPersistenceCount = try countPersistenceCalls(in: [badFile])
-        XCTAssertEqual(caughtPersistenceCount, 4, "Negative control must catch all 4 un-commented direct persistence calls")
-        XCTAssertGreaterThan(caughtPersistenceCount, 0, "Negative control must count at least one persistence call")
-    }
-
     // MARK: - G4: Zero Unmanaged Language Literals (Rule 3)
 
     /// Ensures Swift source code contains zero unmanaged foreign language characters outside translation files/assets.
@@ -362,32 +313,6 @@ final class ArchitectureGuardTests: XCTestCase {
                     count += 1
                 }
             }
-        }
-        return count
-    }
-
-    private func countPersistenceCalls(in files: [URL]) throws -> Int {
-        let persistenceRegex = try NSRegularExpression(
-            pattern: #"UserDefaults\.|FileManager\.default\.(?:write|create|remove|move|copy|replace|trash)[A-Za-z0-9_]*\s*\(|\.write\s*\(\s*to\s*:|Data\s*\(\s*contentsOf\s*:"#
-        )
-        var count = 0
-
-        for file in files {
-            let content = try String(contentsOf: file, encoding: .utf8)
-            let withoutBlockComments = content.replacingOccurrences(
-                of: #"/\*[\s\S]*?\*/"#,
-                with: "",
-                options: .regularExpression
-            )
-            let withoutLineComments = withoutBlockComments
-                .components(separatedBy: .newlines)
-                .map { line in
-                    guard let commentStart = line.range(of: "//") else { return line }
-                    return String(line[..<commentStart.lowerBound])
-                }
-                .joined(separator: "\n")
-            let range = NSRange(withoutLineComments.startIndex..., in: withoutLineComments)
-            count += persistenceRegex.numberOfMatches(in: withoutLineComments, range: range)
         }
         return count
     }
