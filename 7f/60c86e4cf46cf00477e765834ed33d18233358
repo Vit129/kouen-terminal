@@ -1,0 +1,19 @@
+Apps/Kouen/Sources/KouenApp/UI/Automations/AutomationsFleetModel.swift
+  s_e85919b01b7b0e::t_52c66196a18d74 285
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.7",
+  "base_commit_sha": "7f60c86e4cf46cf00477e765834ed33d18233358",
+  "prompts": {},
+  "sessions": {
+    "s_e85919b01b7b0e": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a2018d-2e01-7343-b003-b92f85d0ac4d",
+        "model": "gpt-6.1-terra"
+      },
+      "human_author": "Vit129 <vitosk129@gmail.com>"
+    }
+  }
+}
