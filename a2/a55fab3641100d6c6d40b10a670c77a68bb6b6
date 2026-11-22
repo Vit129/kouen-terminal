@@ -1,0 +1,19 @@
+Apps/Kouen/Sources/KouenApp/UI/Chrome/MainSplitViewController.swift
+  s_7dd6bb10f79da7::t_25a65fc0e74941 341,343
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.7",
+  "base_commit_sha": "a2a55fab3641100d6c6d40b10a670c77a68bb6b6",
+  "prompts": {},
+  "sessions": {
+    "s_7dd6bb10f79da7": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a20182-0f78-7020-8e60-f46c7df7b5aa",
+        "model": "gpt-6.1-terra"
+      },
+      "human_author": "Vit129 <vitosk129@gmail.com>"
+    }
+  }
+}
