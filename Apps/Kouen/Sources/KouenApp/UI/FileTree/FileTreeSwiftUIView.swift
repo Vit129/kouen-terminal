@@ -177,7 +177,7 @@ struct FileTreeSwiftUIView: View {
     /// recent project, or any folder. Picking one pins it until "back to project" or a session switch.
     private var rootPicker: some View {
         let extra = SessionCoordinator.shared.settings.fileSearchRoots
-        let recents = UserDefaults.standard.stringArray(forKey: "RecentProjectPaths") ?? []
+        let recents = RecentProjectsStore.load()
         return HStack(spacing: 4) {
             Menu {
                 Button("Project: \((context.projectRoot as NSString).lastPathComponent)") { context.onPickRoot?(nil) }

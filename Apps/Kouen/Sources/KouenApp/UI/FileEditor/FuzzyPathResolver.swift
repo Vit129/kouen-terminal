@@ -1,4 +1,5 @@
 import Foundation
+import KouenCore
 
 enum FileFuzzyMatcher {
     /// Score `string` against `query`. Returns nil when no subsequence match.
@@ -104,7 +105,7 @@ enum FuzzyPathResolver {
     static func defaultOtherRoots() -> [String] {
         let extra = Thread.isMainThread ? MainActor.assumeIsolated { SessionCoordinator.shared.settings.fileSearchRoots } : []
         var seen = Set<String>()
-        return (extra + (UserDefaults.standard.stringArray(forKey: "RecentProjectPaths") ?? []))
+        return (extra + RecentProjectsStore.load())
             .filter { seen.insert($0).inserted }
     }
 
