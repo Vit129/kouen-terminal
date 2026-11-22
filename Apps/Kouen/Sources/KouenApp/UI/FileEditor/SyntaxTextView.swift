@@ -769,7 +769,7 @@ enum SyntaxHighlighter {
 
     private static func loadSyntaxKeywords() -> [String: [String]]? {
         let file = KouenPaths.applicationSupport.appendingPathComponent("syntax-keywords.json")
-        guard let data = try? Data(contentsOf: file),
+        guard let data = FileEditorPersistence.load(from: file),
               let dict = try? JSONDecoder().decode([String: [String]].self, from: data),
               !dict.isEmpty else { return nil }
         return dict
