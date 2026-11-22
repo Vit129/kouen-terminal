@@ -1,0 +1,21 @@
+Apps/Kouen/Sources/KouenApp/UI/CommandPalette/CommandPromptController.swift
+  s_d3ac2fb6c068d5::t_a221c8d3250759 22,28
+Packages/KouenCore/Sources/KouenCore/Persistence/CommandHistoryPersistence.swift
+  s_d3ac2fb6c068d5::t_ee3ee2a902d103 1-20
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.7",
+  "base_commit_sha": "150fc91bafce4f7c90ccb25fcc1df0a2aabe6f4b",
+  "prompts": {},
+  "sessions": {
+    "s_d3ac2fb6c068d5": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a2018a-a02a-7f61-8508-5b118c1a7d3f",
+        "model": "gpt-6.1-terra"
+      },
+      "human_author": "Vit129 <vitosk129@gmail.com>"
+    }
+  }
+}
