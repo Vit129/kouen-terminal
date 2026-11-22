@@ -1,0 +1,21 @@
+Tests/KouenArchitectureGuardTests/ArchitectureGuardTests.swift
+  s_04ec7362ca55c4::t_3684f3d67c30db 89-137,369-391,393
+  s_04ec7362ca55c4::t_ffc6589d560528 392
+  s_04ec7362ca55c4::t_a7588f4b4ce5cb 394
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.7",
+  "base_commit_sha": "8c103c054a7f0641dcf246096f58a7a5ed084dfd",
+  "prompts": {},
+  "sessions": {
+    "s_04ec7362ca55c4": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a2012d-a96d-7040-9967-b04e607606d9",
+        "model": "gpt-6-luna"
+      },
+      "human_author": "Vit129 <vitosk129@gmail.com>"
+    }
+  }
+}
