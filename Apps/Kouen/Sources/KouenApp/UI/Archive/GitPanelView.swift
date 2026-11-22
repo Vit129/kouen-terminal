@@ -785,9 +785,9 @@ final class GitPanelView: NSView {
             let base = WorktreeManager().baseBranch(for: branch, in: worktreePath) ?? "main"
             let safeName = "\(branch.replacingOccurrences(of: "/", with: "_"))_vs_\(base)"
             let tmpDir = NSTemporaryDirectory() + "kouen-diff/"
-            try? FileManager.default.createDirectory(atPath: tmpDir, withIntermediateDirectories: true)
+            GitTemporaryFiles.createDirectory(atPath: tmpDir)
             let tmpPath = tmpDir + "\(safeName).diff"
-            try? detail.write(toFile: tmpPath, atomically: true, encoding: .utf8)
+            try? GitTemporaryFiles.write(detail, to: tmpPath)
             if let split = self.window?.contentViewController as? MainSplitViewController {
                 split.contentVC.openFileTab(path: tmpPath)
             } else {
@@ -1001,9 +1001,9 @@ final class GitPanelView: NSView {
             let detail = await fetchCommitDiff(hash: hash, path: path)
             let shortHash = String(hash.prefix(7))
             let tmpDir = NSTemporaryDirectory() + "kouen-diff/"
-            try? FileManager.default.createDirectory(atPath: tmpDir, withIntermediateDirectories: true)
+            GitTemporaryFiles.createDirectory(atPath: tmpDir)
             let tmpPath = tmpDir + "\(shortHash).diff"
-            try? detail.write(toFile: tmpPath, atomically: true, encoding: .utf8)
+            try? GitTemporaryFiles.write(detail, to: tmpPath)
             guard let split = self.window?.contentViewController as? MainSplitViewController else { return }
             split.contentVC.openFileTab(path: tmpPath)
         }
@@ -1099,15 +1099,15 @@ final class GitPanelView: NSView {
     /// tmp-file pattern `showChangedFileDiff`/`showCommitDetail` already use for diff text.
     private func applyHunkPatch(header: [String], hunk: [String], reverse: Bool, path: String) async -> GitResult {
         let tmpDir = NSTemporaryDirectory() + "kouen-patch/"
-        try? FileManager.default.createDirectory(atPath: tmpDir, withIntermediateDirectories: true)
+        GitTemporaryFiles.createDirectory(atPath: tmpDir)
         let tmpPath = tmpDir + "\(UUID().uuidString).patch"
         let patch = Self.patchText(header: header, hunk: hunk)
         do {
-            try patch.write(toFile: tmpPath, atomically: true, encoding: .utf8)
+            try GitTemporaryFiles.write(patch, to: tmpPath)
         } catch {
             return GitResult(output: "", stderr: "Failed to write patch: \(error.localizedDescription)", success: false)
         }
-        defer { try? FileManager.default.removeItem(atPath: tmpPath) }
+        defer { GitTemporaryFiles.removeItem(atPath: tmpPath) }
         var args = ["apply", "--cached"]
         if reverse { args.append("-R") }
         args.append(tmpPath)
@@ -1793,10 +1793,10 @@ final class GitPanelView: NSView {
         Task {
             let diff = await runGit(["diff", "HEAD", "--", file], in: path)
             let tmpDir = NSTemporaryDirectory() + "kouen-diff/"
-            try? FileManager.default.createDirectory(atPath: tmpDir, withIntermediateDirectories: true)
+            GitTemporaryFiles.createDirectory(atPath: tmpDir)
             let safeName = file.replacingOccurrences(of: "/", with: "_")
             let tmpPath = tmpDir + "\(safeName).diff"
-            try? diff.write(toFile: tmpPath, atomically: true, encoding: .utf8)
+            try? GitTemporaryFiles.write(diff, to: tmpPath)
             split.contentVC.openFileTab(path: tmpPath)
         }
     }

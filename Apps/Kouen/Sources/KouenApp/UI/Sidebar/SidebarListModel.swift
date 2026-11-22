@@ -135,7 +135,7 @@ final class SidebarListModel {
     private var expandedWorktreeGroups = Set<String>()
     private(set) var projectWorktrees: [String: [SidebarWorktreeEntry]] = [:]
     var pinnedRepos: Set<String> = {
-        let array = UserDefaults.standard.stringArray(forKey: "kouen.sidebar.pinnedRepos") ?? []
+        let array = SidebarPinnedReposPersistence.load()
         return Set(array)
     }()
     private var repoRootCache: [String: (repoRoot: String?, fetchedAt: Date)] = [:]
@@ -252,7 +252,7 @@ final class SidebarListModel {
         } else {
             pinnedRepos.insert(rootPath)
         }
-        UserDefaults.standard.set(Array(pinnedRepos), forKey: "kouen.sidebar.pinnedRepos")
+        SidebarPinnedReposPersistence.save(Array(pinnedRepos))
         rebuildRows()
     }
 

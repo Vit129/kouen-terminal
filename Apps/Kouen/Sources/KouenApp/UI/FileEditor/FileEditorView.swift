@@ -104,7 +104,7 @@ final class FileEditorView: NSView {
         }
         if size <= 128_000 {
             // Fast synchronous path for files <= 128 KB (instantaneous decode, preserves immediate UI sync)
-            guard let data = try? Data(contentsOf: url) else {
+            guard let data = FileEditorPersistence.load(from: url) else {
                 showMessage("Unable to read file.")
                 return
             }
@@ -125,7 +125,7 @@ final class FileEditorView: NSView {
         // Heavy files (> 128 KB up to 5 MB): read & decode asynchronously off the main thread
         Task { @MainActor [weak self, cleanPath, ext, url, isReloadingSamePath] in
             let result = await Task.detached(priority: .userInitiated) { () -> (contents: String?, isBinary: Bool) in
-                guard let data = try? Data(contentsOf: url) else {
+                guard let data = FileEditorPersistence.load(from: url) else {
                     return (contents: nil, isBinary: false)
                 }
                 guard let contents = String(data: data, encoding: .utf8) else {
@@ -237,7 +237,7 @@ final class FileEditorView: NSView {
         syntaxView.translatesAutoresizingMaskIntoConstraints = false
         syntaxView.onSave = { [weak self] text in
             guard let self, !self.filePath.isEmpty else { return }
-            try? text.write(toFile: self.filePath, atomically: true, encoding: .utf8)
+            FileEditorPersistence.save(text, to: self.filePath)
             self.currentMarkdownRaw = text
             self.markdownPreviewView.update(markdown: text)
             DisplayMessage.show("Saved \((self.filePath as NSString).lastPathComponent)")

@@ -16,8 +16,6 @@ final class FloatingPaneController {
     nonisolated(unsafe) private var localMonitor: Any?
     nonisolated(unsafe) private var frameObservers: [NSObjectProtocol] = []
 
-    private static let frameKey = "FloatingPaneFrame"
-
     private init() {}
 
     func install() {
@@ -71,7 +69,7 @@ final class FloatingPaneController {
             let defaultFrame = NSRect(
                 x: screen.frame.midX - 400, y: screen.frame.midY - 250,
                 width: 800, height: 500)
-            let rawSaved = UserDefaults.standard.string(forKey: Self.frameKey).map { NSRectFromString($0) }
+            let rawSaved = FloatingPanePreferences.frame.map { NSRectFromString($0) }
             let frame = (rawSaved.map { $0.width > 100 && $0.height > 100 } == true) ? rawSaved! : defaultFrame
 
             let p = NSPanel(
@@ -99,7 +97,7 @@ final class FloatingPaneController {
             for name in [NSWindow.didMoveNotification, NSWindow.didResizeNotification] {
                 let token = NotificationCenter.default.addObserver(forName: name, object: p, queue: .main) { [weak p] _ in
                     guard let p else { return }
-                    UserDefaults.standard.set(NSStringFromRect(p.frame), forKey: Self.frameKey)
+                    FloatingPanePreferences.frame = NSStringFromRect(p.frame)
                 }
                 frameObservers.append(token)
             }

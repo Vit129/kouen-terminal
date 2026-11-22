@@ -131,8 +131,9 @@ public final class IssueTrackerService: Sendable {
     /// the Basic header ourselves from the stored email + PAT rather than asking the user to
     /// pre-encode it (the PAT field alone was never a complete credential for this API).
     private func fetchJiraIssues(token: String) async throws -> [TrackedIssue] {
-        guard let domain = UserDefaults.standard.string(forKey: "kouen.jira.domain"), !domain.isEmpty,
-              let email = UserDefaults.standard.string(forKey: "kouen.jira.email"), !email.isEmpty,
+        let domain = IssueTrackerPreferences.jiraDomain
+        let email = IssueTrackerPreferences.jiraEmail
+        guard !domain.isEmpty, !email.isEmpty,
               let url = URL(string: "https://\(domain).atlassian.net/rest/api/3/search?jql=assignee=currentUser()+AND+resolution=Unresolved") else {
             return fallbackIssues(for: .jira, isOfflineError: false)
         }
@@ -249,7 +250,8 @@ public final class IssueTrackerService: Sendable {
     /// (no fields), then a batch GET fetches the fields we actually render. Auth is Basic
     /// with an empty username — Azure's own convention for PAT auth (`Basic base64(":<PAT>")`).
     private func fetchAzureIssues(token: String) async throws -> [TrackedIssue] {
-        guard let organization = UserDefaults.standard.string(forKey: "kouen.azure.organization"), !organization.isEmpty,
+        let organization = IssueTrackerPreferences.azureOrganization
+        guard !organization.isEmpty,
               let basicAuth = ":\(token)".data(using: .utf8)?.base64EncodedString() else {
             return fallbackIssues(for: .azureDevOps, isOfflineError: false)
         }

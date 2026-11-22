@@ -850,7 +850,7 @@ final class KouenSidebarPanelViewController: NSViewController {
             var notePath: String?
             if let note = await Self.generateHandoffNote(for: record) {
                 let url = FileManager.default.temporaryDirectory.appendingPathComponent("kouen-handoff-\(record.id).md")
-                if (try? note.write(to: url, atomically: true, encoding: .utf8)) != nil { notePath = url.path }
+                if HandoffNotePersistence.save(note, to: url) { notePath = url.path }
             }
             let brief = AgentHandoffBuilder.buildBrief(from: record, targetAgent: targetKind, handoffNotePath: notePath)
             log.info("handoff: note \(notePath == nil ? "unavailable, transcript-only brief" : "written", privacy: .public)")

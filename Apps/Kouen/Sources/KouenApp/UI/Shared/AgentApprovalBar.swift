@@ -70,7 +70,7 @@ final class AgentApprovalBar: NSView {
         super.init(frame: .zero)
         alphaValue = 0
         wantsLayer = true
-        layer?.backgroundColor = NSColor(white: 0.08, alpha: 0.94).cgColor
+        layer?.backgroundColor = KouenDesign.Colors.agentApprovalBarBackground.cgColor
         layer?.borderWidth = 0.5
         layer?.borderColor = NSColor.white.withAlphaComponent(0.12).cgColor
 

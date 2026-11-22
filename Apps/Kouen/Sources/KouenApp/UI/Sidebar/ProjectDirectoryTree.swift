@@ -80,7 +80,7 @@ final class ProjectStore {
     }
 
     convenience init(userDefaultsSuite suiteName: String) {
-        let defaults = UserDefaults(suiteName: suiteName) ?? .standard
+        let defaults = ProjectDirectoryPersistence.defaults(suiteName: suiteName)
         self.init(userDefaults: defaults)
     }
 
@@ -106,11 +106,11 @@ final class ProjectStore {
     // MARK: - Persistence
 
     private func load() {
-        if let data = userDefaults.data(forKey: Self.categoriesKey),
+        if let data = ProjectDirectoryPersistence.data(userDefaults, forKey: Self.categoriesKey),
            let decoded = try? JSONDecoder().decode([ProjectCategory].self, from: data) {
             categories = decoded
         }
-        if let data = userDefaults.data(forKey: Self.projectsKey),
+        if let data = ProjectDirectoryPersistence.data(userDefaults, forKey: Self.projectsKey),
            let decoded = try? JSONDecoder().decode([ProjectEntry].self, from: data) {
             let home = FileManager.default.homeDirectoryForCurrentUser.path
             projects = decoded.filter {
@@ -120,26 +120,26 @@ final class ProjectStore {
             if let rows = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]],
                rows.contains(where: { $0["stableID"] == nil }),
                let migrated = try? JSONEncoder().encode(projects) {
-                userDefaults.set(migrated, forKey: Self.projectsKey)
+                ProjectDirectoryPersistence.set(userDefaults, migrated, forKey: Self.projectsKey)
             }
         }
-        pendingReconciliationPaths = Set(userDefaults.stringArray(forKey: Self.pendingReconciliationsKey) ?? [])
+        pendingReconciliationPaths = Set(ProjectDirectoryPersistence.stringArray(userDefaults, forKey: Self.pendingReconciliationsKey) ?? [])
     }
 
     func save() {
         if let data = try? JSONEncoder().encode(categories) {
-            userDefaults.set(data, forKey: Self.categoriesKey)
+            ProjectDirectoryPersistence.set(userDefaults, data, forKey: Self.categoriesKey)
         }
         if let data = try? JSONEncoder().encode(projects) {
-            userDefaults.set(data, forKey: Self.projectsKey)
+            ProjectDirectoryPersistence.set(userDefaults, data, forKey: Self.projectsKey)
         }
-        userDefaults.set(Array(pendingReconciliationPaths), forKey: Self.pendingReconciliationsKey)
+        ProjectDirectoryPersistence.set(userDefaults, Array(pendingReconciliationPaths), forKey: Self.pendingReconciliationsKey)
     }
 
     private func absorbLegacyRecents() {
         let home = Self.directoryIdentity(FileManager.default.homeDirectoryForCurrentUser.path)
         var existing = Set(projects.map { Self.directoryIdentity($0.path) })
-        let legacyPaths = (userDefaults.stringArray(forKey: "RecentProjectPaths") ?? [])
+        let legacyPaths = (ProjectDirectoryPersistence.stringArray(userDefaults, forKey: "RecentProjectPaths") ?? [])
             .filter { path in
                 let identity = Self.directoryIdentity(path)
                 return identity != home && WorkspaceRepositoryScanner.isPrimaryRepository(path)
@@ -681,8 +681,8 @@ struct AddToWorkspaceSheet: View {
 final class ProjectDirectoryTreeModel {
     let store: ProjectStore
     var isExpanded: Bool {
-        get { UserDefaults.standard.bool(forKey: "ProjectDirectoryTreeExpanded") }
-        set { UserDefaults.standard.set(newValue, forKey: "ProjectDirectoryTreeExpanded") }
+        get { ProjectDirectoryPersistence.isExpanded }
+        set { ProjectDirectoryPersistence.isExpanded = newValue }
     }
 
     var gitStatuses: [String: ProjectGitStatus] = [:]
@@ -690,7 +690,7 @@ final class ProjectDirectoryTreeModel {
 
     init(store: ProjectStore) {
         self.store = store
-        if UserDefaults.standard.object(forKey: "ProjectDirectoryTreeExpanded") == nil {
+        if !ProjectDirectoryPersistence.hasExpandedPreference {
             isExpanded = true
         }
     }

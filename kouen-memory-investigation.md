@@ -150,7 +150,6 @@ commit เดียว: `12a2f224` (9 ต.ค. 2026, Merge PR #81, `Co-Authored-
 **ที่มา**: เป็น **Dev-QA Pattern 5-Layer Separation** ซึ่งลงจริงใน Kouen วันที่ **25 ต.ค. 2026**
 - PR #122 (`456b522e`): `f6b40e3a` establish QA architecture guard + extract `KouenGit`
 - PR #123 (`65a52752`): `2c7640f9` extract `KouenCompositor`, `c95e9eba` purify `KouenIPC` + unify Layer 2 tokens, `ca7164d7` complete (ProcessRunner ratchet G3 → 0, Rule 2/3 guards, layered test tags)
-- ตัวบังคับใช้: `Tests/KouenArchitectureGuardTests/ArchitectureGuardTests.swift` → **G1** zero UI imports ใน headless packages, **G2** zero rogue colors, **G3** `Process()` ใน UI (ratchet ปัจจุบัน = **0**), **G4** zero unmanaged language literals, **G5** layered test tags, **G7** zero cross-package duplication, **G10** negative control
 
 เทียบชื่อที่ใช้กันในทีม กับของจริงใน Kouen:
 

@@ -165,6 +165,10 @@ enum KouenDesign {
         public static let hintChipBackground = NSColor(red: 0.98, green: 0.87, blue: 0.18, alpha: 0.93)
         public static let hintChipBorder = NSColor.black.withAlphaComponent(0.35)
         public static let hintChipText = NSColor(white: 0.08, alpha: 1)
+        public static let composerBackground = NSColor(white: 0.12, alpha: 1)
+        public static let composerPanelBackground = NSColor(white: 0.12, alpha: 0.97)
+        public static let composerText = NSColor(white: 0.9, alpha: 1)
+        public static let agentApprovalBarBackground = NSColor(white: 0.08, alpha: 0.94)
 
         public enum SUI {
             public static let success = Color(red: 0.42, green: 0.85, blue: 0.50)

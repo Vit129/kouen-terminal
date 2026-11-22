@@ -282,7 +282,7 @@ final class AutomationsFleetModel {
 
         var results: [FleetJobItem] = []
         for url in entries where url.pathExtension == "plist" {
-            guard let data = try? Data(contentsOf: url),
+            guard let data = FileEditorPersistence.load(from: url),
                   let plist = try? PropertyListSerialization.propertyList(from: data, format: nil) as? [String: Any],
                   let label = plist["Label"] as? String else { continue }
             if launchAgentExcludedPrefixes.contains(where: { label.hasPrefix($0) }) { continue }

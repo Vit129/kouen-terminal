@@ -53,8 +53,8 @@ final class ComposerPanel: NSPanel, NSTextViewDelegate {
         tv.isRichText = false
         let font = NSFont.monospacedSystemFont(ofSize: 13, weight: .regular)
         tv.font = font
-        tv.backgroundColor = NSColor(white: 0.12, alpha: 1)
-        tv.textColor = NSColor(white: 0.9, alpha: 1)
+        tv.backgroundColor = KouenDesign.Colors.composerBackground
+        tv.textColor = KouenDesign.Colors.composerText
         tv.isAutomaticQuoteSubstitutionEnabled = false
         tv.isAutomaticDashSubstitutionEnabled = false
         // `.textColor` alone doesn't reliably reach `typingAttributes` for text the user is
@@ -62,7 +62,7 @@ final class ComposerPanel: NSPanel, NSTextViewDelegate {
         // rendering invisible against this dark background until something else (e.g.
         // pasting) resets attributes. Pre-existing bug, not introduced by M9 — set
         // typingAttributes explicitly so every typed character uses the intended color.
-        tv.typingAttributes = [.foregroundColor: NSColor(white: 0.9, alpha: 1), .font: font]
+        tv.typingAttributes = [.foregroundColor: KouenDesign.Colors.composerText, .font: font]
         self.textView = tv
 
         super.init(
@@ -72,7 +72,7 @@ final class ComposerPanel: NSPanel, NSTextViewDelegate {
         )
         self.isFloatingPanel = true
         self.title = "Composer"
-        self.backgroundColor = NSColor(white: 0.12, alpha: 0.97)
+        self.backgroundColor = KouenDesign.Colors.composerPanelBackground
         self.isMovableByWindowBackground = true
         setup()
     }
@@ -114,7 +114,7 @@ final class ComposerPanel: NSPanel, NSTextViewDelegate {
         textView.string = initialText
         // Singleton panel reused across opens — `.string =` can reset typingAttributes on
         // each reuse, so reassert it every time the panel is (re)shown, not just at init.
-        textView.typingAttributes = [.foregroundColor: NSColor(white: 0.9, alpha: 1), .font: textView.font ?? .monospacedSystemFont(ofSize: 13, weight: .regular)]
+        textView.typingAttributes = [.foregroundColor: KouenDesign.Colors.composerText, .font: textView.font ?? .monospacedSystemFont(ofSize: 13, weight: .regular)]
         makeKeyAndOrderFront(nil)
         makeFirstResponder(textView)
     }
@@ -136,7 +136,7 @@ final class ComposerPanel: NSPanel, NSTextViewDelegate {
     /// the one-shot assignments in init/present() don't survive that. Reasserting here, which
     /// fires before every keystroke including the first, closes the gap.
     func textView(_ textView: NSTextView, shouldChangeTextIn affectedCharRange: NSRange, replacementString: String?) -> Bool {
-        textView.typingAttributes = [.foregroundColor: NSColor(white: 0.9, alpha: 1), .font: textView.font ?? .monospacedSystemFont(ofSize: 13, weight: .regular)]
+        textView.typingAttributes = [.foregroundColor: KouenDesign.Colors.composerText, .font: textView.font ?? .monospacedSystemFont(ofSize: 13, weight: .regular)]
         return true
     }
 

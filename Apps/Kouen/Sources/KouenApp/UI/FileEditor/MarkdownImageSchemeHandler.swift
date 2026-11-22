@@ -1,4 +1,5 @@
 import Foundation
+import KouenCore
 import UniformTypeIdentifiers
 import WebKit
 
@@ -22,7 +23,7 @@ final class MarkdownImageSchemeHandler: NSObject, WKURLSchemeHandler {
         guard let size = attributes[.size] as? NSNumber, size.intValue <= 16 * 1024 * 1024 else {
             throw URLError(.dataLengthExceedsMaximum)
         }
-        let data = try Data(contentsOf: file)
+        let data = try FileEditorPersistence.loadThrowing(from: file)
         return (data, URLResponse(url: url, mimeType: mime, expectedContentLength: data.count, textEncodingName: nil))
     }
 

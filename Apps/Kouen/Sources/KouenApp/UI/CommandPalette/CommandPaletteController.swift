@@ -53,7 +53,6 @@ enum CommandPaletteController {
     }
     /// MRU stack of action IDs the user has just run. Persisted across launches so
     /// the palette feels like it learns from the user.
-    private static let recentDefaultsKey = "com.vit129.kouen.palette.recent"
     private static let recentLimit = 5
 
     // Zoxide cache — refreshed in background every 60s so buildActions() never blocks
@@ -172,11 +171,11 @@ enum CommandPaletteController {
         current.removeAll { $0 == actionID }
         current.insert(actionID, at: 0)
         if current.count > recentLimit { current = Array(current.prefix(recentLimit)) }
-        UserDefaults.standard.set(current, forKey: recentDefaultsKey)
+        PalettePersistence.saveRecents(current)
     }
 
     private static func loadRecents() -> [String] {
-        UserDefaults.standard.stringArray(forKey: recentDefaultsKey) ?? []
+        PalettePersistence.loadRecents()
     }
 
     // MARK: - Configurable palette commands
@@ -192,7 +191,7 @@ enum CommandPaletteController {
 
     private static func loadPaletteConfig() -> [PaletteCommandConfig]? {
         let file = KouenPaths.applicationSupport.appendingPathComponent("palette-commands.json")
-        guard let data = try? Data(contentsOf: file),
+        guard let data = PalettePersistence.loadData(from: file),
               let configs = try? JSONDecoder().decode([PaletteCommandConfig].self, from: data),
               !configs.isEmpty else { return nil }
         return configs

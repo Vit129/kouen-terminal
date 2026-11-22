@@ -338,9 +338,9 @@ final class MainSplitViewController: NSViewController {
             let content = diff.isEmpty ? (GitRunner.shared.executeOutput(["diff", "--stat", "--patch", "HEAD"], in: cwd) ?? "") : diff
             let safeName = "\(branch.replacingOccurrences(of: "/", with: "_"))_vs_\(base)"
             let tmpDir = NSTemporaryDirectory() + "kouen-diff/"
-            try? FileManager.default.createDirectory(atPath: tmpDir, withIntermediateDirectories: true)
+            GitTemporaryFiles.createDirectory(atPath: tmpDir)
             let tmpPath = tmpDir + "\(safeName).diff"
-            try? content.write(toFile: tmpPath, atomically: true, encoding: .utf8)
+            try? GitTemporaryFiles.write(content, to: tmpPath)
             await MainActor.run {
                 self?.contentVC.openFileTab(path: tmpPath)
             }

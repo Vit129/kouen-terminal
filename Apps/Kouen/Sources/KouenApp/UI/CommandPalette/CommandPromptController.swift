@@ -17,23 +17,15 @@ final class CommandPromptController: NSObject, NSTextFieldDelegate {
     /// In-progress text saved when history recall begins, restored on Down past the newest entry.
     private var draft = ""
 
-    private static var historyURL: URL {
-        KouenPaths.applicationSupport.appendingPathComponent("command-history.json")
-    }
-
     private override init() {
         super.init()
-        if let data = try? Data(contentsOf: Self.historyURL),
-           let saved = try? JSONDecoder().decode([String].self, from: data) {
+        if let saved = CommandHistoryPersistence.load() {
             history = saved
         }
     }
 
     private func saveHistory() {
-        try? KouenPaths.ensureDirectories()
-        if let data = try? JSONEncoder().encode(history) {
-            try? data.write(to: Self.historyURL, options: .atomic)
-        }
+        CommandHistoryPersistence.save(history)
     }
 
     func present() {
