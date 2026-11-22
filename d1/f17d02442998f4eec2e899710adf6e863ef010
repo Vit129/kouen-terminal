@@ -1,0 +1,21 @@
+Apps/Kouen/Sources/KouenApp/UI/Issues/IssueTrackerPanelView.swift
+  s_67b136f8aaf69b::t_a9353394589905 45-47,284-285,287
+Packages/KouenCore/Sources/KouenCore/IssueTrackerPreferences.swift
+  s_67b136f8aaf69b::t_a9353394589905 1-18
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.7",
+  "base_commit_sha": "d1f17d02442998f4eec2e899710adf6e863ef010",
+  "prompts": {},
+  "sessions": {
+    "s_67b136f8aaf69b": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a2017c-8416-7eb1-8f3c-1ba78383a0d5",
+        "model": "gpt-6.1-terra"
+      },
+      "human_author": "Vit129 <vitosk129@gmail.com>"
+    }
+  }
+}
