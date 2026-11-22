@@ -17,6 +17,10 @@ public enum FileEditorPersistence {
          UserDefaults.standard.string(forKey: "kouen.fileEditorActivePath"))
     }
 
+    public static func loadThrowing(from url: URL) throws -> Data {
+        try Data(contentsOf: url)
+    }
+
     public static func load(from url: URL) -> Data? {
         try? Data(contentsOf: url)
     }
