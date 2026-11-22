@@ -132,9 +132,7 @@ public final class BrowserPaneView: NSView {
         let firstTab = BrowserTab(id: UUID(), webView: webView, title: "New Tab")
         tabs.append(firstTab)
 
-        let tempDir = NSTemporaryDirectory()
-        let logPath = (tempDir as NSString).appendingPathComponent("kouen-browser-\(paneID.uuidString).log")
-        try? "".write(toFile: logPath, atomically: true, encoding: .utf8)
+        BrowserPanePersistence.createLog(paneID: paneID)
 
         setupConsoleLogRedirection(for: webView)
         setupNetworkCapture(for: webView)
@@ -150,7 +148,7 @@ public final class BrowserPaneView: NSView {
         setupProgressObservation()
 
         let resolvedURL: URL
-        if let savedURLString = UserDefaults.standard.string(forKey: "browserPane.\(paneID.uuidString).url"),
+        if let savedURLString = BrowserPanePersistence.savedURL(paneID: paneID),
            let savedURL = URL(string: savedURLString) {
             resolvedURL = savedURL
         } else {
@@ -169,9 +167,7 @@ public final class BrowserPaneView: NSView {
         retryTimer?.invalidate()
         let uuid = paneID.uuidString
         NSLog("[BrowserPane] deinit \(uuid)")
-        let logPath = (NSTemporaryDirectory() as NSString)
-            .appendingPathComponent("kouen-browser-\(uuid).log")
-        try? FileManager.default.removeItem(atPath: logPath)
+        BrowserPanePersistence.removeLog(paneID: paneID)
     }
 
     /// Stop browser work when a pane disappears from the pane tree. WebKit configuration,
@@ -179,7 +175,7 @@ public final class BrowserPaneView: NSView {
     func prepareForDisposal() {
         guard !isDisposed else { return }
         isDisposed = true
-        UserDefaults.standard.removeObject(forKey: "browserPane.\(paneID.uuidString).url")
+        BrowserPanePersistence.removeURL(paneID: paneID)
 
         cancelRetry()
         progressObservation = nil
@@ -1550,7 +1546,7 @@ extension BrowserPaneView: WKNavigationDelegate {
         if let url = webView.url {
             urlTextField.stringValue = url.absoluteString
             updateViewSourceButtonVisibility(for: url)
-            UserDefaults.standard.set(url.absoluteString, forKey: "browserPane.\(paneID.uuidString).url")
+            BrowserPanePersistence.saveURL(url.absoluteString, paneID: paneID)
         }
         applyWebDarkMode()
     }
@@ -1824,23 +1820,12 @@ extension BrowserPaneView: WKScriptMessageHandler {
             self.logWriteScheduled = false
             let batch = self.pendingLogLines
             self.pendingLogLines.removeAll(keepingCapacity: true)
-            let logPath = (NSTemporaryDirectory() as NSString)
-                .appendingPathComponent("kouen-browser-\(self.paneID.uuidString).log")
             let ts = Self.logDateFormatter.string(from: Date())
             let lines = batch.map { "[\(ts)] \($0)\n" }.joined()
             guard let data = lines.data(using: .utf8) else { return }
+            let paneID = self.paneID
             DispatchQueue.global(qos: .utility).async {
-                let url = URL(fileURLWithPath: logPath)
-                if let fh = try? FileHandle(forWritingTo: url) {
-                    defer { try? fh.close() }
-                    let currentOffset = (try? fh.seekToEnd()) ?? 0
-                    if currentOffset > 500_000 {
-                        try? fh.truncate(atOffset: 0)
-                    }
-                    _ = try? fh.write(contentsOf: data)
-                } else {
-                    _ = try? data.write(to: url, options: .atomic)
-                }
+                BrowserPanePersistence.appendLog(data, paneID: paneID)
             }
         }
     }
