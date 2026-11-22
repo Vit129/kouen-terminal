@@ -822,7 +822,7 @@ struct FileTreeSwiftUIView: View {
             Button("Move to Trash", role: .destructive) {
                 let path = node.node.path
                 Task.detached(priority: .userInitiated) {
-                    try? FileManager.default.trashItem(at: URL(fileURLWithPath: path), resultingItemURL: nil)
+                    try? FileTreePersistence.trashItem(at: URL(fileURLWithPath: path))
                     await MainActor.run {
                         refreshPastedImages()
                     }
@@ -1066,7 +1066,7 @@ private struct NodeRow: View {
     private func moveToTrash(path: String) {
         let url = URL(fileURLWithPath: path)
         do {
-            try FileManager.default.trashItem(at: url, resultingItemURL: nil)
+            try FileTreePersistence.trashItem(at: url)
             Self.notifyTreeDidChange()
         } catch {
             NSSound.beep()
@@ -1076,7 +1076,7 @@ private struct NodeRow: View {
     private func newFile(in node: FileNode) {
         let dir = node.isDirectory ? node.path : (node.path as NSString).deletingLastPathComponent
         let path = uniquePath(base: dir, name: "untitled", ext: "")
-        guard FileManager.default.createFile(atPath: path, contents: nil) else {
+        guard FileTreePersistence.createFile(atPath: path) else {
             showCreateError(path: path)
             return
         }
@@ -1088,7 +1088,7 @@ private struct NodeRow: View {
         let dir = node.isDirectory ? node.path : (node.path as NSString).deletingLastPathComponent
         let path = uniquePath(base: dir, name: "untitled folder", ext: "")
         do {
-            try FileManager.default.createDirectory(atPath: path, withIntermediateDirectories: false)
+            try FileTreePersistence.createDirectory(atPath: path)
         } catch {
             showCreateError(path: path, error: error)
             return
@@ -1122,7 +1122,7 @@ private struct NodeRow: View {
         let newName = field.stringValue.trimmingCharacters(in: .whitespaces)
         guard !newName.isEmpty else { return }
         let newPath = ((path as NSString).deletingLastPathComponent as NSString).appendingPathComponent(newName)
-        try? FileManager.default.moveItem(at: url, to: URL(fileURLWithPath: newPath))
+        try? FileTreePersistence.moveItem(at: url, to: URL(fileURLWithPath: newPath))
         Self.notifyTreeDidChange()
     }
 
@@ -1133,7 +1133,7 @@ private struct NodeRow: View {
         let name = (base as NSString).lastPathComponent
         let newName = ext.isEmpty ? "\(name) copy" : "\(name) copy.\(ext)"
         let dest = (dir as NSString).appendingPathComponent(newName)
-        try? FileManager.default.copyItem(atPath: path, toPath: dest)
+        try? FileTreePersistence.copyItem(atPath: path, toPath: dest)
         Self.notifyTreeDidChange()
     }
 
