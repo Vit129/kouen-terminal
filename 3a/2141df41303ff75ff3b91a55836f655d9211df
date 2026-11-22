@@ -1,0 +1,19 @@
+Packages/KouenCore/Sources/KouenCore/ReleaseNotes/GeneratedReleaseNotes.swift
+  s_4a5cd090ce984e::t_046807ac0fb7a5 1,8-9
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.7",
+  "base_commit_sha": "3a2141df41303ff75ff3b91a55836f655d9211df",
+  "prompts": {},
+  "sessions": {
+    "s_4a5cd090ce984e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "a7fa9747-35de-4853-ab7a-8d74c2eb0930",
+        "model": "claude-haiku-5-5"
+      },
+      "human_author": "Vit129 <vitosk129@gmail.com>"
+    }
+  }
+}
