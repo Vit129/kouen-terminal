@@ -80,7 +80,10 @@ no breakpoints, no Run button.
 ```
 
 `KouenCLI` and `KouenMCP` are thin clients: they depend only on interface/data packages
-(`KouenIPC`, `KouenCommands`, `KouenCore`), never on `KouenDaemonCore` (P49).
+(`KouenIPC`, `KouenCommands`, `KouenCore`) and on headless packages that import no UI or
+daemon code (`KouenTerminalEngine`, `KouenCopyMode`, `KouenCompositor`, `KouenGit`,
+`KouenTheme`, `KouenLSP`, `CKouenSys`). They never depend on `KouenDaemonCore` (P49), and never
+on AppKit, SwiftUI or Metal (accepted by the owner, 2026-11-22).
 
 | Package | Path | Role | Target Platform |
 |---|---|---|---|
