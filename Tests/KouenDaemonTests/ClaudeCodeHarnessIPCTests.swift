@@ -10,7 +10,7 @@ import XCTest
 /// (which is a thin, compiler-checked string/dictionary extraction layer).
 ///
 /// Live-daemon-gated like `DaemonRoundTripTests`: binds a real socket (fragile inside the
-/// XCTest runner) and one test spawns a real `claude` subprocess (costs real usage/time).
+/// XCTest runner). The start/run test spawns a subprocess that emits a Claude JSONL result.
 /// Run with `KOUEN_LIVE_DAEMON_TESTS=1 swift test --filter ClaudeCodeHarnessIPCTests`.
 final class ClaudeCodeHarnessIPCTests: XCTestCase {
     private var root: URL?
@@ -26,7 +26,11 @@ final class ClaudeCodeHarnessIPCTests: XCTestCase {
         setenv("KOUEN_HOME", dir.path, 1)
         try KouenPaths.ensureDirectories()
 
-        server = DaemonServer()
+        let adapters = ClaudeCodeHarness.defaultAdapters.filter { $0.agentKind != .claudeCode }
+        server = DaemonServer(
+            enableVersionBanner: false,
+            claudeCodeHarness: ClaudeCodeHarness(adapters: adapters + [FixtureClaudeAdapter()])
+        )
         try server.start()
         try waitForDaemonReady()
     }
@@ -70,10 +74,8 @@ final class ClaudeCodeHarnessIPCTests: XCTestCase {
         }
     }
 
-    /// The one real end-to-end path: spawns an actual `claude` subprocess (readonly
-    /// profile) via the full MCP-shaped request, polls status the same way `kouenCCStatus`
-    /// does, and asserts it reaches a terminal state with a result. Requires `claude` to be
-    /// installed and authenticated on the host running this test.
+    /// Spawns the fixture via the full MCP-shaped request, polls status, and checks the
+    /// terminal result decoded by the production Claude JSONL parser.
     func testStartRunReachesTerminalStateWithResult() throws {
         let client = DaemonClient()
         let id = UUID()
@@ -100,8 +102,8 @@ final class ClaudeCodeHarnessIPCTests: XCTestCase {
             return XCTFail("Run did not reach a terminal state within 30s")
         }
         XCTAssertEqual(finalSummary.state, "succeeded")
-        XCTAssertNotNil(finalSummary.resultText)
-        XCTAssertNotNil(finalSummary.totalCostUSD)
+        XCTAssertEqual(finalSummary.resultText, "pong")
+        XCTAssertEqual(finalSummary.totalCostUSD, 0)
 
         guard case let .ccRuns(runs) = try client.request(.ccRunList) else {
             return XCTFail("Expected .ccRuns from ccRunList")
@@ -118,5 +120,26 @@ final class ClaudeCodeHarnessIPCTests: XCTestCase {
         }
         XCTAssertTrue(message.contains("headless: true has no adapter for 'cursor'"))
         XCTAssertTrue(message.contains("claude-code"))
+    }
+}
+
+private struct FixtureClaudeAdapter: HeadlessCLIAdapter {
+    let agentKind: AgentKind = .claudeCode
+    let binaryName = "sh"
+    let candidateBinaryPaths = ["/bin/sh"]
+
+    func probeCommand(shellPath: String) -> String { "command -v sh" }
+
+    func buildArguments(
+        id: UUID, prompt: String, profile: ClaudeCodeHarness.Profile,
+        model: String?, effort: String?, resumeSessionID: UUID?
+    ) -> [String] {
+        ["-c", #"""
+        printf '%s\n' '{"type":"result","is_error":false,"result":"pong","total_cost_usd":0}'
+        """#]
+    }
+
+    func parseLine(_ lineData: Data) -> [HeadlessRunEvent] {
+        ClaudeAdapter().parseLine(lineData)
     }
 }

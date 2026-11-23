@@ -6,7 +6,14 @@ public enum FileTreePersistence {
     }
 
     public static func trashItem(at url: URL) throws {
+        #if canImport(Darwin)
         try FileManager.default.trashItem(at: url, resultingItemURL: nil)
+        #else
+        throw CocoaError(
+            .featureUnsupported,
+            userInfo: [NSLocalizedDescriptionKey: "Moving items to Trash is unavailable on this platform."]
+        )
+        #endif
     }
 
     public static func createFile(atPath path: String) -> Bool {
