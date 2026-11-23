@@ -1,0 +1,19 @@
+Packages/KouenCore/Sources/KouenCore/Persistence/FileTreePersistence.swift
+  s_04c63116d875c6::t_f98f2af987bae0 9,11-16
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.7",
+  "base_commit_sha": "df75a23059d0dab9ae14cdeb68d29bcf475a23bc",
+  "prompts": {},
+  "sessions": {
+    "s_04c63116d875c6": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "cabc4090-ae31-4a74-ab52-c604befac19e",
+        "model": "claude-haiku-5-5"
+      },
+      "human_author": "Vit129 <vitosk129@gmail.com>"
+    }
+  }
+}
