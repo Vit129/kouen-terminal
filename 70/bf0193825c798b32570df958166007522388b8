@@ -1,0 +1,19 @@
+docs/CHANGELOG-archive.md
+  s_a4141dc99bd339::t_f71338599fe0d2 142-1963
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.7",
+  "base_commit_sha": "70bf0193825c798b32570df958166007522388b8",
+  "prompts": {},
+  "sessions": {
+    "s_a4141dc99bd339": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "s_a4141dc99bd339",
+        "model": "unknown"
+      },
+      "human_author": "Vit129 <vitosk129@gmail.com>"
+    }
+  }
+}
