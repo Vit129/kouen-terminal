@@ -1,0 +1,55 @@
+Tests/KouenAppTests/AgentSessionHistoryModelTests.swift
+  s_895e068e8d52c8::t_72efd75d156cd3 122
+  s_895e068e8d52c8::t_6b6caef2bcf31d 1,97-121,123-215,292,294
+Apps/Kouen/Sources/KouenApp/Services/FileExplorer/FileTreeWatcher.swift
+  s_895e068e8d52c8::t_1e0b00a3df97a4 133-136,138,165
+Apps/Kouen/Sources/KouenApp/UI/History/AgentSessionHistoryLiveUpdates.swift
+  s_895e068e8d52c8::t_1e0b00a3df97a4 1-59
+Tests/KouenCoreTests/AgentHistoryMultiAgentCoverageTests.swift
+  s_895e068e8d52c8::t_2edecc19d9dc15 489-503
+  s_895e068e8d52c8::t_189098a70c63fe 478-488,504-506
+Apps/Kouen/Sources/KouenApp/UI/History/AgentSessionHistoryModel.swift
+  s_895e068e8d52c8::t_cd0f3e69a21d25 327-331,338,359,361-362,366,398-399,551-556
+  s_895e068e8d52c8::t_1e0b00a3df97a4 57-63,116,200,203-205,207,219-221,223,301-308,310-317,319-320,323-326,332,334-336,339-340,343-347,349-357,363,365,367-368,538-540,542-543,548,550,591-595,669
+  s_895e068e8d52c8::t_fa8e1e3af8f47e 369,371-383,385-387,389-392,394,533
+  s_895e068e8d52c8::t_72efd75d156cd3 647,652,656
+  s_895e068e8d52c8::t_4160d9b0c63e19 201-202,370,458,462-478,480-496,562
+Apps/Kouen/Sources/KouenApp/UI/History/HistorySessionDetailsView.swift
+  s_895e068e8d52c8::t_cd0f3e69a21d25 6,29
+  s_895e068e8d52c8::t_fa8e1e3af8f47e 7-8,24,26-28,30-31,46,52-53,57,95-99
+  s_895e068e8d52c8::t_2edecc19d9dc15 25,50,54-56,58
+DESIGN.md
+  s_895e068e8d52c8::t_1e0b00a3df97a4 49-50
+  s_895e068e8d52c8::t_cd0f3e69a21d25 56
+Packages/KouenCore/Sources/KouenCore/Agents/AgentHistoryScanner.swift
+  s_895e068e8d52c8::t_2edecc19d9dc15 342-352,354,696,1020-1023,1436-1437,1788,2093,2178,2271,2285,2305
+  s_895e068e8d52c8::t_1e0b00a3df97a4 353,355-356
+  s_895e068e8d52c8::t_cd0f3e69a21d25 11-12,14,17,513-530,715-716,729,810-812,1826,1835-1837,1873,1877-1880,1925-1926,2179,2181-2187,2191-2196,2201-2205,2207,2209,2228,2232-2234,2308
+  s_895e068e8d52c8::t_fa8e1e3af8f47e 728,752,759,926-934,936-937,939,941-943,946-947
+  s_895e068e8d52c8::t_72efd75d156cd3 935,938,940,944-945
+Apps/Kouen/Sources/KouenApp/UI/History/AgentSessionHistoryView.swift
+  s_895e068e8d52c8::t_1e0b00a3df97a4 12,21-22,28,33,140,179-181,339,341,346,354-355,401,407
+  s_895e068e8d52c8::t_fa8e1e3af8f47e 549,561-565
+  s_895e068e8d52c8::t_69f78a6ddffebf 429-441,443-451,457-459,461-463,465-467,469,473-476,478-480,482-491,493-499,501,503,510-511,513-515,517-523,526-533,535-548,550-551,560,567-569,572
+Apps/Kouen/Sources/KouenApp/UI/Sidebar/KouenSidebarPanelViewController.swift
+  s_895e068e8d52c8::t_1e0b00a3df97a4 665-667
+Tests/KouenCoreTests/AgentHistoryStreamingTests.swift
+  s_895e068e8d52c8::t_fa8e1e3af8f47e 62-70
+  s_895e068e8d52c8::t_f9fd004557443c 45-61,71-72
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.7",
+  "base_commit_sha": "da43560210a3ed4e2ff263af7168871f7bb432ca",
+  "prompts": {},
+  "sessions": {
+    "s_895e068e8d52c8": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a21d48-1502-7a82-a471-2c9f8b040ac3",
+        "model": "gpt-6.2-sol"
+      },
+      "human_author": "Vit129 <vitosk129@gmail.com>"
+    }
+  }
+}
