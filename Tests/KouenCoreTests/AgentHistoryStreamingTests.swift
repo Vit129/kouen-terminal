@@ -42,6 +42,34 @@ final class AgentHistoryStreamingTests: XCTestCase {
         XCTAssertEqual(codexRecord?.latestTurns.last?.content, "last Codex")
     }
 
+    func test_TS_2900_BE_IT_CodexPreservesProjectContextAndMessageOrder() throws {
+        let transcript = """
+        {"type":"session_meta","payload":{"id":"mixed","cwd":"/repo/kouen","git":{"branch":"main"}}}
+        {"type":"turn_context","payload":{"cwd":"/repo/kouen"}}
+        {"type":"message","role":"user","content":"Work on Kouen"}
+        {"type":"turn_context","payload":{"cwd":"/repo/plugin"}}
+        {"type":"message","role":"user","content":"Work on the plugin"}
+        {"type":"message","role":"assistant","content":[{"text":"Patched the plugin"},{"text":"Tests passed"}]}
+        """
+        let (root, file) = try tempFile(Data(transcript.utf8))
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let record = try XCTUnwrap(AgentHistoryScanner.parseCodexTranscript(fileURL: file))
+        XCTAssertEqual(record.projectPath, "/repo/kouen")
+        XCTAssertEqual(record.gitBranch, "main")
+        XCTAssertEqual(record.latestTurns.map(\.projectPath), ["/repo/kouen", "/repo/plugin", "/repo/plugin"])
+        XCTAssertEqual(record.latestTurns.map(\.content), ["Work on Kouen", "Work on the plugin", "Patched the plugin\nTests passed"])
+        let oldRecord = AgentSessionRecord(
+            id: "mixed", agentKind: .codex, title: record.title, projectPath: record.projectPath,
+            projectName: record.projectName, messageCount: record.messageCount, updatedAt: record.updatedAt,
+            firstPrompt: record.firstPrompt,
+            latestTurns: record.latestTurns.map { AgentHistoryTurn(role: $0.role, content: $0.content) },
+            transcriptPath: file.path, worktreeAvailable: false
+        )
+        XCTAssertEqual(AgentHistoryScanner.recoverTurnProjects(for: oldRecord), record.latestTurns)
+        XCTAssertNil(AgentHistoryScanner.recoverTurnProjects(for: record))
+    }
+
     func test_TS_2315_BE_IT_CodexParseFailureKeepsCachedRolloutAndRetries() throws {
         let initial = #"{"type":"session_meta","payload":{"id":"fixture","cwd":"/tmp"}}"# + "\n"
             + #"{"type":"message","role":"user","content":"original prompt"}"#

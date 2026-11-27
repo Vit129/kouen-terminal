@@ -9,6 +9,7 @@ public struct AgentSessionHistoryView: View {
     var onResume: ((AgentSessionRecord) -> Void)?
     var onHandoff: ((AgentSessionRecord, AgentKind) -> Void)?
     var onGoToTab: ((AgentSessionRecord) -> Void)?
+    var isVisible: () -> Bool
 
     @FocusState private var isSearchFocused: Bool
     @State private var isManagingAgentShortcuts = false
@@ -17,16 +18,19 @@ public struct AgentSessionHistoryView: View {
         model: AgentSessionHistoryModel,
         onResume: ((AgentSessionRecord) -> Void)? = nil,
         onHandoff: ((AgentSessionRecord, AgentKind) -> Void)? = nil,
-        onGoToTab: ((AgentSessionRecord) -> Void)? = nil
+        onGoToTab: ((AgentSessionRecord) -> Void)? = nil,
+        isVisible: @escaping () -> Bool = { true }
     ) {
         self.model = model
         self.onResume = onResume
         self.onHandoff = onHandoff
         self.onGoToTab = onGoToTab
+        self.isVisible = isVisible
     }
 
     public var body: some View {
         let c = KouenDesign.chrome
+        let visible = isVisible()
         VStack(spacing: 0) {
             // Search bar on top
             HStack(spacing: 6) {
@@ -133,7 +137,7 @@ public struct AgentSessionHistoryView: View {
                 ScrollViewReader { proxy in
                     ScrollView {
                         LazyVStack(spacing: 6) {
-                            ForEach(model.groupedRecords, id: \.title) { group in
+                            ForEach(model.groupedRecords) { group in
                                 historySection(group: group)
                             }
                             if model.hasMoreToLoad {
@@ -172,10 +176,9 @@ public struct AgentSessionHistoryView: View {
                 .padding(.horizontal, KouenDesign.Spacing.sm)
                 .padding(.vertical, 5)
         }
-        .onAppear {
-            if model.records.isEmpty {
-                model.refresh(force: false)
-            }
+        .task(id: visible) {
+            guard visible else { return }
+            await model.watchLiveHistory()
         }
         .onKeyPress(.upArrow) {
             model.moveSelection(by: -1)
@@ -333,14 +336,14 @@ public struct AgentSessionHistoryView: View {
 
     // MARK: - Section
     @ViewBuilder
-    private func historySection(group: (title: String, records: [AgentSessionRecord])) -> some View {
+    private func historySection(group: AgentSessionHistoryModel.Section) -> some View {
         let c = KouenDesign.chrome
-        let isCollapsed = model.collapsedSections.contains(group.title)
+        let isCollapsed = model.collapsedSections.contains(group.id)
 
         VStack(spacing: 3) {
             Button {
                 withAnimation(.easeInOut(duration: 0.15)) {
-                    model.toggleSectionCollapse(title: group.title)
+                    model.toggleSectionCollapse(id: group.id)
                 }
             } label: {
                 HStack(spacing: 5) {
@@ -348,6 +351,8 @@ public struct AgentSessionHistoryView: View {
                         .font(.system(size: 8, weight: .semibold))
                         .foregroundStyle(Color(nsColor: c.textTertiary))
                     Text(group.title.uppercased())
+                        .lineLimit(1)
+                        .help(group.projectRoot ?? group.title)
                         .font(.system(size: 9.5, weight: .bold))
                         .foregroundStyle(Color(nsColor: c.textTertiary))
                     Spacer()
@@ -393,16 +398,14 @@ public struct AgentSessionHistoryView: View {
         }
     }
 
-    // MARK: - Compact Row (Two-line & Cross-Repo Grouping)
+    // MARK: - Compact Row
     @ViewBuilder
     private func sessionRow(record: AgentSessionRecord) -> some View {
         let c = KouenDesign.chrome
         let isSelected = model.selectedRecordID == record.id
         let isLive = record.liveStatus != nil || record.placement == .cloud || record.placement == .background || record.placement == .remoteControl
-        let showRepo = model.selectedScope == .all || !model.searchQuery.isEmpty
+        let showRepo = !model.searchQuery.isEmpty
         let isNotMainBranch = record.gitBranch != nil && !record.gitBranch!.isEmpty && record.gitBranch != "main" && record.gitBranch != "master"
-        let siblings = record.crossRepoSiblings ?? []
-        let isCrossRepoGroup = siblings.count > 1
 
         VStack(alignment: .leading, spacing: 3) {
             Button {
@@ -423,205 +426,129 @@ public struct AgentSessionHistoryView: View {
                     .lineLimit(1)
                     .frame(maxWidth: .infinity, alignment: .leading)
 
-                    if isCrossRepoGroup {
-                        // Line 2 for Cross-Repo group: age · ⇄ same task in N repos
-                        HStack(spacing: 4) {
-                            Text(relativeDate(record.updatedAt))
-                                .font(.system(size: 9))
-                                .foregroundStyle(Color(nsColor: c.textTertiary))
+                    // Line 2: Metadata (agent · live · msgs · age · repo · branch)
+                    HStack(spacing: 4) {
+                        AgentBadgeView(kind: record.agentKind, iconSize: 10, fontSize: 8.5, showName: false)
 
-                            Text("·")
-                                .font(.system(size: 8))
-                                .foregroundStyle(Color(nsColor: c.textTertiary))
+                        if let tag = record.surfaceTag {
+                            Text(tag)
+                                .font(.system(size: 8, weight: .semibold))
+                                .padding(.horizontal, 3)
+                                .padding(.vertical, 1)
+                                .background(Color(nsColor: c.surfaceElevated))
+                                .cornerRadius(3)
+                                .foregroundStyle(Color(nsColor: c.textSecondary))
+                        }
 
+                        if isLive {
                             HStack(spacing: 2) {
-                                Text("⇄")
-                                    .font(.system(size: 9, weight: .bold))
-                                Text("same task in \(siblings.count) repos")
-                                    .font(.system(size: 9, weight: .semibold))
+                                Circle()
+                                    .fill(Color(nsColor: c.success))
+                                    .frame(width: 5, height: 5)
+                                Text("live")
+                                    .font(.system(size: 9, weight: .medium))
+                                    .foregroundStyle(Color(nsColor: c.success))
                             }
-                            .foregroundStyle(Color(nsColor: c.success))
-
-                            Spacer(minLength: 0)
-                        }
-
-                        // Sub-lines for each repo participating in the task
-                        VStack(alignment: .leading, spacing: 2) {
-                            ForEach(siblings) { sib in
-                                HStack(spacing: 4) {
-                                    AgentBadgeView(kind: sib.agentKind, iconSize: 9, fontSize: 8, showName: false)
-
-                                    if let tag = sib.surfaceTag {
-                                        Text(tag)
-                                            .font(.system(size: 7.5, weight: .semibold))
-                                            .padding(.horizontal, 2.5)
-                                            .padding(.vertical, 0.5)
-                                            .background(Color(nsColor: c.surfaceElevated))
-                                            .cornerRadius(2.5)
-                                            .foregroundStyle(Color(nsColor: c.textSecondary))
-                                    }
-
-                                    highlightedText(
-                                        sib.projectName,
-                                        query: model.searchQuery,
-                                        baseColor: c.textPrimary,
-                                        highlightColor: NSColor.controlAccentColor,
-                                        fontSize: 9.5,
-                                        weight: .semibold
-                                    )
-
-                                    if let branch = sib.gitBranch {
-                                        HStack(spacing: 2) {
-                                            Image(systemName: "arrow.triangle.branch")
-                                                .font(.system(size: 7.5))
-                                            highlightedText(
-                                                branch,
-                                                query: model.searchQuery,
-                                                baseColor: c.textTertiary,
-                                                highlightColor: NSColor.controlAccentColor,
-                                                fontSize: 9,
-                                                weight: .regular
-                                            )
-                                        }
-                                    }
-                                    Spacer(minLength: 0)
-                                }
-                                .padding(.leading, 6)
-                                .overlay(
-                                    Rectangle()
-                                        .fill(Color(nsColor: c.border))
-                                        .frame(width: 2),
-                                    alignment: .leading
-                                )
-                            }
-                        }
-                        .padding(.top, 1)
-
-                    } else {
-                        // Line 2 for Standalone session: Metadata (agent · live · msgs · age · repo · branch)
-                        HStack(spacing: 4) {
-                            AgentBadgeView(kind: record.agentKind, iconSize: 10, fontSize: 8.5, showName: false)
-
-                            if let tag = record.surfaceTag {
-                                Text(tag)
-                                    .font(.system(size: 8, weight: .semibold))
-                                    .padding(.horizontal, 3)
-                                    .padding(.vertical, 1)
-                                    .background(Color(nsColor: c.surfaceElevated))
-                                    .cornerRadius(3)
-                                    .foregroundStyle(Color(nsColor: c.textSecondary))
-                            }
-
-                            if isLive {
-                                HStack(spacing: 2) {
-                                    Circle()
-                                        .fill(Color(nsColor: c.success))
-                                        .frame(width: 5, height: 5)
-                                    Text("live")
-                                        .font(.system(size: 9, weight: .medium))
-                                        .foregroundStyle(Color(nsColor: c.success))
-                                }
-                                Text("·")
-                                    .font(.system(size: 8))
-                                    .foregroundStyle(Color(nsColor: c.textTertiary))
-                            }
-
-                            Text("\(record.messageCount) msgs")
-                                .font(.system(size: 9))
-                                .foregroundStyle(Color(nsColor: c.textTertiary))
-
                             Text("·")
                                 .font(.system(size: 8))
                                 .foregroundStyle(Color(nsColor: c.textTertiary))
+                        }
 
-                            Text(relativeDate(record.updatedAt))
-                                .font(.system(size: 9))
+                        Text("\(record.messageCount) msgs")
+                            .font(.system(size: 9))
+                            .foregroundStyle(Color(nsColor: c.textTertiary))
+
+                        Text("·")
+                            .font(.system(size: 8))
+                            .foregroundStyle(Color(nsColor: c.textTertiary))
+
+                        Text(relativeDate(record.updatedAt))
+                            .font(.system(size: 9))
+                            .foregroundStyle(Color(nsColor: c.textTertiary))
+
+                        if !record.worktreeAvailable {
+                            Text("·")
+                                .font(.system(size: 8))
                                 .foregroundStyle(Color(nsColor: c.textTertiary))
+                            Text("worktree unavailable")
+                                .font(.system(size: 8.5, weight: .medium))
+                                .foregroundStyle(Color(nsColor: c.danger))
+                        }
 
-                            if !record.worktreeAvailable {
-                                Text("·")
-                                    .font(.system(size: 8))
-                                    .foregroundStyle(Color(nsColor: c.textTertiary))
-                                Text("worktree unavailable")
-                                    .font(.system(size: 8.5, weight: .medium))
-                                    .foregroundStyle(Color(nsColor: c.danger))
-                            }
+                        if showRepo {
+                            Text("·")
+                                .font(.system(size: 8))
+                                .foregroundStyle(Color(nsColor: c.textTertiary))
+                            highlightedText(
+                                model.projectName(for: record.projectPath),
+                                query: model.searchQuery,
+                                baseColor: c.textSecondary,
+                                highlightColor: NSColor.controlAccentColor,
+                                fontSize: 9,
+                                weight: .regular
+                            )
+                            .lineLimit(1)
+                        }
 
-                            if showRepo && !record.projectName.isEmpty {
-                                Text("·")
-                                    .font(.system(size: 8))
-                                    .foregroundStyle(Color(nsColor: c.textTertiary))
+                        if isNotMainBranch, let branch = record.gitBranch {
+                            Text("·")
+                                .font(.system(size: 8))
+                                .foregroundStyle(Color(nsColor: c.textTertiary))
+                            HStack(spacing: 2) {
+                                Image(systemName: "arrow.triangle.branch")
+                                    .font(.system(size: 7.5))
                                 highlightedText(
-                                    record.projectName,
+                                    branch,
                                     query: model.searchQuery,
-                                    baseColor: c.textSecondary,
+                                    baseColor: c.textTertiary,
                                     highlightColor: NSColor.controlAccentColor,
                                     fontSize: 9,
                                     weight: .regular
                                 )
                                 .lineLimit(1)
                             }
+                            .foregroundStyle(Color(nsColor: c.textTertiary))
+                        }
 
-                            if isNotMainBranch, let branch = record.gitBranch {
-                                Text("·")
-                                    .font(.system(size: 8))
-                                    .foregroundStyle(Color(nsColor: c.textTertiary))
-                                HStack(spacing: 2) {
-                                    Image(systemName: "arrow.triangle.branch")
-                                        .font(.system(size: 7.5))
-                                    highlightedText(
-                                        branch,
-                                        query: model.searchQuery,
-                                        baseColor: c.textTertiary,
-                                        highlightColor: NSColor.controlAccentColor,
-                                        fontSize: 9,
-                                        weight: .regular
-                                    )
-                                    .lineLimit(1)
-                                }
+                        if model.isSemanticMatch(for: record) {
+                            Text("·")
+                                .font(.system(size: 8))
                                 .foregroundStyle(Color(nsColor: c.textTertiary))
-                            }
-
-                            if model.isSemanticMatch(for: record) {
-                                Text("·")
-                                    .font(.system(size: 8))
-                                    .foregroundStyle(Color(nsColor: c.textTertiary))
-                                Text("Semantic")
-                                    .font(.system(size: 7.5, weight: .semibold))
-                                    .padding(.horizontal, 3.5)
-                                    .padding(.vertical, 0.5)
-                                    .background(Color.purple.opacity(0.18))
-                                    .foregroundStyle(Color.purple)
-                                    .clipShape(RoundedRectangle(cornerRadius: 2.5))
-                            }
-
-                            if !model.searchQuery.isEmpty, let loc = model.matchLocation(for: record) {
-                                Text("·")
-                                    .font(.system(size: 8))
-                                    .foregroundStyle(Color(nsColor: c.textTertiary))
-                                Text(loc.description)
-                                    .font(.system(size: 8.5, weight: .medium))
-                                    .foregroundStyle(Color.accentColor)
-                                    .lineLimit(1)
-                            }
-
-                            Spacer(minLength: 0)
+                            Text("Semantic")
+                                .font(.system(size: 7.5, weight: .semibold))
+                                .padding(.horizontal, 3.5)
+                                .padding(.vertical, 0.5)
+                                .background(Color.purple.opacity(0.18))
+                                .foregroundStyle(Color.purple)
+                                .clipShape(RoundedRectangle(cornerRadius: 2.5))
                         }
 
-                        HistorySearchEvidence(
-                            query: model.searchQuery,
-                            title: record.title,
-                            branch: record.gitBranch,
-                            repo: record.projectName,
-                            agent: record.agentKind.displayName,
-                            file: model.matchMetadata(for: record, field: "File"),
-                            tool: model.matchMetadata(for: record, field: "Tool"),
-                            snippet: model.matchSnippet(for: record),
-                            isSemantic: model.isSemanticMatch(for: record)
-                        )
-                        .task(id: "\(record.id):\(model.searchQuery)") {
-                            await model.loadEvidence(for: record)
+                        if !model.searchQuery.isEmpty, let loc = model.matchLocation(for: record) {
+                            Text("·")
+                                .font(.system(size: 8))
+                                .foregroundStyle(Color(nsColor: c.textTertiary))
+                            Text(loc.description)
+                                .font(.system(size: 8.5, weight: .medium))
+                                .foregroundStyle(Color.accentColor)
+                                .lineLimit(1)
                         }
+
+                        Spacer(minLength: 0)
+                    }
+
+                    HistorySearchEvidence(
+                        query: model.searchQuery,
+                        title: record.title,
+                        branch: record.gitBranch,
+                        repo: model.projectName(for: record.projectPath),
+                        agent: record.agentKind.displayName,
+                        file: model.matchMetadata(for: record, field: "File"),
+                        tool: model.matchMetadata(for: record, field: "Tool"),
+                        snippet: model.matchSnippet(for: record),
+                        isSemantic: model.isSemanticMatch(for: record)
+                    )
+                    .task(id: "\(record.id):\(model.searchQuery)") {
+                        await model.loadEvidence(for: record)
                     }
                 }
                 .contentShape(Rectangle())
@@ -630,49 +557,19 @@ public struct AgentSessionHistoryView: View {
 
             // Selected Row Details & Actions
             if isSelected {
-                if isCrossRepoGroup {
-                    VStack(alignment: .leading, spacing: 6) {
-                        ForEach(siblings) { sib in
-                            let sibIsLive = sib.liveStatus != nil || sib.placement == .cloud || sib.placement == .background || sib.placement == .remoteControl
-                            VStack(alignment: .leading, spacing: 3) {
-                                HStack(spacing: 4) {
-                                    AgentBadgeView(kind: sib.agentKind, iconSize: 9, fontSize: 8, showName: false)
-                                    Text(sib.projectName)
-                                        .font(.system(size: 9.5, weight: .bold))
-                                        .foregroundStyle(Color(nsColor: c.textPrimary))
-                                    Text("·")
-                                        .font(.system(size: 8))
-                                        .foregroundStyle(Color(nsColor: c.textTertiary))
-                                    Text(relativeDate(sib.updatedAt))
-                                        .font(.system(size: 8.5))
-                                        .foregroundStyle(Color(nsColor: c.textTertiary))
-                                    Spacer()
-                                }
-                                HistorySessionDetailsView(record: sib)
-                                HStack(spacing: 0) {
-                                    Spacer()
-                                    splitActionButton(for: sib, isLive: sibIsLive)
-                                }
-                            }
-                            .padding(.vertical, 2)
+                VStack(alignment: .leading, spacing: 4) {
+                    HistorySessionDetailsView(
+                        record: record,
+                        projectRoot: model.projectRoot,
+                        recoverTurnProjects: model.recoverTurnProjects
+                    )
 
-                            if sib.id != siblings.last?.id {
-                                Divider().overlay(Color(nsColor: c.border).opacity(0.4))
-                            }
-                        }
+                    HStack(spacing: 0) {
+                        Spacer()
+                        splitActionButton(for: record, isLive: isLive)
                     }
-                    .padding(.top, 4)
-                } else {
-                    VStack(alignment: .leading, spacing: 4) {
-                        HistorySessionDetailsView(record: record)
-
-                        HStack(spacing: 0) {
-                            Spacer()
-                            splitActionButton(for: record, isLive: isLive)
-                        }
-                    }
-                    .padding(.top, 2)
                 }
+                .padding(.top, 2)
             }
         }
         .id(record.id)

@@ -475,6 +475,35 @@ final class AgentHistoryMultiAgentCoverageTests: XCTestCase {
         #endif
     }
 
+    #if canImport(SQLite3)
+    func test_TS_2901_BE_IT_CopilotRefreshReadsUncheckpointedWALTurns() async throws {
+        let root = makeTempDir()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let url = root.appendingPathComponent("session-store.db")
+        createMockCopilotDB(at: url.path)
+        var connection: OpaquePointer?
+        XCTAssertEqual(sqlite3_open(url.path, &connection), SQLITE_OK)
+        let writer = try XCTUnwrap(connection)
+        defer { sqlite3_close(writer) }
+        XCTAssertEqual(sqlite3_exec(writer, "PRAGMA journal_mode=WAL; PRAGMA wal_autocheckpoint=0;", nil, nil, nil), SQLITE_OK)
+        // A WAL-mode DB without its sidecars cannot be opened read-only by system SQLite.
+        XCTAssertEqual(sqlite3_exec(writer, "UPDATE turns SET user_message = user_message;", nil, nil, nil), SQLITE_OK)
+        let index = AgentHistoryFTSIndex(dbPath: ":memory:")
+        let scanner = AgentHistoryScanner(ftsIndex: index)
+        let before = await scanner.scanCopilot(dbURL: url)
+        XCTAssertEqual(before.first(where: { $0.id == "cop-cli" })?.latestTurns.last?.content, "Hello from copilot")
+        let database = try Data(contentsOf: url)
+
+        let append = "INSERT INTO turns (session_id, turn_index, user_message) VALUES ('cop-cli', 2, 'WAL-only turn');"
+        XCTAssertEqual(sqlite3_exec(writer, append, nil, nil, nil), SQLITE_OK)
+        XCTAssertEqual(try Data(contentsOf: url), database, "The new turn must exist only in the WAL")
+
+        let after = await scanner.scanCopilot(dbURL: url)
+        XCTAssertEqual(after.first(where: { $0.id == "cop-cli" })?.latestTurns.last?.content, "WAL-only turn")
+        XCTAssertNotNil(index.search(query: "WAL-only turn")["cop-cli"])
+    }
+    #endif
+
     // MARK: - [TS-P55-012] FTS Search Indexing Surface Tags
 
     func testFTSSearchMatchesSurfaceTags() throws {

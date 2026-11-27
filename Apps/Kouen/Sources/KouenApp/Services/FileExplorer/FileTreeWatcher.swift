@@ -130,7 +130,12 @@ public actor FileTreeWatcher {
     /// Start watching `rootPath` for filesystem changes recursively using FSEvents.
     /// Fires `onChange` on the **main actor** after events are received.
     public func startWatching(rootPath: String, onChange: @MainActor @escaping () -> Void) {
+        startWatching(rootPaths: [rootPath], onChange: onChange)
+    }
+
+    func startWatching(rootPaths: [String], onChange: @MainActor @escaping () -> Void) {
         stopWatching()
+        guard !rootPaths.isEmpty else { return }
 
         let contextWrapper = WatcherContext(onChange: onChange)
         let contextPointer = UnsafeMutableRawPointer(Unmanaged.passRetained(contextWrapper).toOpaque())
@@ -157,7 +162,7 @@ public actor FileTreeWatcher {
             }
         }
 
-        let paths = [rootPath] as CFArray
+        let paths = rootPaths as CFArray
         guard let stream = FSEventStreamCreate(
             nil,
             callback,

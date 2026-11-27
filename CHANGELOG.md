@@ -5,6 +5,18 @@ All notable changes to Kouen are documented here. The format is based on
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Each released version
 has a matching `vX.Y.Z` tag and a signed, notarized DMG on
 [GitHub Releases](https://github.com/Vit129/kouen-terminal/releases).
+## [4.24.3] - 2026-11-27
+
+### Documentation
+- Allow headless packages in the CLI thin-client rule ([`2d8d199`](https://github.com/Vit129/kouen-terminal/commit/2d8d19921da85e344810671dd9830811cadd66dc))
+- Move older changelog entries to archive ([#165](https://github.com/Vit129/kouen-terminal/pull/165)) ([`3323bda`](https://github.com/Vit129/kouen-terminal/commit/3323bda87b7150cb841c69969cf1cb3314ab6a6f))
+
+### Fixed
+- Regenerate release notes for v4.24.2 ([`3a2141d`](https://github.com/Vit129/kouen-terminal/commit/3a2141df41303ff75ff3b91a55836f655d9211df))
+- Restore Kouen subprocess and daemon checks ([`380acd7`](https://github.com/Vit129/kouen-terminal/commit/380acd7f81bf11b5f5eb10f17d1173daa07bfe72))
+- Guard FileManager.trashItem to Darwin ([`df75a23`](https://github.com/Vit129/kouen-terminal/commit/df75a23059d0dab9ae14cdeb68d29bcf475a23bc))
+
+
 ## [4.24.2] - 2026-11-22
 
 ### Changed

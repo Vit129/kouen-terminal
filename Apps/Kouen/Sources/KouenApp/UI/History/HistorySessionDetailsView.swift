@@ -3,6 +3,9 @@ import SwiftUI
 
 struct HistorySessionDetailsView: View {
     let record: AgentSessionRecord
+    let projectRoot: (String) -> String
+    let recoverTurnProjects: (AgentSessionRecord) async -> AgentSessionHistoryModel.RecoveredTurnProjects?
+    @State private var recovered: AgentSessionHistoryModel.RecoveredTurnProjects?
 
     private var hasAvailableWorktree: Bool {
         var isDirectory: ObjCBool = false
@@ -18,6 +21,14 @@ struct HistorySessionDetailsView: View {
 
     var body: some View {
         let c = KouenDesign.chrome
+        let turns = recovered?.turns ?? record.latestTurns
+        let sessionRoot = projectRoot(record.projectPath)
+        let roots = turns.map { turn in
+            let path = turn.projectPath ?? record.projectPath
+            return recovered?.roots[path] ?? projectRoot(path)
+        }
+        let showProjects = roots.contains { $0 != sessionRoot }
+        let latestTurns = showProjects ? turns : Array(turns.suffix(4))
         VStack(alignment: .leading, spacing: 7) {
             detailSection(title: "First Prompt") {
                 if let cleanPrompt {
@@ -32,12 +43,19 @@ struct HistorySessionDetailsView: View {
             }
 
             detailSection(title: "Latest Turns") {
-                if record.latestTurns.isEmpty {
+                if latestTurns.isEmpty {
                     unavailableText("No conversation turns were captured")
                 } else {
                     VStack(alignment: .leading, spacing: 5) {
-                        ForEach(Array(record.latestTurns.suffix(4).enumerated()), id: \.offset) { _, turn in
+                        ForEach(Array(latestTurns.enumerated()), id: \.offset) { index, turn in
                             VStack(alignment: .leading, spacing: 2) {
+                                if showProjects && (index == 0 || roots[index] != roots[index - 1]) {
+                                    Text(ProjectGroupResolver.projectGroupDisplayName(forRootPath: roots[index]))
+                                        .font(.system(size: 9.5, weight: .semibold))
+                                        .foregroundStyle(Color(nsColor: c.textPrimary))
+                                        .lineLimit(1)
+                                        .help(roots[index])
+                                }
                                 Text(turn.role == "YOU" ? "You" : "Agent")
                                     .font(.system(size: 8.5, weight: .semibold))
                                     .foregroundStyle(Color(nsColor: c.textTertiary))
@@ -74,6 +92,11 @@ struct HistorySessionDetailsView: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+        .task(id: record) {
+            recovered = nil
+            let projects = await recoverTurnProjects(record)
+            if !Task.isCancelled { recovered = projects }
+        }
     }
 
     @ViewBuilder

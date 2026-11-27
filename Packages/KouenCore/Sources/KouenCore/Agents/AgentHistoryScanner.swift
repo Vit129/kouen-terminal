@@ -8,10 +8,13 @@ import SQLite3
 public struct AgentHistoryTurn: Sendable, Equatable, Codable {
     public let role: String // "YOU" or "AGENT"
     public let content: String
+    /// Working directory recorded by the provider for this part of the conversation.
+    public let projectPath: String?
 
-    public init(role: String, content: String) {
+    public init(role: String, content: String, projectPath: String? = nil) {
         self.role = role
         self.content = content
+        self.projectPath = projectPath
     }
 }
 
@@ -62,9 +65,6 @@ public struct AgentSessionRecord: Identifiable, Sendable, Equatable {
     /// Surface descriptor for multi-surface agents (e.g. `"2.0"`, `"Web"`, `"IDE"`, `"CLI"`,
     /// `"Archived"`, `"ChatGPT"`, `"VS Code"`, `"Insiders"`, `"ADO"`, `"GitHub"`).
     public let surfaceTag: String?
-    /// Sibling sessions across different repositories working on the same task.
-    /// `nil` for single standalone sessions; when non-nil with count > 1, this represents a cross-repo task group.
-    public let crossRepoSiblings: [AgentSessionRecord]?
     /// Topic segments / milestones detected in this session (e.g. `["Happy vs Orca", "P51 Mobile Companion", "P52 History"]`).
     public let topicSegments: [String]?
     /// Token counts, context utilization, and cost metrics if captured from the transcript.
@@ -110,7 +110,6 @@ public struct AgentSessionRecord: Identifiable, Sendable, Equatable {
         liveStatus: String? = nil,
         resumeCommandOverride: String? = nil,
         surfaceTag: String? = nil,
-        crossRepoSiblings: [AgentSessionRecord]? = nil,
         topicSegments: [String]? = nil,
         usage: AgentUsage? = nil
     ) {
@@ -131,7 +130,6 @@ public struct AgentSessionRecord: Identifiable, Sendable, Equatable {
         self.liveStatus = liveStatus
         self.resumeCommandOverride = resumeCommandOverride
         self.surfaceTag = surfaceTag
-        self.crossRepoSiblings = crossRepoSiblings
         self.topicSegments = topicSegments ?? Self.detectTopicSegments(title: title, firstPrompt: firstPrompt, turns: latestTurns)
         self.usage = usage
     }
@@ -263,21 +261,6 @@ public struct AgentSessionRecord: Identifiable, Sendable, Equatable {
             worktreeAvailable: worktreeAvailable, placement: placement, liveStatus: status,
             resumeCommandOverride: AgentSessionRecord.resumeOverride(placement: placement, sessionID: id),
             surfaceTag: surfaceTag,
-            crossRepoSiblings: crossRepoSiblings,
-            topicSegments: topicSegments,
-            usage: usage
-        )
-    }
-
-    /// Returns a copy of this record with cross-repo siblings attached.
-    public func withCrossRepoSiblings(_ siblings: [AgentSessionRecord]) -> AgentSessionRecord {
-        AgentSessionRecord(
-            id: id, agentKind: agentKind, title: title, projectPath: projectPath, projectName: projectName,
-            gitBranch: gitBranch, modelName: modelName, messageCount: messageCount, updatedAt: updatedAt,
-            firstPrompt: firstPrompt, latestTurns: latestTurns, transcriptPath: transcriptPath,
-            worktreeAvailable: worktreeAvailable, placement: placement, liveStatus: liveStatus,
-            resumeCommandOverride: resumeCommandOverride, surfaceTag: surfaceTag,
-            crossRepoSiblings: siblings,
             topicSegments: topicSegments,
             usage: usage
         )
@@ -355,6 +338,21 @@ struct LiveClaudeAgentEntry: Sendable {
 /// Antigravity CLI, and Codex CLI to provide a unified history view.
 public actor AgentHistoryScanner {
     public static let shared = AgentHistoryScanner()
+
+    private static let home = FileManager.default.homeDirectoryForCurrentUser
+    private static let claudeStore = home.appendingPathComponent(".claude/projects")
+    private static let antigravityStore = home.appendingPathComponent(".gemini/antigravity-cli")
+    private static let codexStore = home.appendingPathComponent(".codex")
+    private static let copilotStore = home.appendingPathComponent(".copilot")
+    private static let vscodeStores = [
+        home.appendingPathComponent("Library/Application Support/Code/User/workspaceStorage"),
+        home.appendingPathComponent("Library/Application Support/Code - Insiders/User/workspaceStorage")
+    ]
+
+    /// Observe directories so WAL commits, atomic replacements, and new files trigger scans.
+    package static var sourceDirectories: [String] {
+        ([claudeStore, antigravityStore, codexStore, copilotStore] + vscodeStores).map(\.path)
+    }
 
     /// How many trailing lines/events of a transcript to scan for the "latest turns" preview.
     static let turnScanWindow = 60
@@ -512,7 +510,24 @@ public actor AgentHistoryScanner {
     private let ftsIndex: AgentHistoryFTSIndex
     private let scanOperation: (@Sendable () async -> [AgentSessionRecord])?
     #if canImport(SQLite3)
-    private var copilotCache: (mtime: Date, size: Int, records: [AgentSessionRecord])?
+    private struct CopilotStoreStamp: Equatable {
+        let modifiedAt: Date?
+        let size: Int?
+        let walModifiedAt: Date?
+        let walSize: Int?
+
+        init(_ url: URL) {
+            let keys: Set<URLResourceKey> = [.contentModificationDateKey, .fileSizeKey]
+            let db = try? url.resourceValues(forKeys: keys)
+            let wal = try? URL(fileURLWithPath: url.path + "-wal").resourceValues(forKeys: keys)
+            modifiedAt = db?.contentModificationDate
+            size = db?.fileSize
+            walModifiedAt = wal?.contentModificationDate
+            walSize = wal?.fileSize
+        }
+    }
+
+    private var copilotCache: (stamp: CopilotStoreStamp, records: [AgentSessionRecord])?
     #endif
     public static let didUpdateNotification = Notification.Name("KouenAgentHistoryDidUpdate")
 
@@ -678,8 +693,7 @@ public actor AgentHistoryScanner {
     // MARK: - Claude Code Scanner
 
     public func scanClaude() async -> [AgentSessionRecord] {
-        let home = FileManager.default.homeDirectoryForCurrentUser
-        let claudeProjectsDir = home.appendingPathComponent(".claude/projects")
+        let claudeProjectsDir = Self.claudeStore
         guard FileManager.default.fileExists(atPath: claudeProjectsDir.path) else { return [] }
 
         var records: [AgentSessionRecord] = []
@@ -698,7 +712,8 @@ public actor AgentHistoryScanner {
                 let fileURL = folderURL.appendingPathComponent(file)
                 let path = fileURL.path
 
-                if let rv = try? fileURL.resourceValues(forKeys: [.contentModificationDateKey, .fileSizeKey]),
+                let rv = try? fileURL.resourceValues(forKeys: [.contentModificationDateKey, .fileSizeKey])
+                if let rv,
                    let mtime = rv.contentModificationDate,
                    let size = rv.fileSize,
                    let cached = fileCache[path],
@@ -710,8 +725,8 @@ public actor AgentHistoryScanner {
                 }
 
                 if toIndex.count >= Self.indexBatchSize { ftsIndex.indexSessionsBatch(toIndex); toIndex.removeAll(keepingCapacity: true) }
-                if let record = autoreleasepool(invoking: { parseClaudeTranscript(fileURL: fileURL, toIndex: &toIndex) }) {
-                    if let rv = try? fileURL.resourceValues(forKeys: [.contentModificationDateKey, .fileSizeKey]),
+                if let record = autoreleasepool(invoking: { Self.parseClaudeTranscript(fileURL: fileURL, toIndex: &toIndex) }) {
+                    if let rv,
                        let mtime = rv.contentModificationDate,
                        let size = rv.fileSize {
                         fileCache[path] = FileCacheEntry(mtime: mtime, size: size, record: record)
@@ -734,14 +749,14 @@ public actor AgentHistoryScanner {
 
     func parseClaudeTranscript(fileURL: URL) -> AgentSessionRecord? {
         var dummy: [AgentHistoryFTSIndex.SessionIndexItem] = []
-        let rec = parseClaudeTranscript(fileURL: fileURL, toIndex: &dummy)
+        let rec = Self.parseClaudeTranscript(fileURL: fileURL, toIndex: &dummy)
         if !dummy.isEmpty {
             ftsIndex.indexSessionsBatch(dummy)
         }
         return rec
     }
 
-    private func parseClaudeTranscript(fileURL: URL, toIndex: inout [AgentHistoryFTSIndex.SessionIndexItem]) -> AgentSessionRecord? {
+    private static func parseClaudeTranscript(fileURL: URL, toIndex: inout [AgentHistoryFTSIndex.SessionIndexItem]) -> AgentSessionRecord? {
         let fileURL = URL(fileURLWithPath: fileURL.path)
         guard let lines = AgentHistoryJSONLSequence(url: fileURL, validateJSON: true) else { return nil }
         let dataSize = lines.fileSize
@@ -792,7 +807,9 @@ public actor AgentHistoryScanner {
             if let trimmed = ClaudeTranscriptLine.humanText(ClaudeTranscriptLine.messageText(msg), isUser: role == "user") {
                 let turnRole = (role == "user") ? "YOU" : "AGENT"
                 if turns.count >= Self.maxLatestTurns { turns.removeFirst() }
-                turns.append(AgentHistoryTurn(role: turnRole, content: String(trimmed.prefix(Self.turnContentLimit))))
+                let path = (json["cwd"] as? String) ?? cwd ?? Self.home.path
+                turns.append(AgentHistoryTurn(role: turnRole, content: String(trimmed.prefix(Self.turnContentLimit)),
+                                              projectPath: path))
             }
         }
 
@@ -906,6 +923,28 @@ public actor AgentHistoryScanner {
         )
     }
 
+    /// Earlier cache rows lack per-turn directories. Read only the selected
+    /// transcript for this metadata so startup can keep using the history cache.
+    package static func recoverTurnProjects(for record: AgentSessionRecord) -> [AgentHistoryTurn]? {
+        guard !record.latestTurns.isEmpty,
+              record.latestTurns.contains(where: { $0.projectPath == nil }) else { return nil }
+
+        let file = URL(fileURLWithPath: record.transcriptPath)
+        guard file.pathExtension == "jsonl" else { return nil }
+        var unusedIndexItems: [AgentHistoryFTSIndex.SessionIndexItem] = []
+        let recovered: AgentSessionRecord?
+        switch record.agentKind {
+        case .claudeCode:
+            recovered = parseClaudeTranscript(fileURL: file, toIndex: &unusedIndexItems)
+        case .codex:
+            recovered = parseCodexTranscript(fileURL: file, toIndex: &unusedIndexItems)
+        default:
+            return nil
+        }
+        guard let recovered, recovered.id == record.id else { return nil }
+        return recovered.latestTurns
+    }
+
     // MARK: - Live Claude Agents CLI ("claude agents --json")
 
     /// Resolve `claude`'s path the same way `MobileBridgeServer.cachedClaudePath` and
@@ -978,45 +1017,10 @@ public actor AgentHistoryScanner {
     /// file) needs this directly — everything else consumes the merged `AgentSessionRecord`.
     func scanClaudeAgentsCLI() async -> [LiveClaudeAgentEntry] {
         guard let claudePath = Self.cachedClaudePath else { return [] }
-        return Self.runClaudeAgentsJSON(claudePath: claudePath)
-    }
-
-    private static func runClaudeAgentsJSON(claudePath: String) -> [LiveClaudeAgentEntry] {
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: claudePath)
-        process.arguments = ["agents", "--json"]
-        let outPipe = Pipe()
-        process.standardOutput = outPipe
-        process.standardError = FileHandle.nullDevice
-
-        let timeoutFlag = TimeoutFlag()
-        let timeoutWork = DispatchWorkItem {
-            guard process.isRunning else { return }
-            timeoutFlag.markFired()
-            process.terminate()
-        }
-        DispatchQueue.global().asyncAfter(deadline: .now() + Self.liveListTimeout, execute: timeoutWork)
-
-        do {
-            try process.run()
-            let data = outPipe.fileHandleForReading.readDataToEndOfFile()
-            process.waitUntilExit()
-            timeoutWork.cancel()
-            guard !timeoutFlag.didFire, process.terminationStatus == 0 else { return [] }
-            return parseLiveAgentsJSON(data)
-        } catch {
-            timeoutWork.cancel()
-            return []
-        }
-    }
-
-    /// Boxes the "did our own timeout fire" flag — mirrors `VerificationRunner.TimeoutFlag`
-    /// (same rationale: `DispatchWorkItem.isCancelled` can't answer this on its own).
-    private final class TimeoutFlag: @unchecked Sendable {
-        private let lock = NSLock()
-        private var fired = false
-        func markFired() { lock.lock(); fired = true; lock.unlock() }
-        var didFire: Bool { lock.lock(); defer { lock.unlock() }; return fired }
+        let result = await ProcessRunner.runAsync(executable: claudePath, arguments: ["agents", "--json"],
+                                                  timeout: Self.liveListTimeout)
+        guard result.isSuccess, !result.isTimedOut, !result.stdoutWasTruncated else { return [] }
+        return Self.parseLiveAgentsJSON(Data(result.stdout.utf8))
     }
 
     /// `claude agents --json` prints an array of `{pid?, cwd?, kind, startedAt?, sessionId,
@@ -1429,9 +1433,8 @@ public actor AgentHistoryScanner {
     #endif
 
     public func scanAntigravity() async -> [AgentSessionRecord] {
-        let home = FileManager.default.homeDirectoryForCurrentUser
-        let brainDir = home.appendingPathComponent(".gemini/antigravity-cli/brain")
-        let dbPath = home.appendingPathComponent(".gemini/antigravity-cli/conversation_summaries.db").path
+        let brainDir = Self.antigravityStore.appendingPathComponent("brain")
+        let dbPath = Self.antigravityStore.appendingPathComponent("conversation_summaries.db").path
 
         return scanAntigravity(dbPath: dbPath, brainDir: brainDir)
     }
@@ -1782,8 +1785,7 @@ public actor AgentHistoryScanner {
     /// actual messages — the real conversation lives in `~/.codex/sessions/**/rollout-*.jsonl`
     /// and `~/.codex/archived_sessions/**/rollout-*.jsonl`.
     public func scanCodex() async -> [AgentSessionRecord] {
-        let home = FileManager.default.homeDirectoryForCurrentUser
-        let codexDir = home.appendingPathComponent(".codex")
+        let codexDir = Self.codexStore
         guard FileManager.default.fileExists(atPath: codexDir.path) else { return [] }
 
         return Self.readCodexRollouts(baseDir: codexDir, ftsIndex: ftsIndex, fileCache: &fileCache)
@@ -1821,6 +1823,7 @@ public actor AgentHistoryScanner {
 
         var sessionID: String?
         var cwd: String?
+        var turnCWD: String?
         var gitBranch: String?
         var firstPrompt: String?
         var turns: [AgentHistoryTurn] = []
@@ -1829,11 +1832,9 @@ public actor AgentHistoryScanner {
         func extractText(_ content: Any?) -> String {
             if let str = content as? String { return str.trimmingCharacters(in: .whitespacesAndNewlines) }
             guard let items = content as? [[String: Any]] else { return "" }
-            var out = ""
-            for item in items {
-                if let text = (item["text"] ?? item["input_text"]) as? String { out += text }
-            }
-            return out.trimmingCharacters(in: .whitespacesAndNewlines)
+            return items.compactMap { ($0["text"] ?? $0["input_text"]) as? String }
+                .joined(separator: "\n")
+                .trimmingCharacters(in: .whitespacesAndNewlines)
         }
 
         #if !canImport(CryptoKit)
@@ -1869,9 +1870,14 @@ public actor AgentHistoryScanner {
                 if (payload?["source"] as? [String: Any])?["subagent"] != nil { return nil }
                 if sessionID == nil { sessionID = payload?["session_id"] as? String ?? payload?["id"] as? String }
                 if cwd == nil { cwd = payload?["cwd"] as? String }
+                if gitBranch == nil { gitBranch = (payload?["git"] as? [String: Any])?["branch"] as? String }
                 continue
             }
             if type == "turn_context" {
+                if let path = payload?["cwd"] as? String, !path.isEmpty {
+                    turnCWD = path
+                    if cwd == nil { cwd = path }
+                }
                 continue
             }
 
@@ -1916,7 +1922,8 @@ public actor AgentHistoryScanner {
 
                         let turnRole = (role == "user") ? "YOU" : "AGENT"
                         if turns.count >= maxLatestTurns { turns.removeFirst() }
-                        turns.append(AgentHistoryTurn(role: turnRole, content: String(text.prefix(turnContentLimit))))
+                        turns.append(AgentHistoryTurn(role: turnRole, content: String(text.prefix(turnContentLimit)),
+                                                      projectPath: turnCWD ?? cwd ?? Self.home.path))
                     }
                 }
             }
@@ -2083,12 +2090,7 @@ public actor AgentHistoryScanner {
 
     /// Copilot Chat sessions from VS Code's workspace storage — see `VSCodeChatSession`.
     public func scanVSCodeCopilotChat() async -> [AgentSessionRecord] {
-        let fm = FileManager.default
-        let appSupport = fm.homeDirectoryForCurrentUser.appendingPathComponent("Library/Application Support")
-        let dirs = [
-            appSupport.appendingPathComponent("Code/User/workspaceStorage"),
-            appSupport.appendingPathComponent("Code - Insiders/User/workspaceStorage")
-        ].filter { fm.fileExists(atPath: $0.path) }
+        let dirs = Self.vscodeStores.filter { FileManager.default.fileExists(atPath: $0.path) }
 
         return Self.readVSCodeStorageSessions(storageDirs: dirs, ftsIndex: ftsIndex, fileCache: &fileCache)
     }
@@ -2173,31 +2175,39 @@ public actor AgentHistoryScanner {
     /// three agents. Root path is shared by the CLI and any desktop wrapper on this machine
     /// (no separate desktop transcript store was found), so no CLI/desktop split is needed here.
     public func scanCopilot() async -> [AgentSessionRecord] {
-        let home = FileManager.default.homeDirectoryForCurrentUser
-        let dbURL = home.appendingPathComponent(".copilot/session-store.db")
-        guard FileManager.default.fileExists(atPath: dbURL.path) else { return [] }
+        scanCopilot(dbURL: Self.copilotStore.appendingPathComponent("session-store.db"))
+    }
 
-        guard let rv = try? dbURL.resourceValues(forKeys: [.contentModificationDateKey, .fileSizeKey]),
-              let mtime = rv.contentModificationDate,
-              let size = rv.fileSize else { return [] }
-
-        if let cached = copilotCache, cached.mtime == mtime && cached.size == size {
+    func scanCopilot(dbURL: URL) -> [AgentSessionRecord] {
+        let stamp = CopilotStoreStamp(dbURL)
+        guard stamp.modifiedAt != nil else {
+            copilotCache = nil
+            return []
+        }
+        if let cached = copilotCache, cached.stamp == stamp {
             return cached.records
         }
 
-        let records = Self.readCopilotSessions(dbPath: dbURL.path, ftsIndex: ftsIndex)
-        copilotCache = (mtime: mtime, size: size, records: records)
+        guard let records = Self.loadCopilotSessions(dbPath: dbURL.path, ftsIndex: ftsIndex) else {
+            return copilotCache?.records ?? ftsIndex.loadCachedEntries()
+                .map(\.record)
+                .filter { $0.agentKind == .copilot && $0.transcriptPath == dbURL.path }
+        }
+        copilotCache = (stamp: stamp, records: records)
         return records
     }
 
-    /// Synchronous SQLite read, isolated in its own function (never handed an `OpaquePointer`
-    /// across an `await` boundary) so it stays simple under Swift 6 strict concurrency.
     public static func readCopilotSessions(dbPath: String, ftsIndex: AgentHistoryFTSIndex? = nil) -> [AgentSessionRecord] {
+        loadCopilotSessions(dbPath: dbPath, ftsIndex: ftsIndex) ?? []
+    }
+
+    /// An unreadable vendor store is distinct from a successful read of an empty store.
+    private static func loadCopilotSessions(dbPath: String, ftsIndex: AgentHistoryFTSIndex?) -> [AgentSessionRecord]? {
         var db: OpaquePointer?
+        defer { if let db { sqlite3_close(db) } }
         guard sqlite3_open_v2(dbPath, &db, SQLITE_OPEN_READONLY, nil) == SQLITE_OK, let db else {
-            return []
+            return nil
         }
-        defer { sqlite3_close(db) }
 
         let isoFormatter = ISO8601DateFormatter()
         isoFormatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
@@ -2215,11 +2225,13 @@ public actor AgentHistoryScanner {
         if sqlite3_prepare_v2(db, sessionSQL, -1, &sessionStmt, nil) != SQLITE_OK {
             hasHostType = false
             let fallbackSQL = "SELECT id, cwd, repository, branch, summary, updated_at FROM sessions ORDER BY updated_at DESC"
-            guard sqlite3_prepare_v2(db, fallbackSQL, -1, &sessionStmt, nil) == SQLITE_OK else { return [] }
+            guard sqlite3_prepare_v2(db, fallbackSQL, -1, &sessionStmt, nil) == SQLITE_OK else { return nil }
         }
         defer { sqlite3_finalize(sessionStmt) }
 
-        while sqlite3_step(sessionStmt) == SQLITE_ROW {
+        var status = sqlite3_step(sessionStmt)
+        while status == SQLITE_ROW {
+            defer { status = sqlite3_step(sessionStmt) }
             guard let idCStr = sqlite3_column_text(sessionStmt, 0) else { continue }
             let id = String(cString: idCStr)
             let cwd = sqlite3_column_text(sessionStmt, 1).map { String(cString: $0) }
@@ -2256,6 +2268,7 @@ public actor AgentHistoryScanner {
                 ?? firstPrompt?.components(separatedBy: .newlines).first(where: { !$0.isEmpty })
                 ?? "Copilot Session \(id.prefix(8))"
             let modDate = parseDate(updatedAtStr) ?? Date()
+            let transcriptSize = fullTranscript.utf8.count
 
             ftsIndex?.indexSession(
                 sessionID: id,
@@ -2269,7 +2282,7 @@ public actor AgentHistoryScanner {
                 toolsCalled: "",
                 transcriptPath: dbPath,
                 mtime: modDate,
-                fileSize: 0,
+                fileSize: transcriptSize,
                 surfaceTag: surfaceTag
             )
 
@@ -2289,16 +2302,15 @@ public actor AgentHistoryScanner {
                 worktreeAvailable: FileManager.default.fileExists(atPath: finalPath),
                 surfaceTag: surfaceTag
             )
-            toSave.append(CachedSessionEntry(record: record, mtime: modDate, fileSize: 0))
+            toSave.append(CachedSessionEntry(record: record, mtime: modDate, fileSize: transcriptSize))
             records.append(record)
         }
+        guard status == SQLITE_DONE else { return nil }
         if !toSave.isEmpty {
             ftsIndex?.saveRecordsBatch(toSave)
         }
         return records
     }
-
-    private static var home: URL { FileManager.default.homeDirectoryForCurrentUser }
 
     /// Returns (firstPrompt, latestTurns, fullTranscript, messageCount) for one session's `turns` rows.
     private static func readCopilotTurns(db: OpaquePointer, sessionID: String) -> (String?, [AgentHistoryTurn], String, Int) {

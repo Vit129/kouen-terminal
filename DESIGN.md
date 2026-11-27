@@ -46,13 +46,14 @@ Source: `KouenDesign.swift`
 
 - Open session history in the sidebar’s History tab. View → Show Session History (⌃⌘H) expands the sidebar and selects that tab.
 
-- Workspace history shows the active tab's repository first under Current Project, followed by the date-grouped history of other open repositories. Search results retain relevance order.
+- Visible History refreshes from provider file changes, with a periodic refresh for external status. The selected session stays open as records move.
+- Workspace groups sessions by repository and shows the active tab's project first. All groups every project by most recent activity. Linked worktrees share their Git project, and each project's sessions appear newest first. Project groups sessions by date. Search results retain relevance order.
 
 - Keep history rows compact: one session title, a single metadata line, and search evidence only while searching. Show token usage and transcript content in selected-session details.
 - Keep repository scope and agent filters visible at narrow sidebar widths; agent shortcuts scroll horizontally while the trailing More menu remains fixed. The More menu holds other providers and shortcut management.
 - Shortcut management numbers the selected agents and lets users drag the handle to reorder them; selection changes append and removal closes the gaps.
 - Search counts distinguish matching sessions from searchable sessions under the active scope and agent filters. Empty results offer clear/reset actions.
-- Selected details label the first prompt and latest turns, identify speaker roles, and show worktree availability before resume actions.
+- Selected details label the first prompt and latest turns in conversation order, identify speakers and provider-reported project switches, and show worktree availability before resume actions.
 
 ### Review Changes
 

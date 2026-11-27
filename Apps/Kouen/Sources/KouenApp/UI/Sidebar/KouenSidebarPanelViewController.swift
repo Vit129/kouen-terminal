@@ -662,6 +662,9 @@ final class KouenSidebarPanelViewController: NSViewController {
             },
             onGoToTab: { [weak self] record in
                 self?.goToTabForAgentSession(record)
+            },
+            isVisible: { [weak self] in
+                self?.sidebarSectionModel.selectedTab == 3 && self?.sidebarListModel.isSidebarVisible == true
             }
         )
     }
@@ -1070,7 +1073,6 @@ final class KouenSidebarPanelViewController: NSViewController {
         case 3:
             sidebarSectionModel.text = "SESSION HISTORY"
             sidebarSectionModel.isRepoHeader = false
-            sessionHistoryModel.refresh(force: false)
         // case 4:
         //     sidebarSectionModel.text = "ISSUES"
         //     sidebarSectionModel.isRepoHeader = false

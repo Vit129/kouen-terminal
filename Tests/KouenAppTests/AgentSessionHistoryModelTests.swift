@@ -1,3 +1,4 @@
+import Combine
 import Foundation
 @testable import KouenApp
 import KouenCore
@@ -93,6 +94,125 @@ final class AgentSessionHistoryModelTests: XCTestCase {
         XCTAssertEqual(model.displayRecords.map(\.id), ["match", "active"])
     }
 
+    func testTC6904_FE_BL_AllHistoryGroupsCanonicalProjectsAndSortsByActivity() {
+        let now = Date()
+        let model = AgentSessionHistoryModel(repoRootResolver: { path in
+            switch path {
+            case "/worktree/kouen/fix": return "/repo/kouen"
+            case "/repo/kouen/.kouen-worktrees/pruned": return nil
+            default: return path
+            }
+        }, activeCWDProvider: { "/repo/kouen" })
+        model.selectedScope = .all
+        model.records = [
+            makeRecord(id: "old", title: "Old Kouen session", projectPath: "/repo/kouen", projectName: "kouen",
+                       updatedAt: now.addingTimeInterval(-300)),
+            makeRecord(id: "plugin", title: "Plugin session", projectPath: "/repo/plugin", projectName: "plugin",
+                       gitBranch: "fix/shared-name", updatedAt: now.addingTimeInterval(-60)),
+            makeRecord(id: "kouen", title: "Kouen session", projectPath: "/worktree/kouen/fix", projectName: "fix",
+                       gitBranch: "fix/shared-name", updatedAt: now),
+            makeRecord(id: "pruned", title: "Deleted worktree", projectPath: "/repo/kouen/.kouen-worktrees/pruned",
+                       updatedAt: now.addingTimeInterval(-600))
+        ]
+
+        model.applyFilterNow()
+
+        XCTAssertEqual(model.groupedRecords.map(\.title), ["kouen", "plugin"])
+        XCTAssertEqual(model.groupedRecords.map { $0.records.map(\.id) }, [["kouen", "old", "pruned"], ["plugin"]])
+        XCTAssertEqual(model.windowedRecords.map(\.id), ["kouen", "old", "pruned", "plugin"])
+    }
+
+    func testTC6905_FE_BL_ProjectHistoryExcludesNestedRepositories() {
+        let model = AgentSessionHistoryModel(repoRootResolver: { path in
+            path == "/repo/kouen/Sources" ? "/repo/kouen" : path
+        }, activeCWDProvider: { "/repo/kouen" })
+        model.records = [
+            makeRecord(id: "kouen", title: "Kouen", projectPath: "/repo/kouen/Sources"),
+            makeRecord(id: "plugin", title: "Plugin", projectPath: "/repo/kouen/embedded/plugin")
+        ]
+
+        model.applyFilterNow()
+
+        XCTAssertEqual(model.displayRecords.map(\.id), ["kouen"])
+    }
+
+    func testTC6906_FE_BL_RefreshKeepsSelectedSessionWhenRowsMove() {
+        let now = Date()
+        let model = AgentSessionHistoryModel(repoRootResolver: { $0 })
+        model.selectedScope = .all
+        let previous = makeRecord(id: "selected", title: "Selected", updatedAt: now)
+        model.records = [previous]
+        model.applyFilterNow()
+
+        model.records = [
+            makeRecord(id: "new", title: "New session", updatedAt: now.addingTimeInterval(1)),
+            previous
+        ]
+        model.applyFilterNow()
+
+        XCTAssertEqual(model.displayRecords.map(\.id), ["new", "selected"])
+        XCTAssertEqual(model.selectedRecordID, "selected")
+        XCTAssertEqual(model.selectedIndex, 1)
+    }
+
+    func testTC6907_FE_IT_TranscriptEventsRefreshNewSessionsAndAppendedTurns() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let first = root.appendingPathComponent("rollout-first.jsonl")
+        let second = root.appendingPathComponent("rollout-second.jsonl")
+        let scanner = AgentHistoryScanner(ftsIndex: AgentHistoryFTSIndex(dbPath: ":memory:"), scanOperation: {
+            AgentHistoryScanner.readCodexRollouts(baseDir: root)
+        })
+        let model = AgentSessionHistoryModel(repoRootResolver: { $0 })
+        model.selectedScope = .all
+
+        let discovered = expectation(description: "New session discovered")
+        let appended = expectation(description: "Appended turn from the selected session")
+        let subscription = model.$records.sink { records in
+            if records.count == 1 { discovered.fulfill() }
+            if records.count == 2, records.first(where: { $0.id == "first" })?.latestTurns.last?.content == "Latest answer" {
+                appended.fulfill()
+            }
+        }
+        defer { subscription.cancel() }
+        let (updates, continuation) = AsyncStream<Void>.makeStream(bufferingPolicy: .bufferingNewest(1))
+        let watcher = FileTreeWatcher()
+        await watcher.startWatching(rootPaths: [root.path]) { continuation.yield() }
+        let observing = Task { await model.followHistoryUpdates(updates, scanner: scanner) }
+
+        func writeSession(_ id: String, to url: URL) throws {
+            let header = """
+            {"type":"session_meta","payload":{"id":"\(id)","cwd":"/repos/\(id)"}}
+            {"type":"message","role":"user","content":"Initial prompt"}
+
+            """
+            try header.write(to: url, atomically: true, encoding: .utf8)
+        }
+        do {
+            try writeSession("first", to: first)
+            await fulfillment(of: [discovered], timeout: 5)
+
+            try writeSession("second", to: second)
+            let handle = try FileHandle(forWritingTo: first)
+            defer { try? handle.close() }
+            try handle.seekToEnd()
+            let response = #"{"type":"message","role":"assistant","content":"Latest answer"}"# + "\n"
+            try handle.write(contentsOf: Data(response.utf8))
+            await fulfillment(of: [appended], timeout: 5)
+        } catch {
+            observing.cancel()
+            await watcher.stopWatching()
+            throw error
+        }
+        observing.cancel()
+        await observing.value
+        await watcher.stopWatching()
+
+        XCTAssertEqual(model.records.first(where: { $0.id == "first" })?.latestTurns.map(\.content),
+                       ["Initial prompt", "Latest answer"])
+    }
+
     func testDateGrouping() {
         let calendar = Calendar.current
         let now = Date()
@@ -159,7 +279,6 @@ final class AgentSessionHistoryModelTests: XCTestCase {
         model.searchQuery = "refactor/logic-structure"
         model.applyFilterNow()
         XCTAssertEqual(Set(model.windowedRecords.map(\.id)), Set(["search-a", "search-b"]))
-        XCTAssertTrue(model.windowedRecords.allSatisfy { $0.crossRepoSiblings == nil })
     }
 
     func testEmptyQueryGroupsByDate() {
@@ -170,9 +289,9 @@ final class AgentSessionHistoryModelTests: XCTestCase {
         let r1 = makeRecord(id: "r1", title: "Task 1", updatedAt: now)
         let r2 = makeRecord(id: "r2", title: "Task 2", updatedAt: yesterday)
 
-        let model = AgentSessionHistoryModel()
+        let model = AgentSessionHistoryModel(repoRootResolver: { $0 }, activeCWDProvider: { "/Users/test/my-repo" })
         model.records = [r1, r2]
-        model.selectedScope = .all
+        model.selectedScope = .repo
         model.searchQuery = ""
         model.applyFilterNow()
 
@@ -422,98 +541,6 @@ final class AgentSessionHistoryModelTests: XCTestCase {
         normalized.toggleAgentShortcut(.aider)
         normalized.toggleAgentShortcut(.grok)
         XCTAssertEqual(normalized.agentShortcutKinds, [.gemini, .goose, .pi, .hermes, .grok])
-    }
-
-    func testCrossRepoTaskGrouping() {
-        let now = Date()
-        let older = now.addingTimeInterval(-3600)
-
-        let r1 = makeRecord(
-            id: "r1",
-            title: "Blueprint compliance in repo A",
-            projectPath: "/repo/one",
-            projectName: "one",
-            gitBranch: "chore/blueprint-compliance",
-            updatedAt: older
-        )
-        let r2 = makeRecord(
-            id: "r2",
-            title: "Blueprint compliance in repo B",
-            projectPath: "/repo/two",
-            projectName: "two",
-            gitBranch: "chore/blueprint-compliance",
-            updatedAt: now
-        )
-
-        let grouped = AgentSessionHistoryModel.groupCrossRepoTasks([r2, r1])
-        XCTAssertEqual(grouped.count, 1)
-
-        let composite = grouped[0]
-        XCTAssertEqual(composite.id, "r2", "Most recent session must be the primary record")
-        XCTAssertEqual(composite.crossRepoSiblings?.count, 2)
-        XCTAssertEqual(composite.crossRepoSiblings?.map(\.projectName), ["two", "one"])
-    }
-
-    func testCrossRepoTaskGroupingIgnoresMainAndMaster() {
-        let r1 = makeRecord(id: "r1", title: "Main 1", projectPath: "/repo/one", projectName: "one", gitBranch: "main")
-        let r2 = makeRecord(id: "r2", title: "Main 2", projectPath: "/repo/two", projectName: "two", gitBranch: "main")
-        let r3 = makeRecord(id: "r3", title: "Master 1", projectPath: "/repo/one", projectName: "one", gitBranch: "master")
-        let r4 = makeRecord(id: "r4", title: "Master 2", projectPath: "/repo/two", projectName: "two", gitBranch: "master")
-
-        let grouped = AgentSessionHistoryModel.groupCrossRepoTasks([r1, r2, r3, r4])
-        XCTAssertEqual(grouped.count, 4)
-        for item in grouped {
-            XCTAssertNil(item.crossRepoSiblings, "main and master branches must never be grouped")
-        }
-    }
-
-    func testCrossRepoTaskGroupingSingleRepoNotGrouped() {
-        let r1 = makeRecord(id: "r1", title: "Task 1", projectPath: "/repo/one", projectName: "one", gitBranch: "feat/single-repo")
-        let r2 = makeRecord(id: "r2", title: "Task 2", projectPath: "/repo/one", projectName: "one", gitBranch: "feat/single-repo")
-
-        let grouped = AgentSessionHistoryModel.groupCrossRepoTasks([r1, r2])
-        XCTAssertEqual(grouped.count, 2)
-        XCTAssertNil(grouped[0].crossRepoSiblings)
-        XCTAssertNil(grouped[1].crossRepoSiblings)
-    }
-
-    func testCrossRepoTaskGroupingDeduplicatesSameRepo() {
-        let now = Date()
-        let mid = now.addingTimeInterval(-1800)
-        let old = now.addingTimeInterval(-3600)
-
-        // Two sessions in repo "one" and one session in repo "two"
-        let r1 = makeRecord(id: "r1", title: "New in one", projectPath: "/repo/one", projectName: "one", gitBranch: "feat/sync", updatedAt: now)
-        let r2 = makeRecord(id: "r2", title: "Old in one", projectPath: "/repo/one", projectName: "one", gitBranch: "feat/sync", updatedAt: old)
-        let r3 = makeRecord(id: "r3", title: "Mid in two", projectPath: "/repo/two", projectName: "two", gitBranch: "feat/sync", updatedAt: mid)
-
-        let grouped = AgentSessionHistoryModel.groupCrossRepoTasks([r1, r2, r3])
-        XCTAssertEqual(grouped.count, 2, "Older same-repo session must stay visible as its own row")
-
-        let composite = grouped[0]
-        XCTAssertEqual(composite.id, "r1")
-        XCTAssertEqual(composite.crossRepoSiblings?.count, 2, "Only latest session per distinct repo is kept in crossRepoSiblings")
-        XCTAssertEqual(composite.crossRepoSiblings?.map(\.id), ["r1", "r3"])
-        XCTAssertEqual(grouped[1].id, "r2")
-        XCTAssertNil(grouped[1].crossRepoSiblings)
-    }
-
-    func testCrossRepoTaskGroupingWindowedIntegration() {
-        let r1 = makeRecord(id: "r1", title: "Fix A", projectPath: "/repo/one", projectName: "one", gitBranch: "fix/cross-fix")
-        let r2 = makeRecord(id: "r2", title: "Fix B", projectPath: "/repo/two", projectName: "two", gitBranch: "fix/cross-fix")
-        let r3 = makeRecord(id: "r3", title: "Other", projectPath: "/repo/three", projectName: "three", gitBranch: "feat/other")
-
-        let model = AgentSessionHistoryModel()
-        model.records = [r1, r2, r3]
-        model.selectedScope = .all
-        model.applyFilterNow()
-
-        // r1 & r2 grouped into 1 item; r3 is standalone -> 2 total windowed records
-        XCTAssertEqual(model.windowedRecords.count, 2)
-        XCTAssertEqual(model.displayRecords.count, 2)
-        let groupedItem = model.windowedRecords.first { $0.gitBranch == "fix/cross-fix" }
-        XCTAssertNotNil(groupedItem)
-        XCTAssertEqual(groupedItem?.crossRepoSiblings?.count, 2)
     }
 
     // MARK: - Phase 3 Advanced Capabilities Tests

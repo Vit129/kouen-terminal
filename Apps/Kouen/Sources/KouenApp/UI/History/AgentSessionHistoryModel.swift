@@ -8,36 +8,6 @@ import SwiftUI
 
 private let historySignposter = OSSignposter(subsystem: "com.vit129.kouen", category: "history")
 
-final class RepoRootCache: @unchecked Sendable {
-    static let shared = RepoRootCache()
-    private let lock = NSLock()
-    private var cache: [String: (root: String, cachedAt: Date)] = [:]
-    private static let ttl: TimeInterval = 60.0
-
-    func get(_ path: String) -> String? {
-        lock.lock()
-        defer { lock.unlock() }
-        guard let entry = cache[path] else { return nil }
-        if Date().timeIntervalSince(entry.cachedAt) < Self.ttl {
-            return entry.root
-        }
-        cache.removeValue(forKey: path)
-        return nil
-    }
-
-    func set(_ root: String, for path: String) {
-        lock.lock()
-        defer { lock.unlock() }
-        cache[path] = (root, Date())
-    }
-
-    func clear() {
-        lock.lock()
-        defer { lock.unlock() }
-        cache.removeAll()
-    }
-}
-
 public enum HistoryScope: String, CaseIterable, Identifiable, Sendable {
     case workspace = "Workspace"
     case repo = "Project"
@@ -84,6 +54,13 @@ public enum AgentHistoryDateGroup: String, CaseIterable, Comparable {
 
 @MainActor
 public final class AgentSessionHistoryModel: ObservableObject {
+    public struct Section: Identifiable {
+        public let id: String
+        public let title: String
+        public let records: [AgentSessionRecord]
+        let projectRoot: String?
+    }
+
     static let agentShortcutKindsDefaultsKey = "Kouen.AgentSessionHistory.shortcutAgentKinds"
     static let defaultAgentShortcutKinds: [AgentKind] = [.claudeCode, .codex, .antigravity, .copilot]
 
@@ -136,8 +113,7 @@ public final class AgentSessionHistoryModel: ObservableObject {
         }
     }
 
-    private var cachedWindowedRecords: [AgentSessionRecord] = []
-    private var cachedGroupedRecords: [(title: String, records: [AgentSessionRecord])] = []
+    private var cachedGroupedRecords: [Section] = []
     private var cachedDisplayRecords: [AgentSessionRecord] = []
 
     /// Snippets extracted during search scoring, keyed by session id.
@@ -162,7 +138,6 @@ public final class AgentSessionHistoryModel: ObservableObject {
     private var repoRootCache: [String: String] = [:]
 
     private var filterTask: Task<Void, Never>?
-    private var updateCancellable: AnyCancellable?
     private var snapshotCancellable: AnyCancellable?
     private var lastFilterContextSignature = ""
 
@@ -216,31 +191,20 @@ public final class AgentSessionHistoryModel: ObservableObject {
                     }
                 }
             }
-
-        self.updateCancellable = NotificationCenter.default
-            .publisher(for: AgentHistoryScanner.didUpdateNotification)
-            .receive(on: DispatchQueue.main)
-            .sink { [weak self] _ in
-                Task { @MainActor [weak self] in
-                    guard let self else { return }
-                    let updated = await AgentHistoryScanner.shared.getOrScan(force: false)
-                    self.records = updated
-                    self.isLoading = false
-                }
-            }
     }
 
     public func refresh(force: Bool = true) {
-        if force {
-            RepoRootCache.shared.clear()
-        }
         isLoading = true
         Task { [weak self] in
             let scanned = await AgentHistoryScanner.shared.getOrScan(force: force)
-            await MainActor.run {
-                self?.records = scanned
-                self?.isLoading = false
+            guard let self else { return }
+            if force { self.repoRootCache.removeAll() }
+            if self.records != scanned {
+                self.records = scanned
+            } else if force {
+                self.scheduleFilter(debounceMs: 0)
             }
+            self.isLoading = false
         }
     }
 
@@ -252,11 +216,11 @@ public final class AgentSessionHistoryModel: ObservableObject {
         }
     }
 
-    public func toggleSectionCollapse(title: String) {
-        if collapsedSections.contains(title) {
-            collapsedSections.remove(title)
+    public func toggleSectionCollapse(id: String) {
+        if collapsedSections.contains(id) {
+            collapsedSections.remove(id)
         } else {
-            collapsedSections.insert(title)
+            collapsedSections.insert(id)
         }
     }
 
@@ -334,126 +298,105 @@ public final class AgentSessionHistoryModel: ObservableObject {
         selectedIndex = max(0, min(total - 1, next))
     }
 
-    /// Groups sessions across different repositories working on the same task into a single composite entry.
-    public static func groupCrossRepoTasks(_ records: [AgentSessionRecord]) -> [AgentSessionRecord] {
-        guard records.count > 1 else { return records }
-
-        // Find candidate branches that are not main/master and occur across multiple projects
-        var branchMap: [String: [AgentSessionRecord]] = [:]
-        for record in records {
-            guard let branch = record.gitBranch,
-                  !branch.isEmpty,
-                  branch != "main",
-                  branch != "master" else { continue }
-            branchMap[branch, default: []].append(record)
-        }
-
-        // Keep only branches where distinct project names > 1, picking the latest session per repo
-        var validGroups: [String: [AgentSessionRecord]] = [:]
-        for (branch, sessions) in branchMap {
-            let sorted = sessions.sorted { $0.updatedAt > $1.updatedAt }
-            var seenProjects = Set<String>()
-            var perRepoSessions: [AgentSessionRecord] = []
-            for s in sorted {
-                if !seenProjects.contains(s.projectName) {
-                    seenProjects.insert(s.projectName)
-                    perRepoSessions.append(s)
-                }
-            }
-            if perRepoSessions.count > 1 {
-                validGroups[branch] = perRepoSessions
-            }
-        }
-
-        guard !validGroups.isEmpty else { return records }
-
-        // Only the per-repo latest sessions fold into the composite row; older sessions on the
-        // same branch stay as their own rows (grouping suggests, it never hides history).
-        let foldedIDs = Set(validGroups.values.flatMap { $0.map(\.id) })
-        var seenGroupBranches = Set<String>()
-        var result: [AgentSessionRecord] = []
-
-        for record in records {
-            if let branch = record.gitBranch, let siblings = validGroups[branch], foldedIDs.contains(record.id) {
-                if seenGroupBranches.contains(branch) {
-                    continue
-                }
-                seenGroupBranches.insert(branch)
-                let primary = siblings.first ?? record
-                result.append(primary.withCrossRepoSiblings(siblings))
-            } else {
-                result.append(record)
-            }
-        }
-
-        return result
-    }
-
     private func recomputeDerivedLists() {
         let rawWindowed: [AgentSessionRecord]
         if !searchQuery.isEmpty {
             rawWindowed = filteredRecords
         } else {
-            let list = filteredRecords
-            let withinMinimumWindow = list.prefix(while: { $0.updatedAt >= minimumWindowStart }).count
-            let visibleCount = max(withinMinimumWindow, extraRecordsShown)
-            rawWindowed = Array(list.prefix(visibleCount))
+            let withinMinimumWindow = filteredRecords.prefix(while: { $0.updatedAt >= minimumWindowStart }).count
+            rawWindowed = Array(filteredRecords.prefix(max(withinMinimumWindow, extraRecordsShown)))
         }
 
-        var currentProjectRecords: [AgentSessionRecord] = []
-        var remainingRecords = rawWindowed
-        if searchQuery.isEmpty, selectedScope == .workspace,
-           let activeRoot = repoRootCache[activeCWDProvider()] {
-            remainingRecords.removeAll { record in
-                guard repoRootCache[record.projectPath] == activeRoot else { return false }
-                currentProjectRecords.append(record)
-                return true
-            }
-        }
-
-        // Search results must remain individual: grouping can hide the actual matching session.
-        let windowed = searchQuery.isEmpty ? Self.groupCrossRepoTasks(remainingRecords) : remainingRecords
-        cachedWindowedRecords = currentProjectRecords + windowed
-
-        let grouped: [(title: String, records: [AgentSessionRecord])]
         if !searchQuery.isEmpty {
-            if windowed.isEmpty {
-                grouped = []
-            } else {
-                grouped = [(title: "Best matches", records: windowed)]
+            cachedGroupedRecords = rawWindowed.isEmpty ? [] : [
+                Section(id: "search", title: "Best matches", records: rawWindowed, projectRoot: nil)
+            ]
+        } else if selectedScope == .repo {
+            let byDate = Dictionary(grouping: rawWindowed) { AgentHistoryDateGroup.group(for: $0.updatedAt) }
+            cachedGroupedRecords = AgentHistoryDateGroup.allCases.compactMap { group in
+                byDate[group].map { Section(id: group.rawValue, title: group.rawValue, records: $0, projectRoot: nil) }
             }
         } else {
-            var buckets: [AgentHistoryDateGroup: [AgentSessionRecord]] = [:]
-            for record in windowed {
-                let grp = AgentHistoryDateGroup.group(for: record.updatedAt)
-                buckets[grp, default: []].append(record)
-            }
-            var result: [(title: String, records: [AgentSessionRecord])] = []
-            if !currentProjectRecords.isEmpty {
-                result.append((title: "Current Project", records: currentProjectRecords))
-            }
-            for grp in AgentHistoryDateGroup.allCases {
-                if let items = buckets[grp], !items.isEmpty {
-                    result.append((title: grp.rawValue, records: items))
-                }
-            }
-            grouped = result
+            cachedGroupedRecords = projectSections(for: rawWindowed)
         }
-        cachedGroupedRecords = grouped
-        cachedDisplayRecords = grouped.flatMap(\.records)
 
-        if selectedIndex >= cachedDisplayRecords.count {
-            selectedIndex = max(0, cachedDisplayRecords.count - 1)
+        let previousID = selectedRecordID
+        cachedDisplayRecords = cachedGroupedRecords.flatMap(\.records)
+        let restoredIndex = cachedDisplayRecords.firstIndex { $0.id == previousID }
+        let index = restoredIndex ?? min(selectedIndex, max(0, cachedDisplayRecords.count - 1))
+        if selectedIndex != index {
+            selectedIndex = index
+        } else {
+            updateSelectedRecordID()
         }
-        updateSelectedRecordID()
+    }
+
+    private func projectSections(for records: [AgentSessionRecord]) -> [Section] {
+        var orderedRoots: [String] = []
+        var byProject: [String: [AgentSessionRecord]] = [:]
+        for record in records {
+            let root = projectRoot(for: record.projectPath)
+            if byProject[root] == nil { orderedRoots.append(root) }
+            byProject[root, default: []].append(record)
+        }
+
+        let activeRoot = selectedScope == .workspace ? repoRootCache[activeCWDProvider()] : nil
+        if let activeRoot, let index = orderedRoots.firstIndex(of: activeRoot) {
+            orderedRoots.remove(at: index)
+            orderedRoots.insert(activeRoot, at: 0)
+        }
+
+        let nameCounts = Dictionary(grouping: orderedRoots, by: projectName(for:)).mapValues(\.count)
+        return orderedRoots.compactMap { root in
+            guard let records = byProject[root] else { return nil }
+            let name = projectName(for: root)
+            let label = nameCounts[name, default: 0] > 1
+                ? "\(name) · \((root as NSString).deletingLastPathComponent)"
+                : name
+            let title = root == activeRoot ? "Current Project · \(label)" : label
+            return Section(id: "project:\(root)", title: title, records: records, projectRoot: root)
+        }
+    }
+
+    func projectRoot(for path: String) -> String {
+        repoRootCache[path] ?? path
+    }
+
+    func projectName(for path: String) -> String {
+        let root = projectRoot(for: path)
+        let name = (root as NSString).lastPathComponent
+        return name.isEmpty ? "Unknown Project" : name
+    }
+
+    struct RecoveredTurnProjects: Sendable {
+        let turns: [AgentHistoryTurn]
+        let roots: [String: String]
+    }
+
+    func recoverTurnProjects(for record: AgentSessionRecord) async -> RecoveredTurnProjects? {
+        let resolver = repoRootResolver
+        let initialCache = repoRootCache
+        return await Task.detached(priority: .utility) {
+            guard let turns = AgentHistoryScanner.recoverTurnProjects(for: record) else { return nil }
+            var roots: [String: String] = [:]
+            for path in turns.compactMap(\.projectPath) where roots[path] == nil {
+                roots[path] = initialCache[path] ?? Self.resolveProjectRoot(path, resolver: resolver)
+            }
+            return RecoveredTurnProjects(turns: turns, roots: roots)
+        }.value
+    }
+
+    private nonisolated static func resolveProjectRoot(_ path: String, resolver: (String) -> String?) -> String {
+        if let root = resolver(path) { return root }
+        if path.contains("/\(WorktreeManager.worktreeDir)/") {
+            return ProjectGroupResolver.projectGroupRootPath(for: path)
+        }
+        return path
     }
 
     private func updateSelectedRecordID() {
-        if selectedIndex >= 0 && selectedIndex < cachedDisplayRecords.count {
-            selectedRecordID = cachedDisplayRecords[selectedIndex].id
-        } else {
-            selectedRecordID = nil
-        }
+        let id = cachedDisplayRecords.indices.contains(selectedIndex) ? cachedDisplayRecords[selectedIndex].id : nil
+        if selectedRecordID != id { selectedRecordID = id }
     }
 
     /// Pre-warms the session history by loading cached records from SQLite in the background
@@ -512,39 +455,45 @@ public final class AgentSessionHistoryModel: ObservableObject {
 
         let localCache = repoRootCache
 
-        filterTask = Task.detached(priority: .userInitiated) { [weak self] in
+        filterTask = Task(priority: .userInitiated) { [weak self] in
             if debounceMs > 0 {
                 try? await Task.sleep(nanoseconds: debounceMs * 1_000_000)
             }
-            if Task.isCancelled { return }
+            guard !Task.isCancelled else { return }
 
-            let state = historySignposter.beginInterval("computeFiltered")
-            let (filtered, newCache, snippets, matchLocations, semanticIDs, metadata, hydratedIDs, searchableCount) = Self.computeFiltered(
-                query: currentQuery,
-                scope: currentScope,
-                selectedAgents: currentAgents,
-                records: currentRecords,
-                activeCWD: activeCWD,
-                workspaceCWDs: workspaceCWDs,
-                resolver: resolver,
-                initialCache: localCache
-            )
-            historySignposter.endInterval("computeFiltered", state)
-
-            if Task.isCancelled { return }
-
-            await MainActor.run { [weak self] in
-                guard let self, !Task.isCancelled else { return }
-                self.repoRootCache = newCache
-                self.isSearching = false
-                self.searchSnippets = snippets
-                self.searchMetadata = metadata
-                self.hydratedEvidenceIDs = hydratedIDs
-                self.searchMatchLocations = matchLocations
-                self.semanticMatchIDs = semanticIDs
-                self.searchableRecordsCount = searchableCount
-                self.filteredRecords = filtered
+            // Start on the main actor so synchronous filter changes can coalesce
+            // before any worktree resolution starts on the background executor.
+            let worker = Task.detached(priority: .userInitiated) {
+                let state = historySignposter.beginInterval("computeFiltered")
+                defer { historySignposter.endInterval("computeFiltered", state) }
+                return Self.computeFiltered(
+                    query: currentQuery,
+                    scope: currentScope,
+                    selectedAgents: currentAgents,
+                    records: currentRecords,
+                    activeCWD: activeCWD,
+                    workspaceCWDs: workspaceCWDs,
+                    resolver: resolver,
+                    initialCache: localCache
+                )
             }
+            let (filtered, newCache, snippets, matchLocations, semanticIDs, metadata, hydratedIDs, searchableCount) =
+                await withTaskCancellationHandler {
+                    await worker.value
+                } onCancel: {
+                    worker.cancel()
+                }
+
+            guard let self, !Task.isCancelled else { return }
+            self.repoRootCache = newCache
+            self.isSearching = false
+            self.searchSnippets = snippets
+            self.searchMetadata = metadata
+            self.hydratedEvidenceIDs = hydratedIDs
+            self.searchMatchLocations = matchLocations
+            self.semanticMatchIDs = semanticIDs
+            self.searchableRecordsCount = searchableCount
+            self.filteredRecords = filtered
         }
     }
 
@@ -581,37 +530,36 @@ public final class AgentSessionHistoryModel: ObservableObject {
         var cache = initialCache
         func resolveRoot(for path: String) -> String {
             if let cached = cache[path] { return cached }
-            if let cached = RepoRootCache.shared.get(path) {
-                cache[path] = cached
-                return cached
-            }
-            let root = resolver(path) ?? path
+            let root = resolveProjectRoot(path, resolver: resolver)
             cache[path] = root
-            RepoRootCache.shared.set(root, for: path)
             return root
         }
 
-        let activeRepoRoot = activeCWD.isEmpty ? "" : resolveRoot(for: activeCWD)
-        let workspaceRepoRoots = Set(workspaceCWDs.filter { !$0.isEmpty }.map(resolveRoot))
+        let activeRepoRoot = activeCWD.isEmpty ? nil : resolveRoot(for: activeCWD)
+        let workspacePaths = ([activeCWD] + workspaceCWDs).filter { !$0.isEmpty }
+        let workspaceRepoRoots = scope == .workspace ? Set(workspacePaths.map(resolveRoot)) : []
         let scopedRecords = baseRecords.filter { record in
+            guard !Task.isCancelled else { return false }
+            let projectRoot = resolveRoot(for: record.projectPath)
             switch scope {
             case .all:
                 return true
             case .workspace:
-                guard !workspaceRepoRoots.isEmpty else { return false }
-                return workspaceRepoRoots.contains(resolveRoot(for: record.projectPath))
+                return workspaceRepoRoots.contains(projectRoot)
             case .repo:
-                guard !activeRepoRoot.isEmpty else { return false }
-                if record.projectPath == activeRepoRoot || record.projectPath.hasPrefix(activeRepoRoot + "/") {
-                    return true
-                }
-                return resolveRoot(for: record.projectPath) == activeRepoRoot
+                return projectRoot == activeRepoRoot
+            }
+        }
+        for record in scopedRecords {
+            if Task.isCancelled { break }
+            for turn in record.latestTurns {
+                if let path = turn.projectPath { _ = resolveRoot(for: path) }
             }
         }
         let matcher = SearchMatcher(query: query)
 
         // Search respects the same repo and agent filters as the unfiltered list.
-        if matcher.hasQuery {
+        if matcher.hasQuery && !Task.isCancelled {
             let hits = AgentHistorySearch.rank(query: query, records: scopedRecords)
             var snippets: [String: String] = [:]
             var matchLocations: [String: AgentSessionRecord.MatchLocationInfo] = [:]
@@ -640,7 +588,11 @@ public final class AgentSessionHistoryModel: ObservableObject {
             return (hits.map(\.record), cache, snippets, matchLocations, semanticMatchIDs, metadata, Set(hits.prefix(50).map { $0.record.id }), scopedRecords.count)
         }
 
-        return (scopedRecords, cache, [:], [:], [], [:], [], scopedRecords.count)
+        let newestFirst = scopedRecords.sorted {
+            if $0.updatedAt == $1.updatedAt { return $0.id < $1.id }
+            return $0.updatedAt > $1.updatedAt
+        }
+        return (newestFirst, cache, [:], [:], [], [:], [], scopedRecords.count)
     }
 
     /// Fetch evidence only when a result outside the initial screen becomes visible.
@@ -692,16 +644,16 @@ public final class AgentSessionHistoryModel: ObservableObject {
     /// When search is active, the 14-day window is ignored completely.
     /// When empty query, always at least the last 14 days, plus whatever extra batches "Load More" revealed.
     public var windowedRecords: [AgentSessionRecord] {
-        cachedWindowedRecords
+        cachedDisplayRecords
     }
 
     public var hasMoreToLoad: Bool {
         guard searchQuery.isEmpty else { return false }
-        return cachedWindowedRecords.count < filteredRecords.count
+        return cachedDisplayRecords.count < filteredRecords.count
     }
 
     public func loadMore() {
-        extraRecordsShown = cachedWindowedRecords.count + loadMoreBatchSize
+        extraRecordsShown = cachedDisplayRecords.count + loadMoreBatchSize
     }
 
     /// Flat list of currently displayed records in section order
@@ -714,7 +666,7 @@ public final class AgentSessionHistoryModel: ObservableObject {
         return cachedDisplayRecords[selectedIndex]
     }
 
-    public var groupedRecords: [(title: String, records: [AgentSessionRecord])] {
+    public var groupedRecords: [Section] {
         cachedGroupedRecords
     }
 }
